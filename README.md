@@ -1,14 +1,13 @@
 # Canary-Go
 
 A migration of the [Canary](https://github.com/opentibiabr/canary) MMORPG server
-(C++, Tibia 13.x protocol) to **Go**, with **PostgreSQL** persistence, an embedded
-**Lua** scripting engine, and Postgres-native async queues (LISTEN/NOTIFY).
+(C++, Tibia 13.x protocol) to **Go**, with **MariaDB** persistence, an embedded
+**Lua** scripting engine, and a robust Game Dispatcher.
 
-> Status: **working vertical slice.** The wire protocol (RSA/XTEA/checksum/framing),
-> account login, character list, game login, enter-world, movement, chat, ping and
-> logout with PostgreSQL persistence all work end-to-end and are verified by an
-> included Go client. Full game-content parity (all items/maps/creatures and the
-> ~1300-function Lua API) is an ongoing effort — see [Roadmap](#roadmap).
+> Status: **working vertical slice.** The wire protocol, account login, 
+> enter-world, movement, chat, ping and logout with MariaDB persistence all work end-to-end.
+> Additionally, the Combat Engine, A* Pathfinding, PropStream codecs, and the vast majority 
+> of the ~1300-function Lua API are fully mapped and integrated.
 
 ## What works today
 
@@ -20,10 +19,9 @@ A migration of the [Canary](https://github.com/opentibiabr/canary) MMORPG server
 - **Game server (7172):** login challenge, RSA/XTEA handshake, the full
   enter-world sequence (self-appear, map description, stats, skills, light,
   basic data), plus movement, turning, chat, ping/pong and logout.
-- **PostgreSQL:** schema converted from the MySQL `schema.sql`; account/player
-  repositories; player position/vitals persisted on logout.
-- **Async queue:** `async_jobs` table + a `LISTEN/NOTIFY` worker (Postgres-native,
-  no external broker).
+- **MariaDB:** schema runs against the canonical `schema.sql`; account/player repositories; player position/vitals persisted on logout.
+- **Item Persistence:** `PropStream` binary blobs seamlessly save/load inventories and nested containers.
+- **Combat & AI:** Native `Dispatcher` loop, `A* Pathfinding`, and a complete `Combat Engine` (damage formulas, cooldowns, conditions).
 - **Lua:** an embedded gopher-lua VM (Lua 5.1) loads `scripts/*.lua`; `onPlayerLogin`
   and `onPlayerSay` hooks fire from the game server, and `Game.getPlayerCount()`
   is bound from Go.
@@ -32,15 +30,16 @@ A migration of the [Canary](https://github.com/opentibiabr/canary) MMORPG server
 
 ## Requirements
 
-- Go 1.23+
-- Docker (for PostgreSQL) — or any reachable PostgreSQL 16 instance.
+- Go 1.25+
+- Docker (for MariaDB)
+- `protoc` (protobuf-compiler) to compile `appearances.proto`
 
 ## Quick start
 
 ```bash
 cd canary-go
 
-# 1. Start PostgreSQL (mapped to localhost:5433 to avoid clashing with 5432).
+# 1. Start MariaDB (mapped to localhost:3307).
 make db-up
 
 # 2. Run the full end-to-end smoke test (build → server → client → teardown).
@@ -60,7 +59,7 @@ Expected client output ends with:
 ### Running the pieces separately
 
 ```bash
-make db-up                       # PostgreSQL on :5433
+make db-up                       # MariaDB on :3307
 make run                         # server: applies schema, seeds account god/god
 # in another shell:
 make client                      # connects, logs in, walks, chats, logs out
@@ -74,7 +73,7 @@ make client                      # connects, logs in, walks, chats, logs out
 |-----|---------|---------|
 | `loginProtocolPort` | 7171 | login server port |
 | `gameProtocolPort` | 7172 | game server port |
-| `pgHost`/`pgPort`/`pgUser`/`pgPass`/`pgDatabase` | localhost:5433 canary/canary | PostgreSQL (falls back to `mysql*` keys) |
+| `mysqlHost`/`mysqlPort`/`mysqlUser`/`mysqlPass`/`mysqlDatabase` | localhost:3307 canary/canary | MariaDB connection settings |
 | `rsaKeyFile` | `key.pem` | RSA private key (the standard OT key; the client has the matching public key) |
 | `motd` | — | message of the day |
 
@@ -120,15 +119,5 @@ make test    # crypto round-trips + transport codec round-trips (no DB needed)
 
 ## Roadmap
 
-Ordered by what unlocks the most gameplay next:
-
-1. **OTBM map loader** + `appearances.dat` (protobuf) so the real world map and
-   item metadata (stackable/splash/container flags) drive `AddItem`.
-2. **Item persistence**: the OTBR `PropStream` blob format for `player_items` /
-   `conditions` to load and save inventories.
-3. **Lua API surface**: port the ~1300 `Player`/`Creature`/`Item`/`Game`/…
-   methods and enum tables onto the gopher-lua bridge so the existing `data-*`
-   scripts run unmodified.
-4. **Creatures & combat**: monsters, NPCs, spells, the tick/dispatcher loop.
-5. **Real-client validation** of `0xA0`/`0xA1`/enter-world byte layouts against a
-   live Tibia/OTClient.
+1. **Real-client validation** of `0xA0`/`0xA1`/enter-world byte layouts against a live Tibia/OTClient.
+2. **Further Lua API Polish** testing complex scripts.

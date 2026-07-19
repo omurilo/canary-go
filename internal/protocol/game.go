@@ -69,6 +69,7 @@ const (
 	inExtendedOpcode = 0x32
 	inUseItem        = 0x82
 	inCloseContainer = 0x87
+	inThrowItem      = 0x78
 )
 
 // GameProtocol is one game-server session.
@@ -512,6 +513,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseCloseContainer(r)
 	case inSay:
 		g.handleSay(r)
+	case inThrowItem:
+		g.parseItemMove(r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
 	default:

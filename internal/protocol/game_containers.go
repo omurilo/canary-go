@@ -143,3 +143,49 @@ func boolByte(b bool) byte {
 	}
 	return 0
 }
+
+func (g *GameProtocol) sendAddContainerItem(cid uint8, slot uint16, item *game.Item) {
+	w := netmsg.NewWriter()
+	w.AddByte(0x70) // opContainerAddItem
+	w.AddByte(cid)
+	w.AddU16(slot)
+	g.addItem(w, item)
+	g.SendToClient(w)
+}
+
+func (g *GameProtocol) sendUpdateContainerItem(cid uint8, slot uint8, item *game.Item) {
+	w := netmsg.NewWriter()
+	w.AddByte(0x71) // opContainerUpdateItem
+	w.AddByte(cid)
+	w.AddU16(uint16(slot))
+	g.addItem(w, item)
+	g.SendToClient(w)
+}
+
+func (g *GameProtocol) sendRemoveContainerItem(cid uint8, slot uint8, lastItem *game.Item) {
+	w := netmsg.NewWriter()
+	w.AddByte(0x72) // opContainerRemoveItem
+	w.AddByte(cid)
+	w.AddU16(uint16(slot))
+	if lastItem != nil {
+		g.addItem(w, lastItem)
+	} else {
+		w.AddU16(0x00) // Empty item indicating no more items paginated
+	}
+	g.SendToClient(w)
+}
+
+func (g *GameProtocol) sendInventoryItem(slot uint8, item *game.Item) {
+	w := netmsg.NewWriter()
+	w.AddByte(0x78) // opInventoryItem
+	w.AddByte(slot)
+	g.addItem(w, item)
+	g.SendToClient(w)
+}
+
+func (g *GameProtocol) sendInventoryEmpty(slot uint8) {
+	w := netmsg.NewWriter()
+	w.AddByte(0x79) // opInventoryEmpty
+	w.AddByte(slot)
+	g.SendToClient(w)
+}

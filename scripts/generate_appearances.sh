@@ -5,7 +5,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 CANARY_GO_DIR="$DIR/.."
 CANARY_DIR="$DIR/../.."
 
-PROTO_DIR="$CANARY_DIR/src/protobuf"
+PROTO_DIR="$CANARY_GO_DIR/protobuf"
 OUT_DIR="$CANARY_GO_DIR/internal/protobuf/appearances"
 
 mkdir -p "$OUT_DIR"
