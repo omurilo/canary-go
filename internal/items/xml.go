@@ -1,8 +1,10 @@
 package items
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -49,7 +51,11 @@ func (c *Catalog) LoadXML(path string) error {
 	}
 
 	var root xmlItems
-	if err := xml.Unmarshal(data, &root); err != nil {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+		return input, nil
+	}
+	if err := decoder.Decode(&root); err != nil {
 		return fmt.Errorf("items xml: unmarshal: %w", err)
 	}
 
