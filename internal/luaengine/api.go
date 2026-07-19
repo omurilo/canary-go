@@ -40,6 +40,14 @@ func (e *Engine) registerAPI() {
 		return 0
 	}))
 	L.SetGlobal("logger", logger)
+
+	e.registerItem()
+	e.registerContainer()
+	e.registerCreatureType()
+	e.registerPlayerType()
+	e.registerMonsterType()
+	e.registerNpcType()
+	e.registerGame()
 }
 
 // SetGameFunc registers a Go function as a field on the global Game table.

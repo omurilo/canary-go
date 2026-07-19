@@ -1,0 +1,315 @@
+package luaengine
+
+import (
+	lua "github.com/yuin/gopher-lua"
+)
+
+// registerMonsterType registers the Monster userdata type.
+func (e *Engine) registerMonsterType() {
+	mt := e.L.NewTypeMetatable("Monster")
+	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), monsterMethods))
+}
+
+var monsterMethods = map[string]lua.LGFunction{
+	"isMonster": monsterIsmonster,
+	"getType": monsterGettype,
+	"setType": monsterSettype,
+	"getSpawnPosition": monsterGetspawnposition,
+	"isInSpawnRange": monsterIsinspawnrange,
+	"isIdle": monsterIsidle,
+	"setIdle": monsterSetidle,
+	"isTarget": monsterIstarget,
+	"isOpponent": monsterIsopponent,
+	"isFriend": monsterIsfriend,
+	"addFriend": monsterAddfriend,
+	"removeFriend": monsterRemovefriend,
+	"getFriendList": monsterGetfriendlist,
+	"getFriendCount": monsterGetfriendcount,
+	"addTarget": monsterAddtarget,
+	"removeTarget": monsterRemovetarget,
+	"getTargetList": monsterGettargetlist,
+	"getTargetCount": monsterGettargetcount,
+	"changeTargetDistance": monsterChangetargetdistance,
+	"isChallenged": monsterIschallenged,
+	"selectTarget": monsterSelecttarget,
+	"searchTarget": monsterSearchtarget,
+	"setSpawnPosition": monsterSetspawnposition,
+	"getRespawnType": monsterGetrespawntype,
+	"getTimeToChangeFiendish": monsterGettimetochangefiendish,
+	"setTimeToChangeFiendish": monsterSettimetochangefiendish,
+	"getMonsterForgeClassification": monsterGetmonsterforgeclassification,
+	"setMonsterForgeClassification": monsterSetmonsterforgeclassification,
+	"getForgeStack": monsterGetforgestack,
+	"setForgeStack": monsterSetforgestack,
+	"configureForgeSystem": monsterConfigureforgesystem,
+	"clearFiendishStatus": monsterClearfiendishstatus,
+	"isForgeable": monsterIsforgeable,
+	"getName": monsterGetname,
+	"setName": monsterSetname,
+	"hazard": monsterHazard,
+	"hazardCrit": monsterHazardcrit,
+	"hazardDodge": monsterHazarddodge,
+	"hazardDamageBoost": monsterHazarddamageboost,
+	"hazardDefenseBoost": monsterHazarddefenseboost,
+	"soulPit": monsterSoulpit,
+	"addReflectElement": monsterAddreflectelement,
+	"addDefense": monsterAdddefense,
+	"getDefense": monsterGetdefense,
+	"isDead": monsterIsdead,
+	"immune": monsterImmune,
+	"criticalChance": monsterCriticalchance,
+	"criticalDamage": monsterCriticaldamage,
+	"addAttackSpell": monsterAddattackspell,
+	"addDefenseSpell": monsterAdddefensespell,
+}
+
+func monsterAddattackspell(L *lua.LState) int {
+	// TODO: implement addAttackSpell
+	return 0
+}
+
+func monsterAdddefense(L *lua.LState) int {
+	// TODO: implement addDefense
+	return 0
+}
+
+func monsterAdddefensespell(L *lua.LState) int {
+	// TODO: implement addDefenseSpell
+	return 0
+}
+
+func monsterAddfriend(L *lua.LState) int {
+	// TODO: implement addFriend
+	return 0
+}
+
+func monsterAddreflectelement(L *lua.LState) int {
+	// TODO: implement addReflectElement
+	return 0
+}
+
+func monsterAddtarget(L *lua.LState) int {
+	// TODO: implement addTarget
+	return 0
+}
+
+func monsterChangetargetdistance(L *lua.LState) int {
+	// TODO: implement changeTargetDistance
+	return 0
+}
+
+func monsterClearfiendishstatus(L *lua.LState) int {
+	// TODO: implement clearFiendishStatus
+	return 0
+}
+
+func monsterConfigureforgesystem(L *lua.LState) int {
+	// TODO: implement configureForgeSystem
+	return 0
+}
+
+func monsterCriticalchance(L *lua.LState) int {
+	// TODO: implement criticalChance
+	return 0
+}
+
+func monsterCriticaldamage(L *lua.LState) int {
+	// TODO: implement criticalDamage
+	return 0
+}
+
+func monsterGetdefense(L *lua.LState) int {
+	// TODO: implement getDefense
+	return 0
+}
+
+func monsterGetforgestack(L *lua.LState) int {
+	// TODO: implement getForgeStack
+	return 0
+}
+
+func monsterGetfriendcount(L *lua.LState) int {
+	// TODO: implement getFriendCount
+	return 0
+}
+
+func monsterGetfriendlist(L *lua.LState) int {
+	// TODO: implement getFriendList
+	return 0
+}
+
+func monsterGetmonsterforgeclassification(L *lua.LState) int {
+	// TODO: implement getMonsterForgeClassification
+	return 0
+}
+
+func monsterGetname(L *lua.LState) int {
+	// TODO: implement getName
+	return 0
+}
+
+func monsterGetrespawntype(L *lua.LState) int {
+	// TODO: implement getRespawnType
+	return 0
+}
+
+func monsterGetspawnposition(L *lua.LState) int {
+	// TODO: implement getSpawnPosition
+	return 0
+}
+
+func monsterGettargetcount(L *lua.LState) int {
+	// TODO: implement getTargetCount
+	return 0
+}
+
+func monsterGettargetlist(L *lua.LState) int {
+	// TODO: implement getTargetList
+	return 0
+}
+
+func monsterGettimetochangefiendish(L *lua.LState) int {
+	// TODO: implement getTimeToChangeFiendish
+	return 0
+}
+
+func monsterGettype(L *lua.LState) int {
+	// TODO: implement getType
+	return 0
+}
+
+func monsterHazard(L *lua.LState) int {
+	// TODO: implement hazard
+	return 0
+}
+
+func monsterHazardcrit(L *lua.LState) int {
+	// TODO: implement hazardCrit
+	return 0
+}
+
+func monsterHazarddamageboost(L *lua.LState) int {
+	// TODO: implement hazardDamageBoost
+	return 0
+}
+
+func monsterHazarddefenseboost(L *lua.LState) int {
+	// TODO: implement hazardDefenseBoost
+	return 0
+}
+
+func monsterHazarddodge(L *lua.LState) int {
+	// TODO: implement hazardDodge
+	return 0
+}
+
+func monsterImmune(L *lua.LState) int {
+	// TODO: implement immune
+	return 0
+}
+
+func monsterIschallenged(L *lua.LState) int {
+	// TODO: implement isChallenged
+	return 0
+}
+
+func monsterIsdead(L *lua.LState) int {
+	// TODO: implement isDead
+	return 0
+}
+
+func monsterIsforgeable(L *lua.LState) int {
+	// TODO: implement isForgeable
+	return 0
+}
+
+func monsterIsfriend(L *lua.LState) int {
+	// TODO: implement isFriend
+	return 0
+}
+
+func monsterIsidle(L *lua.LState) int {
+	// TODO: implement isIdle
+	return 0
+}
+
+func monsterIsinspawnrange(L *lua.LState) int {
+	// TODO: implement isInSpawnRange
+	return 0
+}
+
+func monsterIsmonster(L *lua.LState) int {
+	// TODO: implement isMonster
+	return 0
+}
+
+func monsterIsopponent(L *lua.LState) int {
+	// TODO: implement isOpponent
+	return 0
+}
+
+func monsterIstarget(L *lua.LState) int {
+	// TODO: implement isTarget
+	return 0
+}
+
+func monsterRemovefriend(L *lua.LState) int {
+	// TODO: implement removeFriend
+	return 0
+}
+
+func monsterRemovetarget(L *lua.LState) int {
+	// TODO: implement removeTarget
+	return 0
+}
+
+func monsterSearchtarget(L *lua.LState) int {
+	// TODO: implement searchTarget
+	return 0
+}
+
+func monsterSelecttarget(L *lua.LState) int {
+	// TODO: implement selectTarget
+	return 0
+}
+
+func monsterSetforgestack(L *lua.LState) int {
+	// TODO: implement setForgeStack
+	return 0
+}
+
+func monsterSetidle(L *lua.LState) int {
+	// TODO: implement setIdle
+	return 0
+}
+
+func monsterSetmonsterforgeclassification(L *lua.LState) int {
+	// TODO: implement setMonsterForgeClassification
+	return 0
+}
+
+func monsterSetname(L *lua.LState) int {
+	// TODO: implement setName
+	return 0
+}
+
+func monsterSetspawnposition(L *lua.LState) int {
+	// TODO: implement setSpawnPosition
+	return 0
+}
+
+func monsterSettimetochangefiendish(L *lua.LState) int {
+	// TODO: implement setTimeToChangeFiendish
+	return 0
+}
+
+func monsterSettype(L *lua.LState) int {
+	// TODO: implement setType
+	return 0
+}
+
+func monsterSoulpit(L *lua.LState) int {
+	// TODO: implement soulPit
+	return 0
+}
+

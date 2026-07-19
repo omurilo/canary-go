@@ -62,6 +62,11 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 			p.Pos = temple
 		}
 	}
+
+	if err := d.LoadPlayerItems(ctx, p); err != nil {
+		return nil, err
+	}
+
 	return p, nil
 }
 
@@ -82,7 +87,11 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		p.Outfit.Feet, p.Outfit.Addons,
 		p.DBID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return d.SavePlayerItems(ctx, p)
 }
 
 // TownTemple returns the temple position of a town.
