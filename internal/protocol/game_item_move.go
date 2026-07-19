@@ -61,27 +61,43 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			toSlot := uint8(toPos.Y)
 			if toSlot > 0 && toSlot <= 10 && it != nil {
 				valid := false
-				if it.SlotPosition != "" {
-					switch toSlot {
-					case 1: valid = (it.SlotPosition == "head")
-					case 2: valid = (it.SlotPosition == "necklace")
-					case 3: valid = (it.SlotPosition == "backpack")
-					case 4: valid = (it.SlotPosition == "body")
-					case 5, 6:
-						valid = (it.SlotPosition == "two-handed" || it.SlotPosition == "right-hand" || it.SlotPosition == "left-hand" || it.WeaponType == "shield" || it.WeaponType == "sword" || it.WeaponType == "club" || it.WeaponType == "axe" || it.WeaponType == "wand" || it.WeaponType == "distance" || it.WeaponType == "ammunition" || it.WeaponType == "ammo")
-					case 7: valid = (it.SlotPosition == "legs")
-					case 8: valid = (it.SlotPosition == "feet")
-					case 9: valid = (it.SlotPosition == "ring")
-					case 10: valid = (it.SlotPosition == "ammo" || it.WeaponType == "ammo" || it.WeaponType == "ammunition")
-					}
-				} else {
-					if toSlot == 3 || toSlot == 5 || toSlot == 6 || toSlot == 10 {
-						valid = true
-					}
-				}
+				if it.SlotPosition == "head" && toSlot == 1 { valid = true }
+				if it.SlotPosition == "necklace" && toSlot == 2 { valid = true }
+				if it.SlotPosition == "backpack" && toSlot == 3 { valid = true }
+				if it.SlotPosition == "body" && toSlot == 4 { valid = true }
+				if (toSlot == 5 || toSlot == 6) && (it.SlotPosition == "two-handed" || it.SlotPosition == "right-hand" || it.SlotPosition == "left-hand" || it.WeaponType != "") { valid = true }
+				if it.SlotPosition == "legs" && toSlot == 7 { valid = true }
+				if it.SlotPosition == "feet" && toSlot == 8 { valid = true }
+				if it.SlotPosition == "ring" && toSlot == 9 { valid = true }
+				if (it.SlotPosition == "ammo" || it.WeaponType == "ammunition" || it.WeaponType == "ammo") && toSlot == 10 { valid = true }
+
 				if !valid {
-					g.sendStatusText("You cannot dress this object there.")
-					return
+					// Check if there is a container in the slot. If so, redirect to it.
+					if existing := g.player.Inventory[toSlot]; existing != nil {
+						if existingType := g.deps.Items.Get(existing.ID); existingType != nil && existingType.IsContainer() {
+							// Find open container ID
+							foundCid := -1
+							for cid, cont := range g.containers {
+								if cont == existing {
+									foundCid = int(cid)
+									break
+								}
+							}
+							if foundCid != -1 {
+								// Redirect to open container
+								toPos = netmsg.Position{X: 0xFFFF, Y: uint16(0x40 + foundCid), Z: 0}
+							} else {
+								g.sendStatusText("You cannot dress this object there.")
+								return
+							}
+						} else {
+							g.sendStatusText("You cannot dress this object there.")
+							return
+						}
+					} else {
+						g.sendStatusText("You cannot dress this object there.")
+						return
+					}
 				}
 			}
 		}
