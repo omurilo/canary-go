@@ -19,7 +19,9 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/config"
 	"github.com/opentibiabr/canary-go/internal/db"
+	"github.com/opentibiabr/canary-go/internal/events"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/game/spawns"
 	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/luaengine"
 	"github.com/opentibiabr/canary-go/internal/network"
@@ -115,6 +117,9 @@ func run(o runOpts, log *slog.Logger) error {
 
 	// World: real OTBM map if provided, else a synthetic spawn field.
 	world := game.NewWorld()
+	spawnEngine := game.NewSpawnEngine(world)
+	aiEngine := game.NewAIEngine(world)
+
 	var spawn game.Position
 	if o.mapFile != "" {
 		if catalog == nil {
@@ -126,6 +131,16 @@ func run(o runOpts, log *slog.Logger) error {
 		}
 		log.Info("loaded OTBM map", "file", o.mapFile, "tiles", res.TileCount,
 			"items", res.ItemCount, "towns", len(res.Towns))
+		
+		// Parse spawn file
+		spawnFile := strings.TrimSuffix(o.mapFile, filepath.Ext(o.mapFile)) + "-spawn.xml"
+		if spawnsData, err := spawns.LoadSpawnFile(spawnFile); err == nil {
+			spawnEngine.LoadSpawns(spawnsData)
+			log.Info("loaded spawns", "file", spawnFile, "spawns", len(spawnsData.Spawns))
+		} else {
+			log.Warn("spawn file not loaded", "file", spawnFile, "err", err)
+		}
+
 		for _, t := range res.Towns {
 			world.Towns[strings.ToLower(t.Name)] = t.Pos
 		}
@@ -145,6 +160,9 @@ func run(o runOpts, log *slog.Logger) error {
 	}
 	world.DefaultSpawn = spawn
 
+	spawnEngine.Start()
+	aiEngine.Start()
+
 	// Lua engine.
 	lengine := luaengine.New(world, log)
 	defer lengine.Close()
@@ -156,8 +174,10 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Warn("loading scripts", "err", err)
 	}
 
+	eventsEngine := events.New(lengine, log)
+
 	deps := &protocol.Deps{
-		Cfg: cfg, DB: database, RSA: rsa, World: world, Items: catalog, Lua: lengine, Log: log,
+		Cfg: cfg, DB: database, RSA: rsa, World: world, Items: catalog, Lua: lengine, Events: eventsEngine, Log: log,
 	}
 
 	// Async job worker (PostgreSQL LISTEN/NOTIFY queue).

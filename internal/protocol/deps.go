@@ -7,6 +7,7 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/config"
 	"github.com/opentibiabr/canary-go/internal/db"
+	"github.com/opentibiabr/canary-go/internal/events"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/luaengine"
@@ -25,7 +26,8 @@ type Deps struct {
 	DB    *db.DB
 	RSA   *tibcrypto.RSA
 	World *game.World
-	Items *items.Catalog
-	Lua   *luaengine.Engine
-	Log   *slog.Logger
+	Items  *items.Catalog
+	Lua    *luaengine.Engine
+	Events *events.Engine
+	Log    *slog.Logger
 }

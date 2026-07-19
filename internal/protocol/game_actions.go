@@ -411,6 +411,11 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 		return
 	}
 
+	if g.deps.Events != nil {
+		g.deps.Events.OnLook(g.player, item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, 0)
+		return
+	}
+
 	name := "an item of type " + fmt.Sprint(spriteID)
 	if t := g.deps.Items.Get(spriteID); t != nil && t.Name != "" {
 		name = t.Name

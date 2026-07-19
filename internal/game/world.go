@@ -18,9 +18,10 @@ type World struct {
 	// Towns maps a lowercased town name to its temple position (from the OTBM).
 	Towns map[string]Position
 
-	mu      sync.RWMutex
-	players map[uint32]*Player
-	byName  map[string]*Player
+	mu        sync.RWMutex
+	players   map[uint32]*Player
+	byName    map[string]*Player
+	creatures map[uint32]Creature
 
 	nextCreatureID atomic.Uint32
 }
@@ -28,10 +29,11 @@ type World struct {
 // NewWorld creates an empty world with a fresh map.
 func NewWorld() *World {
 	w := &World{
-		Map:     NewMap(),
-		Towns:   make(map[string]Position),
-		players: make(map[uint32]*Player),
-		byName:  make(map[string]*Player),
+		Map:       NewMap(),
+		Towns:     make(map[string]Position),
+		players:   make(map[uint32]*Player),
+		byName:    make(map[string]*Player),
+		creatures: make(map[uint32]Creature),
 	}
 	w.nextCreatureID.Store(0x10000000) // player creature ids start high, like TFS
 	return w
@@ -57,6 +59,17 @@ func (w *World) Players() []*Player {
 	out := make([]*Player, 0, len(w.players))
 	for _, p := range w.players {
 		out = append(out, p)
+	}
+	return out
+}
+
+// Creatures returns a snapshot of all non-player creatures.
+func (w *World) Creatures() []Creature {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	out := make([]Creature, 0, len(w.creatures))
+	for _, c := range w.creatures {
+		out = append(out, c)
 	}
 	return out
 }
@@ -96,6 +109,33 @@ func (w *World) PlayerByID(id uint32) *Player {
 	return w.players[id]
 }
 
+// CreatureByID returns a creature or nil.
+func (w *World) CreatureByID(id uint32) Creature {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if c, ok := w.creatures[id]; ok {
+		return c
+	}
+	if p, ok := w.players[id]; ok {
+		return p
+	}
+	return nil
+}
+
+// AddCreature adds a non-player creature to the world.
+func (w *World) AddCreature(c Creature) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.creatures[c.GetID()] = c
+}
+
+// RemoveCreature removes a non-player creature from the world.
+func (w *World) RemoveCreature(id uint32) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	delete(w.creatures, id)
+}
+
 // OnlineCount returns the number of connected players.
 func (w *World) OnlineCount() int {
 	w.mu.RLock()
@@ -120,7 +160,7 @@ func (w *World) Spectators(pos Position, excludeID uint32) []*Player {
 	return out
 }
 
-// TryMove validates and applies a directional step, returning the new position
+// TryMove validates and applies a directional step for a player, returning the new position
 // and whether the move succeeded.
 func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 	dest := p.Pos.Offset(dir)
@@ -130,6 +170,20 @@ func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 	w.mu.Lock()
 	p.Pos = dest
 	p.Direction = dir
+	w.mu.Unlock()
+	return dest, true
+}
+
+// TryMoveCreature validates and applies a directional step for any creature, returning the new position
+// and whether the move succeeded.
+func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
+	dest := c.GetPosition().Offset(dir)
+	if !w.Map.GetTile(dest).Walkable() {
+		return c.GetPosition(), false
+	}
+	w.mu.Lock()
+	c.SetPosition(dest)
+	c.SetDirection(dir)
 	w.mu.Unlock()
 	return dest, true
 }

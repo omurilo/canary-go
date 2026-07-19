@@ -10,6 +10,10 @@ type Creature interface {
 	GetTarget() Creature
 	SetTarget(target Creature)
 	ChangeTargetDistance(distance int32)
+	GetPosition() Position
+	SetPosition(pos Position)
+	GetDirection() Direction
+	SetDirection(dir Direction)
 }
 
 type BaseCreature struct {
@@ -18,6 +22,8 @@ type BaseCreature struct {
 	Health    uint32
 	MaxHealth uint32
 	Target    Creature
+	Pos       Position
+	Direction Direction
 }
 
 func (c *BaseCreature) GetID() uint32 { return c.ID }
@@ -50,3 +56,8 @@ func (c *BaseCreature) SetTarget(target Creature) { c.Target = target }
 func (c *BaseCreature) ChangeTargetDistance(distance int32) {
 	// Logic to change target distance
 }
+func (c *BaseCreature) GetPosition() Position { return c.Pos }
+func (c *BaseCreature) SetPosition(pos Position) { c.Pos = pos }
+func (c *BaseCreature) GetDirection() Direction { return c.Direction }
+func (c *BaseCreature) SetDirection(dir Direction) { c.Direction = dir }
+

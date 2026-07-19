@@ -113,3 +113,7 @@ func (p *Player) AddHealth(amount int32) {
 func (p *Player) GetTarget() Creature { return nil } // Stub for target
 func (p *Player) SetTarget(target Creature) {}
 func (p *Player) ChangeTargetDistance(distance int32) {}
+func (p *Player) GetPosition() Position { return p.Pos }
+func (p *Player) SetPosition(pos Position) { p.Pos = pos }
+func (p *Player) GetDirection() Direction { return p.Direction }
+func (p *Player) SetDirection(dir Direction) { p.Direction = dir }
