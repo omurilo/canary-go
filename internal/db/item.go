@@ -88,7 +88,7 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 		sid := sidCounter
 		sidCounter++
 
-		var attrs []byte
+		attrs := make([]byte, 0)
 		if len(item.Attributes) > 0 {
 			attrs = item.Attributes
 		}
