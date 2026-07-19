@@ -18,8 +18,27 @@ type xmlItem struct {
 }
 
 type xmlAttribute struct {
-	Key   string `xml:"key,attr"`
-	Value string `xml:"value,attr"`
+	Key        string         `xml:"key,attr"`
+	Value      string         `xml:"value,attr"`
+	Attributes []xmlAttribute `xml:"attribute"`
+}
+
+func processAttr(it *ItemType, attr xmlAttribute) {
+	switch attr.Key {
+	case "slotType":
+		it.SlotType = attr.Value
+	case "weaponType":
+		it.WeaponType = attr.Value
+	case "slot":
+		it.SlotPosition = attr.Value
+	case "floorchange":
+		it.FloorChange = attr.Value
+	case "forceuse":
+		it.ForceUse = (attr.Value == "1")
+	}
+	for _, child := range attr.Attributes {
+		processAttr(it, child)
+	}
 }
 
 // LoadXML merges items.xml attributes (like SlotPosition, SlotType, WeaponType) into the catalog.
@@ -50,18 +69,7 @@ func (c *Catalog) LoadXML(path string) error {
 				continue
 			}
 			for _, attr := range item.Attributes {
-				switch attr.Key {
-				case "slotType":
-					it.SlotType = attr.Value
-				case "weaponType":
-					it.WeaponType = attr.Value
-				case "slot":
-					it.SlotPosition = attr.Value
-				case "floorchange":
-					it.FloorChange = attr.Value
-				case "forceuse":
-					it.ForceUse = (attr.Value == "1")
-				}
+				processAttr(it, attr)
 			}
 		}
 	}

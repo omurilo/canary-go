@@ -118,6 +118,7 @@ func Load(path string) (*Catalog, error) {
 			it.WrapKit = f.GetWrapkit()
 			it.BlockSolid = f.GetUnpass()
 			it.Pickupable = f.GetTake()
+			it.ForceUse = f.GetForceuse()
 			switch {
 			case f.GetClip():
 				it.AlwaysOnTopOrder = 1

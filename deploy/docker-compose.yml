@@ -82,8 +82,8 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ../../ip.txt:/var/www/html/install/ip.txt
-      - ../../config.lua.dist:/var/www/html/config.lua
+      - ../ip.txt:/var/www/html/install/ip.txt
+      - ../../config.lua:/var/www/html/config.lua
       - ../../data:/var/www/html/data:ro
       - ../../data-canary:/var/www/html/data-canary:ro
       - ../../data-otservbr-global:/var/www/html/data-otservbr-global:ro
