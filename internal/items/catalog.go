@@ -1,0 +1,130 @@
+// Package items loads client item metadata from appearances.dat (the Tibia
+// protobuf appearance catalog) and exposes the flags the protocol and gameplay
+// need. Item ids here are CLIENT ids, which is what the OTBM map and the
+// AddItem wire encoding use in Canary 13.x.
+package items
+
+import (
+	"fmt"
+	"os"
+
+	"google.golang.org/protobuf/proto"
+
+	"github.com/opentibiabr/canary-go/internal/appproto"
+)
+
+// Group is the single-valued item group derived from the appearance flags,
+// following the C++ precedence: container > ground > fluid-container > splash.
+type Group uint8
+
+const (
+	GroupNone Group = iota
+	GroupContainer
+	GroupGround
+	GroupFluid
+	GroupSplash
+)
+
+// ItemType holds the metadata needed to encode AddItem and drive basic gameplay.
+type ItemType struct {
+	ID    uint16
+	Name  string
+	Group Group
+
+	Stackable             bool
+	Podium                bool
+	UpgradeClassification uint8
+	Expire                bool
+	ExpireStop            bool
+	ClockExpire           bool
+	WearOut               bool
+	WrapKit               bool
+
+	GroundSpeed uint16
+	BlockSolid  bool // unpass: blocks walking
+	Pickupable  bool
+
+	// AlwaysOnTopOrder mirrors ItemType::alwaysOnTopOrder (items.cpp): clip=1,
+	// bottom=2, top=3, else 0. Items with order > 0 stack BELOW creatures on a
+	// tile (the "top items"); order 0 items stack above creatures ("down items").
+	AlwaysOnTopOrder uint8
+}
+
+// AlwaysOnTop reports whether the item stacks below creatures on a tile.
+func (t *ItemType) AlwaysOnTop() bool { return t.AlwaysOnTopOrder > 0 }
+
+func (t *ItemType) IsContainer() bool      { return t.Group == GroupContainer }
+func (t *ItemType) IsGround() bool         { return t.Group == GroupGround }
+func (t *ItemType) IsFluidContainer() bool { return t.Group == GroupFluid }
+func (t *ItemType) IsSplash() bool         { return t.Group == GroupSplash }
+
+// Catalog maps client item ids to their metadata.
+type Catalog struct {
+	byID map[uint16]*ItemType
+}
+
+// Get returns the item type or nil if unknown.
+func (c *Catalog) Get(id uint16) *ItemType {
+	if c == nil {
+		return nil
+	}
+	return c.byID[id]
+}
+
+// Len returns the number of loaded item types.
+func (c *Catalog) Len() int { return len(c.byID) }
+
+// Load parses an appearances.dat protobuf file into a Catalog.
+func Load(path string) (*Catalog, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("items: read %s: %w", path, err)
+	}
+	var app appproto.Appearances
+	if err := proto.Unmarshal(data, &app); err != nil {
+		return nil, fmt.Errorf("items: unmarshal appearances: %w", err)
+	}
+
+	cat := &Catalog{byID: make(map[uint16]*ItemType, len(app.GetObject()))}
+	for _, obj := range app.GetObject() {
+		if obj.GetId() == 0 || obj.GetId() > 0xFFFF {
+			continue
+		}
+		it := &ItemType{ID: uint16(obj.GetId()), Name: string(obj.GetName())}
+		if f := obj.GetFlags(); f != nil {
+			switch {
+			case f.GetContainer():
+				it.Group = GroupContainer
+			case f.GetBank() != nil:
+				it.Group = GroupGround
+				it.GroundSpeed = uint16(f.GetBank().GetWaypoints())
+			case f.GetLiquidcontainer():
+				it.Group = GroupFluid
+			case f.GetLiquidpool():
+				it.Group = GroupSplash
+			}
+			it.Stackable = f.GetCumulative()
+			it.Podium = f.GetShowOffSocket()
+			it.Expire = f.GetExpire()
+			it.ExpireStop = f.GetExpirestop()
+			it.ClockExpire = f.GetClockexpire()
+			it.WearOut = f.GetWearout()
+			it.WrapKit = f.GetWrapkit()
+			it.BlockSolid = f.GetUnpass()
+			it.Pickupable = f.GetTake()
+			switch {
+			case f.GetClip():
+				it.AlwaysOnTopOrder = 1
+			case f.GetTop():
+				it.AlwaysOnTopOrder = 3
+			case f.GetBottom():
+				it.AlwaysOnTopOrder = 2
+			}
+			if uc := f.GetUpgradeclassification(); uc != nil {
+				it.UpgradeClassification = uint8(uc.GetUpgradeClassification())
+			}
+		}
+		cat.byID[it.ID] = it
+	}
+	return cat, nil
+}

@@ -1,0 +1,121 @@
+# Canary-Go full stack — a single shared MariaDB serves the Go game server,
+# MyAAC (account panel) and the login-server (modern-client HTTP/JSON login).
+#
+#   docker compose up -d db          # just the database (used by `make smoke`)
+#   docker compose up -d             # database + canary-go game server
+#   docker compose --profile full up # + MyAAC (:8080) + login-server (:8088)
+#
+# MariaDB host port is 3307 to avoid clashing with a local MySQL on 3306.
+name: canary-go
+
+services:
+  db:
+    image: mariadb:11.4
+    container_name: canary-go-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: "${CANARY_DB_NAME:-canary}"
+      MARIADB_USER: "${CANARY_DB_USER:-canary}"
+      MARIADB_PASSWORD: "${CANARY_DB_PASSWORD:-canary}"
+      MARIADB_ROOT_PASSWORD: "${CANARY_DB_ROOT_PASSWORD:-root}"
+    ports:
+      - "3307:3306"
+    volumes:
+      - db-volume:/var/lib/mysql
+      # Canonical Canary schema so MyAAC/login-server find every table.
+      - ../../schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    # networks: [canary-net]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  canary-go:
+    build:
+      context: ..
+      dockerfile: ./Dockerfile
+    container_name: canary-go-server
+    restart: unless-stopped
+    environment:
+      # config.lua reads these via the mysql* keys; overriding here keeps the
+      # image generic. (canary-go also accepts the mysql* config.lua values.)
+      CANARY_DB_HOST: db
+    command: >
+      -config config.lua -schema schema/mysql.sql -scripts scripts -migrate -seed
+      -map /data-canary/world/canary.otbm
+    ports:
+      - "7171:7171"
+      - "7172:7172"
+    volumes:
+      - ../../data:/data:ro
+      - ../../data-canary:/data-canary:ro
+      - ../../data-otservbr-global:/data-otservbr-global:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    # networks: [canary-net]
+
+  myaac:
+    profiles: ["full"]
+    build:
+      context: ../../docker
+      dockerfile: quickstart/myaac/Dockerfile
+      args:
+        MYAAC_REF: "${MYAAC_REF:-develop}"
+    container_name: canary-go-myaac
+    restart: unless-stopped
+    environment:
+      CANARY_DB_HOST: db
+      CANARY_DB_PORT: "3306"
+      CANARY_DB_NAME: "${CANARY_DB_NAME:-canary}"
+      CANARY_DB_USER: "${CANARY_DB_USER:-canary}"
+      CANARY_DB_PASSWORD: "${CANARY_DB_PASSWORD:-canary}"
+      CANARY_SERVER_NAME: "${CANARY_SERVER_NAME:-Canary-Go}"
+      CANARY_SERVER_IP: "${CANARY_SERVER_IP:-0.0.0.0}"
+      CANARY_GAME_PORT: "7172"
+      CANARY_LOGIN_PORT: "7171"
+      MYAAC_ADMIN_ACCOUNT: "${MYAAC_ADMIN_ACCOUNT:-myaacadmin}"
+      MYAAC_ADMIN_PASSWORD: "${MYAAC_ADMIN_PASSWORD:-admin123}"
+      MYAAC_CLIENT_VERSION: "${MYAAC_CLIENT_VERSION:-1525}"
+      MYAAC_SITE_URL: "http://$CANARY_SERVER_IP:8080"
+    ports:
+      - "8080:80"
+    volumes:
+      - ../../ip.txt:/var/www/html/install/ip.txt
+      - ../../config.lua.dist:/var/www/html/config.lua
+      - ../../data:/var/www/html/data:ro
+      - ../../data-canary:/var/www/html/data-canary:ro
+      - ../../data-otservbr-global:/var/www/html/data-otservbr-global:ro
+
+    depends_on:
+      db:
+        condition: service_healthy
+    # networks: [canary-net]
+
+  login-server:
+    profiles: ["full"]
+    image: "${LOGIN_SERVER_IMAGE:-opentibiabr/login-server:latest}"
+    container_name: canary-go-login
+    restart: unless-stopped
+    environment:
+      LOGIN_HTTP_PORT: "8088"
+      LOGIN_GRPC_PORT: "9090"
+      MYSQL_HOST: db
+      MYSQL_PORT: "3306"
+      MYSQL_DBNAME: "${CANARY_DB_NAME:-canary}"
+      MYSQL_USER: "${CANARY_DB_USER:-canary}"
+      MYSQL_PASS: "${CANARY_DB_PASSWORD:-canary}"
+      SERVER_NAME: "${CANARY_SERVER_NAME:-Canary-Go}"
+      SERVER_IP: "${CANARY_SERVER_IP:-canary-go}"
+      SERVER_PORT: "7172"
+    ports:
+      - "8088:8088"
+      - "9090:9090"
+    depends_on:
+      db:
+        condition: service_healthy
+    # networks: [canary-net]
+
+volumes:
+  db-volume:
