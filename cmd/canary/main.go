@@ -142,7 +142,7 @@ func run(o runOpts, log *slog.Logger) error {
 	world.DefaultSpawn = spawn
 
 	// Lua engine.
-	lengine := luaengine.New(log)
+	lengine := luaengine.New(world, log)
 	defer lengine.Close()
 	lengine.SetGameFunc("getPlayerCount", func(L *lua.LState) int {
 		L.Push(lua.LNumber(world.OnlineCount()))

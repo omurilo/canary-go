@@ -1,0 +1,91 @@
+package luaengine
+
+import (
+	"github.com/opentibiabr/canary-go/internal/game"
+	lua "github.com/yuin/gopher-lua"
+)
+
+const tileTypeName = "Tile"
+
+func (e *Engine) registerTile() {
+	mt := e.L.NewTypeMetatable(tileTypeName)
+	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), e.tileMethods()))
+	e.L.SetGlobal("Tile", e.L.NewFunction(e.tileCreate))
+}
+
+func (e *Engine) tileCreate(L *lua.LState) int {
+	var pos game.Position
+	if L.GetTop() >= 3 {
+		x := L.CheckInt(1)
+		y := L.CheckInt(2)
+		z := L.CheckInt(3)
+		pos = game.Position{X: uint16(x), Y: uint16(y), Z: uint8(z)}
+	} else if L.GetTop() == 1 {
+		pos = checkPosition(L, 1)
+	} else {
+		L.ArgError(1, "Position or X, Y, Z expected")
+		return 0
+	}
+
+	tile := e.world.Map.GetTile(pos)
+	if tile == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	pushTile(L, tile, pos)
+	return 1
+}
+
+type luaTile struct {
+	tile *game.Tile
+	pos  game.Position
+}
+
+func pushTile(L *lua.LState, t *game.Tile, pos game.Position) {
+	if t == nil {
+		L.Push(lua.LNil)
+		return
+	}
+	ud := L.NewUserData()
+	ud.Value = luaTile{tile: t, pos: pos}
+	L.SetMetatable(ud, L.GetTypeMetatable(tileTypeName))
+	L.Push(ud)
+}
+
+func checkTile(L *lua.LState, n int) luaTile {
+	ud := L.CheckUserData(n)
+	if v, ok := ud.Value.(luaTile); ok {
+		return v
+	}
+	L.ArgError(n, "Tile expected")
+	return luaTile{}
+}
+
+func (e *Engine) tileMethods() map[string]lua.LGFunction {
+	return map[string]lua.LGFunction{
+		"isTile": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
+		"getPosition": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			pushPosition(L, t.pos)
+			return 1
+		},
+		"getItemByType": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			itemID := uint16(L.CheckInt(2))
+			
+			if t.tile.Ground != nil && t.tile.Ground.ID == itemID {
+				e.pushItem(L, t.tile.Ground)
+				return 1
+			}
+			for _, it := range t.tile.Items {
+				if it.ID == itemID {
+					e.pushItem(L, it)
+					return 1
+				}
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
+	}
+}

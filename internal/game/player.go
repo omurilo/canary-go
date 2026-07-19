@@ -84,3 +84,32 @@ func (p *Player) ensureDefaults() {
 		}
 	}
 }
+
+func (p *Player) GetID() uint32 { return p.ID }
+func (p *Player) GetName() string { return p.Name }
+func (p *Player) GetHealth() uint32 { return p.Health }
+func (p *Player) SetHealth(health uint32) {
+	p.Health = health
+	if p.Health > p.MaxHealth {
+		p.Health = p.MaxHealth
+	}
+}
+func (p *Player) GetMaxHealth() uint32 { return p.MaxHealth }
+func (p *Player) AddHealth(amount int32) {
+	if amount > 0 {
+		p.Health += uint32(amount)
+		if p.Health > p.MaxHealth {
+			p.Health = p.MaxHealth
+		}
+	} else {
+		sub := uint32(-amount)
+		if sub > p.Health {
+			p.Health = 0
+		} else {
+			p.Health -= sub
+		}
+	}
+}
+func (p *Player) GetTarget() Creature { return nil } // Stub for target
+func (p *Player) SetTarget(target Creature) {}
+func (p *Player) ChangeTargetDistance(distance int32) {}

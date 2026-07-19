@@ -2,7 +2,18 @@ package luaengine
 
 import (
 	lua "github.com/yuin/gopher-lua"
+	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/game/combat"
 )
+
+func checkPlayer(L *lua.LState) *game.Player {
+	ud := L.CheckUserData(1)
+	if v, ok := ud.Value.(*game.Player); ok {
+		return v
+	}
+	L.ArgError(1, "Player expected")
+	return nil
+}
 
 // registerPlayerType registers the Player userdata type.
 func (e *Engine) registerPlayerType() {
@@ -399,7 +410,26 @@ func playerAdditemstash(L *lua.LState) int {
 }
 
 func playerAddmana(L *lua.LState) int {
-	// TODO: implement addMana
+	p := checkPlayer(L)
+	if p == nil {
+		return 0
+	}
+	amount := int32(L.CheckNumber(2))
+	game.GlobalDispatcher.AddEvent(0, func() {
+		if amount > 0 {
+			p.Mana += uint32(amount)
+			if p.Mana > p.MaxMana {
+				p.Mana = p.MaxMana
+			}
+		} else {
+			sub := uint32(-amount)
+			if sub > p.Mana {
+				p.Mana = 0
+			} else {
+				p.Mana -= sub
+			}
+		}
+	})
 	return 0
 }
 
@@ -509,8 +539,14 @@ func playerCalculateflatdamagehealing(L *lua.LState) int {
 }
 
 func playerCancast(L *lua.LState) int {
-	// TODO: implement canCast
-	return 0
+	p := checkPlayer(L)
+	if p == nil {
+		return 0
+	}
+	spellName := L.CheckString(2)
+	canCast := combat.CastSpell(p, spellName)
+	L.Push(lua.LBool(canCast))
+	return 1
 }
 
 func playerCanlearnspell(L *lua.LState) int {

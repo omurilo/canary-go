@@ -2,7 +2,21 @@ package luaengine
 
 import (
 	lua "github.com/yuin/gopher-lua"
+	"github.com/opentibiabr/canary-go/internal/game"
 )
+
+func getCreature(L *lua.LState, index int) game.Creature {
+	ud := L.CheckUserData(index)
+	if v, ok := ud.Value.(game.Creature); ok {
+		return v
+	}
+	L.ArgError(index, "Creature expected")
+	return nil
+}
+
+func checkCreature(L *lua.LState) game.Creature {
+	return getCreature(L, 1)
+}
 
 // registerCreatureType registers the Creature userdata type.
 func (e *Engine) registerCreatureType() {
@@ -91,7 +105,14 @@ func creatureAddcondition(L *lua.LState) int {
 }
 
 func creatureAddhealth(L *lua.LState) int {
-	// TODO: implement addHealth
+	c := checkCreature(L)
+	if c == nil {
+		return 0
+	}
+	amount := int32(L.CheckNumber(2))
+	game.GlobalDispatcher.AddEvent(0, func() {
+		c.AddHealth(amount)
+	})
 	return 0
 }
 
@@ -166,7 +187,10 @@ func creatureGetfollowcreature(L *lua.LState) int {
 }
 
 func creatureGethealth(L *lua.LState) int {
-	// TODO: implement getHealth
+	if c := checkCreature(L); c != nil {
+		L.Push(lua.LNumber(c.GetHealth()))
+		return 1
+	}
 	return 0
 }
 
@@ -196,7 +220,10 @@ func creatureGetmaster(L *lua.LState) int {
 }
 
 func creatureGetmaxhealth(L *lua.LState) int {
-	// TODO: implement getMaxHealth
+	if c := checkCreature(L); c != nil {
+		L.Push(lua.LNumber(c.GetMaxHealth()))
+		return 1
+	}
 	return 0
 }
 
@@ -246,7 +273,15 @@ func creatureGetsummons(L *lua.LState) int {
 }
 
 func creatureGettarget(L *lua.LState) int {
-	// TODO: implement getTarget
+	if c := checkCreature(L); c != nil {
+		target := c.GetTarget()
+		if target != nil {
+			ud := L.NewUserData()
+			ud.Value = target
+			L.Push(ud)
+			return 1
+		}
+	}
 	return 0
 }
 
@@ -371,7 +406,14 @@ func creatureSetfollowcreature(L *lua.LState) int {
 }
 
 func creatureSethealth(L *lua.LState) int {
-	// TODO: implement setHealth
+	c := checkCreature(L)
+	if c == nil {
+		return 0
+	}
+	health := uint32(L.CheckNumber(2))
+	game.GlobalDispatcher.AddEvent(0, func() {
+		c.SetHealth(health)
+	})
 	return 0
 }
 
@@ -431,7 +473,14 @@ func creatureSetspeed(L *lua.LState) int {
 }
 
 func creatureSettarget(L *lua.LState) int {
-	// TODO: implement setTarget
+	c := checkCreature(L)
+	if c == nil {
+		return 0
+	}
+	target := getCreature(L, 2)
+	game.GlobalDispatcher.AddEvent(0, func() {
+		c.SetTarget(target)
+	})
 	return 0
 }
 

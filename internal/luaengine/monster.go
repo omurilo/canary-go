@@ -2,7 +2,17 @@ package luaengine
 
 import (
 	lua "github.com/yuin/gopher-lua"
+	"github.com/opentibiabr/canary-go/internal/game"
 )
+
+func checkMonster(L *lua.LState) *game.Monster {
+	ud := L.CheckUserData(1)
+	if v, ok := ud.Value.(*game.Monster); ok {
+		return v
+	}
+	L.ArgError(1, "Monster expected")
+	return nil
+}
 
 // registerMonsterType registers the Monster userdata type.
 func (e *Engine) registerMonsterType() {
@@ -94,7 +104,14 @@ func monsterAddtarget(L *lua.LState) int {
 }
 
 func monsterChangetargetdistance(L *lua.LState) int {
-	// TODO: implement changeTargetDistance
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	distance := int32(L.CheckNumber(2))
+	game.GlobalDispatcher.AddEvent(0, func() {
+		m.ChangeTargetDistance(distance)
+	})
 	return 0
 }
 
@@ -144,7 +161,10 @@ func monsterGetmonsterforgeclassification(L *lua.LState) int {
 }
 
 func monsterGetname(L *lua.LState) int {
-	// TODO: implement getName
+	if m := checkMonster(L); m != nil {
+		L.Push(lua.LString(m.GetName()))
+		return 1
+	}
 	return 0
 }
 
@@ -269,7 +289,7 @@ func monsterSearchtarget(L *lua.LState) int {
 }
 
 func monsterSelecttarget(L *lua.LState) int {
-	// TODO: implement selectTarget
+	// Stub selection logic
 	return 0
 }
 

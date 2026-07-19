@@ -41,6 +41,8 @@ func (e *Engine) registerAPI() {
 	}))
 	L.SetGlobal("logger", logger)
 
+	e.registerPosition()
+	e.registerTile()
 	e.registerItem()
 	e.registerContainer()
 	e.registerCreatureType()

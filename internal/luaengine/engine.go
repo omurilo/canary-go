@@ -7,21 +7,23 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
 
 // Engine owns a Lua state guarded by a mutex (gopher-lua states are not
 // goroutine-safe).
 type Engine struct {
-	mu  sync.Mutex
-	L   *lua.LState
-	log *slog.Logger
+	mu    sync.Mutex
+	L     *lua.LState
+	log   *slog.Logger
+	world *game.World
 }
 
 // New creates an engine with the base libraries loaded.
-func New(log *slog.Logger) *Engine {
+func New(world *game.World, log *slog.Logger) *Engine {
 	L := lua.NewState()
-	e := &Engine{L: L, log: log}
+	e := &Engine{L: L, log: log, world: world}
 	e.registerAPI()
 	return e
 }

@@ -2,7 +2,17 @@ package luaengine
 
 import (
 	lua "github.com/yuin/gopher-lua"
+	"github.com/opentibiabr/canary-go/internal/game"
 )
+
+func checkNpc(L *lua.LState) *game.Npc {
+	ud := L.CheckUserData(1)
+	if v, ok := ud.Value.(*game.Npc); ok {
+		return v
+	}
+	L.ArgError(1, "Npc expected")
+	return nil
+}
 
 // registerNpcType registers the Npc userdata type.
 func (e *Engine) registerNpcType() {
@@ -131,7 +141,14 @@ func npcRemoveplayerinteraction(L *lua.LState) int {
 }
 
 func npcSay(L *lua.LState) int {
-	// TODO: implement say
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	text := L.CheckString(2)
+	game.GlobalDispatcher.AddEvent(0, func() {
+		n.Say(text)
+	})
 	return 0
 }
 
@@ -171,7 +188,16 @@ func npcTurn(L *lua.LState) int {
 }
 
 func npcTurntocreature(L *lua.LState) int {
-	// TODO: implement turnToCreature
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	ud := L.CheckUserData(2)
+	if c, ok := ud.Value.(game.Creature); ok {
+		game.GlobalDispatcher.AddEvent(0, func() {
+			n.TurnToCreature(c)
+		})
+	}
 	return 0
 }
 

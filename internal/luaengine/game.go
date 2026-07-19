@@ -1,6 +1,8 @@
 package luaengine
 
 import (
+	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/netmsg"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -89,7 +91,22 @@ func (e *Engine) gameGetMonsterTypeByName(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetSpectators(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetBoostedCreature(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetBestiaryList(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetPlayers(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetPlayers(L *lua.LState) int {
+	var players []*game.Player
+	if e.world != nil {
+		players = e.world.Players()
+	}
+
+	table := L.NewTable()
+	for _, p := range players {
+		ud := L.NewUserData()
+		ud.Value = p
+		L.SetMetatable(ud, L.GetTypeMetatable("Player"))
+		table.Append(ud)
+	}
+	L.Push(table)
+	return 1
+}
 func (e *Engine) gameLoadMap(L *lua.LState) int { return 0 }
 func (e *Engine) gameLoadMapChunk(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetExperienceForLevel(L *lua.LState) int { return 0 }
@@ -104,7 +121,17 @@ func (e *Engine) gameSetGameState(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetWorldType(L *lua.LState) int { return 0 }
 func (e *Engine) gameSetWorldType(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetReturnMessage(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateItem(L *lua.LState) int { return 0 }
+func (e *Engine) gameCreateItem(L *lua.LState) int {
+	id := L.CheckInt(1)
+	count := L.OptInt(2, 1)
+
+	item := &game.Item{
+		ID:    uint16(id),
+		Count: uint16(count),
+	}
+	e.pushItem(L, item)
+	return 1
+}
 func (e *Engine) gameCreateContainer(L *lua.LState) int { return 0 }
 func (e *Engine) gameCreateMonster(L *lua.LState) int { return 0 }
 func (e *Engine) gameCreateSoulPitMonster(L *lua.LState) int { return 0 }
@@ -142,4 +169,20 @@ func (e *Engine) gameGetAchievements(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetSoulCoreItems(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetMonstersByRace(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetMonstersByBestiaryStars(L *lua.LState) int { return 0 }
-func (e *Engine) gameBroadcastMessage(L *lua.LState) int { return 0 }
+func (e *Engine) gameBroadcastMessage(L *lua.LState) int {
+	message := L.CheckString(1)
+	messageType := L.OptInt(2, 0xB4) // opTextMessage (e.g. MESSAGE_STATUS_WARNING)
+
+	if e.world != nil {
+		for _, p := range e.world.Players() {
+			if p.Session != nil {
+				w := netmsg.NewWriter()
+				w.AddByte(0xB4) // opTextMessage
+				w.AddByte(byte(messageType))
+				w.AddString(message)
+				p.Session.SendToClient(w)
+			}
+		}
+	}
+	return 0
+}
