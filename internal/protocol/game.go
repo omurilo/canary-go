@@ -342,10 +342,16 @@ func (g *GameProtocol) enterWorld() {
 	w.AddByte(sourceEffectOwn)
 	w.AddByte(magicEffectsEndLoop)
 
-	// Inventory: all slots empty (slots 1..10).
+	// Inventory: send items or empty.
 	for slot := byte(1); slot <= 10; slot++ {
-		w.AddByte(opInventoryEmpty)
-		w.AddByte(slot)
+		if item := p.Inventory[slot]; item != nil {
+			w.AddByte(opInventoryItem)
+			w.AddByte(slot)
+			g.addItem(w, item)
+		} else {
+			w.AddByte(opInventoryEmpty)
+			w.AddByte(slot)
+		}
 	}
 
 	g.addStats(w)
