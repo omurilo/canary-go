@@ -48,6 +48,12 @@ type ItemType struct {
 	// bottom=2, top=3, else 0. Items with order > 0 stack BELOW creatures on a
 	// tile (the "top items"); order 0 items stack above creatures ("down items").
 	AlwaysOnTopOrder uint8
+
+	SlotPosition string
+	SlotType     string
+	WeaponType   string
+	FloorChange  string
+	ForceUse     bool
 }
 
 // AlwaysOnTop reports whether the item stacks below creatures on a tile.

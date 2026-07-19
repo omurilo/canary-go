@@ -17,24 +17,68 @@ const (
 func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	pos := r.GetPosition()
 	itemID := r.GetU16()
-	_ = r.GetByte() // stackpos
-	_ = r.GetByte() // index
+	stackpos := r.GetByte() // stackpos
+	index := r.GetByte()    // index
 
+	var item *game.Item
 	if pos.X == 0xFFFF {
-		return // inventory / inside-container position — not supported yet
+		if pos.Y >= 0x40 {
+			cid := uint8(pos.Y - 0x40)
+			if cont, ok := g.containers[cid]; ok {
+				fromSlot := int(pos.Z)
+				if fromSlot < len(cont.Contents) {
+					item = cont.Contents[fromSlot]
+				}
+			}
+		} else {
+			slot := uint8(pos.Y)
+			if slot > 0 && slot <= 10 {
+				item = g.player.Inventory[slot]
+			}
+		}
+	} else {
+		tile := g.deps.World.Map.GetTile(game.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
+		if tile != nil {
+			item = g.findTileItemByStackPos(tile, itemID, stackpos)
+		}
 	}
-	tile := g.deps.World.Map.GetTile(game.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
-	if tile == nil {
-		return
-	}
-	item := findTileItem(tile, itemID)
+
 	if item == nil {
 		return
 	}
-	if t := g.deps.Items.Get(item.ID); t == nil || !t.IsContainer() {
-		return // only container use is implemented
+
+	t := g.deps.Items.Get(item.ID)
+	if t == nil {
+		return
 	}
-	g.openContainer(item)
+
+	if t.IsContainer() {
+		if pos.X == 0xFFFF {
+			g.containers[index] = item
+			g.sendContainer(index, item, false)
+		} else {
+			g.openContainer(item)
+		}
+		return
+	}
+
+	if t.ForceUse && pos.X != 0xFFFF {
+		teleportPos := game.Position{X: pos.X, Y: pos.Y + 1, Z: pos.Z - 1}
+		p := g.player
+		
+		g.broadcastRemove(p)
+		
+		g.deps.World.SetPosition(p, teleportPos)
+		
+		idx := g.buildCreatureIndex(p.Pos)
+		w := netmsg.NewWriter()
+		w.AddByte(opFullMap)
+		w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
+		g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight, idx)
+		g.SendToClient(w)
+		
+		g.broadcastAppear(p)
+	}
 }
 
 // findTileItem returns the first ground/stacked item on the tile with the id.

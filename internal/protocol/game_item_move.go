@@ -48,6 +48,45 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		return // Invalid move (item not found or ID mismatch)
 	}
 
+	it := g.deps.Items.Get(item.ID)
+
+	// Validation
+	if toPos.X == 0xFFFF {
+		if fromPos.X != 0xFFFF && it != nil && !it.Pickupable {
+			g.sendStatusText("You cannot take this object.")
+			return
+		}
+
+		if toPos.Y < 0x40 {
+			toSlot := uint8(toPos.Y)
+			if toSlot > 0 && toSlot <= 10 && it != nil {
+				valid := false
+				if it.SlotPosition != "" {
+					switch toSlot {
+					case 1: valid = (it.SlotPosition == "head")
+					case 2: valid = (it.SlotPosition == "necklace")
+					case 3: valid = (it.SlotPosition == "backpack")
+					case 4: valid = (it.SlotPosition == "body")
+					case 5, 6:
+						valid = (it.SlotPosition == "two-handed" || it.SlotPosition == "right-hand" || it.SlotPosition == "left-hand" || it.WeaponType == "shield" || it.WeaponType == "sword" || it.WeaponType == "club" || it.WeaponType == "axe" || it.WeaponType == "wand" || it.WeaponType == "distance" || it.WeaponType == "ammunition" || it.WeaponType == "ammo")
+					case 7: valid = (it.SlotPosition == "legs")
+					case 8: valid = (it.SlotPosition == "feet")
+					case 9: valid = (it.SlotPosition == "ring")
+					case 10: valid = (it.SlotPosition == "ammo" || it.WeaponType == "ammo" || it.WeaponType == "ammunition")
+					}
+				} else {
+					if toSlot == 3 || toSlot == 5 || toSlot == 6 || toSlot == 10 {
+						valid = true
+					}
+				}
+				if !valid {
+					g.sendStatusText("You cannot dress this object there.")
+					return
+				}
+			}
+		}
+	}
+
 	// 2. Determine move count
 	moveCount := uint16(count)
 	if moveCount > item.Count {
@@ -55,6 +94,18 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	}
 	if moveCount == 0 {
 		moveCount = 1
+	}
+
+	// Swapping logic
+	var swapItem *game.Item
+	if toPos.X == 0xFFFF && toPos.Y < 0x40 {
+		toSlot := uint8(toPos.Y)
+		if toSlot > 0 && toSlot <= 10 {
+			if existing := g.player.Inventory[toSlot]; existing != nil {
+				swapItem = existing
+				// If swapping, we must move the full stack, or at least we treat moveItem as taking the slot.
+			}
+		}
 	}
 
 	// Splitting logic
@@ -117,6 +168,31 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			if toSlot > 0 && toSlot <= 10 {
 				g.player.Inventory[toSlot] = moveItem
 				g.sendInventoryItem(toSlot, moveItem)
+			}
+		}
+	}
+
+	// 5. Handle swapItem placement back to fromPos
+	if swapItem != nil {
+		if fromPos.X != 0xFFFF {
+			pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+			if !g.deps.World.Map.AddItem(pos, swapItem) {
+				g.deps.World.Map.SetTile(pos, &game.Tile{Items: []*game.Item{swapItem}})
+			}
+			g.broadcastAddTileItem(pos, swapItem)
+		} else {
+			if fromPos.Y >= 0x40 {
+				cid := uint8(fromPos.Y - 0x40)
+				if fromContainer != nil {
+					fromContainer.Contents = append([]*game.Item{swapItem}, fromContainer.Contents...)
+					g.sendAddContainerItem(cid, 0, swapItem)
+				}
+			} else {
+				fSlot := uint8(fromPos.Y)
+				if fSlot > 0 && fSlot <= 10 {
+					g.player.Inventory[fSlot] = swapItem
+					g.sendInventoryItem(fSlot, swapItem)
+				}
 			}
 		}
 	}

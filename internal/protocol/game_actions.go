@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -24,6 +25,63 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 		w.AddByte(byte(p.Direction))
 		g.SendToClient(w)
 		return false
+	}
+
+	// Floor change check
+	var floorChange string
+	if tile := g.deps.World.Map.GetTile(newPos); tile != nil {
+		if tile.Ground != nil {
+			if t := g.deps.Items.Get(tile.Ground.ID); t != nil && t.FloorChange != "" {
+				floorChange = t.FloorChange
+			}
+		}
+		for _, it := range tile.Items {
+			if t := g.deps.Items.Get(it.ID); t != nil && t.FloorChange != "" {
+				floorChange = t.FloorChange
+			}
+		}
+	}
+
+	if floorChange != "" {
+		teleportPos := newPos
+		switch floorChange {
+		case "down":
+			teleportPos.Z++
+		case "north":
+			teleportPos.Z--
+			teleportPos.Y--
+		case "south":
+			teleportPos.Z--
+			teleportPos.Y++
+		case "east":
+			teleportPos.Z--
+			teleportPos.X++
+		case "west":
+			teleportPos.Z--
+			teleportPos.X--
+		case "southalt":
+			teleportPos.Z--
+			teleportPos.Y+=2
+		case "eastalt":
+			teleportPos.Z--
+			teleportPos.X+=2
+		// Add others if needed, but these are the main ones
+		}
+		
+		g.broadcastRemove(p)
+		
+		g.deps.World.SetPosition(p, teleportPos)
+		
+		// Send full map
+		idx := g.buildCreatureIndex(p.Pos)
+		w := netmsg.NewWriter()
+		w.AddByte(opFullMap)
+		w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
+		g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight, idx)
+		g.SendToClient(w)
+		
+		g.broadcastAppear(p)
+		return true
 	}
 
 	// Tell everyone (including self) the creature moved.
@@ -315,5 +373,54 @@ func (g *GameProtocol) sendRemoveCreatureAt(pos game.Position, stack uint8) {
 	w.AddByte(0x6C) // TileRemoveThing
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
 	w.AddByte(stack)
+	g.SendToClient(w)
+}
+
+func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
+	pos := r.GetPosition()
+	spriteID := r.GetU16()
+	stackPos := r.GetByte() // stackPos
+
+	var item *game.Item
+	if pos.X != 0xFFFF {
+		// Map position
+		tile := g.deps.World.Map.GetTile(game.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
+		if tile != nil {
+			item = g.findTileItemByStackPos(tile, spriteID, stackPos)
+		}
+	} else {
+		if pos.Y >= 0x40 {
+			// Container
+			cid := uint8(pos.Y - 0x40)
+			if cont, ok := g.containers[cid]; ok {
+				fromSlot := int(pos.Z)
+				if fromSlot < len(cont.Contents) {
+					item = cont.Contents[fromSlot]
+				}
+			}
+		} else {
+			// Inventory
+			slot := uint8(pos.Y)
+			if slot > 0 && slot <= 10 {
+				item = g.player.Inventory[slot]
+			}
+		}
+	}
+
+	if item == nil || item.ID != spriteID {
+		return
+	}
+
+	name := "an item of type " + fmt.Sprint(spriteID)
+	if t := g.deps.Items.Get(spriteID); t != nil && t.Name != "" {
+		name = t.Name
+	}
+	
+	desc := fmt.Sprintf("You see %s.", name)
+
+	w := netmsg.NewWriter()
+	w.AddByte(opTextMessage)
+	w.AddByte(0x12) // MESSAGE_INFO_DESCR (typically 18 / 0x12)
+	w.AddString(desc)
 	g.SendToClient(w)
 }

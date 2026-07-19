@@ -106,6 +106,10 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Warn("item catalog not loaded (AddItem will send bare ids)", "path", o.appearances, "err", err)
 	} else {
 		catalog = cat
+		xmlPath := filepath.Join(filepath.Dir(o.appearances), "items.xml")
+		if err := catalog.LoadXML(xmlPath); err != nil {
+			log.Warn("items.xml not loaded (missing xml attributes)", "path", xmlPath, "err", err)
+		}
 		log.Info("item catalog loaded", "types", cat.Len())
 	}
 

@@ -69,6 +69,7 @@ const (
 	inExtendedOpcode = 0x32
 	inUseItem        = 0x82
 	inCloseContainer = 0x87
+	inLookAt         = 0x8C
 	inThrowItem      = 0x78
 )
 
@@ -515,6 +516,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.handleSay(r)
 	case inThrowItem:
 		g.parseItemMove(r)
+	case inLookAt:
+		g.parseLookAt(r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
 	default:
