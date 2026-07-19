@@ -1,95 +1,155 @@
 package events
 
 import (
-	"log/slog"
-
+	"fmt"
 	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/luaengine"
 	lua "github.com/yuin/gopher-lua"
 )
 
-// Engine bridges the server and the Lua Events system.
 type Engine struct {
-	lua *luaengine.Engine
-	log *slog.Logger
+	OnLogin    []lua.LValue
+	OnLook     []lua.LValue
+	OnMoveItem []lua.LValue
+	L          *lua.LState
 }
 
-// New creates a new events engine.
-func New(luaEngine *luaengine.Engine, log *slog.Logger) *Engine {
-	return &Engine{
-		lua: luaEngine,
-		log: log,
+var GlobalEngine *Engine
+
+func NewEngine(L *lua.LState) *Engine {
+	e := &Engine{L: L}
+	GlobalEngine = e
+	return e
+}
+
+func (e *Engine) Register(callbackTable *lua.LTable) {
+	if val := callbackTable.RawGetString("onLogin"); val != lua.LNil {
+		e.OnLogin = append(e.OnLogin, val)
+	}
+	if val := callbackTable.RawGetString("playerOnLook"); val != lua.LNil {
+		e.OnLook = append(e.OnLook, val)
+	}
+	// Fallback/alias
+	if val := callbackTable.RawGetString("onLook"); val != lua.LNil {
+		e.OnLook = append(e.OnLook, val)
+	}
+	if val := callbackTable.RawGetString("onMoveItem"); val != lua.LNil {
+		e.OnMoveItem = append(e.OnMoveItem, val)
 	}
 }
 
-// pushThing pushes a game object (Player, Item, etc.) as userdata.
-func (e *Engine) pushThing(L *lua.LState, thing interface{}) lua.LValue {
-	if thing == nil {
-		return lua.LNil
+func (e *Engine) ExecuteOnLogin(player *game.Player) bool {
+	L := e.L
+	for _, fn := range e.OnLogin {
+		L.Push(fn)
+
+		pUd := L.NewUserData()
+		pUd.Value = player
+		L.SetMetatable(pUd, L.GetTypeMetatable("Player"))
+		L.Push(pUd)
+
+		if err := L.PCall(1, 1, nil); err != nil {
+			fmt.Printf("Lua execution error in onLogin: %v\n", err)
+			continue
+		}
+
+		ret := L.Get(-1)
+		L.Pop(1)
+
+		if luaBool, ok := ret.(lua.LBool); ok {
+			if !bool(luaBool) {
+				return false
+			}
+		}
 	}
-	ud := L.NewUserData()
-	ud.Value = thing
-	switch thing.(type) {
-	case *game.Item:
-		L.SetMetatable(ud, L.GetTypeMetatable("Item"))
-	case *game.Player:
-		L.SetMetatable(ud, L.GetTypeMetatable("Player"))
-	// Add other creature types like Monster, Npc if they exist in game package
-	default:
-		L.SetMetatable(ud, L.GetTypeMetatable("Creature"))
-	}
-	return ud
+	return true
 }
 
-// pushPosition pushes a position instance.
-func (e *Engine) pushPosition(L *lua.LState, pos game.Position) lua.LValue {
-	ud := L.NewUserData()
-	ud.Value = pos
-	L.SetMetatable(ud, L.GetTypeMetatable("Position"))
-	return ud
-}
+func (e *Engine) ExecuteOnLook(player *game.Player, thing interface{}, position game.Position, distance int) bool {
+	L := e.L
+	for _, fn := range e.OnLook {
+		L.Push(fn)
 
-// OnLook triggers the Player:onLook(thing, position, distance) event.
-func (e *Engine) OnLook(player *game.Player, thing interface{}, position game.Position, distance int32) {
-	var lPlayer, lThing, lPos lua.LValue
-	e.lua.Execute(func(L *lua.LState) {
-		lPlayer = e.pushThing(L, player)
-		lThing = e.pushThing(L, thing)
-		lPos = e.pushPosition(L, position)
-	})
+		pUd := L.NewUserData()
+		pUd.Value = player
+		L.SetMetatable(pUd, L.GetTypeMetatable("Player"))
+		L.Push(pUd)
 
-	_, _ = e.lua.CallEvent("Player", "onLook", lPlayer, lThing, lPos, lua.LNumber(distance))
-}
+		tUd := L.NewUserData()
+		tUd.Value = thing
+		if _, ok := thing.(*game.Item); ok {
+			L.SetMetatable(tUd, L.GetTypeMetatable("Item"))
+		} else {
+			L.SetMetatable(tUd, L.GetTypeMetatable("Thing"))
+		}
+		L.Push(tUd)
 
-// OnMoveItem triggers the Player:onMoveItem(item, count, fromPosition, toPosition) event.
-// Returns true if the item move is allowed by Lua events.
-func (e *Engine) OnMoveItem(player *game.Player, item *game.Item, count uint16, fromPosition, toPosition game.Position) bool {
-	var lPlayer, lItem, lFrom, lTo lua.LValue
-	e.lua.Execute(func(L *lua.LState) {
-		lPlayer = e.pushThing(L, player)
-		lItem = e.pushThing(L, item)
-		lFrom = e.pushPosition(L, fromPosition)
-		lTo = e.pushPosition(L, toPosition)
-	})
+		posTable := L.NewTable()
+		L.SetField(posTable, "x", lua.LNumber(position.X))
+		L.SetField(posTable, "y", lua.LNumber(position.Y))
+		L.SetField(posTable, "z", lua.LNumber(position.Z))
+		L.Push(posTable)
 
-	allowed, err := e.lua.CallEvent("Player", "onMoveItem", lPlayer, lItem, lua.LNumber(count), lFrom, lTo)
-	if err != nil {
-		return false
+		L.Push(lua.LNumber(distance))
+
+		if err := L.PCall(4, 1, nil); err != nil {
+			fmt.Printf("Lua execution error in onLook: %v\n", err)
+			continue
+		}
+
+		ret := L.Get(-1)
+		L.Pop(1)
+
+		if luaBool, ok := ret.(lua.LBool); ok {
+			if !bool(luaBool) {
+				return false
+			}
+		}
 	}
-	return allowed
+	return true
 }
 
-// OnGainExperience triggers the Player:onGainExperience(source, exp, rawExp) event.
-func (e *Engine) OnGainExperience(player *game.Player, source interface{}, exp uint64, rawExp uint64) bool {
-	var lPlayer, lSource lua.LValue
-	e.lua.Execute(func(L *lua.LState) {
-		lPlayer = e.pushThing(L, player)
-		lSource = e.pushThing(L, source)
-	})
+func (e *Engine) ExecuteOnMoveItem(player *game.Player, item *game.Item, count uint16, fromPos game.Position, toPos game.Position) bool {
+	L := e.L
+	for _, fn := range e.OnMoveItem {
+		L.Push(fn)
 
-	allowed, err := e.lua.CallEvent("Player", "onGainExperience", lPlayer, lSource, lua.LNumber(exp), lua.LNumber(rawExp))
-	if err != nil {
-		return false
+		pUd := L.NewUserData()
+		pUd.Value = player
+		L.SetMetatable(pUd, L.GetTypeMetatable("Player"))
+		L.Push(pUd)
+
+		iUd := L.NewUserData()
+		iUd.Value = item
+		L.SetMetatable(iUd, L.GetTypeMetatable("Item"))
+		L.Push(iUd)
+		
+		L.Push(lua.LNumber(count))
+
+		fromPosTable := L.NewTable()
+		L.SetField(fromPosTable, "x", lua.LNumber(fromPos.X))
+		L.SetField(fromPosTable, "y", lua.LNumber(fromPos.Y))
+		L.SetField(fromPosTable, "z", lua.LNumber(fromPos.Z))
+		L.Push(fromPosTable)
+
+		toPosTable := L.NewTable()
+		L.SetField(toPosTable, "x", lua.LNumber(toPos.X))
+		L.SetField(toPosTable, "y", lua.LNumber(toPos.Y))
+		L.SetField(toPosTable, "z", lua.LNumber(toPos.Z))
+		L.Push(toPosTable)
+
+		if err := L.PCall(5, 1, nil); err != nil {
+			fmt.Printf("Lua execution error in onMoveItem: %v\n", err)
+			continue
+		}
+
+		ret := L.Get(-1)
+		L.Pop(1)
+
+		if luaBool, ok := ret.(lua.LBool); ok {
+			if !bool(luaBool) {
+				return false
+			}
+		}
 	}
-	return allowed
+	return true
 }

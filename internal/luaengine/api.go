@@ -50,6 +50,10 @@ func (e *Engine) registerAPI() {
 	e.registerMonsterType()
 	e.registerNpcType()
 	e.registerGame()
+	e.registerAction()
+	e.registerCombat()
+	e.registerTalkAction()
+	e.registerSpell()
 }
 
 // SetGameFunc registers a Go function as a field on the global Game table.

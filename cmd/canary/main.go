@@ -174,7 +174,7 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Warn("loading scripts", "err", err)
 	}
 
-	eventsEngine := events.New(lengine, log)
+	eventsEngine := events.NewEngine(lengine.L)
 
 	deps := &protocol.Deps{
 		Cfg: cfg, DB: database, RSA: rsa, World: world, Items: catalog, Lua: lengine, Events: eventsEngine, Log: log,
@@ -208,24 +208,21 @@ func run(o runOpts, log *slog.Logger) error {
 	}
 }
 
-// loadScripts runs every .lua file in dir (non-recursive) through the engine.
+// loadScripts runs every .lua file in dir (recursive) through the engine.
 func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".lua" {
-			continue
+	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		path := filepath.Join(dir, entry.Name())
-		if err := e.DoFile(path); err != nil {
-			log.Warn("script error", "file", path, "err", err)
-			continue
+		if !d.IsDir() && filepath.Ext(path) == ".lua" {
+			if err := e.DoFile(path); err != nil {
+				log.Warn("script error", "file", path, "err", err)
+			} else {
+				log.Debug("loaded script", "file", path)
+			}
 		}
-		log.Info("loaded script", "file", path)
-	}
-	return nil
+		return nil
+	})
 }
 
 // jobHandler processes async jobs pulled from the PostgreSQL queue.

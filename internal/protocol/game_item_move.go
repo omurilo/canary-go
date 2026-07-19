@@ -49,7 +49,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	}
 
 	if g.deps.Events != nil {
-		if !g.deps.Events.OnMoveItem(g.player, item, uint16(count), game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}, game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}) {
+		if !g.deps.Events.ExecuteOnMoveItem(g.player, item, uint16(count), game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}, game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}) {
 			return // Rejected by Lua
 		}
 	}

@@ -412,7 +412,7 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 	}
 
 	if g.deps.Events != nil {
-		g.deps.Events.OnLook(g.player, item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, 0)
+		g.deps.Events.ExecuteOnLook(g.player, item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, 0)
 		return
 	}
 

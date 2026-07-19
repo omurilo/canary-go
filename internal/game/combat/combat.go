@@ -1,15 +1,149 @@
 package combat
 
-import (
-	"github.com/opentibiabr/canary-go/internal/game"
-)
+// CombatParams represents the configuration for a combat
+type CombatParams struct {
+	ConditionList []Condition
+	CombatType    CombatType
+	Origin        CombatOrigin
+	DispelType    ConditionType
 
-type Spell struct {
-	Name string
+	ImpactEffect      uint16
+	DistanceEffect    uint16
+	ChainEffect       uint16
+
+	BlockedByArmor       bool
+	BlockedByShield      bool
+	TargetCasterOrTopMost bool
+	Aggressive           bool
+	UseCharges           bool
 }
 
-func CastSpell(caster game.Creature, spellName string) bool {
-	// Combat logic for casting a spell
-	// We can use game.GlobalDispatcher here if there is a cooldown or delay
+// Combat engine struct
+type Combat struct {
+	Params CombatParams
+
+	FormulaType FormulaType
+	MinA, MinB  float64
+	MaxA, MaxB  float64
+}
+
+// NewCombat creates a new combat instance
+func NewCombat() *Combat {
+	return &Combat{
+		Params: CombatParams{
+			Aggressive: true,
+		},
+	}
+}
+
+// DoCombatHealth applies combat damage or healing to health
+func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatDamage) bool {
+	if c.Params.Aggressive && !CanDoCombat(caster, target) {
+		return false
+	}
+
+	// Apply dispel if configured
+	if c.Params.DispelType != ConditionNone {
+		target.RemoveCondition(c.Params.DispelType)
+	}
+
+	// Calculate and apply armor/shield blocking here if needed
+
+	finalDamage := damage.PrimaryValue
+
+	// If it's damage
+	if damage.PrimaryType != CombatHealing {
+		finalDamage = -finalDamage
+	}
+
+	if finalDamage != 0 {
+		target.ChangeHealth(finalDamage)
+	}
+
+	// Apply conditions
+	for _, cond := range c.Params.ConditionList {
+		t := cond.GetType()
+		if t == ConditionPoison || t == ConditionFire || t == ConditionEnergy || t == ConditionBleeding || t == ConditionFreezing || t == ConditionDazzled || t == ConditionCursed {
+			// Add the damage condition
+			target.AddCondition(cond.Clone())
+		} else {
+			target.AddCondition(cond.Clone())
+		}
+	}
+
 	return true
+}
+
+// DoCombatMana applies combat damage to mana
+func (c *Combat) DoCombatMana(caster Creature, target Creature, damage CombatDamage) bool {
+	if c.Params.Aggressive && !CanDoCombat(caster, target) {
+		return false
+	}
+
+	finalDamage := damage.PrimaryValue
+	if damage.PrimaryType != CombatHealing {
+		finalDamage = -finalDamage
+	}
+
+	if finalDamage != 0 {
+		target.ChangeMana(finalDamage)
+	}
+
+	return true
+}
+
+// DoCombatCondition applies only conditions to the target
+func (c *Combat) DoCombatCondition(caster Creature, target Creature) bool {
+	if c.Params.Aggressive && !CanDoCombat(caster, target) {
+		return false
+	}
+
+	for _, cond := range c.Params.ConditionList {
+		target.AddCondition(cond.Clone())
+	}
+
+	return true
+}
+
+// CanDoCombat checks if combat is allowed between caster and target (e.g. PVP zone checks)
+func CanDoCombat(caster Creature, target Creature) bool {
+	if caster == nil || target == nil {
+		return false
+	}
+	// Add protection zone or other checks here
+	return true
+}
+
+// SetPlayerCombatValues sets the minimum and maximum damage formula values
+func (c *Combat) SetPlayerCombatValues(formulaType FormulaType, minA, minB, maxA, maxB float64) {
+	c.FormulaType = formulaType
+	c.MinA = minA
+	c.MinB = minB
+	c.MaxA = maxA
+	c.MaxB = maxB
+}
+
+// AddCondition adds a condition to be applied on combat hit
+func (c *Combat) AddCondition(cond Condition) {
+	c.Params.ConditionList = append(c.Params.ConditionList, cond)
+}
+
+// SetParam sets a param for the combat
+func (c *Combat) SetParam(param CombatParam, value uint32) {
+	switch param {
+	case CombatParamType:
+		c.Params.CombatType = CombatType(value)
+	case CombatParamEffect:
+		c.Params.ImpactEffect = uint16(value)
+	case CombatParamDistanceEffect:
+		c.Params.DistanceEffect = uint16(value)
+	case CombatParamBlockArmor:
+		c.Params.BlockedByArmor = value != 0
+	case CombatParamBlockShield:
+		c.Params.BlockedByShield = value != 0
+	case CombatParamAggressive:
+		c.Params.Aggressive = value != 0
+	case CombatParamDispel:
+		c.Params.DispelType = ConditionType(value)
+	}
 }

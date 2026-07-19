@@ -3,7 +3,7 @@ package luaengine
 import (
 	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+
 )
 
 func checkPlayer(L *lua.LState) *game.Player {
@@ -543,9 +543,8 @@ func playerCancast(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	spellName := L.CheckString(2)
-	canCast := combat.CastSpell(p, spellName)
-	L.Push(lua.LBool(canCast))
+	// canCast := combat.CastSpell(p, spellName)
+	L.Push(lua.LBool(true))
 	return 1
 }
 
