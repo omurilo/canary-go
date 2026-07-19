@@ -62,7 +62,7 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		return
 	}
 
-	if t.ForceUse && pos.X != 0xFFFF {
+	if (t.ForceUse || t.IsLadder) && pos.X != 0xFFFF {
 		teleportPos := game.Position{X: pos.X, Y: pos.Y + 1, Z: pos.Z - 1}
 		p := g.player
 		

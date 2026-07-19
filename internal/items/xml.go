@@ -37,6 +37,10 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 		it.FloorChange = attr.Value
 	case "forceuse":
 		it.ForceUse = (attr.Value == "1")
+	case "type":
+		if attr.Value == "ladder" {
+			it.IsLadder = true
+		}
 	}
 	for _, child := range attr.Attributes {
 		processAttr(it, child)

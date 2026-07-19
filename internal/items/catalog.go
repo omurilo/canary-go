@@ -54,6 +54,7 @@ type ItemType struct {
 	WeaponType   string
 	FloorChange  string
 	ForceUse     bool
+	IsLadder     bool
 }
 
 // AlwaysOnTop reports whether the item stacks below creatures on a tile.
