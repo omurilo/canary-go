@@ -42,7 +42,7 @@ services:
       # image generic. (canary-go also accepts the mysql* config.lua values.)
       CANARY_DB_HOST: db
     command: >
-      -config config.lua -schema schema/mysql.sql -scripts scripts -migrate -seed  -map /data-canary/world/canary.otbm
+      -config config.lua -schema schema/mysql.sql -scripts scripts -migrate -seed
     ports:
       - "7171:7171"
       - "7172:7172"
