@@ -143,8 +143,27 @@ func npcIsintalkrange(L *lua.LState) int {
 }
 
 func npcIsinteractingwithplayer(L *lua.LState) int {
-	L.Push(lua.LFalse)
+	n := checkNpc(L)
+	if n == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	L.Push(lua.LBool(n.IsInteractingWithPlayer(interactionPlayerID(L, 2))))
 	return 1
+}
+
+// interactionPlayerID extracts a player creature id from arg n, which may be a
+// creature userdata or a numeric id.
+func interactionPlayerID(L *lua.LState, n int) uint32 {
+	switch v := L.Get(n); v.Type() {
+	case lua.LTUserData:
+		if c, ok := v.(*lua.LUserData).Value.(game.Creature); ok {
+			return c.GetID()
+		}
+	case lua.LTNumber:
+		return uint32(lua.LVAsNumber(v))
+	}
+	return 0
 }
 
 
@@ -192,7 +211,12 @@ func npcPlace(L *lua.LState) int {
 	return 1
 }
 
-func npcRemoveplayerinteraction(L *lua.LState) int { return 0 }
+func npcRemoveplayerinteraction(L *lua.LState) int {
+	if n := checkNpc(L); n != nil {
+		n.RemovePlayerInteraction(interactionPlayerID(L, 2))
+	}
+	return 0
+}
 
 func npcSay(L *lua.LState) int {
 	return 0
@@ -236,7 +260,18 @@ func npcSetname(L *lua.LState) int {
 	return 0
 }
 
-func npcSetplayerinteraction(L *lua.LState) int { return 0 }
+func npcSetplayerinteraction(L *lua.LState) int {
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	topic := 0
+	if L.GetTop() >= 3 {
+		topic = luaOptInt(L, 3)
+	}
+	n.SetPlayerInteraction(interactionPlayerID(L, 2), topic)
+	return 0
+}
 
 func npcSetspeechbubble(L *lua.LState) int { return 0 }
 

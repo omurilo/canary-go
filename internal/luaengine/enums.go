@@ -22,6 +22,29 @@ func RegisterEnums(L *lua.LState) {
 		"CONST_SLOT_STORE_INBOX": 11,
 		"CONST_SLOT_LAST":        12,
 
+		// Speak classes (talk types). NPC dialogue gates keyword processing on
+		// TALKTYPE_PRIVATE_PN (player→NPC), so these MUST exist as globals — a
+		// nil TALKTYPE_PRIVATE_PN silently kills all post-greeting interaction.
+		"TALKTYPE_SAY":              1,
+		"TALKTYPE_WHISPER":          2,
+		"TALKTYPE_YELL":             3,
+		"TALKTYPE_PRIVATE_FROM":     4,
+		"TALKTYPE_PRIVATE_TO":       5,
+		"TALKTYPE_CHANNEL_MANAGEMENT": 6,
+		"TALKTYPE_CHANNEL_Y":        7,
+		"TALKTYPE_CHANNEL_O":        8,
+		"TALKTYPE_SPELL_USE":        9,
+		"TALKTYPE_PRIVATE_NP":       10,
+		"TALKTYPE_NPC_UNKNOWN":      11,
+		"TALKTYPE_PRIVATE_PN":       12,
+		"TALKTYPE_BROADCAST":        13,
+		"TALKTYPE_CHANNEL_R1":       14,
+		"TALKTYPE_PRIVATE_RED_FROM": 15,
+		"TALKTYPE_PRIVATE_RED_TO":   16,
+		"TALKTYPE_MONSTER_SAY":      36,
+		"TALKTYPE_MONSTER_YELL":     37,
+		"TALKTYPE_CHANNEL_R2":       0xFF,
+
 		// Messages
 		"MESSAGE_GAMEMASTER_CONSOLE":  13,
 		"MESSAGE_LOGIN":               17,

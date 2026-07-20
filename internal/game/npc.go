@@ -4,6 +4,31 @@ import "github.com/opentibiabr/canary-go/internal/creatures"
 
 type Npc struct {
 	BaseCreature
+	// interactions tracks players currently in a conversation with this NPC
+	// (playerID → topic). NpcHandler:checkInteraction gates trade/keyword
+	// navigation on this, so it must be real (not a stub) for post-greeting
+	// interaction to work. Accessed only under the Lua engine lock.
+	interactions map[uint32]int
+}
+
+// SetPlayerInteraction marks playerID as interacting with the NPC at the given
+// dialogue topic.
+func (n *Npc) SetPlayerInteraction(playerID uint32, topic int) {
+	if n.interactions == nil {
+		n.interactions = make(map[uint32]int)
+	}
+	n.interactions[playerID] = topic
+}
+
+// RemovePlayerInteraction ends playerID's conversation with the NPC.
+func (n *Npc) RemovePlayerInteraction(playerID uint32) {
+	delete(n.interactions, playerID)
+}
+
+// IsInteractingWithPlayer reports whether playerID is mid-conversation.
+func (n *Npc) IsInteractingWithPlayer(playerID uint32) bool {
+	_, ok := n.interactions[playerID]
+	return ok
 }
 
 func NewNpc(id uint32, name string, nType *creatures.NpcType) *Npc {
