@@ -19,7 +19,7 @@ func (e *Engine) registerTalkAction() {
 }
 
 func talkActionConstructor(L *lua.LState) int {
-	words := L.CheckString(1)
+	words := L.CheckString(2)
 	t := &talkactions.TalkAction{
 		Words: words,
 	}

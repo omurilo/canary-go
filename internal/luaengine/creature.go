@@ -53,7 +53,7 @@ func checkCreature(L *lua.LState) game.Creature {
 // a numeric creature id (looked up in the world). Pushes nil on miss/mismatch.
 func (e *Engine) creatureConstructorCall(L *lua.LState, kind string) int {
 	var c game.Creature
-	switch arg := L.Get(1); arg.Type() {
+	switch arg := L.Get(2); arg.Type() {
 	case lua.LTUserData:
 		if v, ok := arg.(*lua.LUserData).Value.(game.Creature); ok {
 			c = v

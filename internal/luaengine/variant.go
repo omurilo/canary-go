@@ -54,7 +54,7 @@ func checkVariant(L *lua.LState, n int) *luaVariant {
 
 func variantConstructor(L *lua.LState) int {
 	v := &luaVariant{}
-	arg := L.Get(1)
+	arg := L.Get(2)
 	switch arg.Type() {
 	case lua.LTNumber:
 		v.vtype = VariantNumber

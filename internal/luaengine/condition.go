@@ -30,8 +30,8 @@ func (e *Engine) registerCondition() {
 
 func conditionConstructor(L *lua.LState) int {
 	c := &luaCondition{}
-	if L.GetTop() >= 1 && L.Get(1).Type() == lua.LTNumber {
-		c.condType = luaToConditionType(luaOptInt(L, 1))
+	if L.GetTop() >= 1 && L.Get(2).Type() == lua.LTNumber {
+		c.condType = luaToConditionType(luaOptInt(L, 2))
 	}
 	ud := L.NewUserData()
 	ud.Value = c

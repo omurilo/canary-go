@@ -60,7 +60,7 @@ func (e *Engine) registerItem() {
 }
 
 func (e *Engine) itemCreate(L *lua.LState) int {
-	id := L.OptInt(1, 0)
+	id := L.OptInt(2, 0)
 	it := &game.Item{ID: uint16(id)}
 	e.pushItem(L, it)
 	return 1

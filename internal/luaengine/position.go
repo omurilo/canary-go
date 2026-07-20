@@ -22,15 +22,15 @@ func (e *Engine) registerPosition() {
 func positionCreate(L *lua.LState) int {
 	var x, y, z int
 	// Support Position(x, y, z) and Position(table)
-	if L.GetTop() == 1 && L.Get(1).Type() == lua.LTTable {
-		t := L.ToTable(1)
+	if L.GetTop() == 2 && L.Get(2).Type() == lua.LTTable {
+		t := L.ToTable(2)
 		x = int(lua.LVAsNumber(L.GetField(t, "x")))
 		y = int(lua.LVAsNumber(L.GetField(t, "y")))
 		z = int(lua.LVAsNumber(L.GetField(t, "z")))
 	} else {
-		x = L.OptInt(1, 0)
-		y = L.OptInt(2, 0)
-		z = L.OptInt(3, 7)
+		x = L.OptInt(2, 0)
+		y = L.OptInt(3, 0)
+		z = L.OptInt(4, 7)
 	}
 
 	p := game.Position{

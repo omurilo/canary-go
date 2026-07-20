@@ -16,15 +16,15 @@ func (e *Engine) registerTile() {
 
 func (e *Engine) tileCreate(L *lua.LState) int {
 	var pos game.Position
-	if L.GetTop() >= 3 {
-		x := L.CheckInt(1)
-		y := L.CheckInt(2)
-		z := L.CheckInt(3)
+	if L.GetTop() >= 4 { // Arg 1 is class
+		x := L.CheckInt(2)
+		y := L.CheckInt(3)
+		z := L.CheckInt(4)
 		pos = game.Position{X: uint16(x), Y: uint16(y), Z: uint8(z)}
-	} else if L.GetTop() == 1 {
-		pos = checkPosition(L, 1)
+	} else if L.GetTop() >= 2 {
+		pos = checkPosition(L, 2)
 	} else {
-		L.ArgError(1, "Position or X, Y, Z expected")
+		L.ArgError(2, "Position or X, Y, Z expected")
 		return 0
 	}
 

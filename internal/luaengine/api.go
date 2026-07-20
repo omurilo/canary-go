@@ -141,9 +141,6 @@ func (e *Engine) registerAPI() {
 
 		mt := L.NewTypeMetatable(name + "_ClassCtor")
 		L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int {
-			if L.GetTop() >= 1 {
-				L.Remove(1)
-			}
 			return e.creatureConstructorCall(L, name)
 		}))
 		// Keep field injection working (e.g. Player.feed = ...) on the table.
@@ -228,9 +225,6 @@ func (e *Engine) setClassConstructor(name string, constructor lua.LGFunction, me
 
 	mt := L.NewTypeMetatable(name + "_ClassCtor")
 	call := func(L *lua.LState) int {
-		if L.GetTop() >= 1 {
-			L.Remove(1)
-		}
 		return constructor(L)
 	}
 	L.SetField(mt, "__call", L.NewFunction(call))

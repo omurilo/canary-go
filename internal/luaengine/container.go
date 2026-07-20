@@ -33,7 +33,7 @@ func (e *Engine) registerContainer() {
 }
 
 func (e *Engine) containerCreate(L *lua.LState) int {
-	id := L.OptInt(1, 0)
+	id := L.OptInt(2, 0)
 	c := &game.Item{ID: uint16(id)}
 	e.pushContainer(L, c)
 	return 1
