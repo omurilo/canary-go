@@ -22,10 +22,14 @@ type Creature interface {
 }
 
 type BaseCreature struct {
+	conditionStore
+
 	ID        uint32
 	Name      string
 	Health    uint32
 	MaxHealth uint32
+	Mana      uint32
+	MaxMana   uint32
 	Target     Creature
 	Pos        Position
 	Direction  Direction
@@ -74,4 +78,25 @@ func (c *BaseCreature) GetLightLevel() uint8 { return c.LightLevel }
 func (c *BaseCreature) GetLightColor() uint8 { return c.LightColor }
 func (c *BaseCreature) GetSpeed() uint16 { return c.Speed }
 func (c *BaseCreature) GetCreatureType() uint8 { return 0 } // Player by default
+
+// GetMana/GetMaxMana/AddMana provide the mana accessors the combat adapter
+// needs. Monsters/NPCs default to zero mana; drainMana clamps at 0 like
+// Creature::changeMana in src/creatures/creature.cpp.
+func (c *BaseCreature) GetMana() uint32    { return c.Mana }
+func (c *BaseCreature) GetMaxMana() uint32 { return c.MaxMana }
+func (c *BaseCreature) AddMana(amount int32) {
+	if amount > 0 {
+		c.Mana += uint32(amount)
+		if c.Mana > c.MaxMana {
+			c.Mana = c.MaxMana
+		}
+	} else {
+		sub := uint32(-amount)
+		if sub > c.Mana {
+			c.Mana = 0
+		} else {
+			c.Mana -= sub
+		}
+	}
+}
 

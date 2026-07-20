@@ -26,6 +26,8 @@ const (
 // Player is a logged-in character. It embeds creature-like fields directly to
 // keep the model flat for now.
 type Player struct {
+	conditionStore
+
 	ID        uint32 // creature id (assigned at spawn)
 	DBID      uint32 // players.id
 	AccountID uint32
@@ -125,3 +127,23 @@ func (p *Player) GetLightLevel() uint8 { return p.LightLevel }
 func (p *Player) GetLightColor() uint8 { return p.LightColor }
 func (p *Player) GetSpeed() uint16 { return p.Speed }
 func (p *Player) GetCreatureType() uint8 { return 0 } // CREATURETYPE_PLAYER
+
+// GetMana/GetMaxMana/AddMana expose the player's mana pool for the combat
+// adapter. AddMana clamps like Creature::changeMana (src/creatures/creature.cpp).
+func (p *Player) GetMana() uint32    { return p.Mana }
+func (p *Player) GetMaxMana() uint32 { return p.MaxMana }
+func (p *Player) AddMana(amount int32) {
+	if amount > 0 {
+		p.Mana += uint32(amount)
+		if p.Mana > p.MaxMana {
+			p.Mana = p.MaxMana
+		}
+	} else {
+		sub := uint32(-amount)
+		if sub > p.Mana {
+			p.Mana = 0
+		} else {
+			p.Mana -= sub
+		}
+	}
+}

@@ -140,6 +140,7 @@ func run(o runOpts, log *slog.Logger) error {
 
 	spawnEngine := game.NewSpawnEngine(world, creatureTypes)
 	aiEngine := game.NewAIEngine(world)
+	combatEngine := game.NewCombatEngine(world)
 
 	mapFilePath := o.mapFile
 	if mapFilePath == "" && cfg.WorldFile != "" {
@@ -204,9 +205,22 @@ func run(o runOpts, log *slog.Logger) error {
 	world.OnCreatureRemove = func(c game.Creature) {
 		protocol.BroadcastCreatureRemove(world, c)
 	}
+	world.OnCreatureHealthChange = func(c game.Creature) {
+		protocol.BroadcastCreatureHealth(world, c)
+	}
+	world.OnCombatHit = func(attacker, victim game.Creature, damage int32, effect uint16) {
+		protocol.BroadcastCombatHit(world, attacker, victim, damage, effect)
+	}
+	world.OnItemAppear = func(pos game.Position, item *game.Item) {
+		protocol.BroadcastAddItem(world, pos, item)
+	}
+	world.OnTargetLost = func(p *game.Player) {
+		protocol.SendCancelTarget(p)
+	}
 
 	spawnEngine.Start()
 	aiEngine.Start()
+	combatEngine.Start()
 
 	// Lua engine.
 	lengine := luaengine.New(world, log)

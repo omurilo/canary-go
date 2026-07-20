@@ -22,6 +22,7 @@ type MonsterType struct {
 	Name      string
 	Speed     uint32
 	MaxHealth uint32
+	Corpse    uint16 // corpse item id dropped on death (0 = unknown)
 	Outfit    Outfit
 }
 
@@ -71,6 +72,7 @@ type xmlLook struct {
 	Feet   uint8  `xml:"feet,attr"`
 	Addons uint8  `xml:"addons,attr"`
 	Mount  uint16 `xml:"mount,attr"`
+	Corpse uint16 `xml:"corpse,attr"`
 }
 
 func (r *TypeRegistry) LoadMonsters(dataDir string) error {
@@ -93,6 +95,7 @@ func (r *TypeRegistry) LoadMonsters(dataDir string) error {
 				Name:      mon.Name,
 				Speed:     mon.Speed,
 				MaxHealth: mon.Health.Max,
+				Corpse:    mon.Look.Corpse,
 				Outfit: Outfit{
 					LookType:  mon.Look.Type,
 					Head:      mon.Look.Head,

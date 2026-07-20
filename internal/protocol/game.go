@@ -36,6 +36,7 @@ const (
 	opInventoryEmpty = 0x79
 	opMagicEffect    = 0x83
 	opWorldLight     = 0x82
+	opCreatureHealth = 0x8C
 	opCreatureLight  = 0x8D
 	opBasicData      = 0x9F
 	opPlayerStats    = 0xA0

@@ -24,6 +24,13 @@ type World struct {
 	OnCreatureAppear func(c Creature)
 	OnCreatureRemove func(c Creature)
 
+	// Combat hooks, populated by the protocol layer so the combat engine can
+	// push updates to clients without importing the protocol package.
+	OnCreatureHealthChange func(c Creature)
+	OnCombatHit            func(attacker, victim Creature, damage int32, effect uint16)
+	OnItemAppear           func(pos Position, item *Item)
+	OnTargetLost           func(p *Player)
+
 	TypeRegistry *creatures.TypeRegistry
 }
 
