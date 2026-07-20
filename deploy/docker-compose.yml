@@ -23,7 +23,7 @@ services:
     volumes:
       - db-volume:/var/lib/mysql
       # Canonical Canary schema so MyAAC/login-server find every table.
-      - ../../schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ../schema/mysql.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     # networks: [canary-net]
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
@@ -47,9 +47,10 @@ services:
       - "7171:7171"
       - "7172:7172"
     volumes:
-      - ../../data:/data:ro
-      - ../../data-canary:/data-canary:ro
-      - ../../data-otservbr-global:/data-otservbr-global:ro
+      - ../config.lua:/app/config.lua:ro
+      - ../data:/app/data:ro
+      - ../data-canary:/app/data-canary:ro
+      - ../data-otservbr-global:/app/data-otservbr-global:ro
     depends_on:
       db:
         condition: service_healthy
@@ -58,7 +59,7 @@ services:
   myaac:
     profiles: ["full"]
     build:
-      context: ../../docker
+      context: .
       dockerfile: quickstart/myaac/Dockerfile
       args:
         MYAAC_REF: "${MYAAC_REF:-develop}"
@@ -83,9 +84,9 @@ services:
     volumes:
       - ../ip.txt:/var/www/html/install/ip.txt
       - ../../config.lua:/var/www/html/config.lua
-      - ../../data:/var/www/html/data:ro
-      - ../../data-canary:/var/www/html/data-canary:ro
-      - ../../data-otservbr-global:/var/www/html/data-otservbr-global:ro
+      - ../data:/var/www/html/data:ro
+      - ../data-canary:/var/www/html/data-canary:ro
+      - ../data-otservbr-global:/var/www/html/data-otservbr-global:ro
 
     depends_on:
       db:
