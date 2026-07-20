@@ -60,18 +60,68 @@ func TestBenjaminOnSay(t *testing.T) {
 		t.Fatalf("load benjamin: %v", err)
 	}
 
-	npcType := e.world.TypeRegistry.Npcs["benjamin"]
-	npc := game.NewNpc(2, "Benjamin", npcType)
-	player := &game.Player{ID: 1, Name: "Tester", Level: 8, Health: 100, MaxHealth: 100}
+	greetNpc(t, e, "Benjamin", "benjamin")
+}
 
-	// This logs the error via e.log if the callback raises; capture it directly
-	// by calling the stored onSay through PCall so the test sees the message.
+// TestNpcGreetSmoke greets a spread of real NPCs with "hi" and asserts none of
+// their onSay handlers raise — a regression guard for the Creature/Player method
+// surface, the addEvent/stopEvent scheduler and NetworkMessage that NPC dialogue
+// depends on.
+func TestNpcGreetSmoke(t *testing.T) {
+	repo := filepath.Join("..", "..", "..")
+	datapack := filepath.Join(repo, "data-otservbr-global")
+	core := filepath.Join(repo, "data")
+	if _, err := os.Stat(filepath.Join(datapack, "npc")); err != nil {
+		t.Skip("datapack not available")
+	}
+
+	e := newTestEngine()
+	e.L.SetGlobal("DATA_DIRECTORY", lua.LString(datapack))
+	e.L.SetGlobal("CORE_DIRECTORY", lua.LString(core))
+	walkLoad(t, e, filepath.Join(datapack, "lib"))
+	for _, sub := range []string{"lib", "libs", "npclib"} {
+		walkLoad(t, e, filepath.Join(core, sub))
+	}
+
+	names := []string{
+		"walter_jaeger", "dallheim", "barbara", "seymour", "gamemaster",
+		"a_sweaty_cyclops", "captain_bluebear", "eclesius", "hardek", "rashid",
+	}
+	for _, file := range names {
+		path := filepath.Join(datapack, "npc", file+".lua")
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		if err := e.DoFile(path); err != nil {
+			t.Errorf("%s: load failed: %v", file, err)
+			continue
+		}
+	}
+	// Greet each registered NPC.
 	e.npcCallbacksMu.Lock()
-	cbs := e.npcCallbacks["benjamin"]
+	regNames := make([]string, 0, len(e.npcCallbacks))
+	for n := range e.npcCallbacks {
+		regNames = append(regNames, n)
+	}
+	e.npcCallbacksMu.Unlock()
+	for _, n := range regNames {
+		greetNpc(t, e, n, n)
+	}
+}
+
+// greetNpc invokes the NPC's stored onSay callback with "hi" and fails on error.
+func greetNpc(t *testing.T, e *Engine, display, key string) {
+	t.Helper()
+	e.npcCallbacksMu.Lock()
+	cbs := e.npcCallbacks[key]
 	e.npcCallbacksMu.Unlock()
 	if cbs == nil || cbs["onSay"] == nil {
-		t.Fatalf("benjamin onSay callback not registered (callbacks=%v)", cbs != nil)
+		t.Errorf("%s: onSay callback not registered", display)
+		return
 	}
+
+	npc := game.NewNpc(2, display, e.world.TypeRegistry.Npcs[key])
+	player := &game.Player{ID: 1, Name: "Tester", Level: 8, Health: 100, MaxHealth: 100}
 
 	e.mu.Lock()
 	L := e.L
@@ -89,7 +139,6 @@ func TestBenjaminOnSay(t *testing.T) {
 	err := L.PCall(4, 0, nil)
 	e.mu.Unlock()
 	if err != nil {
-		t.Fatalf("onSay error (this is the repro): %v", err)
+		t.Errorf("%s: onSay error: %v", display, err)
 	}
-	t.Log("onSay ran without error")
 }
