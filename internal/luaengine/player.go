@@ -292,6 +292,7 @@ var playerMethods = map[string]lua.LGFunction{
 	"setLoyaltyTitle": playerSetloyaltytitle,
 	"updateConcoction": playerUpdateconcoction,
 	"updateFood": playerUpdatefood,
+	"feed": playerFeed,
 	"clearSpellCooldowns": playerClearspellcooldowns,
 	"isVip": playerIsvip,
 	"getVipDays": playerGetvipdays,
@@ -523,10 +524,13 @@ func playerAddminorcharmechoes(L *lua.LState) int {
 }
 
 func playerAddmoney(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	amount := uint64(L.CheckNumber(2))
+	p.AddMoney(amount)
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -1438,11 +1442,12 @@ func playerGetmaxsoul(L *lua.LState) int {
 }
 
 func playerGetmoney(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.GetMoney()))
 	return 1
 }
 
@@ -2196,10 +2201,12 @@ func playerRemoveitem(L *lua.LState) int {
 }
 
 func playerRemovemoney(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	amount := uint64(L.CheckNumber(2))
+	L.Push(lua.LBool(p.RemoveMoney(amount)))
 	return 1
 }
 
@@ -2934,6 +2941,14 @@ func playerUpdateconcoction(L *lua.LState) int {
 }
 
 func playerUpdatefood(L *lua.LState) int {
+	if checkPlayer(L) == nil {
+		return 0
+	}
+	L.Push(lua.LTrue) // not modelled yet; safe default
+	return 1
+}
+
+func playerFeed(L *lua.LState) int {
 	if checkPlayer(L) == nil {
 		return 0
 	}
