@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type xmlItems struct {
@@ -91,6 +92,38 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 	case "capacity":
 		if v, err := strconv.ParseUint(attr.Value, 10, 32); err == nil {
 			it.Capacity = uint32(v)
+		}
+	case "maxhitchance", "maxHitChance":
+		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {
+			it.MaxHitChance = int32(v)
+		}
+	case "hitchance", "hitChance":
+		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {
+			it.HitChance = int32(v)
+		}
+	case "range":
+		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {
+			it.Range = int32(v)
+		}
+	case "shoottype", "shootType":
+		it.ShootType = attr.Value
+	case "ammotype", "ammoType":
+		it.AmmoType = attr.Value
+	case "transformequipto", "transformEquipTo":
+		if v, err := strconv.ParseUint(attr.Value, 10, 16); err == nil {
+			it.TransformEquipTo = uint16(v)
+		}
+	case "transformdeequipto", "transformDeEquipTo":
+		if v, err := strconv.ParseUint(attr.Value, 10, 16); err == nil {
+			it.TransformDeEquipTo = uint16(v)
+		}
+	default:
+		// Attempt to parse as int for Stats (e.g., skillSword, absorbpercentfire, elementice)
+		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {
+			if it.Stats == nil {
+				it.Stats = make(map[string]int32)
+			}
+			it.Stats[strings.ToLower(attr.Key)] = int32(v)
 		}
 	}
 	for _, child := range attr.Attributes {

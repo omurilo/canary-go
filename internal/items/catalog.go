@@ -71,6 +71,18 @@ type ItemType struct {
 	Charges      uint32
 	ShowCharges  bool
 	Capacity     uint32
+
+	MaxHitChance int32
+	HitChance    int32
+	Range        int32
+	ShootType    string
+	AmmoType     string
+
+	TransformEquipTo   uint16
+	TransformDeEquipTo uint16
+
+	// Stats stores values like "skillsword", "absorbpercentfire", "elementice", "magiclevelpoints", etc.
+	Stats map[string]int32
 }
 
 // AlwaysOnTop reports whether the item stacks below creatures on a tile.
