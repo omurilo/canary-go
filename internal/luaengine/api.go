@@ -93,10 +93,25 @@ func (e *Engine) registerAPI() {
 			L.SetGlobal(name, classTable)
 		}
 	}
-	ensureClassTable("Player")
-	ensureClassTable("Monster")
-	ensureClassTable("Npc")
-	ensureClassTable("Creature")
+	// Player/Creature/Npc/Monster are also callable constructors: Player(x)
+	// resolves x (a creature userdata, or a numeric creature id) to the matching
+	// userdata, mirroring the C++ Player(cid)/Creature(cid) lookups. NPC dialog
+	// scripts rely on Player(creature):getPosition() etc. A dummy __call here
+	// would return nil and crash those scripts.
+	setCreatureConstructor := func(name string) {
+		classTable := L.NewTable()
+		mt := L.NewTypeMetatable(name + "_ClassCtor")
+		L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int {
+			return e.creatureConstructorCall(L, name)
+		}))
+		// Keep field injection working (e.g. Player.feed = ...) on the table.
+		L.SetMetatable(classTable, mt)
+		L.SetGlobal(name, classTable)
+	}
+	setCreatureConstructor("Player")
+	setCreatureConstructor("Monster")
+	setCreatureConstructor("Npc")
+	setCreatureConstructor("Creature")
 	ensureClassTable("ItemType")
 	ensureClassTable("MonsterType")
 	ensureClassTable("Teleport")

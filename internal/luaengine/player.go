@@ -1081,8 +1081,13 @@ func playerGetstashitemcount(L *lua.LState) int {
 }
 
 func playerGetstoragevalue(L *lua.LState) int {
-	// TODO: implement getStorageValue
-	return 0
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LNumber(p.GetStorageValue(uint32(luaOptInt(L, 2)))))
+	return 1
 }
 
 func playerGetstoreinbox(L *lua.LState) int {
@@ -1767,8 +1772,13 @@ func playerSetstaminaxpboost(L *lua.LState) int {
 }
 
 func playerSetstoragevalue(L *lua.LState) int {
-	// TODO: implement setStorageValue
-	return 0
+	p := checkPlayer(L)
+	if p == nil {
+		return 0
+	}
+	p.SetStorageValue(uint32(luaOptInt(L, 2)), int32(luaOptInt(L, 3)))
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func playerSettown(L *lua.LState) int {

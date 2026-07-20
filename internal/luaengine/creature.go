@@ -47,6 +47,70 @@ func checkCreature(L *lua.LState) game.Creature {
 	return getCreature(L, 1)
 }
 
+// creatureConstructorCall implements the Player(x)/Creature(x)/Npc(x)/Monster(x)
+// global constructors. __call passes the class table as arg #1, so the real
+// argument is #2: either a creature userdata (returned as the matching kind) or
+// a numeric creature id (looked up in the world). Pushes nil on miss/mismatch.
+func (e *Engine) creatureConstructorCall(L *lua.LState, kind string) int {
+	var c game.Creature
+	switch arg := L.Get(2); arg.Type() {
+	case lua.LTUserData:
+		if v, ok := arg.(*lua.LUserData).Value.(game.Creature); ok {
+			c = v
+		}
+	case lua.LTNumber:
+		if e.world != nil {
+			c = e.world.CreatureByID(uint32(lua.LVAsNumber(arg)))
+		}
+	}
+	if !e.pushCreatureAs(L, c, kind) {
+		L.Push(lua.LNil)
+	}
+	return 1
+}
+
+// pushCreatureAs pushes c as a userdata bound to the metatable for kind
+// ("Player"/"Npc"/"Monster"/"Creature"). It returns false (pushing nothing)
+// when c is nil or doesn't match the requested concrete kind, so the caller
+// can push nil — mirroring the C++ Player(cid)/Npc(cid) casts that yield nil
+// on a type mismatch.
+func (e *Engine) pushCreatureAs(L *lua.LState, c game.Creature, kind string) bool {
+	if c == nil {
+		return false
+	}
+	metatable := kind
+	switch kind {
+	case "Player":
+		if _, ok := c.(*game.Player); !ok {
+			return false
+		}
+	case "Npc":
+		if _, ok := c.(*game.Npc); !ok {
+			return false
+		}
+	case "Monster":
+		if _, ok := c.(*game.Monster); !ok {
+			return false
+		}
+	default: // "Creature": accept any, but bind the most specific metatable.
+		switch c.(type) {
+		case *game.Player:
+			metatable = "Player"
+		case *game.Npc:
+			metatable = "Npc"
+		case *game.Monster:
+			metatable = "Monster"
+		default:
+			metatable = "Creature"
+		}
+	}
+	ud := L.NewUserData()
+	ud.Value = c
+	L.SetMetatable(ud, L.GetTypeMetatable(metatable))
+	L.Push(ud)
+	return true
+}
+
 // outfitToTable converts a game.Outfit into the { lookType, lookHead, ... }
 // table shape the Lua API uses (Creature:getOutfit / setOutfit).
 func outfitToTable(L *lua.LState, o game.Outfit) *lua.LTable {
