@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
@@ -34,6 +35,11 @@ type Engine struct {
 
 	npcCallbacksMu sync.Mutex
 	npcCallbacks   map[string]map[string]*lua.LFunction
+
+	// Scheduled Lua events (addEvent/stopEvent). Guarded by eventMu.
+	eventMu  sync.Mutex
+	eventSeq int
+	events   map[int]*time.Timer
 }
 
 // New creates an engine with the base libraries loaded.
@@ -42,7 +48,67 @@ func New(world *game.World, log *slog.Logger) *Engine {
 	e := &Engine{L: L, log: log, world: world}
 	e.registerAPI()
 	e.overrideFileLoaders()
+	e.registerScheduler()
 	return e
+}
+
+// registerScheduler installs the global addEvent/stopEvent scheduling functions
+// (g_dispatcher/g_scheduler in C++). addEvent(callback, delayMs, ...args)
+// queues callback(...args) after delayMs and returns a cancellable event id;
+// stopEvent(id) cancels it. Used pervasively by NPC dialogue, spells, quests.
+func (e *Engine) registerScheduler() {
+	e.L.SetGlobal("addEvent", e.L.NewFunction(e.luaAddEvent))
+	e.L.SetGlobal("stopEvent", e.L.NewFunction(e.luaStopEvent))
+}
+
+func (e *Engine) luaAddEvent(L *lua.LState) int {
+	fn, ok := L.Get(1).(*lua.LFunction)
+	if !ok {
+		L.RaiseError("addEvent: first argument must be a function")
+		return 0
+	}
+	delay := time.Duration(L.CheckInt(2)) * time.Millisecond
+	if delay < 0 {
+		delay = 0
+	}
+	// Capture the remaining arguments to forward to the callback.
+	var args []lua.LValue
+	for i := 3; i <= L.GetTop(); i++ {
+		args = append(args, L.Get(i))
+	}
+
+	e.eventMu.Lock()
+	e.eventSeq++
+	id := e.eventSeq
+	if e.events == nil {
+		e.events = make(map[int]*time.Timer)
+	}
+	e.events[id] = time.AfterFunc(delay, func() {
+		e.eventMu.Lock()
+		delete(e.events, id)
+		e.eventMu.Unlock()
+
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		if err := e.L.CallByParam(lua.P{Fn: fn, NRet: 0, Protect: true}, args...); err != nil {
+			e.log.Error("addEvent callback", "err", err)
+		}
+	})
+	e.eventMu.Unlock()
+
+	L.Push(lua.LNumber(id))
+	return 1
+}
+
+func (e *Engine) luaStopEvent(L *lua.LState) int {
+	id := L.OptInt(1, 0)
+	e.eventMu.Lock()
+	if t, ok := e.events[id]; ok {
+		t.Stop()
+		delete(e.events, id)
+	}
+	e.eventMu.Unlock()
+	return 0
 }
 
 // overrideFileLoaders replaces the builtin dofile/loadfile so nested dofile()

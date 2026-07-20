@@ -58,6 +58,7 @@ func (e *Engine) registerAPI() {
 	e.registerMoveEvent()
 	e.registerMonsterType()
 	e.registerNpcType()
+	e.registerNetworkMessage()
 
 	// Mock constructors for unused revscriptsys classes so scripts don't crash
 	mockClass := func(name string) {
