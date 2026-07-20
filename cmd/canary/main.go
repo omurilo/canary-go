@@ -297,6 +297,19 @@ func run(o runOpts, log *slog.Logger) error {
 	coreData := filepath.Dir(filepath.Dir(o.appearances)) // e.g. ../data
 	if coreData != "" && coreData != cfg.DataPack {
 		lengine.L.SetGlobal("CORE_DIRECTORY", lua.LString(coreData))
+		// data/global.lua + stages.lua are the C++ bootstrap (dofiled by
+		// data/core.lua). They define base helpers/constants — IsTravelFree,
+		// IsRetroPVP, NORTH/EAST direction aliases, rate globals — that the
+		// npclib modules rely on (e.g. StdModule.say calls IsTravelFree()).
+		// Without them those globals are nil and every keyword reply errors.
+		for _, f := range []string{"global.lua", "stages.lua"} {
+			p := filepath.Join(coreData, f)
+			if _, err := os.Stat(p); err == nil {
+				if err := lengine.DoFile(p); err != nil {
+					log.Warn("loading core bootstrap", "file", p, "err", err)
+				}
+			}
+		}
 		for _, sub := range []string{"lib", "libs", "npclib", "scripts"} {
 			d := filepath.Join(coreData, sub)
 			if err := loadScripts(lengine, d, log); err != nil {

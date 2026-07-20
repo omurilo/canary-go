@@ -163,12 +163,23 @@ func (e *Engine) overrideFileLoaders() {
 		path := L.CheckString(1)
 		fn, err := load(L, path)
 		if err != nil {
-			L.RaiseError("dofile: %s", err.Error())
+			// Compile error: log and continue rather than aborting the caller.
+			// The datapack bootstrap is one long dofile chain (global.lua →
+			// lib.lua → ...); a hard abort on one un-ported file would drop every
+			// later definition (e.g. global.lua's IsTravelFree, defined after its
+			// own dofiles). Resilience beats fidelity during the incremental port.
+			e.log.Warn("dofile compile error", "file", path, "err", err)
 			return 0
 		}
 		top := L.GetTop()
 		L.Push(fn)
-		L.Call(0, lua.MultRet)
+		if perr := L.PCall(0, lua.MultRet, nil); perr != nil {
+			// Runtime error inside the loaded chunk: log and continue so the
+			// parent chunk keeps executing (nested require/dofile failures in
+			// not-yet-ported libs must not cascade).
+			e.log.Warn("dofile runtime error", "file", path, "err", perr)
+			return 0
+		}
 		return L.GetTop() - top
 	}))
 	e.L.SetGlobal("loadfile", e.L.NewFunction(func(L *lua.LState) int {
