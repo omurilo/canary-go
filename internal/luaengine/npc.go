@@ -19,11 +19,15 @@ func checkNpc(L *lua.LState) *game.Npc {
 // registerNpc registers the Npc userdata type.
 func (e *Engine) registerNpc() {
 	mt := e.L.NewTypeMetatable("Npc")
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), npcMethods))
-	
+	// Npc IS-A Creature: expose all creature methods, npc-specific win.
+	idx := e.L.NewTable()
+	e.L.SetFuncs(idx, creatureMethods)
+	e.L.SetFuncs(idx, npcMethods)
+	e.L.SetField(mt, "__index", idx)
+
 	// Override methods that need the engine/world instance
-	e.L.SetField(e.L.GetField(mt, "__index"), "say", e.L.NewFunction(e.npcSay))
-	e.L.SetField(e.L.GetField(mt, "__index"), "openShopWindow", e.L.NewFunction(e.npcOpenshopwindow))
+	e.L.SetField(idx, "say", e.L.NewFunction(e.npcSay))
+	e.L.SetField(idx, "openShopWindow", e.L.NewFunction(e.npcOpenshopwindow))
 }
 
 var npcMethods = map[string]lua.LGFunction{

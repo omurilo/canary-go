@@ -18,7 +18,13 @@ func checkPlayer(L *lua.LState) *game.Player {
 // registerPlayerType registers the Player userdata type.
 func (e *Engine) registerPlayerType() {
 	mt := e.L.NewTypeMetatable("Player")
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), playerMethods))
+	// Player IS-A Creature (C++ Player : Creature), so it must expose every
+	// Creature method (getId, getPosition, getHealth, say, teleportTo, ...).
+	// Layer creature methods first, then let player-specific methods override.
+	idx := e.L.NewTable()
+	e.L.SetFuncs(idx, creatureMethods)
+	e.L.SetFuncs(idx, playerMethods)
+	e.L.SetField(mt, "__index", idx)
 }
 
 var playerMethods = map[string]lua.LGFunction{

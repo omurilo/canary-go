@@ -220,8 +220,13 @@ func creatureGeticons(L *lua.LState) int {
 }
 
 func creatureGetid(L *lua.LState) int {
-	// TODO: implement getId
-	return 0
+	c := checkCreature(L)
+	if c == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LNumber(c.GetID()))
+	return 1
 }
 
 func creatureGetlight(L *lua.LState) int {

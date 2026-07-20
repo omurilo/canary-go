@@ -279,6 +279,19 @@ func run(o runOpts, log *slog.Logger) error {
 			}
 		}
 	}
+	// The datapack ships its own lib/ (data-otservbr-global/lib) that defines
+	// Storage, Storage.Quest and the quest/boss constants that the core npclib
+	// (e.g. data/npclib/npc_system/custom_modules.lua) AND the datapack scripts
+	// reference. In the C++ flow data/global.lua dofiles it via DATA_DIRECTORY
+	// before the rest; the Go loader bypasses that bootstrap, so load it FIRST
+	// (with DATA_DIRECTORY set for the scripts' own dofile chains) — before the
+	// core npclib and the datapack scripts/monsters/npcs that depend on Storage.
+	if cfg.DataPack != "" {
+		lengine.L.SetGlobal("DATA_DIRECTORY", lua.LString(cfg.DataPack))
+		if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "lib"), log); err != nil {
+			log.Warn("loading datapack lib", "err", err)
+		}
+	}
 	// datapack npc scripts require, and data/scripts/spells holds the player
 	// vocation spells. Load these (libs first) BEFORE the datapack scripts/npcs.
 	coreData := filepath.Dir(filepath.Dir(o.appearances)) // e.g. ../data
@@ -289,18 +302,6 @@ func run(o runOpts, log *slog.Logger) error {
 			if err := loadScripts(lengine, d, log); err != nil {
 				log.Warn("loading core data", "dir", d, "err", err)
 			}
-		}
-	}
-	// The datapack ships its own lib/ (data-otservbr-global/lib) that defines
-	// Storage, Storage.Quest and the quest/boss constants the datapack scripts
-	// and NPCs reference. In the C++ flow data/global.lua dofiles it via
-	// DATA_DIRECTORY; the Go loader bypasses that bootstrap, so load it here
-	// (with DATA_DIRECTORY set for the scripts' own dofile chains) BEFORE the
-	// datapack scripts/monsters/npcs that depend on those globals.
-	if cfg.DataPack != "" {
-		lengine.L.SetGlobal("DATA_DIRECTORY", lua.LString(cfg.DataPack))
-		if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "lib"), log); err != nil {
-			log.Warn("loading datapack lib", "err", err)
 		}
 	}
 	if err := loadScripts(lengine, scriptsDir, log); err != nil {

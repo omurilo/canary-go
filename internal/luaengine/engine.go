@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -40,7 +41,48 @@ func New(world *game.World, log *slog.Logger) *Engine {
 	L := lua.NewState()
 	e := &Engine{L: L, log: log, world: world}
 	e.registerAPI()
+	e.overrideFileLoaders()
 	return e
+}
+
+// overrideFileLoaders replaces the builtin dofile/loadfile so nested dofile()
+// chains (e.g. data/npclib/load.lua → npc_system/modules.lua) get the same
+// \z-continuation preprocessing as top-level DoFile loads. gopher-lua's builtin
+// dofile skips it and chokes on Lua 5.3 string continuations ("unterminated
+// string"), which aborts the whole ordered load chain. These run while the
+// engine lock is already held by the outer DoFile/DoString, so they must NOT
+// re-lock.
+func (e *Engine) overrideFileLoaders() {
+	load := func(L *lua.LState, path string) (*lua.LFunction, error) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		return L.Load(strings.NewReader(preprocessLuaSource(string(data))), path)
+	}
+	e.L.SetGlobal("dofile", e.L.NewFunction(func(L *lua.LState) int {
+		path := L.CheckString(1)
+		fn, err := load(L, path)
+		if err != nil {
+			L.RaiseError("dofile: %s", err.Error())
+			return 0
+		}
+		top := L.GetTop()
+		L.Push(fn)
+		L.Call(0, lua.MultRet)
+		return L.GetTop() - top
+	}))
+	e.L.SetGlobal("loadfile", e.L.NewFunction(func(L *lua.LState) int {
+		path := L.CheckString(1)
+		fn, err := load(L, path)
+		if err != nil {
+			L.Push(lua.LNil)
+			L.Push(lua.LString(err.Error()))
+			return 2
+		}
+		L.Push(fn)
+		return 1
+	}))
 }
 
 // Close releases the Lua state.
@@ -51,7 +93,9 @@ func (e *Engine) Close() {
 }
 
 // DoFile executes a Lua script file under the engine lock.
-// It preprocesses \z continuation sequences (Lua 5.3) that gopher-lua (5.1) doesn't support.
+// It preprocesses \z continuation sequences (Lua 5.3) that gopher-lua (5.1)
+// doesn't support, and names the chunk after its path so runtime tracebacks
+// point at the real file:line instead of an opaque "<string>".
 func (e *Engine) DoFile(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -60,7 +104,12 @@ func (e *Engine) DoFile(path string) error {
 	src := preprocessLuaSource(string(data))
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.L.DoString(src)
+	fn, err := e.L.Load(strings.NewReader(src), path)
+	if err != nil {
+		return err
+	}
+	e.L.Push(fn)
+	return e.L.PCall(0, lua.MultRet, nil)
 }
 
 // DoString executes a Lua chunk under the engine lock.
