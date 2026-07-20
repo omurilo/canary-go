@@ -155,6 +155,20 @@ func (p *Player) SendOpenShop(npc Creature, items []creatures.ShopItem) {
 			w.AddU32(item.SellPrice)
 		}
 		p.Session.SendToClient(w)
+
+		// Resource balances so the shop shows the player's funds on open
+		// (0xEE: RESOURCE_BANK=0, RESOURCE_INVENTORY_MONEY=1).
+		bank := netmsg.NewWriter()
+		bank.AddByte(0xEE)
+		bank.AddByte(0x00)
+		bank.AddU64(p.BankBalance)
+		p.Session.SendToClient(bank)
+
+		inv := netmsg.NewWriter()
+		inv.AddByte(0xEE)
+		inv.AddByte(0x01)
+		inv.AddU64(p.GetMoney())
+		p.Session.SendToClient(inv)
 	}
 }
 

@@ -587,20 +587,40 @@ func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 	
 	// Fast path: if no backpack, or if we need a place, just create and dump to backpack contents
 	if bp != nil {
-		for i := 0; i < int(amount); i++ {
-			item := &game.Item{ID: itemID, Count: 1}
-			if subType > 0 {
-				item.Count = uint16(subType)
-			}
+		it := g.deps.Items.Get(itemID)
+		stackable := it != nil && it.Stackable
+		if stackable {
+			// Stackable: one entry with the full count (client shows a stack).
+			item := &game.Item{ID: itemID, Count: uint16(amount)}
 			bp.Contents = append(bp.Contents, item)
-			addedCount++
+			addedCount = uint16(amount)
+		} else {
+			for i := 0; i < int(amount); i++ {
+				bp.Contents = append(bp.Contents, &game.Item{ID: itemID, Count: 1})
+				addedCount++
+			}
 		}
-		g.player.SendTextMessage(0x14, fmt.Sprintf("Bought %d %dx items for %d gold.", amount, subType, totalCost))
-		// We should notify client about updated capacity and bank balance
+		g.player.SendTextMessage(0x14, fmt.Sprintf("Bought %dx for %d gold.", amount, totalCost))
+		// Reflect the purchase in the client: refresh the backpack window (if
+		// open) and its inventory slot so the items actually appear.
+		g.refreshContainerIfOpen(bp)
+		g.sendInventoryItem(3, bp)
 		g.sendStats()
+		g.sendShopGoods()
 	} else {
 		g.player.SendTextMessage(0x13, "You do not have a backpack to store this item.")
 		g.player.BankBalance += totalCost
+	}
+}
+
+// refreshContainerIfOpen re-sends a container's window to the client when the
+// player currently has it open, so item add/remove is reflected live.
+func (g *GameProtocol) refreshContainerIfOpen(container *game.Item) {
+	for cid, open := range g.containers {
+		if open == container {
+			g.sendContainer(cid, container, false)
+			return
+		}
 	}
 }
 
@@ -670,7 +690,10 @@ func (g *GameProtocol) parseSellItem(r *netmsg.Reader) {
 	totalGain := uint64(price) * uint64(removedAmount)
 	g.player.BankBalance += totalGain
 	g.player.SendTextMessage(0x14, fmt.Sprintf("Sold %d items for %d gold.", removedAmount, totalGain))
+	g.refreshContainerIfOpen(bp)
+	g.sendInventoryItem(3, bp)
 	g.sendStats()
+	g.sendShopGoods()
 }
 
 func (g *GameProtocol) parseCloseShop(r *netmsg.Reader) {
