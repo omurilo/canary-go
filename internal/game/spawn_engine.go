@@ -1,8 +1,10 @@
 package game
 
 import (
+	"strings"
 	"time"
 
+	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/spawns"
 )
 
@@ -22,16 +24,22 @@ type Spawn struct {
 type SpawnEngine struct {
 	world  *World
 	spawns []*Spawn
+	Types  *creatures.TypeRegistry
 }
 
 // NewSpawnEngine creates a new SpawnEngine.
-func NewSpawnEngine(w *World) *SpawnEngine {
-	return &SpawnEngine{world: w}
+func NewSpawnEngine(w *World, types *creatures.TypeRegistry) *SpawnEngine {
+	return &SpawnEngine{
+		world: w,
+		Types: types,
+	}
 }
 
 // LoadSpawns loads spawns from parsed XML data.
 func (e *SpawnEngine) LoadSpawns(data *spawns.SpawnsData) {
-	for _, sn := range data.Spawns {
+	allNodes := append(data.Spawns, data.Monsters...)
+	allNodes = append(allNodes, data.NPCs...)
+	for _, sn := range allNodes {
 		for _, mn := range sn.Monsters {
 			pos := Position{
 				X: uint16(sn.CenterX + mn.X),
@@ -104,11 +112,19 @@ func (e *SpawnEngine) spawnCreature(s *Spawn) {
 	id := e.world.nextCreatureID.Add(1)
 
 	if s.IsNPC {
-		npc := NewNpc(id, s.Name)
+		var nType *creatures.NpcType
+		if e.Types != nil {
+			nType = e.Types.Npcs[strings.ToLower(s.Name)]
+		}
+		npc := NewNpc(id, s.Name, nType)
 		npc.SetPosition(s.Pos)
 		c = npc
 	} else {
-		monster := NewMonster(id, s.Name, 100)
+		var mType *creatures.MonsterType
+		if e.Types != nil {
+			mType = e.Types.Monsters[strings.ToLower(s.Name)]
+		}
+		monster := NewMonster(id, s.Name, mType)
 		monster.SetPosition(s.Pos)
 		c = monster
 	}

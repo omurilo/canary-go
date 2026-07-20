@@ -485,8 +485,22 @@ func creatureSettarget(L *lua.LState) int {
 }
 
 func creatureTeleportto(L *lua.LState) int {
-	// TODO: implement teleportTo
-	return 0
+	c := checkCreature(L)
+	if c == nil {
+		return 0
+	}
+	// pos is a table at index 2
+	posTable := L.CheckTable(2)
+	pos := game.Position{
+		X: uint16(L.GetField(posTable, "x").(lua.LNumber)),
+		Y: uint16(L.GetField(posTable, "y").(lua.LNumber)),
+		Z: uint8(L.GetField(posTable, "z").(lua.LNumber)),
+	}
+
+	c.SetPosition(pos)
+
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func creatureUnregisterevent(L *lua.LState) int {

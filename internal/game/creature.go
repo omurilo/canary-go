@@ -14,6 +14,10 @@ type Creature interface {
 	SetPosition(pos Position)
 	GetDirection() Direction
 	SetDirection(dir Direction)
+	GetOutfit() Outfit
+	GetLightLevel() uint8
+	GetLightColor() uint8
+	GetSpeed() uint16
 }
 
 type BaseCreature struct {
@@ -21,9 +25,13 @@ type BaseCreature struct {
 	Name      string
 	Health    uint32
 	MaxHealth uint32
-	Target    Creature
-	Pos       Position
-	Direction Direction
+	Target     Creature
+	Pos        Position
+	Direction  Direction
+	Outfit     Outfit
+	LightLevel uint8
+	LightColor uint8
+	Speed      uint16
 }
 
 func (c *BaseCreature) GetID() uint32 { return c.ID }
@@ -60,4 +68,8 @@ func (c *BaseCreature) GetPosition() Position { return c.Pos }
 func (c *BaseCreature) SetPosition(pos Position) { c.Pos = pos }
 func (c *BaseCreature) GetDirection() Direction { return c.Direction }
 func (c *BaseCreature) SetDirection(dir Direction) { c.Direction = dir }
+func (c *BaseCreature) GetOutfit() Outfit { return c.Outfit }
+func (c *BaseCreature) GetLightLevel() uint8 { return c.LightLevel }
+func (c *BaseCreature) GetLightColor() uint8 { return c.LightColor }
+func (c *BaseCreature) GetSpeed() uint16 { return c.Speed }
 

@@ -7,8 +7,12 @@ import (
 )
 
 type SpawnsData struct {
-	XMLName xml.Name    `xml:"spawns"`
-	Spawns  []SpawnNode `xml:"spawn"`
+	// Old format (spawns/spawn)
+	Spawns []SpawnNode `xml:"spawn"`
+	// New Canary format (monsters/monster)
+	Monsters []SpawnNode `xml:"monster"`
+	// New Canary format (npcs/npc)
+	NPCs []SpawnNode `xml:"npc"`
 }
 
 type SpawnNode struct {

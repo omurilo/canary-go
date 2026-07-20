@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/moveevents"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -14,8 +15,8 @@ import (
 func (g *GameProtocol) walk(dir game.Direction) bool {
 	p := g.player
 	oldPos := p.Pos
-	idxOld := g.buildCreatureIndex(oldPos)
-	oldStack := g.stackPosOf(oldPos, p.ID, idxOld)
+
+	oldStack := g.StackPosOf(oldPos, p.ID)
 
 	newPos, ok := g.deps.World.TryMove(p, dir)
 	if !ok {
@@ -65,30 +66,64 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 		case "eastalt":
 			teleportPos.Z--
 			teleportPos.X+=2
-		// Add others if needed, but these are the main ones
 		}
 		
 		g.broadcastRemove(p)
-		
 		g.deps.World.SetPosition(p, teleportPos)
 		
-		// Send full map
-		idx := g.buildCreatureIndex(p.Pos)
 		w := netmsg.NewWriter()
 		w.AddByte(opFullMap)
 		w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
-		g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight, idx)
+		g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight)
 		g.SendToClient(w)
 		
 		g.broadcastAppear(p)
 		return true
 	}
 
-	// Tell everyone (including self) the creature moved.
-	g.broadcastMove(p, oldPos, oldStack, newPos)
-
 	// Self: shift the visible map in the walk direction.
+	g.SendCreatureMove(oldPos, oldStack, newPos)
 	g.sendMapShift(dir, newPos)
+
+	// Trigger StepIn events
+	if tile := g.deps.World.Map.GetTile(newPos); tile != nil {
+		var stepInEvents []*moveevents.MoveEvent
+		var stepInItems []*game.Item
+
+		if tile.Ground != nil {
+			if evt := moveevents.FindStepInByItemID(tile.Ground.ID); evt != nil {
+				stepInEvents = append(stepInEvents, evt)
+				stepInItems = append(stepInItems, tile.Ground)
+			}
+		}
+		for _, it := range tile.Items {
+			if evt := moveevents.FindStepInByItemID(it.ID); evt != nil {
+				stepInEvents = append(stepInEvents, evt)
+				stepInItems = append(stepInItems, it)
+			}
+		}
+
+		for i, evt := range stepInEvents {
+			it := stepInItems[i]
+			g.deps.Lua.CallStepIn(evt, p, it, newPos, oldPos)
+			// If lua script changed player position (e.g. teleportTo), update client
+			if p.Pos != newPos {
+				teleportedTo := p.Pos
+				p.Pos = newPos
+				g.broadcastRemove(p)
+				p.Pos = teleportedTo
+
+				w := netmsg.NewWriter()
+				w.AddByte(opFullMap)
+				w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
+				g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight)
+				g.SendToClient(w)
+				g.broadcastAppear(p)
+				break
+			}
+		}
+	}
+
 	return true
 }
 
@@ -207,26 +242,26 @@ func (g *GameProtocol) stepDuration(dir game.Direction) time.Duration {
 
 // sendMapShift sends the newly revealed strip after the player moved.
 func (g *GameProtocol) sendMapShift(dir game.Direction, pos game.Position) {
-	idx := g.buildCreatureIndex(pos)
+	
 	w := netmsg.NewWriter()
 	switch dir {
 	case game.DirNorth:
 		w.AddByte(opMapNorth)
-		g.addMapDescription(w, int(pos.X)-viewportX, int(pos.Y)-viewportY, pos.Z, mapWidth, 1, idx)
+		g.addMapDescription(w, int(pos.X)-viewportX, int(pos.Y)-viewportY, pos.Z, mapWidth, 1)
 	case game.DirSouth:
 		w.AddByte(opMapSouth)
-		g.addMapDescription(w, int(pos.X)-viewportX, int(pos.Y)+viewportY+1, pos.Z, mapWidth, 1, idx)
+		g.addMapDescription(w, int(pos.X)-viewportX, int(pos.Y)+viewportY+1, pos.Z, mapWidth, 1)
 	case game.DirEast:
 		w.AddByte(opMapEast)
-		g.addMapDescription(w, int(pos.X)+viewportX+1, int(pos.Y)-viewportY, pos.Z, 1, mapHeight, idx)
+		g.addMapDescription(w, int(pos.X)+viewportX+1, int(pos.Y)-viewportY, pos.Z, 1, mapHeight)
 	case game.DirWest:
 		w.AddByte(opMapWest)
-		g.addMapDescription(w, int(pos.X)-viewportX, int(pos.Y)-viewportY, pos.Z, 1, mapHeight, idx)
+		g.addMapDescription(w, int(pos.X)-viewportX, int(pos.Y)-viewportY, pos.Z, 1, mapHeight)
 	default:
 		// Diagonal: send a full map redraw.
 		w.AddByte(opFullMap)
 		w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
-		g.addMapDescription(w, int(pos.X)-viewportX, int(pos.Y)-viewportY, pos.Z, mapWidth, mapHeight, idx)
+		g.addMapDescription(w, int(pos.X)-viewportX, int(pos.Y)-viewportY, pos.Z, mapWidth, mapHeight)
 	}
 	g.SendToClient(w)
 }
@@ -235,8 +270,8 @@ func (g *GameProtocol) sendMapShift(dir game.Direction, pos game.Position) {
 func (g *GameProtocol) turn(dir game.Direction) {
 	p := g.player
 	p.Direction = dir
-	idx := g.buildCreatureIndex(p.Pos)
-	stack := g.stackPosOf(p.Pos, p.ID, idx)
+	
+	stack := g.StackPosOf(p.Pos, p.ID)
 
 	notify := func(gp *GameProtocol) {
 		w := netmsg.NewWriter()
@@ -284,6 +319,7 @@ func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text st
 		w.AddByte(opCreatureSay)
 		w.AddU32(g.statementID)
 		w.AddString(speaker.Name)
+		w.AddByte(0) // Show (Traded)
 		w.AddU16(speaker.Level)
 		w.AddByte(talkType)
 		w.AddPosition(netmsg.Position{X: speaker.Pos.X, Y: speaker.Pos.Y, Z: speaker.Pos.Z})
@@ -298,67 +334,40 @@ func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text st
 	}
 }
 
-// broadcastMove informs the mover and all relevant spectators.
-func (g *GameProtocol) broadcastMove(p *game.Player, oldPos game.Position, oldStack uint8, newPos game.Position) {
-	// Self already handled via map shift; also send explicit move so the client
-	// relocates the creature marker.
-	moveTo := func(gp *GameProtocol) {
-		w := netmsg.NewWriter()
-		w.AddByte(opCreatureMove)
-		w.AddPosition(netmsg.Position{X: oldPos.X, Y: oldPos.Y, Z: oldPos.Z})
-		w.AddByte(oldStack)
-		w.AddPosition(netmsg.Position{X: newPos.X, Y: newPos.Y, Z: newPos.Z})
-		gp.SendToClient(w)
-	}
-	moveTo(g)
-
-	visited := map[uint32]bool{p.ID: true}
-	for _, s := range g.deps.World.Spectators(oldPos, p.ID) {
-		gp, ok := s.Session.(*GameProtocol)
-		if !ok || visited[s.ID] {
-			continue
-		}
-		visited[s.ID] = true
-		if s.Pos.InRangeOf(newPos) && gp.known[p.ID] {
-			moveTo(gp)
-		} else {
-			gp.sendRemoveCreatureAt(oldPos, oldStack)
-		}
-	}
-	for _, s := range g.deps.World.Spectators(newPos, p.ID) {
-		gp, ok := s.Session.(*GameProtocol)
-		if !ok || visited[s.ID] {
-			continue
-		}
-		visited[s.ID] = true
-		gp.sendAppendCreature(p, newPos)
-	}
-}
-
 // broadcastAppear tells nearby players a creature entered their view.
-func (g *GameProtocol) broadcastAppear(p *game.Player) {
-	for _, s := range g.deps.World.Spectators(p.Pos, p.ID) {
+func (g *GameProtocol) broadcastAppear(p game.Creature) {
+	for _, s := range g.deps.World.Spectators(p.GetPosition(), p.GetID()) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
-			gp.sendAppendCreature(p, p.Pos)
+			gp.SendAppendCreature(p, p.GetPosition())
 		}
 	}
 }
 
 // broadcastRemove tells nearby players a creature left.
-func (g *GameProtocol) broadcastRemove(p *game.Player) {
-	idx := g.buildCreatureIndex(p.Pos)
-	stack := g.stackPosOf(p.Pos, p.ID, idx)
-	for _, s := range g.deps.World.Spectators(p.Pos, p.ID) {
+func (g *GameProtocol) broadcastRemove(p game.Creature) {
+	
+	stack := g.StackPosOf(p.GetPosition(), p.GetID())
+	for _, s := range g.deps.World.Spectators(p.GetPosition(), p.GetID()) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
-			gp.sendRemoveCreatureAt(p.Pos, stack)
+			gp.SendRemoveCreatureAt(p.GetPosition(), stack)
 		}
 	}
 }
 
-// sendAppendCreature adds a creature onto a tile in this client's view.
-func (g *GameProtocol) sendAppendCreature(p *game.Player, pos game.Position) {
-	idx := g.buildCreatureIndex(pos)
-	stack := g.stackPosOf(pos, p.ID, idx)
+// SendCreatureMove sends a move packet.
+func (g *GameProtocol) SendCreatureMove(oldPos game.Position, oldStack uint8, newPos game.Position) {
+	w := netmsg.NewWriter()
+	w.AddByte(opCreatureMove)
+	w.AddPosition(netmsg.Position{X: oldPos.X, Y: oldPos.Y, Z: oldPos.Z})
+	w.AddByte(oldStack)
+	w.AddPosition(netmsg.Position{X: newPos.X, Y: newPos.Y, Z: newPos.Z})
+	g.SendToClient(w)
+}
+
+// SendAppendCreature adds a creature onto a tile in this client's view.
+func (g *GameProtocol) SendAppendCreature(p game.Creature, pos game.Position) {
+	
+	stack := g.StackPosOf(pos, p.GetID())
 	w := netmsg.NewWriter()
 	w.AddByte(0x6A) // TileAddThing
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
@@ -367,8 +376,8 @@ func (g *GameProtocol) sendAppendCreature(p *game.Player, pos game.Position) {
 	g.SendToClient(w)
 }
 
-// sendRemoveCreatureAt removes a thing at a tile stack position.
-func (g *GameProtocol) sendRemoveCreatureAt(pos game.Position, stack uint8) {
+// SendRemoveCreatureAt removes a thing at a tile stack position.
+func (g *GameProtocol) SendRemoveCreatureAt(pos game.Position, stack uint8) {
 	w := netmsg.NewWriter()
 	w.AddByte(0x6C) // TileRemoveThing
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
@@ -427,5 +436,43 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 	w.AddByte(opTextMessage)
 	w.AddByte(0x12) // MESSAGE_INFO_DESCR (typically 18 / 0x12)
 	w.AddString(desc)
+	g.SendToClient(w)
+}
+
+func (g *GameProtocol) parseAttack(r *netmsg.Reader) {
+	creatureID := r.GetU32()
+	_ = r.GetU32() // seq
+
+	p := g.player
+	if p == nil {
+		return
+	}
+
+	target := g.deps.World.CreatureByID(creatureID)
+	if target == nil {
+		g.sendCancelTarget()
+		p.SetAttackTarget(0)
+		return
+	}
+
+	if _, isNpc := target.(*game.Npc); isNpc {
+		w := netmsg.NewWriter()
+		w.AddByte(opTextMessage)
+		w.AddByte(0x15) // MESSAGE_FAILURE (21)
+		w.AddString("You may not attack this creature.")
+		g.SendToClient(w)
+
+		g.sendCancelTarget()
+		p.SetAttackTarget(0)
+		return
+	}
+
+	p.SetAttackTarget(creatureID)
+}
+
+func (g *GameProtocol) sendCancelTarget() {
+	w := netmsg.NewWriter()
+	w.AddByte(opCancelTarget)
+	w.AddU32(0)
 	g.SendToClient(w)
 }

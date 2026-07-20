@@ -1,0 +1,2 @@
+time=2026-07-19T21:12:29.385-03:00 level=INFO msg="configuration loaded" server=Canary-Go loginPort=7171 gamePort=7172 db=canary
+time=2026-07-19T21:12:29.387-03:00 level=ERROR msg=fatal err="db: ping: dial tcp 0.0.0.0:3306: connect: connection refused"

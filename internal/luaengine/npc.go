@@ -14,8 +14,8 @@ func checkNpc(L *lua.LState) *game.Npc {
 	return nil
 }
 
-// registerNpcType registers the Npc userdata type.
-func (e *Engine) registerNpcType() {
+// registerNpc registers the Npc userdata type.
+func (e *Engine) registerNpc() {
 	mt := e.L.NewTypeMetatable("Npc")
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), npcMethods))
 }

@@ -58,6 +58,8 @@ type Player struct {
 	// index 0 is unused. Persistence of these is a later milestone.
 	Inventory [11]*Item
 
+	TargetID uint32
+
 	Session Session
 }
 
@@ -112,8 +114,13 @@ func (p *Player) AddHealth(amount int32) {
 }
 func (p *Player) GetTarget() Creature { return nil } // Stub for target
 func (p *Player) SetTarget(target Creature) {}
+func (p *Player) SetAttackTarget(id uint32) { p.TargetID = id }
 func (p *Player) ChangeTargetDistance(distance int32) {}
 func (p *Player) GetPosition() Position { return p.Pos }
 func (p *Player) SetPosition(pos Position) { p.Pos = pos }
 func (p *Player) GetDirection() Direction { return p.Direction }
 func (p *Player) SetDirection(dir Direction) { p.Direction = dir }
+func (p *Player) GetOutfit() Outfit { return p.Outfit }
+func (p *Player) GetLightLevel() uint8 { return p.LightLevel }
+func (p *Player) GetLightColor() uint8 { return p.LightColor }
+func (p *Player) GetSpeed() uint16 { return p.Speed }

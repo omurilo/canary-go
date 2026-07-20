@@ -14,8 +14,8 @@ func checkMonster(L *lua.LState) *game.Monster {
 	return nil
 }
 
-// registerMonsterType registers the Monster userdata type.
-func (e *Engine) registerMonsterType() {
+// registerMonster registers the Monster userdata type.
+func (e *Engine) registerMonster() {
 	mt := e.L.NewTypeMetatable("Monster")
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), monsterMethods))
 }

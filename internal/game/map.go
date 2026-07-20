@@ -4,8 +4,9 @@ import "sync"
 
 // Tile holds the contents of a single map cell.
 type Tile struct {
-	Ground *Item
-	Items  []*Item // stacked items (top + down), excluding creatures
+	Ground    *Item
+	Items     []*Item // stacked items (top + down), excluding creatures
+	Creatures []Creature
 }
 
 // Walkable reports whether a creature may stand on the tile.

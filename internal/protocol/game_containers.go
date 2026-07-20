@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"github.com/opentibiabr/canary-go/internal/actions"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
@@ -51,6 +52,64 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	if t == nil {
 		return
 	}
+	
+	// Execute Lua action first
+	action := actions.FindByItemID(item.ID)
+	if action != nil {
+		gamePos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
+		originalPos := g.player.Pos
+		if g.deps.Lua.CallAction(action, g.player, item, gamePos, nil, gamePos, false) {
+			if g.player.Pos != originalPos {
+				teleportedTo := g.player.Pos
+				g.player.Pos = originalPos
+				g.broadcastRemove(g.player)
+				g.player.Pos = teleportedTo
+
+				w := netmsg.NewWriter()
+				w.AddByte(opFullMap)
+				w.AddPosition(netmsg.Position{X: g.player.Pos.X, Y: g.player.Pos.Y, Z: g.player.Pos.Z})
+				g.addMapDescription(w, int(g.player.Pos.X)-viewportX, int(g.player.Pos.Y)-viewportY, g.player.Pos.Z, mapWidth, mapHeight)
+				g.SendToClient(w)
+				g.broadcastAppear(g.player)
+			}
+			return // Handled by Lua script
+		}
+	}
+
+	// Fallback to FloorChange if the item has it
+	if t.FloorChange != "" {
+		teleportPos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
+		// Typically, using a ladder/sewer drops you at the same X/Y but different Z, 
+		// but let's apply the floor change shift if any.
+		switch t.FloorChange {
+		case "down":
+			teleportPos.Z++
+		case "north":
+			teleportPos.Z--
+			teleportPos.Y--
+		case "south":
+			teleportPos.Z--
+			teleportPos.Y++
+		case "east":
+			teleportPos.Z--
+			teleportPos.X++
+		case "west":
+			teleportPos.Z--
+			teleportPos.X--
+		}
+		
+		g.broadcastRemove(g.player)
+		g.deps.World.SetPosition(g.player, teleportPos)
+		
+		w := netmsg.NewWriter()
+		w.AddByte(opFullMap)
+		w.AddPosition(netmsg.Position{X: g.player.Pos.X, Y: g.player.Pos.Y, Z: g.player.Pos.Z})
+		g.addMapDescription(w, int(g.player.Pos.X)-viewportX, int(g.player.Pos.Y)-viewportY, g.player.Pos.Z, mapWidth, mapHeight)
+		g.SendToClient(w)
+		
+		g.broadcastAppear(g.player)
+		return
+	}
 
 	if t.IsContainer() {
 		if pos.X == 0xFFFF {
@@ -59,10 +118,42 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		} else {
 			g.openContainer(item)
 		}
-		return
-	}
+	} else if t.FloorChange != "" {
+		teleportPos := g.player.Pos
+		switch t.FloorChange {
+		case "down":
+			teleportPos.Z++
+		case "north":
+			teleportPos.Z--
+			teleportPos.Y--
+		case "south":
+			teleportPos.Z--
+			teleportPos.Y++
+		case "east":
+			teleportPos.Z--
+			teleportPos.X++
+		case "west":
+			teleportPos.Z--
+			teleportPos.X--
+		case "southalt":
+			teleportPos.Z--
+			teleportPos.Y+=2
+		case "eastalt":
+			teleportPos.Z--
+			teleportPos.X+=2
+		}
 
-	if (t.ForceUse || t.IsLadder) && pos.X != 0xFFFF {
+		g.broadcastRemove(g.player)
+		g.deps.World.SetPosition(g.player, teleportPos)
+
+		w := netmsg.NewWriter()
+		w.AddByte(opFullMap)
+		w.AddPosition(netmsg.Position{X: teleportPos.X, Y: teleportPos.Y, Z: teleportPos.Z})
+		g.addMapDescription(w, int(teleportPos.X)-viewportX, int(teleportPos.Y)-viewportY, teleportPos.Z, mapWidth, mapHeight)
+		g.SendToClient(w)
+
+		g.broadcastAppear(g.player)
+	} else if (t.ForceUse || t.IsLadder) && pos.X != 0xFFFF {
 		teleportPos := game.Position{X: pos.X, Y: pos.Y + 1, Z: pos.Z - 1}
 		p := g.player
 		
@@ -70,11 +161,10 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		
 		g.deps.World.SetPosition(p, teleportPos)
 		
-		idx := g.buildCreatureIndex(p.Pos)
 		w := netmsg.NewWriter()
 		w.AddByte(opFullMap)
 		w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
-		g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight, idx)
+		g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight)
 		g.SendToClient(w)
 		
 		g.broadcastAppear(p)

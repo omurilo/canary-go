@@ -53,18 +53,18 @@ func (g *GameProtocol) teleport(dest game.Position) {
 
 	p := g.player
 	oldPos := p.Pos
-	idxOld := g.buildCreatureIndex(oldPos)
-	oldStack := g.stackPosOf(oldPos, p.ID, idxOld)
+
+	oldStack := g.StackPosOf(oldPos, p.ID)
 
 	g.broadcastRemove(p) // old spectators see us vanish
 	g.deps.World.SetPosition(p, dest)
 
-	g.sendRemoveCreatureAt(oldPos, oldStack) // self: drop the old marker
-	idx := g.buildCreatureIndex(dest)
+	g.SendRemoveCreatureAt(oldPos, oldStack) // self: drop the old marker
+	
 	w := netmsg.NewWriter()
 	w.AddByte(opFullMap)
 	w.AddPosition(netmsg.Position{X: dest.X, Y: dest.Y, Z: dest.Z})
-	g.addMapDescription(w, int(dest.X)-viewportX, int(dest.Y)-viewportY, dest.Z, mapWidth, mapHeight, idx)
+	g.addMapDescription(w, int(dest.X)-viewportX, int(dest.Y)-viewportY, dest.Z, mapWidth, mapHeight)
 	g.SendToClient(w)
 
 	g.sendMagicEffect(dest, constMETeleport)
@@ -148,26 +148,26 @@ func (g *GameProtocol) cmdCreateItem(args []string) {
 func (g *GameProtocol) broadcastAddItem(pos game.Position, item *game.Item) {
 	send := func(gp *GameProtocol) {
 		// The new item sits on top of everything currently on the tile.
-		idx := gp.buildCreatureIndex(pos)
+
 		stack := 0
 		if t := gp.deps.World.Map.GetTile(pos); t != nil {
 			if t.Ground != nil {
 				stack++
 			}
 			stack += len(t.Items) - 1 // the item is already in the stack; index is the rest
+			stack += len(t.Creatures)
 		}
-		stack += len(idx[posKey{pos.X, pos.Y, pos.Z}])
 		w := netmsg.NewWriter()
 		w.AddByte(0x6A) // TileAddThing
 		w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
-		w.AddByte(byte(stack))
+		w.AddByte(byte(stack - 1))
 		gp.addItem(w, item)
 		gp.SendToClient(w)
 	}
 	send(g)
 	for _, s := range g.deps.World.Spectators(pos, g.player.ID) {
-		if gp, ok := s.Session.(*GameProtocol); ok {
-			send(gp)
+		if gp, ok := s.Session.(*GameProtocol); ok && gp.known[g.player.ID] {
+			gp.SendRemoveCreatureAt(pos, 0)
 		}
 	}
 }

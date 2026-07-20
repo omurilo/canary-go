@@ -7,7 +7,7 @@ loginProtocolPort = 7171
 gameProtocolPort = 7172
 statusProtocolPort = 7171
 
-dataPackDirectory = "../data-otservbr-global"
+dataPackDirectory = "../data-canary"
 coreDirectory = "../data"
 
 -- MariaDB connection (shared with MyAAC and the login-server).
@@ -24,4 +24,4 @@ rsaKeyFile = "key.pem"
 
 -- Spawn field (synthetic map) generated around the town temple until OTBM
 -- loading is enabled.
-worldFile = ""
+worldFile = "../data-canary/world/otservbr.otbm"

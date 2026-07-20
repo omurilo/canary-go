@@ -43,7 +43,6 @@ services:
       CANARY_DB_HOST: db
     command: >
       -config config.lua -schema schema/mysql.sql -scripts scripts -migrate -seed
-      -map /data-canary/world/canary.otbm
     ports:
       - "7171:7171"
       - "7172:7172"

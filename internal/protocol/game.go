@@ -29,6 +29,7 @@ const (
 	opMapEast        = 0x66
 	opMapSouth       = 0x67
 	opMapWest        = 0x68
+	opUpdateTile     = 0x69
 	opTileTransform  = 0x6B
 	opCreatureMove   = 0x6D
 	opInventoryItem  = 0x78
@@ -43,6 +44,7 @@ const (
 	opCreatureSay    = 0xAA
 	opPing           = 0x1D // server→client keep-alive ping (client replies 0x1E)
 	opPingBack       = 0x1E // server→client reply to a client ping
+	opCancelTarget   = 0xA3
 	creatureTurnMark = 0x0063
 )
 
@@ -71,6 +73,7 @@ const (
 	inCloseContainer = 0x87
 	inLookAt         = 0x8C
 	inThrowItem      = 0x78
+	inAttack         = 0xA1
 )
 
 // GameProtocol is one game-server session.
@@ -298,7 +301,7 @@ func (g *GameProtocol) disconnect(msg string) {
 // enterWorld sends the full login sequence as a single message.
 func (g *GameProtocol) enterWorld() {
 	p := g.player
-	idx := g.buildCreatureIndex(p.Pos)
+	
 	w := netmsg.NewWriter()
 
 	// 0x17 self appear.
@@ -331,7 +334,7 @@ func (g *GameProtocol) enterWorld() {
 	// 0x64 full map description.
 	w.AddByte(opFullMap)
 	w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
-	g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight, idx)
+	g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight)
 
 	// 0x83 magic effect (login teleport), modern layout: create-effect (3),
 	// u16 type, source byte, end-loop (0).
@@ -479,7 +482,7 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	switch op {
 	case inLogout:
 		c.Close()
-	case inPing:
+	case inPing, 0x1C:
 		// Client keep-alive ping — answer with a ping-back (0x1E).
 		w := netmsg.NewWriter()
 		w.AddByte(opPingBack)
@@ -524,6 +527,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseItemMove(r)
 	case inLookAt:
 		g.parseLookAt(r)
+	case inAttack:
+		g.parseAttack(r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
 	default:

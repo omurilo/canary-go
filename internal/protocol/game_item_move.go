@@ -50,6 +50,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 
 	if g.deps.Events != nil {
 		if !g.deps.Events.ExecuteOnMoveItem(g.player, item, uint16(count), game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}, game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}) {
+			g.revertMove(fromPos, toPos, spriteID)
 			return // Rejected by Lua
 		}
 	}
@@ -60,6 +61,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	if toPos.X == 0xFFFF {
 		if fromPos.X != 0xFFFF && it != nil && !it.Pickupable {
 			g.sendStatusText("You cannot take this object.")
+			g.revertMove(fromPos, toPos, spriteID)
 			return
 		}
 
@@ -94,14 +96,17 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 								toPos = netmsg.Position{X: 0xFFFF, Y: uint16(0x40 + foundCid), Z: 0}
 							} else {
 								g.sendStatusText("You cannot dress this object there.")
+								g.revertMove(fromPos, toPos, spriteID)
 								return
 							}
 						} else {
 							g.sendStatusText("You cannot dress this object there.")
+							g.revertMove(fromPos, toPos, spriteID)
 							return
 						}
 					} else {
 						g.sendStatusText("You cannot dress this object there.")
+						g.revertMove(fromPos, toPos, spriteID)
 						return
 					}
 				}
@@ -234,6 +239,84 @@ func (g *GameProtocol) findTileItemByStackPos(tile *game.Tile, spriteID uint16, 
 	return nil
 }
 
+// revertMove forces the client to redraw the from and to positions.
+func (g *GameProtocol) revertMove(fromPos netmsg.Position, toPos netmsg.Position, spriteID uint16) {
+	if fromPos.X != 0xFFFF {
+		pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+		tile := g.deps.World.Map.GetTile(pos)
+		if tile != nil {
+			g.sendUpdateTile(pos, tile)
+		}
+	} else {
+		if fromPos.Y >= 0x40 {
+			cid := uint8(fromPos.Y - 0x40)
+			fromSlot := uint8(fromPos.Z)
+			if cont, ok := g.containers[cid]; ok {
+				var oldItem *game.Item
+				if int(fromSlot) < len(cont.Contents) {
+					oldItem = cont.Contents[fromSlot]
+				}
+				g.sendUpdateContainerItem(cid, fromSlot, oldItem)
+			}
+		} else {
+			slot := uint8(fromPos.Y)
+			if slot > 0 && slot <= 10 {
+				if oldItem := g.player.Inventory[slot]; oldItem != nil {
+					g.sendInventoryItem(slot, oldItem)
+				} else {
+					g.sendInventoryEmpty(slot)
+				}
+			}
+		}
+	}
+
+	if toPos.X != 0xFFFF {
+		pos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
+		tile := g.deps.World.Map.GetTile(pos)
+		if tile != nil {
+			g.sendUpdateTile(pos, tile)
+		}
+	} else {
+		if toPos.Y >= 0x40 {
+			cid := uint8(toPos.Y - 0x40)
+			// Wait, the client doesn't specify a to-slot for containers (it goes to index 0).
+			// If it was reverted, we just resend the container or it might be OK since we didn't add it yet.
+			// Actually, sending the full container updates it.
+			if cont, ok := g.containers[cid]; ok {
+				g.sendContainer(cid, cont, false)
+			}
+		} else {
+			slot := uint8(toPos.Y)
+			if slot > 0 && slot <= 10 {
+				if oldItem := g.player.Inventory[slot]; oldItem != nil {
+					g.sendInventoryItem(slot, oldItem)
+				} else {
+					g.sendInventoryEmpty(slot)
+				}
+			}
+		}
+	}
+}
+
+// sendUpdateTile sends opUpdateTile to force a client to redraw a single tile.
+func (g *GameProtocol) sendUpdateTile(pos game.Position, tile *game.Tile) {
+	w := netmsg.NewWriter()
+	w.AddByte(opUpdateTile)
+	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
+	
+	g.deps.World.RLock()
+	if tile != nil {
+		g.addTileDescription(w, tile, pos)
+		w.AddByte(0x00)
+		w.AddByte(0xFF)
+	} else {
+		w.AddByte(0x01)
+		w.AddByte(0xFF)
+	}
+	g.deps.World.RUnlock()
+	g.SendToClient(w)
+}
+
 func (g *GameProtocol) broadcastRemoveTileThing(pos game.Position, stack uint8) {
 	for _, s := range g.deps.World.Spectators(pos, 0) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
@@ -270,8 +353,8 @@ func (g *GameProtocol) sendUpdateTileThing(pos game.Position, stack uint8, item 
 func (g *GameProtocol) broadcastAddTileItem(pos game.Position, item *game.Item) {
 	for _, s := range g.deps.World.Spectators(pos, 0) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
-			idx := gp.buildCreatureIndex(pos)
-			stack := gp.stackPosOfItem(pos, item, idx)
+
+			stack := gp.stackPosOfItem(pos, item)
 			gp.sendAddTileItem(pos, stack, item)
 		}
 	}
@@ -286,7 +369,9 @@ func (g *GameProtocol) sendAddTileItem(pos game.Position, stack uint8, item *gam
 	g.SendToClient(w)
 }
 
-func (g *GameProtocol) stackPosOfItem(pos game.Position, item *game.Item, idx creatureIndex) uint8 {
+func (g *GameProtocol) stackPosOfItem(pos game.Position, item *game.Item) uint8 {
+	g.deps.World.RLock()
+	defer g.deps.World.RUnlock()
 	stack := 0
 	tile := g.deps.World.Map.GetTile(pos)
 	if tile != nil {
@@ -305,9 +390,9 @@ func (g *GameProtocol) stackPosOfItem(pos game.Position, item *game.Item, idx cr
 			}
 		}
 	}
-	creatures := idx[posKey{pos.X, pos.Y, pos.Z}]
-	stack += len(creatures)
-
+	if tile != nil {
+		stack += len(tile.Creatures)
+	}
 	if tile != nil {
 		for _, it := range tile.Items {
 			if !g.isTopItem(it) {

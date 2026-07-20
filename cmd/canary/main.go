@@ -18,6 +18,7 @@ import (
 	lua "github.com/yuin/gopher-lua"
 
 	"github.com/opentibiabr/canary-go/internal/config"
+	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/db"
 	"github.com/opentibiabr/canary-go/internal/events"
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -75,6 +76,10 @@ func run(o runOpts, log *slog.Logger) error {
 	if err != nil {
 		log.Warn("using default config", "err", err)
 	}
+	
+	if scriptsDir == "scripts" && cfg.DataPack != "" {
+		scriptsDir = filepath.Join(cfg.DataPack, "scripts")
+	}
 	log.Info("configuration loaded", "server", cfg.ServerName, "loginPort", cfg.LoginPort,
 		"gamePort", cfg.GamePort, "db", cfg.DBName)
 
@@ -117,28 +122,58 @@ func run(o runOpts, log *slog.Logger) error {
 
 	// World: real OTBM map if provided, else a synthetic spawn field.
 	world := game.NewWorld()
-	spawnEngine := game.NewSpawnEngine(world)
+
+	creatureTypes := creatures.NewTypeRegistry()
+	if cfg.DataPack != "" {
+		if err := creatureTypes.LoadMonsters(filepath.Join(cfg.DataPack, "monster")); err != nil {
+			log.Warn("loading monster types", "err", err)
+		} else {
+			log.Info("loaded monster types", "count", len(creatureTypes.Monsters))
+		}
+		if err := creatureTypes.LoadNpcs(filepath.Join(cfg.DataPack, "npc")); err != nil {
+			log.Warn("loading npc types", "err", err)
+		} else {
+			log.Info("loaded npc types", "count", len(creatureTypes.Npcs))
+		}
+	}
+
+	spawnEngine := game.NewSpawnEngine(world, creatureTypes)
 	aiEngine := game.NewAIEngine(world)
 
+	mapFilePath := o.mapFile
+	if mapFilePath == "" && cfg.WorldFile != "" {
+		mapFilePath = cfg.WorldFile
+	}
+
 	var spawn game.Position
-	if o.mapFile != "" {
+	if mapFilePath != "" {
 		if catalog == nil {
 			return fmt.Errorf("map loading requires a valid appearances.dat (item metadata)")
 		}
-		res, err := otbm.Load(o.mapFile, catalog, world.Map)
+		res, err := otbm.Load(mapFilePath, catalog, world.Map)
 		if err != nil {
 			return fmt.Errorf("load map: %w", err)
 		}
-		log.Info("loaded OTBM map", "file", o.mapFile, "tiles", res.TileCount,
+		log.Info("loaded OTBM map", "file", mapFilePath, "tiles", res.TileCount,
 			"items", res.ItemCount, "towns", len(res.Towns))
 		
-		// Parse spawn file
-		spawnFile := strings.TrimSuffix(o.mapFile, filepath.Ext(o.mapFile)) + "-spawn.xml"
-		if spawnsData, err := spawns.LoadSpawnFile(spawnFile); err == nil {
+		// Parse spawn files
+		mapBase := strings.TrimSuffix(mapFilePath, filepath.Ext(mapFilePath))
+		
+		monsterFile := mapBase + "-monster.xml"
+		if spawnsData, err := spawns.LoadSpawnFile(monsterFile); err == nil {
 			spawnEngine.LoadSpawns(spawnsData)
-			log.Info("loaded spawns", "file", spawnFile, "spawns", len(spawnsData.Spawns))
+			log.Info("loaded monster spawns", "file", monsterFile)
 		} else {
-			log.Warn("spawn file not loaded", "file", spawnFile, "err", err)
+			log.Warn("monster spawn file not loaded", "file", monsterFile, "err", err)
+		}
+		
+		npcFile := mapBase + "-npc.xml"
+		if spawnsData, err := spawns.LoadSpawnFile(npcFile); err == nil {
+			spawnEngine.LoadSpawns(spawnsData)
+			log.Info("loaded npc spawns", "file", npcFile)
+		} else {
+			log.Warn("npc spawn file not loaded", "file", npcFile, "err", err)
 		}
 
 		for _, t := range res.Towns {
@@ -159,6 +194,15 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Info("generated synthetic spawn field", "center", spawn, "radius", 40)
 	}
 	world.DefaultSpawn = spawn
+	world.OnCreatureMove = func(c game.Creature, oldPos game.Position, newPos game.Position, oldTileIndex int) {
+		protocol.BroadcastCreatureMove(world, c, oldPos, newPos, oldTileIndex)
+	}
+	world.OnCreatureAppear = func(c game.Creature) {
+		protocol.BroadcastCreatureAppear(world, c)
+	}
+	world.OnCreatureRemove = func(c game.Creature) {
+		protocol.BroadcastCreatureRemove(world, c)
+	}
 
 	spawnEngine.Start()
 	aiEngine.Start()
@@ -172,6 +216,12 @@ func run(o runOpts, log *slog.Logger) error {
 	})
 	if err := loadScripts(lengine, scriptsDir, log); err != nil {
 		log.Warn("loading scripts", "err", err)
+	}
+	if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "monster"), log); err != nil {
+		log.Warn("loading monsters", "err", err)
+	}
+	if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "npc"), log); err != nil {
+		log.Warn("loading npcs", "err", err)
 	}
 
 	eventsEngine := events.NewEngine(lengine.L)
@@ -210,9 +260,28 @@ func run(o runOpts, log *slog.Logger) error {
 
 // loadScripts runs every .lua file in dir (recursive) through the engine.
 func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
+	libDir := filepath.Join(dir, "lib")
+	// load lib first
+	filepath.WalkDir(libDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil // ignore if lib doesn't exist
+		}
+		if !d.IsDir() && filepath.Ext(path) == ".lua" {
+			if err := e.DoFile(path); err != nil {
+				log.Warn("script error", "file", path, "err", err)
+			} else {
+				log.Debug("loaded script", "file", path)
+			}
+		}
+		return nil
+	})
+
 	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if d.IsDir() && d.Name() == "lib" && path == libDir {
+			return filepath.SkipDir
 		}
 		if !d.IsDir() && filepath.Ext(path) == ".lua" {
 			if err := e.DoFile(path); err != nil {
