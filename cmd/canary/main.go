@@ -153,53 +153,70 @@ func run(o runOpts, log *slog.Logger) error {
 		mapFilePath = cfg.WorldFile
 	}
 
+	// generateSyntheticField is the playable fallback used when no OTBM map is
+	// configured, or when the configured map can't be loaded (e.g. the datapack
+	// ships without the main otservbr.otbm). It mirrors the C++ "spawn field".
+	generateSyntheticField := func() game.Position {
+		spawn := game.Position{X: 1000, Y: 1000, Z: 7}
+		if temple, err := database.TownTemple(ctx, 1); err == nil && (temple.X != 0 || temple.Y != 0) {
+			spawn = temple
+		}
+		world.Map.GenerateFlatField(spawn, 40, 4526) // grass field
+		log.Info("generated synthetic spawn field", "center", spawn, "radius", 40)
+		return spawn
+	}
+
 	var spawn game.Position
+	var loadedMap bool
 	if mapFilePath != "" {
 		if catalog == nil {
 			return fmt.Errorf("map loading requires a valid appearances.dat (item metadata)")
 		}
 		res, err := otbm.Load(mapFilePath, catalog, world.Map)
 		if err != nil {
-			return fmt.Errorf("load map: %w", err)
-		}
-		log.Info("loaded OTBM map", "file", mapFilePath, "tiles", res.TileCount,
-			"items", res.ItemCount, "towns", len(res.Towns))
-		
-		// Parse spawn files
-		mapBase := strings.TrimSuffix(mapFilePath, filepath.Ext(mapFilePath))
-		
-		monsterFile := mapBase + "-monster.xml"
-		if spawnsData, err := spawns.LoadSpawnFile(monsterFile); err == nil {
-			spawnEngine.LoadSpawns(spawnsData)
-			log.Info("loaded monster spawns", "file", monsterFile)
+			// A missing or unreadable map must not crash the server: the working
+			// vertical slice falls back to the synthetic spawn field so login and
+			// gameplay still work without the (large, unshipped) OTBM map.
+			log.Warn("OTBM map not loaded; falling back to synthetic spawn field",
+				"file", mapFilePath, "err", err)
+			spawn = generateSyntheticField()
 		} else {
-			log.Warn("monster spawn file not loaded", "file", monsterFile, "err", err)
-		}
-		
-		npcFile := mapBase + "-npc.xml"
-		if spawnsData, err := spawns.LoadSpawnFile(npcFile); err == nil {
-			spawnEngine.LoadSpawns(spawnsData)
-			log.Info("loaded npc spawns", "file", npcFile)
-		} else {
-			log.Warn("npc spawn file not loaded", "file", npcFile, "err", err)
-		}
+			loadedMap = true
+			log.Info("loaded OTBM map", "file", mapFilePath, "tiles", res.TileCount,
+				"items", res.ItemCount, "towns", len(res.Towns))
 
-		for _, t := range res.Towns {
-			world.Towns[strings.ToLower(t.Name)] = t.Pos
+			// Parse spawn files
+			mapBase := strings.TrimSuffix(mapFilePath, filepath.Ext(mapFilePath))
+
+			monsterFile := mapBase + "-monster.xml"
+			if spawnsData, err := spawns.LoadSpawnFile(monsterFile); err == nil {
+				spawnEngine.LoadSpawns(spawnsData)
+				log.Info("loaded monster spawns", "file", monsterFile)
+			} else {
+				log.Warn("monster spawn file not loaded", "file", monsterFile, "err", err)
+			}
+
+			npcFile := mapBase + "-npc.xml"
+			if spawnsData, err := spawns.LoadSpawnFile(npcFile); err == nil {
+				spawnEngine.LoadSpawns(spawnsData)
+				log.Info("loaded npc spawns", "file", npcFile)
+			} else {
+				log.Warn("npc spawn file not loaded", "file", npcFile, "err", err)
+			}
+
+			for _, t := range res.Towns {
+				world.Towns[strings.ToLower(t.Name)] = t.Pos
+			}
+			if len(res.Towns) > 0 {
+				spawn = res.Towns[0].Pos
+				log.Info("spawn set to town temple", "town", res.Towns[0].Name, "pos", spawn)
+			} else {
+				spawn = game.Position{X: res.Width / 2, Y: res.Height / 2, Z: 7}
+			}
 		}
-		if len(res.Towns) > 0 {
-			spawn = res.Towns[0].Pos
-			log.Info("spawn set to town temple", "town", res.Towns[0].Name, "pos", spawn)
-		} else {
-			spawn = game.Position{X: res.Width / 2, Y: res.Height / 2, Z: 7}
-		}
-	} else {
-		spawn = game.Position{X: 1000, Y: 1000, Z: 7}
-		if temple, err := database.TownTemple(ctx, 1); err == nil && (temple.X != 0 || temple.Y != 0) {
-			spawn = temple
-		}
-		world.Map.GenerateFlatField(spawn, 40, 4526) // grass field
-		log.Info("generated synthetic spawn field", "center", spawn, "radius", 40)
+	}
+	if !loadedMap && mapFilePath == "" {
+		spawn = generateSyntheticField()
 	}
 	world.DefaultSpawn = spawn
 	world.StartDecayingMap()
@@ -272,6 +289,18 @@ func run(o runOpts, log *slog.Logger) error {
 			if err := loadScripts(lengine, d, log); err != nil {
 				log.Warn("loading core data", "dir", d, "err", err)
 			}
+		}
+	}
+	// The datapack ships its own lib/ (data-otservbr-global/lib) that defines
+	// Storage, Storage.Quest and the quest/boss constants the datapack scripts
+	// and NPCs reference. In the C++ flow data/global.lua dofiles it via
+	// DATA_DIRECTORY; the Go loader bypasses that bootstrap, so load it here
+	// (with DATA_DIRECTORY set for the scripts' own dofile chains) BEFORE the
+	// datapack scripts/monsters/npcs that depend on those globals.
+	if cfg.DataPack != "" {
+		lengine.L.SetGlobal("DATA_DIRECTORY", lua.LString(cfg.DataPack))
+		if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "lib"), log); err != nil {
+			log.Warn("loading datapack lib", "err", err)
 		}
 	}
 	if err := loadScripts(lengine, scriptsDir, log); err != nil {

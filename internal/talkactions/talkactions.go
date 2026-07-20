@@ -9,7 +9,11 @@ import (
 type TalkAction struct {
 	Words      string
 	Separator  string
-	OnSayFunc  lua.LValue
+	// GroupType is the minimum player group required to use the command
+	// (e.g. "god", "gm", "normal"). Recorded on registration; access
+	// enforcement is not wired in this slice yet.
+	GroupType string
+	OnSayFunc lua.LValue
 }
 
 var (

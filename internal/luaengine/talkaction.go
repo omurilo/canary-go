@@ -32,6 +32,7 @@ func talkActionConstructor(L *lua.LState) int {
 
 var talkActionMethods = map[string]lua.LGFunction{
 	"separator": talkActionSeparator,
+	"groupType": talkActionGroupType,
 	"register":  talkActionRegister,
 }
 
@@ -58,6 +59,13 @@ func talkActionNewIndex(L *lua.LState) int {
 func talkActionSeparator(L *lua.LState) int {
 	t := checkTalkAction(L)
 	t.Separator = L.CheckString(2)
+	L.Push(L.Get(1))
+	return 1
+}
+
+func talkActionGroupType(L *lua.LState) int {
+	t := checkTalkAction(L)
+	t.GroupType = L.CheckString(2)
 	L.Push(L.Get(1))
 	return 1
 }

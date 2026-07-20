@@ -102,7 +102,6 @@ func (e *Engine) registerAPI() {
 	ensureClassTable("Teleport")
 	ensureClassTable("Vocation")
 	ensureClassTable("Party")
-	ensureClassTable("configManager")
 	ensureClassTable("GemAtelier")
 	ensureClassTable("Guild")
 	ensureClassTable("Group")
@@ -111,6 +110,28 @@ func (e *Engine) registerAPI() {
 	ensureClassTable("Variant")
 	ensureClassTable("Condition")
 	ensureClassTable("Combat")
+
+	// configManager / configKeys mirror the C++ globals that expose config.lua.
+	// The full server reads real config values here; this slice provides safe
+	// defaults so datapack scripts that read config (e.g. boss cooldowns via
+	// configKeys.*) degrade gracefully instead of erroring on a nil table.
+	configManagerTbl := L.NewTable()
+	L.SetField(configManagerTbl, "getNumber", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }))
+	L.SetField(configManagerTbl, "getFloat", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }))
+	L.SetField(configManagerTbl, "getString", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LString("")); return 1 }))
+	L.SetField(configManagerTbl, "getBoolean", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LFalse); return 1 }))
+	L.SetGlobal("configManager", configManagerTbl)
+
+	// configKeys.X resolves to the key name itself (never nil), so callers can
+	// pass it straight to configManager.get*.
+	configKeysTbl := L.NewTable()
+	configKeysMeta := L.NewTable()
+	L.SetField(configKeysMeta, "__index", L.NewFunction(func(L *lua.LState) int {
+		L.Push(L.Get(2))
+		return 1
+	}))
+	L.SetMetatable(configKeysTbl, configKeysMeta)
+	L.SetGlobal("configKeys", configKeysTbl)
 
 	e.registerShop()
 	e.registerEventCallback()
@@ -139,8 +160,18 @@ func (e *Engine) SetGameFunc(name string, fn lua.LGFunction) {
 func (e *Engine) setClassConstructor(name string, constructor lua.LGFunction, methods map[string]lua.LGFunction) {
 	L := e.L
 	mt := L.NewTypeMetatable(name + "_Class")
-	L.SetField(mt, "__call", L.NewFunction(constructor))
-	
+	// gopher-lua's __call metamethod prepends the callable (the class table)
+	// itself as argument #1. Strip it so constructors receive their real
+	// arguments at position 1 — matching how they're written and how the C++
+	// Canary API is called, e.g. Position(x, y, z) / TalkAction(words).
+	call := func(L *lua.LState) int {
+		if L.GetTop() >= 1 {
+			L.Remove(1)
+		}
+		return constructor(L)
+	}
+	L.SetField(mt, "__call", L.NewFunction(call))
+
 	classTable := L.NewTable()
 	if methods != nil {
 		L.SetFuncs(classTable, methods)
