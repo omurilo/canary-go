@@ -7,8 +7,8 @@ loginProtocolPort = 7171
 gameProtocolPort = 7172
 statusProtocolPort = 7171
 
-dataPackDirectory = "../data-otservbr-global"
-coreDirectory = "../data"
+dataPackDirectory = "data-otservbr-global"
+coreDirectory = "data"
 
 -- MariaDB connection (shared with MyAAC and the login-server).
 mysqlHost = "0.0.0.0"
@@ -24,4 +24,4 @@ rsaKeyFile = "key.pem"
 
 -- Spawn field (synthetic map) generated around the town temple until OTBM
 -- loading is enabled.
-worldFile = "../data-otservbr-global/world/otservbr.otbm"
+worldFile = "data-otservbr-global/world/otservbr.otbm"
