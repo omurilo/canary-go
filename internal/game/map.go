@@ -1,6 +1,10 @@
 package game
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/opentibiabr/canary-go/internal/items"
+)
 
 // Tile holds the contents of a single map cell.
 type Tile struct {
@@ -10,8 +14,24 @@ type Tile struct {
 }
 
 // Walkable reports whether a creature may stand on the tile.
-func (t *Tile) Walkable() bool {
-	return t != nil && t.Ground != nil
+func (t *Tile) Walkable(catalog *items.Catalog) bool {
+	if t == nil || t.Ground == nil {
+		return false
+	}
+	if len(t.Creatures) > 0 {
+		return false
+	}
+	if catalog != nil {
+		if ct := catalog.Get(t.Ground.ID); ct != nil && ct.BlockSolid {
+			return false
+		}
+		for _, it := range t.Items {
+			if ct := catalog.Get(it.ID); ct != nil && ct.BlockSolid {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // Map is a sparse tile store keyed by position.

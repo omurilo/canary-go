@@ -1,6 +1,7 @@
 package luaengine
 
 import (
+	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -14,8 +15,9 @@ func (e *Engine) registerCombat() {
 	e.L.NewTypeMetatable(combatAreaTypeName)
 
 	mt := e.L.NewTypeMetatable(combatTypeName)
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), e.combatMethods()))
-	e.L.SetGlobal("Combat", e.L.NewFunction(combatCreate))
+	methods := e.combatMethods()
+	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
+	e.setClassConstructor("Combat", combatCreate, methods)
 }
 
 // combatMatrixFromTable converts a Lua matrix (rows of {0/1/3,...}) into a flat
@@ -159,10 +161,28 @@ func (e *Engine) combatMethods() map[string]lua.LGFunction {
 			}
 			return 0
 		},
-		// setCallback captures a Lua callback (e.g. onGetPlayerMinMaxValues). Full
-		// callback support is not ported; the formula path covers instant spells.
-		// TODO(spells): invoke onGetPlayerMinMaxValues / onTargetTile callbacks.
-		"setCallback": func(L *lua.LState) int { return 0 },
+		// setCallback captures a Lua callback (e.g. onGetPlayerMinMaxValues).
+		"setCallback": func(L *lua.LState) int {
+			c := checkCombat(L, 1)
+			if c == nil {
+				L.Push(lua.LFalse)
+				return 1
+			}
+			key := L.CheckInt(2)
+			funcName := L.CheckString(3)
+			switch key {
+			case 1: // CALLBACK_PARAM_LEVELMAGICVALUE
+				c.CallbackLevelMagicValue = funcName
+			case 2: // CALLBACK_PARAM_SKILLVALUE
+				c.CallbackSkillValue = funcName
+			case 3: // CALLBACK_PARAM_TARGETTILE
+				c.CallbackTargetTile = funcName
+			case 4: // CALLBACK_PARAM_TARGETCREATURE
+				c.CallbackTargetCreature = funcName
+			}
+			L.Push(lua.LTrue)
+			return 1
+		},
 		"execute":     e.combatExecute,
 	}
 }
@@ -179,6 +199,84 @@ func (e *Engine) combatExecute(L *lua.LState) int {
 		return 1
 	}
 	c.InstantSpellName = v.instantName
+
+	if c.CallbackLevelMagicValue != "" {
+		level, maglevel := 0, 0
+		if p, ok := caster.(*game.Player); ok {
+			level = int(p.Level)
+			maglevel = int(p.MagLevel)
+		}
+		
+		fn := e.L.GetGlobal(c.CallbackLevelMagicValue)
+		if fn.Type() == lua.LTFunction {
+			ud := e.L.NewUserData()
+			ud.Value = caster
+			if _, isPlayer := caster.(*game.Player); isPlayer {
+				e.L.SetMetatable(ud, e.L.GetTypeMetatable("Player"))
+			} else if _, isMonster := caster.(*game.Monster); isMonster {
+				e.L.SetMetatable(ud, e.L.GetTypeMetatable("Monster"))
+			} else {
+				e.L.SetMetatable(ud, e.L.GetTypeMetatable("Creature"))
+			}
+
+			if err := e.L.CallByParam(lua.P{
+				Fn:      fn,
+				NRet:    2,
+				Protect: true,
+			}, ud, lua.LNumber(level), lua.LNumber(maglevel)); err == nil {
+				minDamage := int32(e.L.ToNumber(-2))
+				maxDamage := int32(e.L.ToNumber(-1))
+				e.L.Pop(2)
+
+				e.log.Info("executed formula callback", "func", c.CallbackLevelMagicValue, "min", minDamage, "max", maxDamage)
+
+				c2 := *c
+				c2.FormulaType = combat.CombatFormulaDamage
+				c2.MinA = float64(minDamage)
+				c2.MaxA = float64(maxDamage)
+				c = &c2
+			} else {
+				e.log.Error("combat callback error", "func", c.CallbackLevelMagicValue, "err", err)
+			}
+		} else {
+			e.log.Error("combat callback is not a function", "func", c.CallbackLevelMagicValue, "type", fn.Type().String())
+		}
+	} else if c.CallbackSkillValue != "" {
+			fn := e.L.GetGlobal(c.CallbackSkillValue)
+			if fn.Type() == lua.LTFunction {
+				ud := e.L.NewUserData()
+				ud.Value = caster
+				if _, isPlayer := caster.(*game.Player); isPlayer {
+					e.L.SetMetatable(ud, e.L.GetTypeMetatable("Player"))
+				} else if _, isMonster := caster.(*game.Monster); isMonster {
+					e.L.SetMetatable(ud, e.L.GetTypeMetatable("Monster"))
+				} else {
+					e.L.SetMetatable(ud, e.L.GetTypeMetatable("Creature"))
+				}
+
+				if err := e.L.CallByParam(lua.P{
+					Fn:      fn,
+					NRet:    2,
+					Protect: true,
+				}, ud, lua.LNumber(0), lua.LNumber(0), lua.LNumber(0)); err == nil {
+					minDamage := int32(e.L.ToNumber(-2))
+					maxDamage := int32(e.L.ToNumber(-1))
+					e.L.Pop(2)
+
+					e.log.Info("executed formula callback (skill)", "func", c.CallbackSkillValue, "min", minDamage, "max", maxDamage)
+
+					c2 := *c
+					c2.FormulaType = combat.CombatFormulaDamage
+					c2.MinA = float64(minDamage)
+					c2.MaxA = float64(maxDamage)
+					c = &c2
+				} else {
+					e.log.Error("combat callback error", "func", c.CallbackSkillValue, "err", err)
+				}
+			} else {
+				e.log.Error("combat callback is not a function", "func", c.CallbackSkillValue, "type", fn.Type().String())
+			}
+	}
 
 	if e.world == nil || e.world.Combat == nil {
 		L.Push(lua.LFalse)

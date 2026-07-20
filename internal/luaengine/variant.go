@@ -32,8 +32,8 @@ const variantTypeName = "Variant"
 // constructor, matching variant_functions.cpp: Variant(number|position|string).
 func (e *Engine) registerVariant() {
 	mt := e.L.NewTypeMetatable(variantTypeName)
+	e.setClassConstructor("Variant", variantConstructor, variantMethods)
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), variantMethods))
-	e.L.SetGlobal("Variant", e.L.NewFunction(variantConstructor))
 }
 
 func pushVariant(L *lua.LState, v *luaVariant) {

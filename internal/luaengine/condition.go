@@ -24,8 +24,8 @@ type luaCondition struct {
 
 func (e *Engine) registerCondition() {
 	mt := e.L.NewTypeMetatable(luaConditionTypeName)
+	e.setClassConstructor("Condition", conditionConstructor, conditionMethods)
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), conditionMethods))
-	e.L.SetGlobal("Condition", e.L.NewFunction(conditionConstructor))
 }
 
 func conditionConstructor(L *lua.LState) int {

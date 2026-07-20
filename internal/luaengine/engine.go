@@ -30,6 +30,9 @@ type Engine struct {
 	L     *lua.LState
 	log   *slog.Logger
 	world *game.World
+
+	npcCallbacksMu sync.Mutex
+	npcCallbacks   map[string]map[string]*lua.LFunction
 }
 
 // New creates an engine with the base libraries loaded.

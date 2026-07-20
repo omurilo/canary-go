@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/opentibiabr/canary-go/internal/creatures"
+	"github.com/opentibiabr/canary-go/internal/items"
 )
 
 // World is the authoritative in-memory game state: the map plus all online
@@ -19,6 +20,9 @@ type World struct {
 	byName         map[string]*Player
 	creatures      map[uint32]Creature
 	nextCreatureID atomic.Uint32
+
+	Items *items.Catalog
+	Decay *DecayManager
 
 	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldTileIndex int)
 	OnCreatureAppear func(c Creature)
@@ -34,10 +38,14 @@ type World struct {
 	// experience/level changes, e.g. on a monster kill.
 	OnPlayerStatsChange func(p *Player)
 
+	// OnItemDecay is triggered when an item transforms due to decay.
+	OnItemDecay func(pos Position, stackPos uint8, oldItem, newItem *Item)
+
 	// OnMagicEffect shows a graphical effect on a tile (spell area/impact with no
 	// damage text). OnDistanceEffect shows a shoot animation from->to.
 	OnMagicEffect    func(pos Position, effect uint16)
 	OnDistanceEffect func(from, to Position, effect uint16)
+	OnCreatureSay    func(speaker Creature, talkType byte, text string)
 
 	// Combat is the world's combat engine, used by the spell system to resolve
 	// spell damage/heal through the same hit/death path as melee.
@@ -56,12 +64,15 @@ func (w *World) PlayerByName(name string) *Player {
 // NewWorld creates an empty world with a fresh map.
 func NewWorld() *World {
 	w := &World{
-		Map:       NewMap(),
-		Towns:     make(map[string]Position),
-		players:   make(map[uint32]*Player),
-		byName:    make(map[string]*Player),
-		creatures: make(map[uint32]Creature),
+		Map:          NewMap(),
+		Towns:        make(map[string]Position),
+		players:      make(map[uint32]*Player),
+		byName:       make(map[string]*Player),
+		creatures:    make(map[uint32]Creature),
+		TypeRegistry: creatures.NewTypeRegistry(),
 	}
+	w.Combat = NewCombatEngine(w)
+	w.Decay = NewDecayManager(w)
 	w.nextCreatureID.Store(0x10000000) // player creature ids start high, like TFS
 	return w
 }
@@ -80,6 +91,35 @@ func (w *World) SetPosition(p *Player, pos Position) {
 	p.Pos = pos
 	w.addCreatureToTile(p)
 	w.mu.Unlock()
+}
+
+// AddItem appends an item to the map and triggers decay if applicable.
+func (w *World) AddItem(pos Position, it *Item) bool {
+	if !w.Map.AddItem(pos, it) {
+		return false
+	}
+	if w.Items != nil && w.Decay != nil {
+		if itemType := w.Items.Get(it.ID); itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
+			w.Decay.StartDecaying(pos, it, itemType.Duration, itemType.DecayTo)
+		}
+	}
+	return true
+}
+
+// StartDecayingMap scans the entire map and starts decay for all applicable items.
+func (w *World) StartDecayingMap() {
+	if w.Items == nil || w.Decay == nil {
+		return
+	}
+	w.Map.mu.RLock()
+	defer w.Map.mu.RUnlock()
+	for pos, tile := range w.Map.tiles {
+		for _, it := range tile.Items {
+			if itemType := w.Items.Get(it.ID); itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
+				w.Decay.StartDecaying(pos, it, itemType.Duration, itemType.DecayTo)
+			}
+		}
+	}
 }
 
 // Players returns a snapshot of all online players.
@@ -244,6 +284,33 @@ func (w *World) Spectators(pos Position, excludeID uint32) []*Player {
 	return out
 }
 
+func (w *World) SpectatorCreatures(pos Position) []Creature {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	var out []Creature
+	for _, c := range w.creatures {
+		if c.GetPosition().InRangeOf(pos) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// SpectatingNpcs returns NPCs whose AI can see pos.
+func (w *World) SpectatingNpcs(pos Position) []*Npc {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	var out []*Npc
+	for _, c := range w.creatures {
+		if npc, ok := c.(*Npc); ok {
+			if npc.Pos.InRangeOf(pos) {
+				out = append(out, npc)
+			}
+		}
+	}
+	return out
+}
+
 // CreaturesAt returns every creature standing exactly on pos (players, monsters,
 // NPCs). Used by the spell system to resolve area-combat targets.
 func (w *World) CreaturesAt(pos Position) []Creature {
@@ -285,7 +352,7 @@ func (w *World) CreaturesInView(pos Position) []Creature {
 // and whether the move succeeded.
 func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 	dest := p.Pos.Offset(dir)
-	if !w.Map.GetTile(dest).Walkable() {
+	if !w.Map.GetTile(dest).Walkable(w.Items) {
 		return p.Pos, false
 	}
 	w.mu.Lock()
@@ -307,7 +374,7 @@ func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 // and whether the move succeeded.
 func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 	dest := c.GetPosition().Offset(dir)
-	if !w.Map.GetTile(dest).Walkable() {
+	if !w.Map.GetTile(dest).Walkable(w.Items) {
 		return c.GetPosition(), false
 	}
 	w.mu.Lock()
@@ -323,4 +390,32 @@ func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 	}
 	
 	return dest, true
+}
+
+// TransformItem changes an item's ID and notifies the clients.
+func (w *World) TransformItem(pos Position, item *Item, newID uint16) {
+	tile := w.Map.GetTile(pos)
+	if tile == nil {
+		item.ID = newID
+		return
+	}
+
+	stackPos := uint8(255)
+	if tile.Ground == item {
+		stackPos = 0
+	} else {
+		for i, it := range tile.Items {
+			if it == item {
+				stackPos = uint8(1 + i)
+				break
+			}
+		}
+	}
+
+	oldItem := &Item{ID: item.ID}
+	item.ID = newID
+
+	if stackPos != 255 && w.OnItemDecay != nil {
+		w.OnItemDecay(pos, stackPos, oldItem, item)
+	}
 }

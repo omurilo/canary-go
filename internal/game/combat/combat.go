@@ -33,6 +33,12 @@ type Combat struct {
 	// InstantSpellName mirrors Combat::setInstantSpellName; captured for parity
 	// with the C++ combat:execute path but not otherwise consumed yet.
 	InstantSpellName string
+
+	// Lua Callbacks
+	CallbackLevelMagicValue string
+	CallbackSkillValue      string
+	CallbackTargetTile      string
+	CallbackTargetCreature  string
 }
 
 // SetArea assigns the combat area. Mirrors Combat::setArea (combat.cpp).

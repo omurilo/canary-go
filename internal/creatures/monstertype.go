@@ -90,11 +90,20 @@ type MonsterFlags struct {
 	LootDrop bool
 }
 
+type ShopItem struct {
+	ID        uint16
+	SubType   uint8
+	Name      string
+	BuyPrice  uint32
+	SellPrice uint32
+}
+
 type NpcType struct {
 	Name      string
 	Speed     uint32
 	MaxHealth uint32
 	Outfit    Outfit
+	ShopItems []ShopItem
 }
 
 type TypeRegistry struct {

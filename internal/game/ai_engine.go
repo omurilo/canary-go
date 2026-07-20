@@ -3,6 +3,8 @@ package game
 import (
 	"math/rand"
 	"time"
+
+	"github.com/opentibiabr/canary-go/internal/items"
 )
 
 // AIEngine handles AI logic for creatures.
@@ -60,7 +62,7 @@ func (e *AIEngine) updateAI() {
 		// Move towards target or wander
 		if c.GetTarget() != nil {
 			// Pathfinding towards target
-			path := findPath(e.world.Map, c.GetPosition(), c.GetTarget().GetPosition())
+			path := findPath(e.world.Map, e.world.Items, c.GetPosition(), c.GetTarget().GetPosition())
 			if len(path) > 0 {
 				nextPos := path[0]
 				e.world.TryMoveCreature(c, getDirectionTo(c.GetPosition(), nextPos))
@@ -105,7 +107,7 @@ type node struct {
 	parent *node
 }
 
-func findPath(m *Map, start, end Position) []Position {
+func findPath(m *Map, catalog *items.Catalog, start, end Position) []Position {
 	if start == end {
 		return nil
 	}
@@ -146,7 +148,7 @@ func findPath(m *Map, start, end Position) []Position {
 
 			// Check if walkable (basic check)
 			tile := m.GetTile(nextPos)
-			if tile == nil || !tile.Walkable() {
+			if tile == nil || !tile.Walkable(catalog) {
 				// We can't walk there
 				if nextPos != end { // If it's the target, we don't need to walk ON it
 					continue

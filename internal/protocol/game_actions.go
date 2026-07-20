@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -25,6 +24,8 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 		w.AddByte(0xB5) // walk cancel
 		w.AddByte(byte(p.Direction))
 		g.SendToClient(w)
+		
+		g.player.SendTextMessage(0x14, "Sorry, not possible.") // MESSAGE_STATUS_SMALL
 		return false
 	}
 
@@ -338,6 +339,9 @@ func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text st
 			send(gp)
 		}
 	}
+	for _, n := range g.deps.World.SpectatingNpcs(speaker.Pos) {
+		g.deps.Lua.CallNpcOnCreatureSay(n, speaker, talkType, text)
+	}
 }
 
 // broadcastAppear tells nearby players a creature entered their view.
@@ -397,11 +401,21 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 	stackPos := r.GetByte() // stackPos
 
 	var item *game.Item
+	var targetCreature game.Creature
 	if pos.X != 0xFFFF {
 		// Map position
 		tile := g.deps.World.Map.GetTile(game.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
 		if tile != nil {
-			item = g.findTileItemByStackPos(tile, spriteID, stackPos)
+			if spriteID == creatureTurnMark {
+				// Stack position for creatures
+				// The client stackpos counts from top to bottom.
+				// For now, just grab the first creature if any.
+				if len(tile.Creatures) > 0 {
+					targetCreature = tile.Creatures[0]
+				}
+			} else {
+				item = g.findTileItemByStackPos(tile, spriteID, stackPos)
+			}
 		}
 	} else {
 		if pos.Y >= 0x40 {
@@ -422,27 +436,33 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 		}
 	}
 
-	if item == nil || item.ID != spriteID {
+	if item == nil && targetCreature == nil {
 		return
 	}
 
-	if g.deps.Events != nil {
-		g.deps.Events.ExecuteOnLook(g.player, item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, 0)
+	if item != nil && item.ID != spriteID {
 		return
 	}
 
-	name := "an item of type " + fmt.Sprint(spriteID)
-	if t := g.deps.Items.Get(spriteID); t != nil && t.Name != "" {
-		name = t.Name
+	if targetCreature != nil {
+		if g.deps.Events != nil {
+			if !g.deps.Events.ExecuteOnLook(g.player, targetCreature, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, 0) {
+				return
+			}
+		}
+		// If lua script doesn't handle it, we'd do fallback.
+		// For now just return, the script handles the look description.
+		return
 	}
-	
-	desc := fmt.Sprintf("You see %s.", name)
 
-	w := netmsg.NewWriter()
-	w.AddByte(opTextMessage)
-	w.AddByte(0x12) // MESSAGE_INFO_DESCR (typically 18 / 0x12)
-	w.AddString(desc)
-	g.SendToClient(w)
+	if item != nil {
+		if g.deps.Events != nil {
+			if !g.deps.Events.ExecuteOnLook(g.player, item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, 0) {
+				return
+			}
+		}
+		return
+	}
 }
 
 func (g *GameProtocol) parseAttack(r *netmsg.Reader) {
@@ -481,4 +501,25 @@ func (g *GameProtocol) sendCancelTarget() {
 	w.AddByte(opCancelTarget)
 	w.AddU32(0)
 	g.SendToClient(w)
+}
+
+func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
+	r.GetU16() // itemid
+	r.GetByte() // subType
+	r.GetByte() // amount
+	r.GetByte() // ignoreCapacity
+	r.GetByte() // buyWithBackpacks
+	g.player.SendTextMessage(0x13, "Buying items is not fully implemented yet in canary-go.")
+}
+
+func (g *GameProtocol) parseSellItem(r *netmsg.Reader) {
+	r.GetU16() // itemid
+	r.GetByte() // subType
+	r.GetByte() // amount
+	r.GetByte() // ignoreEquipped
+	g.player.SendTextMessage(0x13, "Selling items is not fully implemented yet in canary-go.")
+}
+
+func (g *GameProtocol) parseCloseShop(r *netmsg.Reader) {
+	// client closed the shop, nothing needed unless we store the state
 }

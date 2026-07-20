@@ -16,7 +16,7 @@ func (e *Engine) registerPosition() {
 	e.L.SetField(mt, "__newindex", e.L.NewFunction(positionNewIndex))
 	e.L.SetField(mt, "__eq", e.L.NewFunction(positionEq))
 
-	e.L.SetGlobal("Position", e.L.NewFunction(positionCreate))
+	e.setClassConstructor("Position", positionCreate, positionMethods)
 }
 
 func positionCreate(L *lua.LState) int {

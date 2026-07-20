@@ -58,6 +58,61 @@ func (e *Engine) registerAPI() {
 	e.registerMoveEvent()
 	e.registerMonsterType()
 	e.registerNpcType()
+
+	// Mock constructors for unused revscriptsys classes so scripts don't crash
+	mockClass := func(name string) {
+		mt := L.NewTypeMetatable(name)
+		L.SetField(mt, "__index", L.NewTable())
+		L.SetField(mt, "__newindex", L.NewFunction(func(L *lua.LState) int { return 0 }))
+		
+		// The constructor (__call) returns a new userdata
+		L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int {
+			ud := L.NewUserData()
+			ud.Value = name
+			L.SetMetatable(ud, mt)
+			L.Push(ud)
+			return 1
+		}))
+
+		classTable := L.NewTable()
+		L.SetMetatable(classTable, mt)
+		L.SetGlobal(name, classTable)
+	}
+	mockClass("CreatureEvent")
+	mockClass("GlobalEvent")
+	mockClass("Weapon")
+	
+	// Ensure these class tables exist so scripts can inject methods into them (e.g. Player.feed = ...)
+	ensureClassTable := func(name string) {
+		if L.GetGlobal(name).Type() == lua.LTNil {
+			classTable := L.NewTable()
+			mt := L.NewTypeMetatable(name + "_ClassDummy")
+			// Dummy __call returning nil so scripts don't crash when calling Player(cid)
+			L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int { return 0 }))
+			L.SetMetatable(classTable, mt)
+			L.SetGlobal(name, classTable)
+		}
+	}
+	ensureClassTable("Player")
+	ensureClassTable("Monster")
+	ensureClassTable("Npc")
+	ensureClassTable("Creature")
+	ensureClassTable("ItemType")
+	ensureClassTable("MonsterType")
+	ensureClassTable("Teleport")
+	ensureClassTable("Vocation")
+	ensureClassTable("Party")
+	ensureClassTable("configManager")
+	ensureClassTable("GemAtelier")
+	ensureClassTable("Guild")
+	ensureClassTable("Group")
+	ensureClassTable("Town")
+	ensureClassTable("House")
+	ensureClassTable("Variant")
+	ensureClassTable("Condition")
+	ensureClassTable("Combat")
+
+	e.registerShop()
 	e.registerEventCallback()
 	e.registerTalkAction()
 	e.registerSpell()
@@ -76,4 +131,20 @@ func (e *Engine) SetGameFunc(name string, fn lua.LGFunction) {
 		e.L.SetGlobal("Game", game)
 	}
 	e.L.SetField(game, name, e.L.NewFunction(fn))
+}
+
+// setClassConstructor registers a global table with a __call metamethod so that
+// scripts can use `Class(args)` to construct new instances. This matches how Canary C++
+// exports constructors like Action, MoveEvent, Spell, etc.
+func (e *Engine) setClassConstructor(name string, constructor lua.LGFunction, methods map[string]lua.LGFunction) {
+	L := e.L
+	mt := L.NewTypeMetatable(name + "_Class")
+	L.SetField(mt, "__call", L.NewFunction(constructor))
+	
+	classTable := L.NewTable()
+	if methods != nil {
+		L.SetFuncs(classTable, methods)
+	}
+	L.SetMetatable(classTable, mt)
+	L.SetGlobal(name, classTable)
 }

@@ -54,7 +54,7 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	}
 	
 	// Execute Lua action first
-	action := actions.FindByItemID(item.ID)
+	action := actions.FindAction(item)
 	if action != nil {
 		gamePos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
 		originalPos := g.player.Pos

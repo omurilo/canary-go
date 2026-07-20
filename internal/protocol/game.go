@@ -75,6 +75,9 @@ const (
 	inLookAt         = 0x8C
 	inThrowItem      = 0x78
 	inAttack         = 0xA1
+	inBuyItem        = 0x7A
+	inSellItem       = 0x7B
+	inCloseShop      = 0x7C
 )
 
 // GameProtocol is one game-server session.
@@ -269,7 +272,7 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 
 	// Relocate to the default spawn if the stored tile has no ground (e.g. a
 	// fresh character, or a stored position outside the loaded map).
-	if !g.deps.World.Map.GetTile(player.Pos).Walkable() {
+	if !g.deps.World.Map.GetTile(player.Pos).Walkable(g.deps.Items) {
 		player.Pos = g.deps.World.DefaultSpawn
 	}
 
@@ -383,12 +386,26 @@ func (g *GameProtocol) enterWorld() {
 	g.broadcastAppear(p)
 }
 
+func (g *GameProtocol) sendStats() {
+	w := netmsg.NewWriter()
+	g.addStats(w)
+	g.conn.Send(w)
+}
+
 func (g *GameProtocol) addStats(w *netmsg.Writer) {
 	p := g.player
 	w.AddByte(opPlayerStats)
 	w.AddU32(p.Health)
 	w.AddU32(p.MaxHealth)
-	w.AddU32(p.Capacity * 100)
+
+	totalCap := p.Capacity * 100
+	usedCap := g.getPlayerTotalWeight()
+	freeCap := uint32(0)
+	if totalCap > usedCap {
+		freeCap = totalCap - usedCap
+	}
+	w.AddU32(freeCap)
+	
 	w.AddU64(p.Experience)
 	w.AddU16(p.Level)
 	w.AddU16(0)   // level percent (0-10000)
@@ -530,6 +547,12 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseLookAt(r)
 	case inAttack:
 		g.parseAttack(r)
+	case inBuyItem:
+		g.parseBuyItem(r)
+	case inSellItem:
+		g.parseSellItem(r)
+	case inCloseShop:
+		g.parseCloseShop(r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
 	default:

@@ -1,6 +1,10 @@
 package game
 
-import "github.com/opentibiabr/canary-go/internal/game/combat"
+import (
+	"fmt"
+
+	"github.com/opentibiabr/canary-go/internal/game/combat"
+)
 
 // This file drives Lua-defined spell combats through the same hit/death path as
 // melee, mirroring the Combat::doCombat family (src/creatures/combat/combat.cpp).
@@ -123,6 +127,8 @@ func (e *CombatEngine) applySpellHit(c *combat.Combat, caster, target Creature, 
 		// Damage: effect + animated damage text at the victim.
 		e.world.OnCombatHit(caster, target, amount, c.Params.ImpactEffect)
 	}
+
+	fmt.Printf("applySpellHit: caster=%s target=%s amount=%d isHeal=%t health_after=%d\n", caster.GetName(), target.GetName(), amount, isHeal, target.GetHealth())
 
 	// Refresh the target's own stat bars (HP/mana) if it is a player.
 	if p, ok := target.(*Player); ok && e.world.OnPlayerStatsChange != nil {

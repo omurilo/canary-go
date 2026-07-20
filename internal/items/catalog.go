@@ -28,9 +28,11 @@ const (
 
 // ItemType holds the metadata needed to encode AddItem and drive basic gameplay.
 type ItemType struct {
-	ID    uint16
-	Name  string
-	Group Group
+	ID          uint16
+	Name        string
+	Article     string
+	Description string
+	Group       Group
 
 	Stackable             bool
 	Podium                bool
@@ -56,6 +58,19 @@ type ItemType struct {
 	FloorChange  string
 	ForceUse     bool
 	IsLadder     bool
+	IsDoor       bool
+
+	Weight       uint32
+	Armor        int32
+	Attack       int32
+	Defense      int32
+	ExtraDefense int32
+	DecayTo      uint16
+	Duration     uint32
+	ShowDuration bool
+	Charges      uint32
+	ShowCharges  bool
+	Capacity     uint32
 }
 
 // AlwaysOnTop reports whether the item stacks below creatures on a tile.

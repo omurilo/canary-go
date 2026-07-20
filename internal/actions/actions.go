@@ -40,6 +40,7 @@ var (
 // Register stores the action in the maps.
 func Register(a *Action) {
 	for _, id := range a.ItemIDs {
+		fmt.Printf("RegisterAction: id %d\n", id)
 		byItemID[id] = a
 	}
 	for _, id := range a.ActionIDs {
@@ -50,9 +51,17 @@ func Register(a *Action) {
 	}
 }
 
+func Count() int {
+	return len(byItemID) + len(byActionID) + len(byUniqueID)
+}
+
 // FindByItemID looks up an action by item ID.
 func FindByItemID(id uint16) *Action {
-	return byItemID[id]
+	a := byItemID[id]
+	if a == nil {
+		fmt.Printf("FindByItemID: %d -> nil\n", id)
+	}
+	return a
 }
 
 // FindByActionID looks up an action by action ID.
@@ -65,9 +74,26 @@ func FindByUniqueID(id uint16) *Action {
 	return byUniqueID[id]
 }
 
+// FindAction looks up an action for an item, respecting UniqueID and ActionID.
+func FindAction(item *game.Item) *Action {
+	if item.Attr != nil {
+		if item.Attr.UniqueID != nil {
+			if a := FindByUniqueID(*item.Attr.UniqueID); a != nil {
+				return a
+			}
+		}
+		if item.Attr.ActionID != nil {
+			if a := FindByActionID(*item.Attr.ActionID); a != nil {
+				return a
+			}
+		}
+	}
+	return FindByItemID(item.ID)
+}
+
 // Execute looks up and executes an action for an item.
 func (e *ActionsEngine) ExecuteUse(player *game.Player, item *game.Item, fromPos game.Position, target interface{}, toPos game.Position, isHotkey bool) bool {
-	action := FindByItemID(item.ID)
+	action := FindAction(item)
 	if action == nil || action.OnUse == nil {
 		return false
 	}

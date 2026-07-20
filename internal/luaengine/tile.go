@@ -9,8 +9,9 @@ const tileTypeName = "Tile"
 
 func (e *Engine) registerTile() {
 	mt := e.L.NewTypeMetatable(tileTypeName)
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), e.tileMethods()))
-	e.L.SetGlobal("Tile", e.L.NewFunction(e.tileCreate))
+	methods := e.tileMethods()
+	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
+	e.setClassConstructor("Tile", e.tileCreate, methods)
 }
 
 func (e *Engine) tileCreate(L *lua.LState) int {
@@ -85,6 +86,19 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 				}
 			}
 			L.Push(lua.LNil)
+			return 1
+		},
+		"getTopCreature": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if len(t.tile.Creatures) > 0 {
+				e.pushCreature(L, t.tile.Creatures[0])
+				return 1
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
+		"queryAdd": func(L *lua.LState) int {
+			L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR
 			return 1
 		},
 	}

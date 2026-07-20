@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 )
 
 type xmlItems struct {
@@ -16,6 +17,8 @@ type xmlItem struct {
 	ID         uint16         `xml:"id,attr"`
 	FromID     uint16         `xml:"fromid,attr"`
 	ToID       uint16         `xml:"toid,attr"`
+	Name       string         `xml:"name,attr"`
+	Article    string         `xml:"article,attr"`
 	Attributes []xmlAttribute `xml:"attribute"`
 }
 
@@ -27,6 +30,12 @@ type xmlAttribute struct {
 
 func processAttr(it *ItemType, attr xmlAttribute) {
 	switch attr.Key {
+	case "name":
+		it.Name = attr.Value
+	case "article":
+		it.Article = attr.Value
+	case "description":
+		it.Description = attr.Value
 	case "slotType":
 		it.SlotType = attr.Value
 	case "weaponType":
@@ -40,6 +49,48 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 	case "type":
 		if attr.Value == "ladder" {
 			it.IsLadder = true
+		} else if attr.Value == "door" {
+			it.IsDoor = true
+		}
+	case "weight":
+		if v, err := strconv.ParseUint(attr.Value, 10, 32); err == nil {
+			it.Weight = uint32(v)
+		}
+	case "armor":
+		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {
+			it.Armor = int32(v)
+		}
+	case "attack":
+		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {
+			it.Attack = int32(v)
+		}
+	case "defense":
+		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {
+			it.Defense = int32(v)
+		}
+	case "extradefense":
+		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {
+			it.ExtraDefense = int32(v)
+		}
+	case "decayTo":
+		if v, err := strconv.ParseUint(attr.Value, 10, 16); err == nil {
+			it.DecayTo = uint16(v)
+		}
+	case "duration":
+		if v, err := strconv.ParseUint(attr.Value, 10, 32); err == nil {
+			it.Duration = uint32(v)
+		}
+	case "showduration":
+		it.ShowDuration = (attr.Value == "1")
+	case "charges":
+		if v, err := strconv.ParseUint(attr.Value, 10, 32); err == nil {
+			it.Charges = uint32(v)
+		}
+	case "showcharges":
+		it.ShowCharges = (attr.Value == "1")
+	case "capacity":
+		if v, err := strconv.ParseUint(attr.Value, 10, 32); err == nil {
+			it.Capacity = uint32(v)
 		}
 	}
 	for _, child := range attr.Attributes {
@@ -77,6 +128,12 @@ func (c *Catalog) LoadXML(path string) error {
 			it := c.Get(id)
 			if it == nil {
 				continue
+			}
+			if item.Name != "" {
+				it.Name = item.Name
+			}
+			if item.Article != "" {
+				it.Article = item.Article
 			}
 			for _, attr := range item.Attributes {
 				processAttr(it, attr)

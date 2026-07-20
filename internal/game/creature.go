@@ -24,6 +24,7 @@ type Creature interface {
 type BaseCreature struct {
 	conditionStore
 
+	World     *World
 	ID        uint32
 	Name      string
 	Health    uint32

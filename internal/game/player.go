@@ -3,6 +3,7 @@ package game
 import (
 	"strings"
 
+	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
@@ -105,6 +106,43 @@ func (p *Player) LearnSpell(name string) {
 		p.learnedSpells = make(map[string]bool)
 	}
 	p.learnedSpells[strings.ToLower(name)] = true
+}
+
+// GamemasterOutfit sets a default outfit if none was loaded.
+func (p *Player) GamemasterOutfit() {
+	if p.Outfit.LookType == 0 {
+		p.Outfit.LookType = 75 // GM outfit
+	}
+}
+
+// SendTextMessage sends a text message to the player's client.
+func (p *Player) SendTextMessage(msgType uint8, text string) {
+	if p.Session != nil {
+		w := netmsg.NewWriter()
+		w.AddByte(0xB4) // opTextMessage
+		w.AddByte(msgType)
+		w.AddString(text)
+		p.Session.SendToClient(w)
+	}
+}
+
+// SendOpenShop sends the shop window (opcode 0x7A) to the player's client.
+func (p *Player) SendOpenShop(npc Creature, items []creatures.ShopItem) {
+	if p.Session != nil {
+		w := netmsg.NewWriter()
+		w.AddByte(0x7A) // opOpenShop
+		w.AddString(npc.GetName())
+		w.AddU16(uint16(len(items)))
+		for _, item := range items {
+			w.AddU16(item.ID)
+			w.AddByte(item.SubType)
+			w.AddString(item.Name)
+			w.AddU32(0) // weight (0 for now)
+			w.AddU32(item.BuyPrice)
+			w.AddU32(item.SellPrice)
+		}
+		p.Session.SendToClient(w)
+	}
 }
 
 // GamemasterOutfit sets a default outfit if none was loaded.
@@ -234,4 +272,15 @@ func (p *Player) AddMana(amount int32) {
 			p.Mana -= sub
 		}
 	}
+}
+
+// GetTotalWeight calculates the total weight of all items in the player's inventory
+func (p *Player) GetTotalWeight(w *World) uint32 {
+	total := uint32(0)
+	for _, item := range p.Inventory {
+		if item != nil {
+			total += item.GetWeight(w.Items)
+		}
+	}
+	return total
 }

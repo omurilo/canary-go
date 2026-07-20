@@ -76,3 +76,43 @@ type Outfit struct {
 	MountLegs  uint8
 	MountFeet  uint8
 }
+
+// GetWeight returns the total weight of the item (and its contents if it's a container).
+// Weight is in hundredths of an ounce (like capacity).
+func (i *Item) GetWeight(catalog interface{}) uint32 {
+	weight := uint32(0)
+	
+	// Fallback interface to avoid cyclic dependency
+	type Catalog interface {
+		Get(id uint16) interface{}
+	}
+	
+	type ItemType interface {
+		GetWeight() uint32
+	}
+
+	if cat, ok := catalog.(Catalog); ok {
+		if t, ok := cat.Get(i.ID).(ItemType); ok {
+			weight = t.GetWeight()
+		}
+	}
+	
+	if i.Attr != nil && i.Attr.Weight != nil {
+		weight = *i.Attr.Weight
+	}
+	
+	// Stackable items multiply weight by count
+	count := uint32(i.Count)
+	if count == 0 {
+		count = 1
+	}
+	// Note: We only multiply if it's stackable? Usually weight in XML is per-item.
+	// Actually, in Tibia, weight is always per-item. So weight * count.
+	total := weight * count
+
+	for _, child := range i.Contents {
+		total += child.GetWeight(catalog)
+	}
+
+	return total
+}

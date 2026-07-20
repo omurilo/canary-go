@@ -144,6 +144,31 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		item.Count -= moveCount
 	}
 
+	// 2.5 Capacity check
+	if toPos.X == 0xFFFF {
+		moveWeight := g.getItemWeight(moveItem)
+		swapWeight := g.getItemWeight(swapItem)
+		weightDiff := moveWeight
+		if swapWeight > 0 && weightDiff >= swapWeight {
+			weightDiff -= swapWeight
+		} else if swapWeight > weightDiff {
+			weightDiff = 0 // Actually freeing up weight
+		}
+		
+		// If moving from map to inventory, or moving inside inventory (which might involve swapping)
+		if fromPos.X != 0xFFFF {
+			totalWeight := g.getPlayerTotalWeight()
+			if totalWeight + weightDiff > g.player.Capacity * 100 {
+				g.sendStatusText("This object is too heavy for you to carry.")
+				if moveItem != item {
+					item.Count += moveCount // restore count
+				}
+				g.revertMove(fromPos, toPos, spriteID)
+				return
+			}
+		}
+	}
+
 	// 3. Remove from source
 	if moveItem == item {
 		if fromPos.X != 0xFFFF {
@@ -174,7 +199,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	// 4. Add to destination
 	if toPos.X != 0xFFFF {
 		pos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
-		if !g.deps.World.Map.AddItem(pos, moveItem) {
+		if !g.deps.World.AddItem(pos, moveItem) {
 			// Create a new tile if none exists
 			g.deps.World.Map.SetTile(pos, &game.Tile{Items: []*game.Item{moveItem}})
 		}
@@ -203,7 +228,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	if swapItem != nil {
 		if fromPos.X != 0xFFFF {
 			pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
-			if !g.deps.World.Map.AddItem(pos, swapItem) {
+			if !g.deps.World.AddItem(pos, swapItem) {
 				g.deps.World.Map.SetTile(pos, &game.Tile{Items: []*game.Item{swapItem}})
 			}
 			g.broadcastAddTileItem(pos, swapItem)
@@ -222,6 +247,11 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 				}
 			}
 		}
+	}
+
+	// 6. Update capacity in client if inventory changed
+	if fromPos.X == 0xFFFF || toPos.X == 0xFFFF {
+		g.sendStats()
 	}
 }
 
@@ -404,4 +434,31 @@ func (g *GameProtocol) stackPosOfItem(pos game.Position, item *game.Item) uint8 
 		}
 	}
 	return uint8(stack)
+}
+
+func (g *GameProtocol) getItemWeight(item *game.Item) uint32 {
+	if item == nil {
+		return 0
+	}
+	weight := uint32(0)
+	if item.Attr != nil && item.Attr.Weight != nil {
+		weight = *item.Attr.Weight
+	} else if it := g.deps.Items.Get(item.ID); it != nil {
+		weight = it.Weight
+	}
+	if it := g.deps.Items.Get(item.ID); it != nil && it.Stackable {
+		weight *= uint32(item.Count)
+	}
+	for _, child := range item.Contents {
+		weight += g.getItemWeight(child)
+	}
+	return weight
+}
+
+func (g *GameProtocol) getPlayerTotalWeight() uint32 {
+	weight := uint32(0)
+	for _, item := range g.player.Inventory {
+		weight += g.getItemWeight(item)
+	}
+	return weight
 }

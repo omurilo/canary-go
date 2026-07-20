@@ -316,7 +316,7 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	if m, ok := victim.(*Monster); ok && m.Type != nil && m.Type.Flags.LootDrop {
 		corpse.Contents = rollLoot(m.Type.Loot)
 	}
-	if e.world.Map.AddItem(pos, corpse) && e.world.OnItemAppear != nil {
+	if e.world.AddItem(pos, corpse) && e.world.OnItemAppear != nil {
 		e.world.OnItemAppear(pos, corpse)
 	}
 

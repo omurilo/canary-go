@@ -14,6 +14,21 @@ func getCreature(L *lua.LState, index int) game.Creature {
 	return nil
 }
 
+func (e *Engine) pushCreature(L *lua.LState, c game.Creature) {
+	if c == nil {
+		L.Push(lua.LNil)
+		return
+	}
+	ud := L.NewUserData()
+	ud.Value = c
+	if _, ok := c.(*game.Player); ok {
+		L.SetMetatable(ud, L.GetTypeMetatable("Player"))
+	} else {
+		L.SetMetatable(ud, L.GetTypeMetatable("Creature"))
+	}
+	L.Push(ud)
+}
+
 func checkCreature(L *lua.LState) game.Creature {
 	return getCreature(L, 1)
 }

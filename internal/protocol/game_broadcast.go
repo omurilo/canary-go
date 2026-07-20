@@ -1,6 +1,29 @@
 package protocol
 
-import "github.com/opentibiabr/canary-go/internal/game"
+import (
+	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/netmsg"
+)
+
+// BroadcastCreatureSay sends a creature speech to spectators.
+func BroadcastCreatureSay(w *game.World, c game.Creature, talkType byte, text string) {
+	for _, s := range w.Spectators(c.GetPosition(), c.GetID()) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			gp.statementID++
+			w := netmsg.NewWriter()
+			w.AddByte(opCreatureSay)
+			w.AddU32(gp.statementID)
+			w.AddString(c.GetName())
+			w.AddByte(0) // Show (Traded)
+			// For players we would send their level, but for NPC we just send 0.
+			w.AddU16(0) 
+			w.AddByte(talkType)
+			w.AddPosition(netmsg.Position{X: c.GetPosition().X, Y: c.GetPosition().Y, Z: c.GetPosition().Z})
+			w.AddString(text)
+			gp.SendToClient(w)
+		}
+	}
+}
 
 // BroadcastCreatureMove tells spectators about a creature's movement.
 func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position, newPos game.Position, oldTileIndex int) {

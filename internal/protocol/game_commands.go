@@ -135,7 +135,7 @@ func (g *GameProtocol) cmdCreateItem(args []string) {
 	}
 	pos := g.player.Pos
 	item := &game.Item{ID: uint16(id), Count: uint16(count)}
-	if !g.deps.World.Map.AddItem(pos, item) {
+	if !g.deps.World.AddItem(pos, item) {
 		g.sendStatusText("No tile to place the item on.")
 		return
 	}

@@ -10,7 +10,7 @@ const luaMoveEventTypeName = "MoveEvent"
 
 func (e *Engine) registerMoveEvent() {
 	mt := e.L.NewTypeMetatable(luaMoveEventTypeName)
-	e.L.SetGlobal("MoveEvent", e.L.NewFunction(moveEventConstructor))
+	e.setClassConstructor("MoveEvent", moveEventConstructor, moveEventMethods)
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), moveEventMethods))
 	e.L.SetField(mt, "__newindex", e.L.NewFunction(moveEventNewIndex))
 }

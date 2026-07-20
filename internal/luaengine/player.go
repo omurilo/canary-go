@@ -138,6 +138,7 @@ var playerMethods = map[string]lua.LGFunction{
 	"setBankBalance": playerSetbankbalance,
 	"getStorageValue": playerGetstoragevalue,
 	"setStorageValue": playerSetstoragevalue,
+	"sendCancelMessage": func(L *lua.LState) int { return 0 },
 	"addItem": playerAdditem,
 	"addItemEx": playerAdditemex,
 	"addItemBatchToPaginedContainer": playerAdditembatchtopaginedcontainer,
@@ -1549,7 +1550,13 @@ func playerSendspellgroupcooldown(L *lua.LState) int {
 }
 
 func playerSendtextmessage(L *lua.LState) int {
-	// TODO: implement sendTextMessage
+	player := checkPlayer(L)
+	if player == nil {
+		return 0
+	}
+	msgType := uint8(L.CheckNumber(2))
+	text := L.CheckString(3)
+	player.SendTextMessage(msgType, text)
 	return 0
 }
 

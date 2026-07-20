@@ -11,7 +11,7 @@ const luaActionTypeName = "Action"
 // registerAction registers the Action global constructor and metatable
 func (e *Engine) registerAction() {
 	mt := e.L.NewTypeMetatable(luaActionTypeName)
-	e.L.SetGlobal("Action", e.L.NewFunction(actionConstructor))
+	e.setClassConstructor("Action", actionConstructor, actionMethods)
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), actionMethods))
 	e.L.SetField(mt, "__newindex", e.L.NewFunction(actionNewIndex))
 }

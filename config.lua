@@ -24,4 +24,4 @@ rsaKeyFile = "key.pem"
 
 -- Spawn field (synthetic map) generated around the town temple until OTBM
 -- loading is enabled.
-worldFile = "../data-canary/world/otservbr.otbm"
+worldFile = "../data-otservbr-global/world/otservbr.otbm"

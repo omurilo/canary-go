@@ -1,6 +1,8 @@
 package luaengine
 
 import (
+	"fmt"
+
 	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -16,9 +18,10 @@ type luaItem struct {
 
 func (e *Engine) registerItem() {
 	mt := e.L.NewTypeMetatable(itemTypeName)
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), e.itemMethods()))
+	methods := e.itemMethods()
+	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
 
-	e.L.SetGlobal("Item", e.L.NewFunction(e.itemCreate))
+	e.setClassConstructor("Item", e.itemCreate, methods)
 }
 
 func (e *Engine) itemCreate(L *lua.LState) int {
@@ -80,7 +83,7 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 				e.world.Map.RemoveItemPtr(it.pos, it.item)
 			}
 			
-			ok := e.world.Map.AddItem(dest, it.item)
+			ok := e.world.AddItem(dest, it.item)
 			if ok {
 				it.pos = dest
 			}
@@ -101,10 +104,60 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		"setAttribute": stubItemMethod,
 		"removeAttribute": stubItemMethod,
 		"canBeMoved": stubItemMethod,
-		"transform": stubItemMethod,
+		"transform": e.itemTransform,
 		"decay": stubItemMethod,
-		"getDescription": stubItemMethod,
+		"getDescription": e.itemGetDescription,
 		"isInsideDepot": stubItemMethod,
 		"isContainer": stubItemMethod,
 	}
+}
+
+func (e *Engine) itemGetDescription(L *lua.LState) int {
+	li := checkItem(L)
+	if li.item == nil {
+		L.Push(lua.LString(""))
+		return 1
+	}
+	
+	it := e.world.Items.Get(li.item.ID)
+	if it == nil {
+		L.Push(lua.LString("an item of type " + fmt.Sprint(li.item.ID)))
+		return 1
+	}
+
+	name := it.Name
+	if name == "" {
+		name = "an item of type " + fmt.Sprint(li.item.ID)
+	}
+
+	article := it.Article
+	if article == "" {
+		article = "a"
+	}
+
+	var desc string
+	if it.Description != "" {
+		desc = "\n" + it.Description
+	}
+
+	// Just a basic "You see a sword." for now.
+	// Weight, attack, armor can be added later.
+	text := "You see " + article + " " + name + "." + desc
+
+	L.Push(lua.LString(text))
+	return 1
+}
+
+func (e *Engine) itemTransform(L *lua.LState) int {
+	li := checkItem(L)
+	if li.item == nil {
+		L.Push(lua.LBool(false))
+		return 1
+	}
+	newID := uint16(L.CheckNumber(2))
+	if newID > 0 {
+		e.world.TransformItem(li.pos, li.item, newID)
+	}
+	L.Push(lua.LBool(true))
+	return 1
 }

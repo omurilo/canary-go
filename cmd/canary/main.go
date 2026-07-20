@@ -17,6 +17,7 @@ import (
 
 	lua "github.com/yuin/gopher-lua"
 
+	"github.com/opentibiabr/canary-go/internal/actions"
 	"github.com/opentibiabr/canary-go/internal/config"
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/db"
@@ -123,6 +124,7 @@ func run(o runOpts, log *slog.Logger) error {
 
 	// World: real OTBM map if provided, else a synthetic spawn field.
 	world := game.NewWorld()
+	world.Items = catalog
 
 	creatureTypes := creatures.NewTypeRegistry()
 	world.TypeRegistry = creatureTypes
@@ -200,6 +202,7 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Info("generated synthetic spawn field", "center", spawn, "radius", 40)
 	}
 	world.DefaultSpawn = spawn
+	world.StartDecayingMap()
 	world.OnCreatureMove = func(c game.Creature, oldPos game.Position, newPos game.Position, oldTileIndex int) {
 		protocol.BroadcastCreatureMove(world, c, oldPos, newPos, oldTileIndex)
 	}
@@ -218,6 +221,9 @@ func run(o runOpts, log *slog.Logger) error {
 	world.OnItemAppear = func(pos game.Position, item *game.Item) {
 		protocol.BroadcastAddItem(world, pos, item)
 	}
+	world.OnItemDecay = func(pos game.Position, stackPos uint8, oldItem, newItem *game.Item) {
+		protocol.BroadcastItemDecay(world, pos, stackPos, oldItem, newItem)
+	}
 	world.OnTargetLost = func(p *game.Player) {
 		protocol.SendCancelTarget(p)
 	}
@@ -233,9 +239,6 @@ func run(o runOpts, log *slog.Logger) error {
 	// The spell system resolves spell damage/heal through the combat engine.
 	world.Combat = combatEngine
 
-	spawnEngine.Start()
-	aiEngine.Start()
-	combatEngine.Start()
 
 	// Lua engine.
 	lengine := luaengine.New(world, log)
@@ -246,11 +249,25 @@ func run(o runOpts, log *slog.Logger) error {
 	})
 	// Core engine data lives in the base `data/` tree (not the world datapack):
 	// data/lib + data/npclib define framework classes (e.g. KeywordHandler) that
+	
+	world.OnCreatureSay = func(speaker game.Creature, talkType byte, text string) {
+		protocol.BroadcastCreatureSay(world, speaker, talkType, text)
+		
+		if player, ok := speaker.(*game.Player); ok {
+			spectators := world.SpectatorCreatures(speaker.GetPosition())
+			for _, spec := range spectators {
+				if npc, ok := spec.(*game.Npc); ok {
+					lengine.CallNpcOnCreatureSay(npc, player, talkType, text)
+				}
+			}
+		}
+	}
 	// datapack npc scripts require, and data/scripts/spells holds the player
 	// vocation spells. Load these (libs first) BEFORE the datapack scripts/npcs.
 	coreData := filepath.Dir(filepath.Dir(o.appearances)) // e.g. ../data
 	if coreData != "" && coreData != cfg.DataPack {
-		for _, sub := range []string{"lib", "npclib", "scripts"} {
+		lengine.L.SetGlobal("CORE_DIRECTORY", lua.LString(coreData))
+		for _, sub := range []string{"lib", "libs", "npclib", "scripts"} {
 			d := filepath.Join(coreData, sub)
 			if err := loadScripts(lengine, d, log); err != nil {
 				log.Warn("loading core data", "dir", d, "err", err)
@@ -260,6 +277,7 @@ func run(o runOpts, log *slog.Logger) error {
 	if err := loadScripts(lengine, scriptsDir, log); err != nil {
 		log.Warn("loading scripts", "err", err)
 	}
+	log.Info("registered actions (lua)", "count", actions.Count())
 	log.Info("registered instant spells (lua)", "count", spells.Count())
 	if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "monster"), log); err != nil {
 		log.Warn("loading monsters", "err", err)
@@ -275,6 +293,10 @@ func run(o runOpts, log *slog.Logger) error {
 	}
 
 	eventsEngine := events.NewEngine(lengine.L)
+
+	spawnEngine.Start()
+	aiEngine.Start()
+	combatEngine.Start()
 
 	deps := &protocol.Deps{
 		Cfg: cfg, DB: database, RSA: rsa, World: world, Items: catalog, Lua: lengine, Events: eventsEngine, Log: log,
@@ -326,6 +348,18 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 		return nil
 	})
 
+	// Special case for npclib to ensure npc_handler is loaded before modules
+	if filepath.Base(dir) == "npclib" {
+		npcHandler := filepath.Join(dir, "npc_system", "npc_handler.lua")
+		if _, err := os.Stat(npcHandler); err == nil {
+			if err := e.DoFile(npcHandler); err != nil {
+				log.Warn("script error", "file", npcHandler, "err", err)
+			} else {
+				log.Debug("loaded script", "file", npcHandler)
+			}
+		}
+	}
+
 	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -334,6 +368,10 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 			return filepath.SkipDir
 		}
 		if !d.IsDir() && filepath.Ext(path) == ".lua" {
+			// Skip npc_handler since we already loaded it
+			if filepath.Base(dir) == "npclib" && strings.HasSuffix(path, "npc_handler.lua") {
+				return nil
+			}
 			if err := e.DoFile(path); err != nil {
 				log.Warn("script error", "file", path, "err", err)
 			} else {

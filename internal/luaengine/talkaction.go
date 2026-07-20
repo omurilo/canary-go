@@ -13,7 +13,7 @@ const luaTalkActionTypeName = "TalkAction"
 // registerTalkAction registers the TalkAction global constructor and metatable
 func (e *Engine) registerTalkAction() {
 	mt := e.L.NewTypeMetatable(luaTalkActionTypeName)
-	e.L.SetGlobal("TalkAction", e.L.NewFunction(talkActionConstructor))
+	e.setClassConstructor("TalkAction", talkActionConstructor, talkActionMethods)
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), talkActionMethods))
 	e.L.SetField(mt, "__newindex", e.L.NewFunction(talkActionNewIndex))
 }

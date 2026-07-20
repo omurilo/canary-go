@@ -1,6 +1,8 @@
 package luaengine
 
 import (
+	"strings"
+	
 	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
 )
@@ -18,6 +20,10 @@ func checkNpc(L *lua.LState) *game.Npc {
 func (e *Engine) registerNpc() {
 	mt := e.L.NewTypeMetatable("Npc")
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), npcMethods))
+	
+	// Override methods that need the engine/world instance
+	e.L.SetField(e.L.GetField(mt, "__index"), "say", e.L.NewFunction(e.npcSay))
+	e.L.SetField(e.L.GetField(mt, "__index"), "openShopWindow", e.L.NewFunction(e.npcOpenshopwindow))
 }
 
 var npcMethods = map[string]lua.LGFunction{
@@ -121,7 +127,26 @@ func npcMove(L *lua.LState) int {
 }
 
 func npcOpenshopwindow(L *lua.LState) int {
-	// TODO: implement openShopWindow
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func (e *Engine) npcOpenshopwindow(L *lua.LState) int {
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	p, _ := L.CheckUserData(2).Value.(*game.Player)
+	if p == nil {
+		return 0
+	}
+	
+	if e.world != nil {
+		nType := e.world.TypeRegistry.Npcs[strings.ToLower(n.Name)]
+		if nType != nil && len(nType.ShopItems) > 0 {
+			p.SendOpenShop(n, nType.ShopItems)
+		}
+	}
 	return 0
 }
 
@@ -141,13 +166,24 @@ func npcRemoveplayerinteraction(L *lua.LState) int {
 }
 
 func npcSay(L *lua.LState) int {
+	return 0
+}
+
+func (e *Engine) npcSay(L *lua.LState) int {
 	n := checkNpc(L)
 	if n == nil {
 		return 0
 	}
 	text := L.CheckString(2)
+	talkType := byte(1) // SAY
+	if L.GetTop() >= 3 && L.Get(3).Type() == lua.LTNumber {
+		talkType = byte(L.ToNumber(3))
+	}
+	
 	game.GlobalDispatcher.AddEvent(0, func() {
-		n.Say(text)
+		if e.world != nil && e.world.OnCreatureSay != nil {
+			e.world.OnCreatureSay(n, talkType, text)
+		}
 	})
 	return 0
 }
@@ -201,3 +237,41 @@ func npcTurntocreature(L *lua.LState) int {
 	return 0
 }
 
+
+func (e *Engine) CallNpcOnCreatureSay(npc *game.Npc, player *game.Player, talkType byte, text string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.npcCallbacksMu.Lock()
+	if e.npcCallbacks == nil {
+		e.npcCallbacksMu.Unlock()
+		return
+	}
+	callbacks, ok := e.npcCallbacks[strings.ToLower(npc.Name)]
+	if !ok || callbacks["onSay"] == nil {
+		e.npcCallbacksMu.Unlock()
+		return
+	}
+	fn := callbacks["onSay"]
+	e.npcCallbacksMu.Unlock()
+
+	L := e.L
+	L.Push(fn)
+
+	udNpc := L.NewUserData()
+	udNpc.Value = npc
+	L.SetMetatable(udNpc, L.GetTypeMetatable("Npc"))
+	L.Push(udNpc)
+
+	udPlayer := L.NewUserData()
+	udPlayer.Value = player
+	L.SetMetatable(udPlayer, L.GetTypeMetatable("Player"))
+	L.Push(udPlayer)
+
+	L.Push(lua.LNumber(talkType))
+	L.Push(lua.LString(text))
+
+	if err := L.PCall(4, 0, nil); err != nil {
+		e.log.Error("lua npc onCreatureSay", "npc", npc.Name, "err", err)
+	}
+}

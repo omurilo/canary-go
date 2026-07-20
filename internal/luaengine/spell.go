@@ -14,7 +14,7 @@ const luaSpellTypeName = "Spell"
 // the Lua Spell bindings (src/lua/functions/creatures/combat/spell_functions.cpp).
 func (e *Engine) registerSpell() {
 	mt := e.L.NewTypeMetatable(luaSpellTypeName)
-	e.L.SetGlobal("Spell", e.L.NewFunction(spellConstructor))
+	e.setClassConstructor("Spell", spellConstructor, spellMethods)
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), spellMethods))
 	e.L.SetField(mt, "__newindex", e.L.NewFunction(spellNewIndex))
 }

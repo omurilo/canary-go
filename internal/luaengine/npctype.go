@@ -63,6 +63,15 @@ func (e *Engine) registerNpcType() {
 			L.Push(lua.LTrue)
 			return 1
 		},
+		"addShopItem": func(L *lua.LState) int {
+			n := checkNpcType(L)
+			ud := L.CheckUserData(2)
+			if shopItem, ok := ud.Value.(*creatures.ShopItem); ok {
+				n.ShopItems = append(n.ShopItems, *shopItem)
+			}
+			L.Push(lua.LTrue)
+			return 1
+		},
 	}
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), npcTypeMethods))
 	// Datapack NPC scripts assign event callbacks directly on the userdata, e.g.
@@ -72,6 +81,22 @@ func (e *Engine) registerNpcType() {
 	// callbacks (onSay dialogue, onThink, shop handlers) into the NPC runtime is
 	// the remaining NPC step.
 	e.L.SetField(mt, "__newindex", e.L.NewFunction(func(L *lua.LState) int {
+		n := checkNpcType(L)
+		key := L.CheckString(2)
+		val := L.CheckAny(3)
+		
+		if fn, ok := val.(*lua.LFunction); ok {
+			e.npcCallbacksMu.Lock()
+			if e.npcCallbacks == nil {
+				e.npcCallbacks = make(map[string]map[string]*lua.LFunction)
+			}
+			name := strings.ToLower(n.Name)
+			if e.npcCallbacks[name] == nil {
+				e.npcCallbacks[name] = make(map[string]*lua.LFunction)
+			}
+			e.npcCallbacks[name][key] = fn
+			e.npcCallbacksMu.Unlock()
+		}
 		return 0
 	}))
 
@@ -101,4 +126,49 @@ func checkNpcType(L *lua.LState) *creatures.NpcType {
 	}
 	L.ArgError(1, "NpcType expected")
 	return nil
+}
+
+func (e *Engine) registerShop() {
+	mt := e.L.NewTypeMetatable("Shop")
+	methods := map[string]lua.LGFunction{
+		"setId": func(L *lua.LState) int {
+			s := L.CheckUserData(1).Value.(*creatures.ShopItem)
+			s.ID = uint16(L.CheckNumber(2))
+			return 0
+		},
+		"setCount": func(L *lua.LState) int {
+			s := L.CheckUserData(1).Value.(*creatures.ShopItem)
+			s.SubType = uint8(L.CheckNumber(2))
+			return 0
+		},
+		"setNameItem": func(L *lua.LState) int {
+			s := L.CheckUserData(1).Value.(*creatures.ShopItem)
+			s.Name = L.CheckString(2)
+			return 0
+		},
+		"setBuyPrice": func(L *lua.LState) int {
+			s := L.CheckUserData(1).Value.(*creatures.ShopItem)
+			s.BuyPrice = uint32(L.CheckNumber(2))
+			return 0
+		},
+		"setSellPrice": func(L *lua.LState) int {
+			s := L.CheckUserData(1).Value.(*creatures.ShopItem)
+			s.SellPrice = uint32(L.CheckNumber(2))
+			return 0
+		},
+		"addChildShop": func(L *lua.LState) int {
+			// Actually we don't need to do anything here because addShopItem does it
+			return 0
+		},
+	}
+	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
+
+	// Shop constructor
+	e.setClassConstructor("Shop", func(L *lua.LState) int {
+		ud := L.NewUserData()
+		ud.Value = &creatures.ShopItem{}
+		L.SetMetatable(ud, mt)
+		L.Push(ud)
+		return 1
+	}, methods)
 }

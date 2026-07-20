@@ -15,16 +15,21 @@ type luaContainer struct {
 func (e *Engine) registerContainer() {
 	mt := e.L.NewTypeMetatable(containerTypeName)
 	// Combine itemMethods and containerMethods for the __index table
-	indexTbl := e.L.NewTable()
+	combinedMethods := make(map[string]lua.LGFunction)
 	for k, v := range e.itemMethods() {
-		e.L.SetField(indexTbl, k, e.L.NewFunction(v))
+		combinedMethods[k] = v
 	}
 	for k, v := range e.containerMethods() {
+		combinedMethods[k] = v
+	}
+	
+	indexTbl := e.L.NewTable()
+	for k, v := range combinedMethods {
 		e.L.SetField(indexTbl, k, e.L.NewFunction(v))
 	}
 	e.L.SetField(mt, "__index", indexTbl)
 
-	e.L.SetGlobal("Container", e.L.NewFunction(e.containerCreate))
+	e.setClassConstructor("Container", e.containerCreate, combinedMethods)
 }
 
 func (e *Engine) containerCreate(L *lua.LState) int {

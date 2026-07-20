@@ -81,6 +81,8 @@ func (g *GameProtocol) sendTileAddItem(pos game.Position, item *game.Item) {
 	g.SendToClient(w)
 }
 
+
+
 // BroadcastCreatureHealth sends a health-bar update for c to every player who
 // can see it (item #3 of the combat migration).
 func BroadcastCreatureHealth(w *game.World, c game.Creature) {
@@ -188,6 +190,15 @@ func BroadcastAddItem(w *game.World, pos game.Position, item *game.Item) {
 	for _, s := range w.Spectators(pos, 0) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
 			gp.sendTileAddItem(pos, item)
+		}
+	}
+}
+
+// BroadcastItemDecay tells every spectator an item transformed due to decay.
+func BroadcastItemDecay(w *game.World, pos game.Position, stackPos uint8, oldItem, newItem *game.Item) {
+	for _, s := range w.Spectators(pos, 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			gp.sendUpdateTileThing(pos, stackPos, newItem)
 		}
 	}
 }
