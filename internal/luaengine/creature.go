@@ -131,11 +131,19 @@ func outfitToTable(L *lua.LState, o game.Outfit) *lua.LTable {
 }
 
 // registerCreatureType registers the Creature userdata type.
+//
+// Methods are stored DIRECTLY on the metatable (not a separate __index table)
+// and __index points at the metatable itself. This is required because the
+// datapack's revscriptsys.lua overwrites __index with a `CreatureIndex(self,key)`
+// function that resolves methods via `getmetatable(self)[key]` — i.e. it reads
+// them off the metatable. A separate __index table would be bypassed and every
+// method (getId, getPosition, ...) would read back nil.
 func (e *Engine) registerCreatureType() {
 	mt := e.L.NewTypeMetatable("Creature")
-	idx := e.L.SetFuncs(e.L.NewTable(), creatureMethods)
+	e.L.SetFuncs(mt, creatureMethods)
 	// teleportTo needs the world (to broadcast the jump), so it's engine-bound.
-	e.L.SetField(idx, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "__index", mt)
 }
 
 var creatureMethods = map[string]lua.LGFunction{

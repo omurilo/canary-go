@@ -21,6 +21,8 @@ func (e *Engine) registerPlayerType() {
 	// Player IS-A Creature (C++ Player : Creature), so it must expose every
 	// Creature method (getId, getPosition, getHealth, say, teleportTo, ...).
 	// Layer creature methods first, then let player-specific methods override.
+	// Methods live directly on the metatable (see registerCreatureType) so the
+	// datapack's revscriptsys CreatureIndex (getmetatable(self)[key]) finds them.
 	e.L.SetFuncs(mt, creatureMethods)
 	e.L.SetFuncs(mt, playerMethods)
 	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))

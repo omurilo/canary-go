@@ -18,14 +18,12 @@ func checkMonster(L *lua.LState) *game.Monster {
 func (e *Engine) registerMonster() {
 	mt := e.L.NewTypeMetatable("Monster")
 	// Monster IS-A Creature: expose all creature methods, monster-specific win.
+	// Methods directly on the metatable (see registerCreatureType) for
+	// revscriptsys CreatureIndex compatibility.
 	e.L.SetFuncs(mt, creatureMethods)
 	e.L.SetFuncs(mt, monsterMethods)
 	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
 	e.L.SetField(mt, "__index", mt)
-	// idx
-	e.L.SetFuncs(mt, creatureMethods)
-	e.L.SetFuncs(mt, monsterMethods)
-	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
 }
 
 var monsterMethods = map[string]lua.LGFunction{
