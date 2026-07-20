@@ -77,6 +77,11 @@ type Player struct {
 	// Player::learnedInstantSpellList (src/creatures/players/player.hpp).
 	learnedSpells map[string]bool
 
+	// Storages holds the player's key/value action storages (quest progress,
+	// cooldowns, NPC state). Persistence is a later milestone; for now they live
+	// for the session. Absent keys read back as -1 (see GetStorageValue).
+	Storages map[uint32]int32
+
 	Session Session
 }
 
@@ -167,6 +172,31 @@ func (p *Player) ensureDefaults() {
 			p.Skills[i] = 10
 		}
 	}
+}
+
+// GetStorageValue returns the player's value for a storage key, or -1 when the
+// key was never set (mirroring Player::getStorageValue). Quest/NPC scripts rely
+// on the -1 sentinel to detect "not started".
+func (p *Player) GetStorageValue(key uint32) int32 {
+	if p.Storages == nil {
+		return -1
+	}
+	if v, ok := p.Storages[key]; ok {
+		return v
+	}
+	return -1
+}
+
+// SetStorageValue sets (or, with value -1, clears) a storage key.
+func (p *Player) SetStorageValue(key uint32, value int32) {
+	if value == -1 {
+		delete(p.Storages, key)
+		return
+	}
+	if p.Storages == nil {
+		p.Storages = make(map[uint32]int32)
+	}
+	p.Storages[key] = value
 }
 
 func (p *Player) GetID() uint32 { return p.ID }

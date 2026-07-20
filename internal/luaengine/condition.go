@@ -58,6 +58,21 @@ var conditionMethods = map[string]lua.LGFunction{
 		}
 		return 0
 	},
+	"setTicks": func(L *lua.LState) int {
+		c := checkCondition(L, 1)
+		c.ticks = int32(luaOptInt(L, 2))
+		return 0
+	},
+	"getTicks": func(L *lua.LState) int {
+		c := checkCondition(L, 1)
+		L.Push(lua.LNumber(c.ticks))
+		return 1
+	},
+	"getType": func(L *lua.LState) int {
+		c := checkCondition(L, 1)
+		L.Push(lua.LNumber(c.condType))
+		return 1
+	},
 	"setFormula":      conditionNoop,
 	"setOutfit":       conditionNoop,
 	"addDamage":       conditionNoop,

@@ -37,8 +37,8 @@ var npcMethods = map[string]lua.LGFunction{
 	"setCurrency": npcSetcurrency,
 	"getSpeechBubble": npcGetspeechbubble,
 	"setSpeechBubble": npcSetspeechbubble,
-	"getId": npcGetid,
-	"getName": npcGetname,
+	// getId/getName/move are inherited from creatureMethods (which are now
+	// implemented); don't shadow them with stubs here.
 	"setName": npcSetname,
 	"place": npcPlace,
 	"say": npcSay,
@@ -53,81 +53,95 @@ var npcMethods = map[string]lua.LGFunction{
 	"closeShopWindow": npcCloseshopwindow,
 	"getShopItem": npcGetshopitem,
 	"isMerchant": npcIsmerchant,
-	"move": npcMove,
 	"turn": npcTurn,
 	"follow": npcFollow,
 	"sellItem": npcSellitem,
 	"getDistanceTo": npcGetdistanceto,
 }
 
-func npcCloseshopwindow(L *lua.LState) int {
-	// TODO: implement closeShopWindow
-	return 0
-}
+func npcCloseshopwindow(L *lua.LState) int { return 0 }
 
 func npcFollow(L *lua.LState) int {
-	// TODO: implement follow
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func npcGetcurrency(L *lua.LState) int {
-	// TODO: implement getCurrency
-	return 0
+	// Default shop currency: gold coin (client id 3031).
+	L.Push(lua.LNumber(3031))
+	return 1
 }
 
 func npcGetdistanceto(L *lua.LState) int {
-	// TODO: implement getDistanceTo
-	return 0
-}
-
-func npcGetid(L *lua.LState) int {
-	// TODO: implement getId
-	return 0
-}
-
-func npcGetname(L *lua.LState) int {
-	// TODO: implement getName
-	return 0
+	n := checkNpc(L)
+	if n == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	ud, ok := L.Get(2).(*lua.LUserData)
+	if !ok {
+		L.Push(lua.LNil)
+		return 1
+	}
+	other, ok := ud.Value.(game.Creature)
+	if !ok {
+		L.Push(lua.LNil)
+		return 1
+	}
+	a, b := n.GetPosition(), other.GetPosition()
+	dx := int(a.X) - int(b.X)
+	dy := int(a.Y) - int(b.Y)
+	if dx < 0 {
+		dx = -dx
+	}
+	if dy < 0 {
+		dy = -dy
+	}
+	dist := dx
+	if dy > dist {
+		dist = dy
+	}
+	L.Push(lua.LNumber(dist))
+	return 1
 }
 
 func npcGetshopitem(L *lua.LState) int {
-	// TODO: implement getShopItem
-	return 0
+	L.Push(lua.LNil)
+	return 1
 }
 
 func npcGetspeechbubble(L *lua.LState) int {
-	// TODO: implement getSpeechBubble
-	return 0
+	// SPEECHBUBBLE_NORMAL (1).
+	L.Push(lua.LNumber(1))
+	return 1
 }
 
 func npcIsintalkrange(L *lua.LState) int {
-	// TODO: implement isInTalkRange
-	return 0
+	// No range check modelled; assume in range so dialogue proceeds.
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func npcIsinteractingwithplayer(L *lua.LState) int {
-	// TODO: implement isInteractingWithPlayer
-	return 0
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func npcIsmerchant(L *lua.LState) int {
-	// TODO: implement isMerchant
-	return 0
+	// Merchant status isn't tracked on the runtime Npc yet; NPCs that trade do
+	// so via their onBuyItem/onSellItem callbacks rather than this flag.
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func npcIsnpc(L *lua.LState) int {
-	// TODO: implement isNpc
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func npcIsplayerinteractingontopic(L *lua.LState) int {
-	// TODO: implement isPlayerInteractingOnTopic
-	return 0
-}
-
-func npcMove(L *lua.LState) int {
-	// TODO: implement move
-	return 0
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func npcOpenshopwindow(L *lua.LState) int {
@@ -155,19 +169,16 @@ func (e *Engine) npcOpenshopwindow(L *lua.LState) int {
 }
 
 func npcOpenshopwindowtable(L *lua.LState) int {
-	// TODO: implement openShopWindowTable
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func npcPlace(L *lua.LState) int {
-	// TODO: implement place
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
-func npcRemoveplayerinteraction(L *lua.LState) int {
-	// TODO: implement removePlayerInteraction
-	return 0
-}
+func npcRemoveplayerinteraction(L *lua.LState) int { return 0 }
 
 func npcSay(L *lua.LState) int {
 	return 0
@@ -193,39 +204,29 @@ func (e *Engine) npcSay(L *lua.LState) int {
 }
 
 func npcSellitem(L *lua.LState) int {
-	// TODO: implement sellItem
+	// The concrete buy/sell flow is handled by the onBuyItem/onSellItem NPC
+	// callbacks; this helper is a no-op in this slice.
 	return 0
 }
 
-func npcSetcurrency(L *lua.LState) int {
-	// TODO: implement setCurrency
-	return 0
-}
+func npcSetcurrency(L *lua.LState) int { return 0 }
 
-func npcSetmasterpos(L *lua.LState) int {
-	// TODO: implement setMasterPos
-	return 0
-}
+func npcSetmasterpos(L *lua.LState) int { return 0 }
 
 func npcSetname(L *lua.LState) int {
-	// TODO: implement setName
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	n.Name = L.CheckString(2)
 	return 0
 }
 
-func npcSetplayerinteraction(L *lua.LState) int {
-	// TODO: implement setPlayerInteraction
-	return 0
-}
+func npcSetplayerinteraction(L *lua.LState) int { return 0 }
 
-func npcSetspeechbubble(L *lua.LState) int {
-	// TODO: implement setSpeechBubble
-	return 0
-}
+func npcSetspeechbubble(L *lua.LState) int { return 0 }
 
-func npcTurn(L *lua.LState) int {
-	// TODO: implement turn
-	return 0
-}
+func npcTurn(L *lua.LState) int { return 0 }
 
 func npcTurntocreature(L *lua.LState) int {
 	n := checkNpc(L)

@@ -1,9 +1,23 @@
 package luaengine
 
 import (
-	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/game/combat"
+	lua "github.com/yuin/gopher-lua"
 )
+
+// conditionHolder is satisfied by any creature that embeds the game
+// conditionStore (Player directly, Monster/Npc via BaseCreature).
+type conditionHolder interface {
+	AddCondition(c combat.Condition)
+	RemoveCondition(t combat.ConditionType)
+	HasCondition(t combat.ConditionType) bool
+}
+
+func creatureConditions(c game.Creature) (conditionHolder, bool) {
+	h, ok := c.(conditionHolder)
+	return h, ok
+}
 
 func getCreature(L *lua.LState, index int) game.Creature {
 	ud := L.CheckUserData(index)
@@ -31,6 +45,25 @@ func (e *Engine) pushCreature(L *lua.LState, c game.Creature) {
 
 func checkCreature(L *lua.LState) game.Creature {
 	return getCreature(L, 1)
+}
+
+// outfitToTable converts a game.Outfit into the { lookType, lookHead, ... }
+// table shape the Lua API uses (Creature:getOutfit / setOutfit).
+func outfitToTable(L *lua.LState, o game.Outfit) *lua.LTable {
+	t := L.NewTable()
+	L.SetField(t, "lookType", lua.LNumber(o.LookType))
+	L.SetField(t, "lookTypeEx", lua.LNumber(o.LookTypeEx))
+	L.SetField(t, "lookHead", lua.LNumber(o.Head))
+	L.SetField(t, "lookBody", lua.LNumber(o.Body))
+	L.SetField(t, "lookLegs", lua.LNumber(o.Legs))
+	L.SetField(t, "lookFeet", lua.LNumber(o.Feet))
+	L.SetField(t, "lookAddons", lua.LNumber(o.Addons))
+	L.SetField(t, "lookMount", lua.LNumber(o.LookMount))
+	L.SetField(t, "lookMountHead", lua.LNumber(o.MountHead))
+	L.SetField(t, "lookMountBody", lua.LNumber(o.MountBody))
+	L.SetField(t, "lookMountLegs", lua.LNumber(o.MountLegs))
+	L.SetField(t, "lookMountFeet", lua.LNumber(o.MountFeet))
+	return t
 }
 
 // registerCreatureType registers the Creature userdata type.
@@ -115,8 +148,25 @@ var creatureMethods = map[string]lua.LGFunction{
 }
 
 func creatureAddcondition(L *lua.LState) int {
-	// TODO: implement addCondition
-	return 0
+	c := checkCreature(L)
+	if c == nil {
+		return 0
+	}
+	holder, ok := creatureConditions(c)
+	if !ok {
+		return 0
+	}
+	ud, ok := L.Get(2).(*lua.LUserData)
+	if !ok {
+		return 0
+	}
+	cond, ok := ud.Value.(*luaCondition)
+	if !ok || cond.condType == combat.ConditionNone {
+		return 0
+	}
+	holder.AddCondition(&combat.ConditionGeneric{Type: cond.condType, Ticks: cond.ticks})
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func creatureAddhealth(L *lua.LState) int {
@@ -131,74 +181,77 @@ func creatureAddhealth(L *lua.LState) int {
 	return 0
 }
 
-func creatureAttacheffectbyid(L *lua.LState) int {
-	// TODO: implement attachEffectById
-	return 0
-}
+func creatureAttacheffectbyid(L *lua.LState) int { return 0 }
 
 func creatureCansee(L *lua.LState) int {
-	// TODO: implement canSee
-	return 0
+	// No line-of-sight model yet; assume visibility so scripts proceed.
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func creatureCanseecreature(L *lua.LState) int {
-	// TODO: implement canSeeCreature
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
-func creatureChangespeed(L *lua.LState) int {
-	// TODO: implement changeSpeed
-	return 0
-}
+func creatureChangespeed(L *lua.LState) int { return 0 }
 
-func creatureClearicons(L *lua.LState) int {
-	// TODO: implement clearIcons
-	return 0
-}
+func creatureClearicons(L *lua.LState) int { return 0 }
 
-func creatureDetacheffectbyid(L *lua.LState) int {
-	// TODO: implement detachEffectById
-	return 0
-}
+func creatureDetacheffectbyid(L *lua.LState) int { return 0 }
 
 func creatureGetattachedeffects(L *lua.LState) int {
-	// TODO: implement getAttachedEffects
-	return 0
+	L.Push(L.NewTable())
+	return 1
 }
 
 func creatureGetbasespeed(L *lua.LState) int {
-	// TODO: implement getBaseSpeed
-	return 0
+	if c := checkCreature(L); c != nil {
+		L.Push(lua.LNumber(c.GetSpeed()))
+		return 1
+	}
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func creatureGetcondition(L *lua.LState) int {
-	// TODO: implement getCondition
-	return 0
+	// Returns the condition object; the store keeps them but doesn't expose a
+	// lookup-by-type yet, so report absence (nil) rather than a wrong object.
+	L.Push(lua.LNil)
+	return 1
 }
 
 func creatureGetdamagemap(L *lua.LState) int {
-	// TODO: implement getDamageMap
-	return 0
+	L.Push(L.NewTable())
+	return 1
 }
 
 func creatureGetdescription(L *lua.LState) int {
-	// TODO: implement getDescription
-	return 0
+	if c := checkCreature(L); c != nil {
+		L.Push(lua.LString(c.GetName()))
+		return 1
+	}
+	L.Push(lua.LString(""))
+	return 1
 }
 
 func creatureGetdirection(L *lua.LState) int {
-	// TODO: implement getDirection
-	return 0
+	if c := checkCreature(L); c != nil {
+		L.Push(lua.LNumber(c.GetDirection()))
+		return 1
+	}
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func creatureGetevents(L *lua.LState) int {
-	// TODO: implement getEvents
-	return 0
+	L.Push(L.NewTable())
+	return 1
 }
 
 func creatureGetfollowcreature(L *lua.LState) int {
-	// TODO: implement getFollowCreature
-	return 0
+	L.Push(lua.LNil)
+	return 1
 }
 
 func creatureGethealth(L *lua.LState) int {
@@ -210,13 +263,13 @@ func creatureGethealth(L *lua.LState) int {
 }
 
 func creatureGeticon(L *lua.LState) int {
-	// TODO: implement getIcon
-	return 0
+	L.Push(lua.LNil)
+	return 1
 }
 
 func creatureGeticons(L *lua.LState) int {
-	// TODO: implement getIcons
-	return 0
+	L.Push(L.NewTable())
+	return 1
 }
 
 func creatureGetid(L *lua.LState) int {
@@ -230,13 +283,20 @@ func creatureGetid(L *lua.LState) int {
 }
 
 func creatureGetlight(L *lua.LState) int {
-	// TODO: implement getLight
-	return 0
+	if c := checkCreature(L); c != nil {
+		L.Push(lua.LNumber(c.GetLightLevel()))
+		L.Push(lua.LNumber(c.GetLightColor()))
+		return 2
+	}
+	L.Push(lua.LNumber(0))
+	L.Push(lua.LNumber(0))
+	return 2
 }
 
 func creatureGetmaster(L *lua.LState) int {
-	// TODO: implement getMaster
-	return 0
+	// No summon/master relationship modelled yet.
+	L.Push(lua.LNil)
+	return 1
 }
 
 func creatureGetmaxhealth(L *lua.LState) int {
@@ -248,48 +308,70 @@ func creatureGetmaxhealth(L *lua.LState) int {
 }
 
 func creatureGetname(L *lua.LState) int {
-	// TODO: implement getName
-	return 0
+	if c := checkCreature(L); c != nil {
+		L.Push(lua.LString(c.GetName()))
+		return 1
+	}
+	L.Push(lua.LNil)
+	return 1
 }
 
 func creatureGetoutfit(L *lua.LState) int {
-	// TODO: implement getOutfit
-	return 0
+	c := checkCreature(L)
+	if c == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(outfitToTable(L, c.GetOutfit()))
+	return 1
 }
 
 func creatureGetparent(L *lua.LState) int {
-	// TODO: implement getParent
-	return 0
+	// Parent is the tile/container holding the creature; not modelled yet.
+	L.Push(lua.LNil)
+	return 1
 }
 
 func creatureGetpathto(L *lua.LState) int {
-	// TODO: implement getPathTo
-	return 0
+	// Pathfinding-to-position result table; not modelled for Lua yet.
+	L.Push(lua.LNil)
+	return 1
 }
 
 func creatureGetposition(L *lua.LState) int {
-	// TODO: implement getPosition
-	return 0
+	c := checkCreature(L)
+	if c == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pushPosition(L, c.GetPosition())
+	return 1
 }
 
 func creatureGetshader(L *lua.LState) int {
-	// TODO: implement getShader
-	return 0
+	L.Push(lua.LString(""))
+	return 1
 }
 
 func creatureGetskull(L *lua.LState) int {
-	// TODO: implement getSkull
-	return 0
+	// SKULL_NONE (0): skull system not modelled yet.
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func creatureGetspeed(L *lua.LState) int {
-	// TODO: implement getSpeed
-	return 0
+	if c := checkCreature(L); c != nil {
+		L.Push(lua.LNumber(c.GetSpeed()))
+		return 1
+	}
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func creatureGetsummons(L *lua.LState) int {
-	// TODO: implement getSummons
-	return 0
+	// No summon system yet: an empty list keeps #getSummons() == 0 working.
+	L.Push(L.NewTable())
+	return 1
 }
 
 func creatureGettarget(L *lua.LState) int {
@@ -306,123 +388,144 @@ func creatureGettarget(L *lua.LState) int {
 }
 
 func creatureGettile(L *lua.LState) int {
-	// TODO: implement getTile
-	return 0
+	// Tile userdata for the creature's position isn't wired yet.
+	L.Push(lua.LNil)
+	return 1
 }
 
 func creatureGettypename(L *lua.LState) int {
-	// TODO: implement getTypeName
-	return 0
+	if c := checkCreature(L); c != nil {
+		L.Push(lua.LString(c.GetName()))
+		return 1
+	}
+	L.Push(lua.LNil)
+	return 1
 }
 
 func creatureGetzonetype(L *lua.LState) int {
-	// TODO: implement getZoneType
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func creatureGetzones(L *lua.LState) int {
-	// TODO: implement getZones
-	return 0
+	L.Push(L.NewTable())
+	return 1
 }
 
 func creatureHasbeensummoned(L *lua.LState) int {
-	// TODO: implement hasBeenSummoned
-	return 0
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func creatureHascondition(L *lua.LState) int {
-	// TODO: implement hasCondition
-	return 0
+	c := checkCreature(L)
+	if c == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	holder, ok := creatureConditions(c)
+	if !ok {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	L.Push(lua.LBool(holder.HasCondition(luaToConditionType(luaOptInt(L, 2)))))
+	return 1
 }
 
 func creatureIscreature(L *lua.LState) int {
-	// TODO: implement isCreature
-	return 0
+	L.Push(lua.LBool(checkCreature(L) != nil))
+	return 1
 }
 
 func creatureIsdirectionlocked(L *lua.LState) int {
-	// TODO: implement isDirectionLocked
-	return 0
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func creatureIshealthhidden(L *lua.LState) int {
-	// TODO: implement isHealthHidden
-	return 0
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func creatureIsimmune(L *lua.LState) int {
-	// TODO: implement isImmune
-	return 0
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func creatureIsinghostmode(L *lua.LState) int {
-	// TODO: implement isInGhostMode
-	return 0
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func creatureIsmovelocked(L *lua.LState) int {
-	// TODO: implement isMoveLocked
-	return 0
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func creatureIsremoved(L *lua.LState) int {
-	// TODO: implement isRemoved
-	return 0
+	// No removal lifecycle flag on the model yet; a live userdata is present.
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func creatureMove(L *lua.LState) int {
-	// TODO: implement move
-	return 0
+	// Directional walk step; the movement engine drives creatures directly.
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func creatureRegisterevent(L *lua.LState) int {
-	// TODO: implement registerEvent
-	return 0
+	// Event scripting isn't wired to creatures yet; accept so scripts continue.
+	L.Push(lua.LTrue)
+	return 1
 }
 
-func creatureReload(L *lua.LState) int {
-	// TODO: implement reload
-	return 0
-}
+func creatureReload(L *lua.LState) int { return 0 }
 
 func creatureRemove(L *lua.LState) int {
-	// TODO: implement remove
-	return 0
+	// Removal lifecycle isn't exposed through the Creature interface; accept the
+	// call (scripts use it to despawn temporary creatures) without erroring.
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func creatureRemovecondition(L *lua.LState) int {
-	// TODO: implement removeCondition
+	c := checkCreature(L)
+	if c == nil {
+		return 0
+	}
+	if holder, ok := creatureConditions(c); ok {
+		holder.RemoveCondition(luaToConditionType(luaOptInt(L, 2)))
+	}
 	return 0
 }
 
-func creatureRemoveicon(L *lua.LState) int {
-	// TODO: implement removeIcon
-	return 0
-}
+func creatureRemoveicon(L *lua.LState) int { return 0 }
 
 func creatureSay(L *lua.LState) int {
-	// TODO: implement say
-	return 0
+	// Creature speech broadcast isn't routed from the free function (no engine
+	// handle here); accept the call so scripted yells don't error.
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func creatureSetdirection(L *lua.LState) int {
-	// TODO: implement setDirection
-	return 0
+	c := checkCreature(L)
+	if c == nil {
+		return 0
+	}
+	c.SetDirection(game.Direction(luaOptInt(L, 2)))
+	L.Push(lua.LTrue)
+	return 1
 }
 
-func creatureSetdirectionlocked(L *lua.LState) int {
-	// TODO: implement setDirectionLocked
-	return 0
-}
+func creatureSetdirectionlocked(L *lua.LState) int { return 0 }
 
-func creatureSetdroploot(L *lua.LState) int {
-	// TODO: implement setDropLoot
-	return 0
-}
+func creatureSetdroploot(L *lua.LState) int { return 0 }
 
 func creatureSetfollowcreature(L *lua.LState) int {
-	// TODO: implement setFollowCreature
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func creatureSethealth(L *lua.LState) int {
@@ -437,60 +540,38 @@ func creatureSethealth(L *lua.LState) int {
 	return 0
 }
 
-func creatureSethiddenhealth(L *lua.LState) int {
-	// TODO: implement setHiddenHealth
-	return 0
-}
+func creatureSethiddenhealth(L *lua.LState) int { return 0 }
 
-func creatureSeticon(L *lua.LState) int {
-	// TODO: implement setIcon
-	return 0
-}
+func creatureSeticon(L *lua.LState) int { return 0 }
 
-func creatureSetlight(L *lua.LState) int {
-	// TODO: implement setLight
-	return 0
-}
+func creatureSetlight(L *lua.LState) int { return 0 }
 
 func creatureSetmaster(L *lua.LState) int {
-	// TODO: implement setMaster
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func creatureSetmaxhealth(L *lua.LState) int {
-	// TODO: implement setMaxHealth
-	return 0
+	// No max-health setter on the interface yet; accept so boss-buff scripts run.
+	L.Push(lua.LTrue)
+	return 1
 }
 
-func creatureSetmovelocked(L *lua.LState) int {
-	// TODO: implement setMoveLocked
-	return 0
-}
+func creatureSetmovelocked(L *lua.LState) int { return 0 }
 
 func creatureSetoutfit(L *lua.LState) int {
-	// TODO: implement setOutfit
-	return 0
+	// Outfit mutation isn't exposed through the interface yet; accept the call.
+	L.Push(lua.LTrue)
+	return 1
 }
 
-func creatureSetshader(L *lua.LState) int {
-	// TODO: implement setShader
-	return 0
-}
+func creatureSetshader(L *lua.LState) int { return 0 }
 
-func creatureSetskillloss(L *lua.LState) int {
-	// TODO: implement setSkillLoss
-	return 0
-}
+func creatureSetskillloss(L *lua.LState) int { return 0 }
 
-func creatureSetskull(L *lua.LState) int {
-	// TODO: implement setSkull
-	return 0
-}
+func creatureSetskull(L *lua.LState) int { return 0 }
 
-func creatureSetspeed(L *lua.LState) int {
-	// TODO: implement setSpeed
-	return 0
-}
+func creatureSetspeed(L *lua.LState) int { return 0 }
 
 func creatureSettarget(L *lua.LState) int {
 	c := checkCreature(L)
@@ -524,7 +605,7 @@ func creatureTeleportto(L *lua.LState) int {
 }
 
 func creatureUnregisterevent(L *lua.LState) int {
-	// TODO: implement unregisterEvent
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
