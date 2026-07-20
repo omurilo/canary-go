@@ -7,7 +7,7 @@ loginProtocolPort = 7171
 gameProtocolPort = 7172
 statusProtocolPort = 7171
 
-dataPackDirectory = "../data-canary"
+dataPackDirectory = "../data-otservbr-global"
 coreDirectory = "../data"
 
 -- MariaDB connection (shared with MyAAC and the login-server).

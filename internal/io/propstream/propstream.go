@@ -56,6 +56,25 @@ func (p *PropStream) ReadUint64() (uint64, error) {
 	return val, nil
 }
 
+// ReadInt8 mirrors C++ PropStream::read<int8_t>. Bytes are identical to the
+// unsigned form; only the interpretation differs.
+func (p *PropStream) ReadInt8() (int8, error) {
+	v, err := p.ReadUint8()
+	return int8(v), err
+}
+
+// ReadInt32 mirrors C++ PropStream::read<int32_t>.
+func (p *PropStream) ReadInt32() (int32, error) {
+	v, err := p.ReadUint32()
+	return int32(v), err
+}
+
+// ReadInt64 mirrors C++ PropStream::read<int64_t>.
+func (p *PropStream) ReadInt64() (int64, error) {
+	v, err := p.ReadUint64()
+	return int64(v), err
+}
+
 func (p *PropStream) ReadString() (string, error) {
 	strLen, err := p.ReadUint16()
 	if err != nil {
@@ -113,6 +132,21 @@ func (p *PropWriteStream) WriteUint64(val uint64) {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, val)
 	p.buf = append(p.buf, b...)
+}
+
+// WriteInt8 mirrors C++ PropWriteStream::write<int8_t>.
+func (p *PropWriteStream) WriteInt8(val int8) {
+	p.WriteUint8(uint8(val))
+}
+
+// WriteInt32 mirrors C++ PropWriteStream::write<int32_t>.
+func (p *PropWriteStream) WriteInt32(val int32) {
+	p.WriteUint32(uint32(val))
+}
+
+// WriteInt64 mirrors C++ PropWriteStream::write<int64_t>.
+func (p *PropWriteStream) WriteInt64(val int64) {
+	p.WriteUint64(uint64(val))
 }
 
 func (p *PropWriteStream) WriteString(val string) {

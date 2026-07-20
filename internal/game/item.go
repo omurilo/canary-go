@@ -1,15 +1,64 @@
 package game
 
-// Item is a minimal item instance: a client item id plus an optional stack
-// count/subtype. Full item attributes (the OTBR blob) are a later milestone.
+// Item is an item instance: a client item id, a stack count/subtype, and the
+// decoded OTBR attribute blob (see ItemAttributes).
+//
+// Count is the item's subtype (stack count for stackables, fluid subtype for
+// splash/fluid containers). It mirrors C++ Item::getSubType(): the DB `count`
+// column seeds it and, when present, the blob's ATTR_COUNT overrides it. The
+// client encoder (addItem) reads Count directly.
 type Item struct {
-	ID         uint16
-	Count      uint16
+	ID    uint16
+	Count uint16
+
+	// Attr holds the decoded OTBR attribute TLV stream. Nil when the item has
+	// no attributes. Decoded fields are authoritative over the raw blob.
+	Attr *ItemAttributes
+
+	// Attributes is the raw OTBR blob, kept as a round-trip fallback for blobs
+	// that DecodeItemAttributes could not fully model (e.g. nested custom
+	// attributes). It is written back verbatim on save only when Attr is nil;
+	// otherwise Attr is authoritative.
 	Attributes []byte
 
 	// Contents holds the items inside a container item (chest, bag, ...), in
 	// stack order. Empty for non-containers.
 	Contents []*Item
+}
+
+// ItemAttributes is the structured form of the OTBR ATTR_* TLV blob stored in
+// the player_items.attributes column. Each optional field is a pointer whose
+// non-nil value marks the attribute as present, so a decode→encode round-trip
+// reproduces the same attribute set. Field order and wire widths mirror
+// C++ Item::serializeAttr / Item::readAttr (src/items/item.cpp).
+//
+// The subtype (ATTR_COUNT / ATTR_RUNE_CHARGES) lives on Item.Count; HasCount
+// records that the blob carried it so it is re-emitted on save.
+type ItemAttributes struct {
+	StoreTimestamp *int64  // ATTR_STORE (1)      int64
+	HasCount       bool    // ATTR_COUNT (15) / ATTR_RUNE_CHARGES (12) -> Item.Count (u8)
+	Charges        *uint16 // ATTR_CHARGES (22)   uint16
+	ActionID       *uint16 // ATTR_ACTION_ID (4)  uint16
+	UniqueID       *uint16 // ATTR_UNIQUE_ID (5)  uint16
+	Text           *string // ATTR_TEXT (6)
+	WrittenDate    *uint64 // ATTR_WRITTENDATE (18) uint64
+	WrittenBy      *string // ATTR_WRITTENBY (19)
+	Description    *string // ATTR_DESC (7)
+	Duration       *int32  // ATTR_DURATION (16)  int32
+	DecayState     *uint8  // ATTR_DECAYING_STATE (17) uint8
+	Name           *string // ATTR_NAME (24)
+	Article        *string // ATTR_ARTICLE (25)
+	PluralName     *string // ATTR_PLURALNAME (26)
+	Weight         *uint32 // ATTR_WEIGHT (27)    uint32
+	Attack         *int32  // ATTR_ATTACK (28)    int32
+	Defense        *int32  // ATTR_DEFENSE (29)   int32
+	ExtraDefense   *int32  // ATTR_EXTRADEFENSE (30) int32
+	Armor          *int32  // ATTR_ARMOR (31)     int32
+	HitChance      *int8   // ATTR_HITCHANCE (32) int8
+	ShootRange     *uint8  // ATTR_SHOOTRANGE (33) uint8
+	Tier           *uint8  // ATTR_TIER (40)      uint8
+	Amount         *uint16 // ATTR_AMOUNT (39)    uint16
+	Owner          *uint32 // ATTR_OWNER (43)     uint32
 }
 
 // Outfit describes a creature's appearance.
