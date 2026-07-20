@@ -127,7 +127,12 @@ func (g *GameProtocol) addCreature(w *netmsg.Writer, c game.Creature) {
 		w.AddByte(0) // guild emblem
 	}
 	w.AddByte(c.GetCreatureType()) // creature type (again)
-	w.AddByte(0)                   // vocation client id
+	// Vocation client id is sent ONLY for players (CREATURETYPE_PLAYER == 0).
+	// Sending it for NPCs/monsters adds a spurious byte that desyncs the whole
+	// tile/map stream — see ProtocolGame::AddCreature (protocolgame.cpp:9641).
+	if c.GetCreatureType() == 0 {
+		w.AddByte(0) // vocation client id
+	}
 	w.AddByte(0)    // speech bubble
 	w.AddByte(0xFF) // mark (unmarked)
 	w.AddByte(0)    // inspection type
