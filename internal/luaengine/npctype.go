@@ -65,6 +65,15 @@ func (e *Engine) registerNpcType() {
 		},
 	}
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), npcTypeMethods))
+	// Datapack NPC scripts assign event callbacks directly on the userdata, e.g.
+	// `npcType.onThink = function(npc, interval) ... end`. Without a __newindex,
+	// gopher-lua raises "attempt to index a non-table object(userdata)". Accept
+	// (and currently ignore) such assignments so the scripts load; wiring these
+	// callbacks (onSay dialogue, onThink, shop handlers) into the NPC runtime is
+	// the remaining NPC step.
+	e.L.SetField(mt, "__newindex", e.L.NewFunction(func(L *lua.LState) int {
+		return 0
+	}))
 
 	// Game.createNpcType
 	gameTable := e.L.GetGlobal("Game")

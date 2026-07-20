@@ -244,6 +244,19 @@ func run(o runOpts, log *slog.Logger) error {
 		L.Push(lua.LNumber(world.OnlineCount()))
 		return 1
 	})
+	// Core engine data lives in the base `data/` tree (not the world datapack):
+	// data/lib + data/npclib define framework classes (e.g. KeywordHandler) that
+	// datapack npc scripts require, and data/scripts/spells holds the player
+	// vocation spells. Load these (libs first) BEFORE the datapack scripts/npcs.
+	coreData := filepath.Dir(filepath.Dir(o.appearances)) // e.g. ../data
+	if coreData != "" && coreData != cfg.DataPack {
+		for _, sub := range []string{"lib", "npclib", "scripts"} {
+			d := filepath.Join(coreData, sub)
+			if err := loadScripts(lengine, d, log); err != nil {
+				log.Warn("loading core data", "dir", d, "err", err)
+			}
+		}
+	}
 	if err := loadScripts(lengine, scriptsDir, log); err != nil {
 		log.Warn("loading scripts", "err", err)
 	}
