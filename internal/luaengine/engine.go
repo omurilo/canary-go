@@ -49,7 +49,40 @@ func New(world *game.World, log *slog.Logger) *Engine {
 	e.registerAPI()
 	e.overrideFileLoaders()
 	e.registerScheduler()
+	e.registerLuaCompat()
 	return e
+}
+
+// registerLuaCompat patches standard-library incompatibilities between
+// gopher-lua and the Lua 5.1 the datapack targets. Currently: string.gsub
+// rejects a numeric replacement, but real Lua coerces it to a string (used by
+// NPC message parsing, e.g. |BLESSCOST| → a number). Wrap gsub to coerce arg 3.
+func (e *Engine) registerLuaCompat() {
+	strTbl, ok := e.L.GetGlobal("string").(*lua.LTable)
+	if !ok {
+		return
+	}
+	orig, ok := e.L.GetField(strTbl, "gsub").(*lua.LFunction)
+	if !ok {
+		return
+	}
+	e.L.SetField(strTbl, "gsub", e.L.NewFunction(func(L *lua.LState) int {
+		n := L.GetTop()
+		args := make([]lua.LValue, 0, n)
+		for i := 1; i <= n; i++ {
+			a := L.Get(i)
+			if i == 3 && a.Type() == lua.LTNumber {
+				a = lua.LString(a.String())
+			}
+			args = append(args, a)
+		}
+		// gsub returns (string, count); forward both.
+		if err := L.CallByParam(lua.P{Fn: orig, NRet: 2, Protect: true}, args...); err != nil {
+			L.RaiseError("%s", err.Error())
+			return 0
+		}
+		return 2
+	}))
 }
 
 // registerScheduler installs the global addEvent/stopEvent scheduling functions

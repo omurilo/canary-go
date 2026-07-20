@@ -1,13 +1,44 @@
 package luaengine
 
 import (
+	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
+
+// errCaptureHandler records ERROR-level log messages so tests can assert that
+// timer-fired callbacks (the delayed NPC say scheduled via addEvent) don't
+// raise Lua errors — those run after the synchronous onSay returns and would
+// otherwise only be logged and silently missed.
+type errCaptureHandler struct {
+	mu   sync.Mutex
+	errs *[]string
+}
+
+func (h *errCaptureHandler) Enabled(_ context.Context, l slog.Level) bool {
+	return l >= slog.LevelError
+}
+func (h *errCaptureHandler) Handle(_ context.Context, r slog.Record) error {
+	msg := r.Message
+	r.Attrs(func(a slog.Attr) bool {
+		msg += " " + a.Key + "=" + a.Value.String()
+		return true
+	})
+	h.mu.Lock()
+	*h.errs = append(*h.errs, msg)
+	h.mu.Unlock()
+	return nil
+}
+func (h *errCaptureHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h *errCaptureHandler) WithGroup(string) slog.Handler      { return h }
 
 // walkLoad mimics cmd/canary loadScripts: lib/ first, then every other .lua.
 func walkLoad(t *testing.T, e *Engine, dir string) {
@@ -75,7 +106,10 @@ func TestNpcGreetSmoke(t *testing.T) {
 		t.Skip("datapack not available")
 	}
 
-	e := newTestEngine()
+	var capturedErrs []string
+	w := game.NewWorld()
+	w.TypeRegistry = creatures.NewTypeRegistry()
+	e := New(w, slog.New(&errCaptureHandler{errs: &capturedErrs}))
 	e.L.SetGlobal("DATA_DIRECTORY", lua.LString(datapack))
 	e.L.SetGlobal("CORE_DIRECTORY", lua.LString(core))
 	walkLoad(t, e, filepath.Join(datapack, "lib"))
@@ -107,9 +141,24 @@ func TestNpcGreetSmoke(t *testing.T) {
 	for _, n := range regNames {
 		greetNpc(t, e, n, n)
 	}
+
+	// The greeting's reply is sent via addEvent (SayEvent) on a ~1s timer, so
+	// its Lua errors surface after onSay returns. Wait for those timers, then
+	// assert none of the delayed callbacks raised (e.g. getWorldTime/Blessings
+	// missing, the actual crash the user hit).
+	time.Sleep(1500 * time.Millisecond)
+	if len(capturedErrs) > 0 {
+		for _, msg := range capturedErrs {
+			t.Errorf("delayed NPC callback error: %s", msg)
+		}
+	}
 }
 
+var greetSeq int
+
 // greetNpc invokes the NPC's stored onSay callback with "hi" and fails on error.
+// The npc and a player are registered in the world so the delayed SayEvent
+// reply (which does Npc(npcId)/Player(playerId) lookups) resolves them.
 func greetNpc(t *testing.T, e *Engine, display, key string) {
 	t.Helper()
 	e.npcCallbacksMu.Lock()
@@ -120,8 +169,11 @@ func greetNpc(t *testing.T, e *Engine, display, key string) {
 		return
 	}
 
-	npc := game.NewNpc(2, display, e.world.TypeRegistry.Npcs[key])
-	player := &game.Player{ID: 1, Name: "Tester", Level: 8, Health: 100, MaxHealth: 100}
+	greetSeq++
+	npc := game.NewNpc(uint32(100000+greetSeq), display, e.world.TypeRegistry.Npcs[key])
+	e.world.AddCreature(npc)
+	player := &game.Player{Name: display + "_tester", Level: 8, Health: 100, MaxHealth: 100}
+	e.world.AddPlayer(player, nil)
 
 	e.mu.Lock()
 	L := e.L

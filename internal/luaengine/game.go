@@ -83,6 +83,20 @@ func (e *Engine) registerGame() {
 	for name, fn := range gameMethods {
 		e.L.SetField(game, name, e.L.NewFunction(fn))
 	}
+
+	// Global world-time helpers used by NPC greetings / day-night scripts
+	// (data/libs/functions/functions.lua getFormattedWorldTime → getWorldTime).
+	// No day/night clock is modelled yet, so report a stable midday: enough for
+	// the "day"/"night" branch and the |TIME| dialog tag to resolve.
+	e.L.SetGlobal("getWorldTime", e.L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(720)) // minutes since midnight → 12:00
+		return 1
+	}))
+	e.L.SetGlobal("getWorldLight", e.L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(250)) // full daylight level
+		L.Push(lua.LNumber(215)) // default light color
+		return 2
+	}))
 }
 
 func (e *Engine) gameCreateNpcType(L *lua.LState) int { return 0 }

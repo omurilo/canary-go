@@ -174,8 +174,7 @@ func networkMessageGetU32(L *lua.LState) int {
 	return 1
 }
 
-// networkMessagePlayerArg resolves a Player from a userdata argument (either a
-// *game.Player directly or any creature that is a player).
+// networkMessagePlayerArg resolves a *game.Player from a userdata argument.
 func networkMessagePlayerArg(L *lua.LState, n int) *game.Player {
 	ud, ok := L.Get(n).(*lua.LUserData)
 	if !ok {
