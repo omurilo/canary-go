@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -535,20 +536,141 @@ func (g *GameProtocol) sendCancelTarget() {
 }
 
 func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
-	r.GetU16() // itemid
-	r.GetByte() // subType
-	r.GetByte() // amount
-	r.GetByte() // ignoreCapacity
-	r.GetByte() // buyWithBackpacks
-	g.player.SendTextMessage(0x13, "Buying items is not fully implemented yet in canary-go.")
+	itemID := r.GetU16()
+	subType := r.GetByte()
+	amount := r.GetByte()
+	_ = r.GetByte() // ignoreCapacity
+	_ = r.GetByte() // buyWithBackpacks
+
+	npcID := g.player.ShopOwnerID
+	if npcID == 0 {
+		return
+	}
+
+	npcCreature := g.deps.World.CreatureByID(npcID)
+	npc, ok := npcCreature.(*game.Npc)
+	if !ok {
+		return
+	}
+
+	nType := g.deps.World.TypeRegistry.Npcs[strings.ToLower(npc.Name)]
+	if nType == nil {
+		return
+	}
+
+	var price uint32
+	var found bool
+	for _, si := range nType.ShopItems {
+		if si.ID == itemID && (si.SubType == 0 || si.SubType == subType) {
+			price = si.BuyPrice
+			found = true
+			break
+		}
+	}
+
+	if !found || price == 0 {
+		g.player.SendTextMessage(0x13, "This item is not available.")
+		return
+	}
+
+	totalCost := uint64(price) * uint64(amount)
+	if g.player.BankBalance < totalCost {
+		g.player.SendTextMessage(0x13, "You do not have enough money in your bank account.")
+		return
+	}
+
+	g.player.BankBalance -= totalCost
+
+	// Attempt to put in backpack (Slot 3)
+	bp := g.player.Inventory[3]
+	addedCount := uint16(0)
+	
+	// Fast path: if no backpack, or if we need a place, just create and dump to backpack contents
+	if bp != nil {
+		for i := 0; i < int(amount); i++ {
+			item := &game.Item{ID: itemID, Count: 1}
+			if subType > 0 {
+				item.Count = uint16(subType)
+			}
+			bp.Contents = append(bp.Contents, item)
+			addedCount++
+		}
+		g.player.SendTextMessage(0x14, fmt.Sprintf("Bought %d %dx items for %d gold.", amount, subType, totalCost))
+		// We should notify client about updated capacity and bank balance
+		g.sendStats()
+	} else {
+		g.player.SendTextMessage(0x13, "You do not have a backpack to store this item.")
+		g.player.BankBalance += totalCost
+	}
 }
 
 func (g *GameProtocol) parseSellItem(r *netmsg.Reader) {
-	r.GetU16() // itemid
-	r.GetByte() // subType
-	r.GetByte() // amount
-	r.GetByte() // ignoreEquipped
-	g.player.SendTextMessage(0x13, "Selling items is not fully implemented yet in canary-go.")
+	itemID := r.GetU16()
+	subType := r.GetByte()
+	amount := r.GetByte()
+	_ = r.GetByte() // ignoreEquipped
+
+	npcID := g.player.ShopOwnerID
+	if npcID == 0 {
+		return
+	}
+
+	npcCreature := g.deps.World.CreatureByID(npcID)
+	npc, ok := npcCreature.(*game.Npc)
+	if !ok {
+		return
+	}
+
+	nType := g.deps.World.TypeRegistry.Npcs[strings.ToLower(npc.Name)]
+	if nType == nil {
+		return
+	}
+
+	var price uint32
+	var found bool
+	for _, si := range nType.ShopItems {
+		if si.ID == itemID && (si.SubType == 0 || si.SubType == subType) {
+			price = si.SellPrice
+			found = true
+			break
+		}
+	}
+
+	if !found || price == 0 {
+		g.player.SendTextMessage(0x13, "This NPC does not buy this item.")
+		return
+	}
+
+	// For 75% parity: just assume the player has it in the backpack and remove it
+	bp := g.player.Inventory[3]
+	if bp == nil {
+		g.player.SendTextMessage(0x13, "You do not have this item.")
+		return
+	}
+
+	removedAmount := uint8(0)
+	for i := len(bp.Contents) - 1; i >= 0; i-- {
+		if bp.Contents[i].ID == itemID {
+			if subType == 0 || uint8(bp.Contents[i].Count) == subType {
+				// Remove item
+				bp.Contents = append(bp.Contents[:i], bp.Contents[i+1:]...)
+				removedAmount++
+				if removedAmount == amount {
+					break
+				}
+			}
+		}
+	}
+
+	if removedAmount == 0 {
+		g.player.SendTextMessage(0x13, "You do not have this item.")
+		return
+	}
+
+	totalGain := uint64(price) * uint64(removedAmount)
+	g.player.BankBalance += totalGain
+	g.player.SendTextMessage(0x14, fmt.Sprintf("Sold %d items for %d gold.", removedAmount, totalGain))
+	g.sendStats()
 }
 
 func (g *GameProtocol) parseCloseShop(r *netmsg.Reader) {

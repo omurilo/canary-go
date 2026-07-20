@@ -196,6 +196,7 @@ func (e *Engine) npcOpenshopwindow(L *lua.LState) int {
 	if e.world != nil {
 		nType := e.world.TypeRegistry.Npcs[strings.ToLower(n.Name)]
 		if nType != nil && len(nType.ShopItems) > 0 {
+			p.ShopOwnerID = n.ID
 			p.SendOpenShop(n, nType.ShopItems)
 		}
 	}
@@ -248,6 +249,7 @@ func npcOpenshopwindowtable(L *lua.LState) int {
 		}
 	})
 	
+	p.ShopOwnerID = n.ID
 	p.SendOpenShop(n, shopItems)
 	
 	L.Push(lua.LTrue)

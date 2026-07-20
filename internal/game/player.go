@@ -68,6 +68,8 @@ type Player struct {
 	Inventory [11]*Item
 
 	TargetID uint32
+	ShopOwnerID uint32 // ID of the NPC currently being traded with
+
 
 	// cooldowns tracks per-spell and per-group spell cooldowns, mirroring the
 	// CONDITION_SPELLCOOLDOWN / CONDITION_SPELLGROUPCOOLDOWN conditions applied
