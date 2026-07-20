@@ -308,6 +308,12 @@ func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 	if g.handleCommand(text) {
 		return // GM command — handled, not broadcast as chat
 	}
+	// Instant spells are tried before normal chat (Game::playerSay ->
+	// playerSaySpell, src/game/game.cpp:7402). A match casts the spell (and
+	// broadcasts the words itself on success); the raw words are not chatted.
+	if g.tryCastSpell(talkType, text) {
+		return
+	}
 	g.broadcastSay(g.player, talkType, text)
 	g.deps.Lua.Call("onPlayerSay", g.player.Name, text)
 }

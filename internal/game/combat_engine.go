@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 )
 
@@ -38,8 +39,11 @@ const (
 
 	// defaultCorpseID is used when a monster has no parsed corpse id. 5964 is
 	// the rat corpse, a real item id used only as a safe placeholder.
-	// TODO(monster-data): always resolve Monster.CorpseID from monster data.
 	defaultCorpseID = 5964
+
+	// maxLootChance is MAX_LOOTCHANCE from src/utils/const.hpp: loot chances in
+	// monster data are out of 100000.
+	maxLootChance = 100000
 )
 
 // CombatEngine resolves melee attacks on a fixed tick. It runs on its own
@@ -75,10 +79,11 @@ func (e *CombatEngine) resolveAttacks() {
 	for _, p := range e.world.Players() {
 		e.tryAttack(p, e.playerTarget(p), defaultPlayerAttackSpeed)
 	}
-	// Monsters attack their AI target (set by the AI engine).
+	// Monsters attack their AI target (set by the AI engine), each at its own
+	// melee interval (MonsterType attack block; default 2000ms).
 	for _, c := range e.world.Creatures() {
 		if m, ok := c.(*Monster); ok {
-			e.tryAttack(m, m.GetTarget(), defaultMonsterAttackSpeed)
+			e.tryAttack(m, m.GetTarget(), m.AttackInterval())
 		}
 	}
 }
@@ -181,12 +186,82 @@ func (e *CombatEngine) meleeDamage(attacker Creature) int {
 		// once a vocation registry is available; nil == x1.0 for now.
 		return combat.CalculateMeleeDamage(fistAttackValue, skill, 0, nil)
 	case *Monster:
-		// TODO(monster-data): use the monster's attack/skill data. Flat default
-		// so monsters can still fight back.
-		return rand.Intn(defaultMonsterAttackValue + 1)
+		// Use the monster's real melee attack block. The Lua attack stores raw
+		// combat values (minDamage..maxDamage, typically <= 0, e.g. rat 0..-8);
+		// the damage dealt is the magnitude. Mirrors Monster::doAttacking picking
+		// the melee spellBlock and rolling minCombatValue..maxCombatValue
+		// (src/creatures/monsters/monster.cpp:1753, monsters.cpp:57-70).
+		atk := a.MeleeAttack()
+		if atk == nil {
+			// Fall back to a small default so monsters without parsed attack
+			// data can still fight back.
+			return rand.Intn(defaultMonsterAttackValue + 1)
+		}
+		// Per-swing chance gate; a miss deals no damage (poff effect).
+		if atk.Chance < 100 && rand.Intn(100) >= atk.Chance {
+			return 0
+		}
+		lo, hi := absDamageRange(atk.MinDamage, atk.MaxDamage)
+		if hi <= 0 {
+			return 0
+		}
+		return lo + rand.Intn(hi-lo+1)
 	default:
 		return 0
 	}
+}
+
+// absDamageRange converts a monster attack's raw min/max combat values (which
+// are negative for damage) into a positive [lo, hi] damage span. Mirrors
+// Monsters::deserializeSpell taking min/max of the two values
+// (src/creatures/monsters/monsters.cpp:69).
+func absDamageRange(minDamage, maxDamage int) (lo, hi int) {
+	a, b := abs(minDamage), abs(maxDamage)
+	if a > b {
+		a, b = b, a
+	}
+	return a, b
+}
+
+// rollLoot rolls a monster's loot table into a slice of items for the corpse
+// container. Mirrors MonsterType:generateLootRoll (data/libs/functions/monstertype.lua)
+// / getLootRandom (data/libs/functions/functions.lua): for each entry roll a
+// value in [0, MAX_LOOTCHANCE) and drop the item when it is below the entry's
+// chance. Stackable stacks (CountMax > 1) get a random count in
+// [CountMin, CountMax]. Container entries recurse into their child loot.
+//
+// Simplifications vs C++ (TODOs for later): loot rate/factor multipliers, the
+// dynamic 95..105% jitter, gut/charm bonuses, and unique-item de-duplication are
+// omitted (rate assumed 1x). Stackability is inferred from CountMax rather than
+// item metadata because the combat engine has no item catalog.
+func rollLoot(loot []creatures.LootBlock) []*Item {
+	var out []*Item
+	for _, lb := range loot {
+		if lb.ID == 0 {
+			continue // unresolved name; skip
+		}
+		if rand.Intn(maxLootChance) >= int(lb.Chance) {
+			continue
+		}
+		count := uint16(1)
+		if lb.CountMax > 1 {
+			lo := lb.CountMin
+			if lo < 1 {
+				lo = 1
+			}
+			hi := lb.CountMax
+			if hi < lo {
+				hi = lo
+			}
+			count = uint16(lo + uint32(rand.Intn(int(hi-lo+1))))
+		}
+		item := &Item{ID: lb.ID, Count: count}
+		if len(lb.ChildLoot) > 0 {
+			item.Contents = rollLoot(lb.ChildLoot)
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 // handleDeath mirrors, at a basic level, Creature::onDeath -> dropCorpse ->
@@ -217,14 +292,30 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 		}
 	}
 
-	// TODO(loot/xp): mirror Creature::onDeath's damageMap -> experience/killers
-	// and Creature::dropCorpse's dropLoot(corpse->getContainer(), ...) here.
-	// `killer` is passed through so that hook has the last-hit creature.
-	_ = killer
+	// Award experience to the killer. Basic version of Creature::onDeath's
+	// experienceMap -> onGainExperience: the whole reward goes to the last hitter
+	// (no damage-share split, party, stamina or bonus multipliers yet).
+	// (src/creatures/creature.cpp:609-656, player.cpp:3560).
+	if m, ok := victim.(*Monster); ok {
+		if p, ok := killer.(*Player); ok {
+			if exp := m.Experience(); exp > 0 {
+				// TODO(loot/xp): split experience across all damagers, apply
+				// party sharing and rate/stamina/VIP multipliers.
+				p.AddExperience(exp)
+				if e.world.OnPlayerStatsChange != nil {
+					e.world.OnPlayerStatsChange(p)
+				}
+			}
+		}
+	}
 
 	// Drop the corpse first (as in dropCorpse, which adds the corpse while the
-	// creature is still on the tile), then remove the creature.
+	// creature is still on the tile), then remove the creature. The corpse is a
+	// container whose Contents are the rolled loot table.
 	corpse := &Item{ID: corpseID, Count: 1}
+	if m, ok := victim.(*Monster); ok && m.Type != nil && m.Type.Flags.LootDrop {
+		corpse.Contents = rollLoot(m.Type.Loot)
+	}
 	if e.world.Map.AddItem(pos, corpse) && e.world.OnItemAppear != nil {
 		e.world.OnItemAppear(pos, corpse)
 	}

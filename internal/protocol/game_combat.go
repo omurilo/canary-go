@@ -48,9 +48,9 @@ func (g *GameProtocol) sendDamageText(class byte, pos game.Position, value uint3
 	w.AddByte(opTextMessage)
 	w.AddByte(class)
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
-	w.AddU32(value)   // primary.value
-	w.AddByte(color)  // primary.color
-	w.AddU32(0)       // secondary.value
+	w.AddU32(value)          // primary.value
+	w.AddByte(color)         // primary.color
+	w.AddU32(0)              // secondary.value
 	w.AddByte(textcolorNone) // secondary.color
 	w.AddString(text)
 	g.SendToClient(w)
@@ -132,6 +132,56 @@ func BroadcastCombatHit(w *game.World, attacker, victim game.Creature, damage in
 	}
 }
 
+// sendDistanceEffect shows a shoot animation from->to, mirroring the modern
+// branch of ProtocolGame::sendDistanceShoot (protocolgame.cpp:8089): 0x83,
+// from-position, MAGIC_EFFECTS_CREATE_DISTANCEEFFECT (4), u16 type, signed dx,
+// signed dy, source byte, end-loop.
+func (g *GameProtocol) sendDistanceEffect(from, to game.Position, effect uint16) {
+	w := netmsg.NewWriter()
+	w.AddByte(opMagicEffect)
+	w.AddPosition(netmsg.Position{X: from.X, Y: from.Y, Z: from.Z})
+	w.AddByte(4) // MAGIC_EFFECTS_CREATE_DISTANCEEFFECT
+	w.AddU16(effect)
+	w.AddByte(byte(int8(int32(to.X) - int32(from.X))))
+	w.AddByte(byte(int8(int32(to.Y) - int32(from.Y))))
+	w.AddByte(sourceEffectOwn)
+	w.AddByte(magicEffectsEndLoop)
+	g.SendToClient(w)
+}
+
+// BroadcastMagicEffect shows a graphical effect on a tile to every spectator,
+// used by spell area/impact effects that carry no damage text.
+func BroadcastMagicEffect(w *game.World, pos game.Position, effect uint16) {
+	for _, s := range w.Spectators(pos, 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			gp.sendMagicEffect(pos, effect)
+		}
+	}
+}
+
+// BroadcastDistanceEffect shows a shoot animation from->to to spectators of both
+// endpoints (used by spell distance effects).
+func BroadcastDistanceEffect(w *game.World, from, to game.Position, effect uint16) {
+	seen := make(map[uint32]bool)
+	send := func(gp *GameProtocol, id uint32) {
+		if seen[id] {
+			return
+		}
+		seen[id] = true
+		gp.sendDistanceEffect(from, to, effect)
+	}
+	for _, s := range w.Spectators(from, 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			send(gp, s.ID)
+		}
+	}
+	for _, s := range w.Spectators(to, 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			send(gp, s.ID)
+		}
+	}
+}
+
 // BroadcastAddItem tells every spectator an item appeared on a tile (used for
 // dropped corpses).
 func BroadcastAddItem(w *game.World, pos game.Position, item *game.Item) {
@@ -147,6 +197,17 @@ func BroadcastAddItem(w *game.World, pos game.Position, item *game.Item) {
 func SendCancelTarget(p *game.Player) {
 	if gp, ok := p.Session.(*GameProtocol); ok {
 		gp.sendCancelTarget()
+	}
+}
+
+// SendPlayerStats pushes a fresh stats packet (0xA0) to the player, used after
+// experience/level changes on a monster kill. Mirrors Player::sendStats
+// (src/creatures/players/player.cpp).
+func SendPlayerStats(p *game.Player) {
+	if gp, ok := p.Session.(*GameProtocol); ok {
+		w := netmsg.NewWriter()
+		gp.addStats(w)
+		gp.SendToClient(w)
 	}
 }
 

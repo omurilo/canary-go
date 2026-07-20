@@ -10,7 +10,8 @@ import (
 
 const luaSpellTypeName = "Spell"
 
-// registerSpell registers the Spell global constructor and metatable
+// registerSpell registers the Spell global constructor and metatable, mirroring
+// the Lua Spell bindings (src/lua/functions/creatures/combat/spell_functions.cpp).
 func (e *Engine) registerSpell() {
 	mt := e.L.NewTypeMetatable(luaSpellTypeName)
 	e.L.SetGlobal("Spell", e.L.NewFunction(spellConstructor))
@@ -18,13 +19,11 @@ func (e *Engine) registerSpell() {
 	e.L.SetField(mt, "__newindex", e.L.NewFunction(spellNewIndex))
 }
 
+// spellConstructor mirrors SpellFunctions::luaSpellCreate: the argument selects
+// the spell TYPE ("instant"/"rune" or SPELL_* enum), not the name. Name/words
+// are set later via spell:name()/spell:words().
 func spellConstructor(L *lua.LState) int {
-	arg := L.CheckString(1)
-	s := &spells.Spell{}
-	
-	s.Name = arg
-	s.Words = arg
-
+	s := spells.NewSpell("")
 	ud := L.NewUserData()
 	ud.Value = s
 	L.SetMetatable(ud, L.GetTypeMetatable(luaSpellTypeName))
@@ -33,18 +32,37 @@ func spellConstructor(L *lua.LState) int {
 }
 
 var spellMethods = map[string]lua.LGFunction{
-	"name":        spellName,
-	"words":       spellWords,
-	"level":       spellLevel,
-	"mana":        spellMana,
-	"group":       spellGroup,
-	"id":          spellId,
-	"cooldown":    spellCooldown,
-	"groupCooldown": spellGroupCooldown,
-	"isAggressive": spellIsAggressive,
-	"needLearn":   spellNeedLearn,
-	"vocation":    spellVocation,
-	"register":    spellRegister,
+	"name":                        spellName,
+	"words":                       spellWords,
+	"level":                       spellLevel,
+	"magicLevel":                  spellMagicLevel,
+	"mana":                        spellMana,
+	"manaPercent":                 spellManaPercent,
+	"soul":                        spellSoul,
+	"group":                       spellGroup,
+	"secondaryGroup":              spellSecondaryGroup,
+	"id":                          spellNoop,
+	"cooldown":                    spellCooldown,
+	"groupCooldown":               spellGroupCooldown,
+	"isAggressive":                spellIsAggressive,
+	"isSelfTarget":                spellIsSelfTarget,
+	"needTarget":                  spellNeedTarget,
+	"needDirection":               spellNeedDirection,
+	"blockWalls":                  spellBlockWalls,
+	"needLearn":                   spellNeedLearn,
+	"needWeapon":                  spellNeedWeapon,
+	"isPremium":                   spellIsPremium,
+	"allowOnSelf":                 spellAllowOnSelf,
+	"pzLock":                      spellPzLock,
+	"hasParams":                   spellHasParams,
+	"range":                       spellRange,
+	"vocation":                    spellVocation,
+	"castSound":                   spellNoop,
+	"impactSound":                 spellNoop,
+	"isBlocking":                  spellNoop,
+	"isDisabled":                  spellNoop,
+	"needCasterTargetOrDirection": spellCasterTargetOrDirection,
+	"register":                    spellRegister,
 }
 
 func checkSpell(L *lua.LState) *spells.Spell {
@@ -56,11 +74,16 @@ func checkSpell(L *lua.LState) *spells.Spell {
 	return nil
 }
 
+// spellSelf returns the spell userdata (arg 1) so setters can be chained.
+func spellSelf(L *lua.LState) int {
+	L.Push(L.Get(1))
+	return 1
+}
+
 func spellNewIndex(L *lua.LState) int {
 	s := checkSpell(L)
 	key := L.CheckString(2)
 	val := L.CheckAny(3)
-
 	if key == "onCastSpell" {
 		s.OnCastSpell = val
 	}
@@ -70,115 +93,235 @@ func spellNewIndex(L *lua.LState) int {
 func spellName(L *lua.LState) int {
 	s := checkSpell(L)
 	s.Name = L.CheckString(2)
-	L.Push(L.Get(1))
-	return 1
+	return spellSelf(L)
 }
 
 func spellWords(L *lua.LState) int {
 	s := checkSpell(L)
 	s.Words = L.CheckString(2)
-	L.Push(L.Get(1))
-	return 1
+	// A second argument declares the spell takes a parameter (hasParams).
+	if L.GetTop() >= 3 && L.Get(3).Type() == lua.LTBool {
+		s.HasParam = lua.LVAsBool(L.Get(3))
+	}
+	return spellSelf(L)
 }
 
 func spellLevel(L *lua.LState) int {
 	s := checkSpell(L)
-	s.Level = L.CheckInt(2)
-	L.Push(L.Get(1))
-	return 1
+	s.Level = luaOptInt(L, 2)
+	return spellSelf(L)
+}
+
+func spellMagicLevel(L *lua.LState) int {
+	s := checkSpell(L)
+	s.MagicLevel = luaOptInt(L, 2)
+	return spellSelf(L)
 }
 
 func spellMana(L *lua.LState) int {
 	s := checkSpell(L)
-	s.Mana = L.CheckInt(2)
-	L.Push(L.Get(1))
-	return 1
+	s.Mana = luaOptInt(L, 2)
+	return spellSelf(L)
+}
+
+func spellManaPercent(L *lua.LState) int {
+	s := checkSpell(L)
+	s.ManaPercent = luaOptInt(L, 2)
+	return spellSelf(L)
+}
+
+func spellSoul(L *lua.LState) int {
+	s := checkSpell(L)
+	s.Soul = luaOptInt(L, 2)
+	return spellSelf(L)
+}
+
+// spellGroupValue resolves a group argument that may be a numeric SPELLGROUP_*
+// enum or a group name string.
+func spellGroupValue(L *lua.LState, n int) spells.SpellGroup {
+	v := L.Get(n)
+	if v.Type() == lua.LTNumber {
+		return spells.SpellGroup(lua.LVAsNumber(v))
+	}
+	switch strings.ToLower(v.String()) {
+	case "attack":
+		return spells.SpellGroupAttack
+	case "healing":
+		return spells.SpellGroupHealing
+	case "support":
+		return spells.SpellGroupSupport
+	case "special":
+		return spells.SpellGroupSpecial
+	default:
+		return spells.SpellGroupNone
+	}
 }
 
 func spellGroup(L *lua.LState) int {
 	s := checkSpell(L)
-	s.Group = L.CheckString(2)
-	L.Push(L.Get(1))
-	return 1
+	s.Group = spellGroupValue(L, 2)
+	if L.GetTop() >= 3 {
+		s.SecondaryGroup = spellGroupValue(L, 3)
+	}
+	return spellSelf(L)
 }
 
-func spellId(L *lua.LState) int {
-	_ = checkSpell(L)
-	L.Push(L.Get(1))
-	return 1
+func spellSecondaryGroup(L *lua.LState) int {
+	s := checkSpell(L)
+	s.SecondaryGroup = spellGroupValue(L, 2)
+	return spellSelf(L)
 }
 
 func spellCooldown(L *lua.LState) int {
-	_ = checkSpell(L)
-	L.Push(L.Get(1))
-	return 1
+	s := checkSpell(L)
+	s.Cooldown = uint32(luaOptInt(L, 2))
+	return spellSelf(L)
 }
 
 func spellGroupCooldown(L *lua.LState) int {
-	_ = checkSpell(L)
-	L.Push(L.Get(1))
-	return 1
+	s := checkSpell(L)
+	s.GroupCooldown = uint32(luaOptInt(L, 2))
+	if L.GetTop() >= 3 {
+		s.SecondaryGroupCooldown = uint32(luaOptInt(L, 3))
+	}
+	return spellSelf(L)
 }
 
 func spellIsAggressive(L *lua.LState) int {
-	_ = checkSpell(L)
-	L.Push(L.Get(1))
-	return 1
+	s := checkSpell(L)
+	s.Aggressive = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellIsSelfTarget(L *lua.LState) int {
+	s := checkSpell(L)
+	s.SelfTarget = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellNeedTarget(L *lua.LState) int {
+	s := checkSpell(L)
+	s.NeedTarget = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellNeedDirection(L *lua.LState) int {
+	s := checkSpell(L)
+	s.NeedDirection = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellCasterTargetOrDirection(L *lua.LState) int {
+	s := checkSpell(L)
+	s.CasterTargetOrDirection = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellBlockWalls(L *lua.LState) int {
+	s := checkSpell(L)
+	s.BlockWalls = luaOptBool(L, 2)
+	return spellSelf(L)
 }
 
 func spellNeedLearn(L *lua.LState) int {
 	s := checkSpell(L)
-	s.NeedLearn = L.CheckBool(2)
-	L.Push(L.Get(1))
-	return 1
+	s.NeedLearn = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellNeedWeapon(L *lua.LState) int {
+	s := checkSpell(L)
+	s.NeedWeapon = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellIsPremium(L *lua.LState) int {
+	s := checkSpell(L)
+	s.NeedPremium = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellAllowOnSelf(L *lua.LState) int {
+	s := checkSpell(L)
+	s.AllowOnSelf = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellPzLock(L *lua.LState) int {
+	s := checkSpell(L)
+	s.PzLock = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellHasParams(L *lua.LState) int {
+	s := checkSpell(L)
+	s.HasParam = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellRange(L *lua.LState) int {
+	s := checkSpell(L)
+	s.Range = luaOptInt(L, 2)
+	return spellSelf(L)
 }
 
 func spellVocation(L *lua.LState) int {
 	s := checkSpell(L)
-	s.Vocation = append(s.Vocation, L.CheckString(2))
-	L.Push(L.Get(1))
-	return 1
+	// vocation("name") or vocation("name;true") — take the leading name.
+	for i := 2; i <= L.GetTop(); i++ {
+		if L.Get(i).Type() != lua.LTString {
+			continue
+		}
+		name := L.Get(i).String()
+		if idx := strings.IndexByte(name, ';'); idx >= 0 {
+			name = name[:idx]
+		}
+		s.VocationNames = append(s.VocationNames, strings.ToLower(strings.TrimSpace(name)))
+	}
+	return spellSelf(L)
+}
+
+// spellNoop accepts and ignores its argument, returning self (used for setters
+// with no gameplay effect yet, e.g. castSound/impactSound/id).
+func spellNoop(L *lua.LState) int {
+	_ = checkSpell(L)
+	return spellSelf(L)
 }
 
 func spellRegister(L *lua.LState) int {
 	s := checkSpell(L)
-	spells.Register(s)
-	L.Push(lua.LTrue)
+	ok := spells.Register(s)
+	L.Push(lua.LBool(ok))
 	return 1
 }
 
-// CallSpell executes the spell's OnCastSpell func.
-func (e *Engine) CallSpell(s *spells.Spell, player *game.Player, words string) bool {
+// RunSpell executes a spell's onCastSpell(creature, var) closure with the given
+// variant, mirroring InstantSpell::executeCastSpell (spells.cpp:1322). It does
+// NOT run the cast checks or spend mana/cooldowns — the protocol layer does that
+// before calling this. Returns the boolean the Lua function returned.
+func (e *Engine) RunSpell(sp *spells.Spell, caster *game.Player, vtype LuaVariantType, targetID uint32, pos game.Position) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	L := e.L
-	if s.OnCastSpell == nil || s.OnCastSpell.Type() != lua.LTFunction {
+	if sp.OnCastSpell == nil || sp.OnCastSpell.Type() != lua.LTFunction {
 		return false
 	}
 
-	playerUd := L.NewUserData()
-	playerUd.Value = player
-	L.SetMetatable(playerUd, L.GetTypeMetatable("Player"))
+	casterUD := L.NewUserData()
+	casterUD.Value = caster
+	L.SetMetatable(casterUD, L.GetTypeMetatable("Player"))
 
-	param := ""
-	prefix := s.Words
-	if len(words) > len(prefix) && strings.HasPrefix(strings.ToLower(words), strings.ToLower(prefix)) {
-		param = strings.TrimSpace(words[len(prefix):])
-	}
+	v := &luaVariant{vtype: vtype, number: targetID, pos: pos, instantName: sp.Name}
+	varUD := L.NewUserData()
+	varUD.Value = v
+	L.SetMetatable(varUD, L.GetTypeMetatable(variantTypeName))
 
-	variantUd := lua.LString(param)
-
-	err := L.CallByParam(lua.P{Fn: s.OnCastSpell, NRet: 1, Protect: true}, playerUd, variantUd)
-	if err != nil {
-		e.log.Error("spell error", "err", err)
+	if err := L.CallByParam(lua.P{Fn: sp.OnCastSpell, NRet: 1, Protect: true}, casterUD, varUD); err != nil {
+		e.log.Error("spell onCastSpell error", "spell", sp.Name, "err", err)
 		return false
 	}
-
 	ret := L.Get(-1)
 	L.Pop(1)
-	if lua.LVIsFalse(ret) {
-		return false
-	}
-	return true
+	return !lua.LVIsFalse(ret)
 }

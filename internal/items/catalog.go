@@ -7,6 +7,7 @@ package items
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 
@@ -67,7 +68,19 @@ func (t *ItemType) IsSplash() bool         { return t.Group == GroupSplash }
 
 // Catalog maps client item ids to their metadata.
 type Catalog struct {
-	byID map[uint16]*ItemType
+	byID   map[uint16]*ItemType
+	byName map[string]uint16 // lower-cased name -> first id seen
+}
+
+// IDByName resolves an item id from its (case-insensitive) name, mirroring
+// Item::items.getItemIdByName used by the C++ loot loader. Returns (0, false)
+// when unknown.
+func (c *Catalog) IDByName(name string) (uint16, bool) {
+	if c == nil || c.byName == nil {
+		return 0, false
+	}
+	id, ok := c.byName[strings.ToLower(name)]
+	return id, ok
 }
 
 // Get returns the item type or nil if unknown.
@@ -92,7 +105,10 @@ func Load(path string) (*Catalog, error) {
 		return nil, fmt.Errorf("items: unmarshal appearances: %w", err)
 	}
 
-	cat := &Catalog{byID: make(map[uint16]*ItemType, len(app.GetObject()))}
+	cat := &Catalog{
+		byID:   make(map[uint16]*ItemType, len(app.GetObject())),
+		byName: make(map[string]uint16, len(app.GetObject())),
+	}
 	for _, obj := range app.GetObject() {
 		if obj.GetId() == 0 || obj.GetId() > 0xFFFF {
 			continue
@@ -133,6 +149,11 @@ func Load(path string) (*Catalog, error) {
 			}
 		}
 		cat.byID[it.ID] = it
+		if it.Name != "" {
+			if lname := strings.ToLower(it.Name); cat.byName[lname] == 0 {
+				cat.byName[lname] = it.ID
+			}
+		}
 	}
 	return cat, nil
 }

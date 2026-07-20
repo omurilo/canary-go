@@ -30,8 +30,27 @@ type World struct {
 	OnCombatHit            func(attacker, victim Creature, damage int32, effect uint16)
 	OnItemAppear           func(pos Position, item *Item)
 	OnTargetLost           func(p *Player)
+	// OnPlayerStatsChange pushes a refreshed stats packet (0xA0) after
+	// experience/level changes, e.g. on a monster kill.
+	OnPlayerStatsChange func(p *Player)
+
+	// OnMagicEffect shows a graphical effect on a tile (spell area/impact with no
+	// damage text). OnDistanceEffect shows a shoot animation from->to.
+	OnMagicEffect    func(pos Position, effect uint16)
+	OnDistanceEffect func(from, to Position, effect uint16)
+
+	// Combat is the world's combat engine, used by the spell system to resolve
+	// spell damage/heal through the same hit/death path as melee.
+	Combat *CombatEngine
 
 	TypeRegistry *creatures.TypeRegistry
+}
+
+// PlayerByName returns an online player by (case-insensitive) name, or nil.
+func (w *World) PlayerByName(name string) *Player {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.byName[strings.ToLower(strings.TrimSpace(name))]
 }
 
 // NewWorld creates an empty world with a fresh map.
@@ -220,6 +239,25 @@ func (w *World) Spectators(pos Position, excludeID uint32) []*Player {
 		}
 		if p.Pos.InRangeOf(pos) {
 			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// CreaturesAt returns every creature standing exactly on pos (players, monsters,
+// NPCs). Used by the spell system to resolve area-combat targets.
+func (w *World) CreaturesAt(pos Position) []Creature {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	var out []Creature
+	for _, p := range w.players {
+		if p.Pos == pos {
+			out = append(out, p)
+		}
+	}
+	for _, c := range w.creatures {
+		if c.GetPosition() == pos {
+			out = append(out, c)
 		}
 	}
 	return out

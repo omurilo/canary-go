@@ -7,15 +7,15 @@ type CombatParams struct {
 	Origin        CombatOrigin
 	DispelType    ConditionType
 
-	ImpactEffect      uint16
-	DistanceEffect    uint16
-	ChainEffect       uint16
+	ImpactEffect   uint16
+	DistanceEffect uint16
+	ChainEffect    uint16
 
-	BlockedByArmor       bool
-	BlockedByShield      bool
+	BlockedByArmor        bool
+	BlockedByShield       bool
 	TargetCasterOrTopMost bool
-	Aggressive           bool
-	UseCharges           bool
+	Aggressive            bool
+	UseCharges            bool
 }
 
 // Combat engine struct
@@ -25,7 +25,29 @@ type Combat struct {
 	FormulaType FormulaType
 	MinA, MinB  float64
 	MaxA, MaxB  float64
+
+	// Area holds the resolved combat area (nil for single-target spells),
+	// mirroring Combat::area (src/creatures/combat/combat.hpp).
+	Area *AreaCombat
+
+	// InstantSpellName mirrors Combat::setInstantSpellName; captured for parity
+	// with the C++ combat:execute path but not otherwise consumed yet.
+	InstantSpellName string
 }
+
+// SetArea assigns the combat area. Mirrors Combat::setArea (combat.cpp).
+func (c *Combat) SetArea(a *AreaCombat) { c.Area = a }
+
+// HasArea reports whether this combat targets an area, mirroring
+// Combat::hasArea (src/creatures/combat/combat.hpp).
+func (c *Combat) HasArea() bool { return c.Area != nil }
+
+// CombatType returns the configured primary combat type.
+func (c *Combat) CombatType() CombatType { return c.Params.CombatType }
+
+// IsManaDrain reports whether the combat drains mana rather than health,
+// matching the COMBAT_MANADRAIN branch of Combat::doCombat (combat.cpp:1350).
+func (c *Combat) IsManaDrain() bool { return c.Params.CombatType == CombatManaDrain }
 
 // NewCombat creates a new combat instance
 func NewCombat() *Combat {
@@ -112,6 +134,40 @@ func CanDoCombat(caster Creature, target Creature) bool {
 	}
 	// Add protection zone or other checks here
 	return true
+}
+
+// RollValue computes the (signed) primary combat value for a player-cast spell,
+// mirroring Combat::getCombatDamage (src/creatures/combat/combat.cpp:52) and
+// Combat::getLevelFormula (combat.cpp:33) for the two formulas instant spells
+// use. Damage spells have negative coefficients (value < 0); healing spells have
+// positive coefficients (value > 0). normal_random is approximated by a uniform
+// draw over the [min,max] range, matching the existing melee/distance formulas.
+//
+// LEVELMAGIC: levelFormula = level*2 + magicLevel*3;
+//
+//	value = rand(levelFormula*minA + minB, levelFormula*maxA + maxB)
+//
+// DAMAGE:     value = rand(minA, maxA)
+func (c *Combat) RollValue(level, magicLevel int) int32 {
+	var lo, hi int
+	switch c.FormulaType {
+	case CombatFormulaLevelMagic:
+		levelFormula := level*2 + magicLevel*3
+		lo = int(float64(levelFormula)*c.MinA + c.MinB)
+		hi = int(float64(levelFormula)*c.MaxA + c.MaxB)
+	case CombatFormulaDamage:
+		lo = int(c.MinA)
+		hi = int(c.MaxA)
+	default:
+		return 0
+	}
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	if hi == lo {
+		return int32(lo)
+	}
+	return int32(lo + randInt(hi-lo+1))
 }
 
 // SetPlayerCombatValues sets the minimum and maximum damage formula values

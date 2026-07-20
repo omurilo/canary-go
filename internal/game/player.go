@@ -1,6 +1,11 @@
 package game
 
-import "github.com/opentibiabr/canary-go/internal/netmsg"
+import (
+	"strings"
+
+	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/opentibiabr/canary-go/internal/netmsg"
+)
 
 // Session is implemented by the game protocol connection so the world can push
 // updates to a player's client.
@@ -62,7 +67,44 @@ type Player struct {
 
 	TargetID uint32
 
+	// cooldowns tracks per-spell and per-group spell cooldowns, mirroring the
+	// CONDITION_SPELLCOOLDOWN / CONDITION_SPELLGROUPCOOLDOWN conditions applied
+	// by Spell::applyCooldownConditions (src/creatures/combat/spells.cpp:795).
+	cooldowns *combat.CooldownManager
+
+	// learnedSpells records the instant spells the player may cast, mirroring
+	// Player::learnedInstantSpellList (src/creatures/players/player.hpp).
+	learnedSpells map[string]bool
+
 	Session Session
+}
+
+// Cooldowns returns the player's spell cooldown manager, creating it on first
+// use.
+func (p *Player) Cooldowns() *combat.CooldownManager {
+	if p.cooldowns == nil {
+		p.cooldowns = combat.NewCooldownManager()
+	}
+	return p.cooldowns
+}
+
+// HasLearnedSpell mirrors Player::hasLearnedInstantSpell
+// (src/creatures/players/player.cpp). Spell names are compared case-insensitively.
+// TODO(spells): persist learned spells and grant them on level-up / by vocation;
+// this store is currently only populated via LearnSpell (e.g. GM commands/tests).
+func (p *Player) HasLearnedSpell(name string) bool {
+	if p.learnedSpells == nil {
+		return false
+	}
+	return p.learnedSpells[strings.ToLower(name)]
+}
+
+// LearnSpell records that the player has learned the named spell.
+func (p *Player) LearnSpell(name string) {
+	if p.learnedSpells == nil {
+		p.learnedSpells = make(map[string]bool)
+	}
+	p.learnedSpells[strings.ToLower(name)] = true
 }
 
 // GamemasterOutfit sets a default outfit if none was loaded.
@@ -114,6 +156,52 @@ func (p *Player) AddHealth(amount int32) {
 		}
 	}
 }
+// ExpForLevel returns the total experience required to reach a level, mirroring
+// Player::getExpForLevel (src/creatures/players/player.cpp:4438):
+// (((level-6)*level + 17)*level - 12) / 6 * 100.
+func ExpForLevel(level uint64) uint64 {
+	return (((level-6)*level+17)*level - 12) / 6 * 100
+}
+
+// AddExperience grants raw experience and applies any resulting level-ups,
+// mirroring the core of Player::addExperience (src/creatures/players/player.cpp:3560).
+// Basic only: no party sharing, stamina, VIP or bonus multipliers (left as
+// TODOs for the vocations/party agents). On level-up, health/mana are refilled
+// to max like the C++ path.
+func (p *Player) AddExperience(exp uint64) {
+	if exp == 0 {
+		return
+	}
+	if p.Level == 0 {
+		p.Level = 1
+	}
+	nextLevelExp := ExpForLevel(uint64(p.Level) + 1)
+	currLevelExp := ExpForLevel(uint64(p.Level))
+	if currLevelExp >= nextLevelExp {
+		return // already at max level
+	}
+
+	p.Experience += exp
+
+	prevLevel := p.Level
+	for p.Experience >= nextLevelExp {
+		p.Level++
+		currLevelExp = nextLevelExp
+		nextLevelExp = ExpForLevel(uint64(p.Level) + 1)
+		if currLevelExp >= nextLevelExp {
+			break // reached max level
+		}
+	}
+
+	if p.Level != prevLevel {
+		// TODO(vocations): apply per-vocation HP/mana/cap gains. Without a
+		// vocation registry we just refill to the current max, matching the C++
+		// "health = healthMax" refill after a level change.
+		p.Health = p.MaxHealth
+		p.Mana = p.MaxMana
+	}
+}
+
 func (p *Player) GetTarget() Creature { return nil } // Stub for target
 func (p *Player) SetTarget(target Creature) {}
 func (p *Player) SetAttackTarget(id uint32) { p.TargetID = id }

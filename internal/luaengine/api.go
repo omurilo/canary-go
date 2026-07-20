@@ -10,6 +10,10 @@ import (
 func (e *Engine) registerAPI() {
 	L := e.L
 
+	// Global Tibia enums (COMBAT_*, BESTY_RACE_*, CONST_SLOT_*, ...) must exist
+	// before content scripts (monsters, spells) reference them.
+	RegisterEnums(L)
+
 	// print -> structured logger, so script output shows up in server logs.
 	L.SetGlobal("print", L.NewFunction(func(L *lua.LState) int {
 		n := L.GetTop()
@@ -58,6 +62,8 @@ func (e *Engine) registerAPI() {
 	e.registerTalkAction()
 	e.registerSpell()
 	e.registerCombat()
+	e.registerVariant()
+	e.registerCondition()
 }
 
 // SetGameFunc registers a Go function as a field on the global Game table.

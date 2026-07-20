@@ -12,6 +12,14 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// randInt returns a uniform int in [0, n). Guards n<=0 to avoid a panic.
+func randInt(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	return rand.Intn(n)
+}
+
 // CalculateMeleeDamage returns damage value based on Tibia formulas from Canary.
 func CalculateMeleeDamage(attack int, skill int, armor int, voc *vocations.Vocation) int {
 	multiplier := 1.0

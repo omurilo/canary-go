@@ -57,22 +57,24 @@ func RegisterEnums(L *lua.LState) {
 		"MESSAGE_POTION":              31,
 		"MESSAGE_STATUS_CONSOLE_BLUE": 32, // commonly used alias/value
 
-		// Combat Types
-		"COMBAT_NONE":            0,
-		"COMBAT_PHYSICALDAMAGE":  1,
-		"COMBAT_ENERGYDAMAGE":    2,
-		"COMBAT_EARTHDAMAGE":     3,
-		"COMBAT_FIREDAMAGE":      4,
-		"COMBAT_UNDEFINEDDAMAGE": 5,
-		"COMBAT_LIFEDRAIN":       6,
-		"COMBAT_MANADRAIN":       7,
-		"COMBAT_HEALING":         8,
-		"COMBAT_DROWNDAMAGE":     9,
-		"COMBAT_ICEDAMAGE":       10,
-		"COMBAT_HOLYDAMAGE":      11,
-		"COMBAT_DEATHDAMAGE":     12,
-		"COMBAT_AGONYDAMAGE":     13,
-		"COMBAT_NEUTRALDAMAGE":   14,
+		// Combat Types (CombatType_t, src/creatures/creatures_definitions.hpp).
+		// These are sequential C++ enum values, not bitflags; the setParameter
+		// binding maps them to the internal combat.CombatType flags.
+		"COMBAT_PHYSICALDAMAGE":  0,
+		"COMBAT_FIREDAMAGE":      1,
+		"COMBAT_EARTHDAMAGE":     2,
+		"COMBAT_ENERGYDAMAGE":    3,
+		"COMBAT_UNDEFINEDDAMAGE": 4,
+		"COMBAT_LIFEDRAIN":       5,
+		"COMBAT_MANADRAIN":       6,
+		"COMBAT_HEALING":         7,
+		"COMBAT_DROWNDAMAGE":     8,
+		"COMBAT_ICEDAMAGE":       9,
+		"COMBAT_HOLYDAMAGE":      10,
+		"COMBAT_DEATHDAMAGE":     11,
+		"COMBAT_AGONYDAMAGE":     12,
+		"COMBAT_NEUTRALDAMAGE":   13,
+		"COMBAT_NONE":            255,
 
 		// Item Types
 		"ITEM_TYPE_DEPOT":       0,
@@ -184,4 +186,6 @@ func RegisterEnums(L *lua.LState) {
 	for k, v := range enums {
 		L.SetGlobal(k, v)
 	}
+
+	registerSpellEnums(L)
 }

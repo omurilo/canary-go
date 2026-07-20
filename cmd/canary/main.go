@@ -28,6 +28,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/network"
 	"github.com/opentibiabr/canary-go/internal/otbm"
 	"github.com/opentibiabr/canary-go/internal/protocol"
+	"github.com/opentibiabr/canary-go/internal/spells"
 	"github.com/opentibiabr/canary-go/internal/tibcrypto"
 )
 
@@ -126,10 +127,13 @@ func run(o runOpts, log *slog.Logger) error {
 	creatureTypes := creatures.NewTypeRegistry()
 	world.TypeRegistry = creatureTypes
 	if cfg.DataPack != "" {
+		// XML fallback loader (legacy format). The otservbr data pack is Lua, so
+		// this typically loads nothing; the real load happens later via the Lua
+		// engine (Game.createMonsterType/register) in loadScripts.
 		if err := creatureTypes.LoadMonsters(filepath.Join(cfg.DataPack, "monster")); err != nil {
-			log.Warn("loading monster types", "err", err)
-		} else {
-			log.Info("loaded monster types", "count", len(creatureTypes.Monsters))
+			log.Warn("loading monster types (xml fallback)", "err", err)
+		} else if n := len(creatureTypes.Monsters); n > 0 {
+			log.Info("loaded monster types (xml fallback)", "count", n)
 		}
 		if err := creatureTypes.LoadNpcs(filepath.Join(cfg.DataPack, "npc")); err != nil {
 			log.Warn("loading npc types", "err", err)
@@ -217,6 +221,17 @@ func run(o runOpts, log *slog.Logger) error {
 	world.OnTargetLost = func(p *game.Player) {
 		protocol.SendCancelTarget(p)
 	}
+	world.OnPlayerStatsChange = func(p *game.Player) {
+		protocol.SendPlayerStats(p)
+	}
+	world.OnMagicEffect = func(pos game.Position, effect uint16) {
+		protocol.BroadcastMagicEffect(world, pos, effect)
+	}
+	world.OnDistanceEffect = func(from, to game.Position, effect uint16) {
+		protocol.BroadcastDistanceEffect(world, from, to, effect)
+	}
+	// The spell system resolves spell damage/heal through the combat engine.
+	world.Combat = combatEngine
 
 	spawnEngine.Start()
 	aiEngine.Start()
@@ -232,9 +247,16 @@ func run(o runOpts, log *slog.Logger) error {
 	if err := loadScripts(lengine, scriptsDir, log); err != nil {
 		log.Warn("loading scripts", "err", err)
 	}
+	log.Info("registered instant spells (lua)", "count", spells.Count())
 	if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "monster"), log); err != nil {
 		log.Warn("loading monsters", "err", err)
 	}
+	// The real monster data is Lua (executed above via createMonsterType/register),
+	// not the XML the earlier LoadMonsters call scans. Resolve loot entries given
+	// by name to item ids now that both the catalog and the registry are loaded,
+	// then log the real count.
+	resolveMonsterLoot(creatureTypes, catalog, log)
+	log.Info("loaded monster types (lua)", "count", len(creatureTypes.Monsters))
 	if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "npc"), log); err != nil {
 		log.Warn("loading npcs", "err", err)
 	}
@@ -307,6 +329,38 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 		}
 		return nil
 	})
+}
+
+// resolveMonsterLoot resolves loot entries declared by name (e.g. "gold coin")
+// to item ids using the item catalog, mirroring the name lookup the C++ loot
+// loader performs. Entries with an explicit id are left as-is.
+func resolveMonsterLoot(reg *creatures.TypeRegistry, catalog *items.Catalog, log *slog.Logger) {
+	if reg == nil || catalog == nil {
+		return
+	}
+	var unresolved int
+	var walk func(loot []creatures.LootBlock)
+	walk = func(loot []creatures.LootBlock) {
+		for i := range loot {
+			lb := &loot[i]
+			if lb.ID == 0 && lb.Name != "" {
+				if id, ok := catalog.IDByName(lb.Name); ok {
+					lb.ID = id
+				} else {
+					unresolved++
+				}
+			}
+			if len(lb.ChildLoot) > 0 {
+				walk(lb.ChildLoot)
+			}
+		}
+	}
+	for _, mt := range reg.Monsters {
+		walk(mt.Loot)
+	}
+	if unresolved > 0 {
+		log.Warn("some monster loot names could not be resolved to item ids", "count", unresolved)
+	}
 }
 
 // jobHandler processes async jobs pulled from the PostgreSQL queue.
