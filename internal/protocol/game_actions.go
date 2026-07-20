@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -463,8 +464,13 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 				return
 			}
 		}
-		// If lua script doesn't handle it, we'd do fallback.
-		// For now just return, the script handles the look description.
+		
+		desc := fmt.Sprintf("You see %s.", targetCreature.GetName())
+		w := netmsg.NewWriter()
+		w.AddByte(opTextMessage)
+		w.AddByte(0x15) // MESSAGE_EVENT_ADVANCE (white text center)
+		w.AddString(desc)
+		g.SendToClient(w)
 		return
 	}
 
@@ -474,6 +480,18 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 				return
 			}
 		}
+		
+		name := "an item of type " + fmt.Sprint(spriteID)
+		if t := g.deps.Items.Get(spriteID); t != nil && t.Name != "" {
+			name = t.Name
+		}
+		desc := fmt.Sprintf("You see %s.", name)
+
+		w := netmsg.NewWriter()
+		w.AddByte(opTextMessage)
+		w.AddByte(0x15) // MESSAGE_EVENT_ADVANCE (white text center)
+		w.AddString(desc)
+		g.SendToClient(w)
 		return
 	}
 }

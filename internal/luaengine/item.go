@@ -19,7 +19,42 @@ type luaItem struct {
 func (e *Engine) registerItem() {
 	mt := e.L.NewTypeMetatable(itemTypeName)
 	methods := e.itemMethods()
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
+	
+	// Create method table
+	methodTable := e.L.SetFuncs(e.L.NewTable(), methods)
+	
+	e.L.SetField(mt, "__index", e.L.NewFunction(func(L *lua.LState) int {
+		it := checkItem(L)
+		key := L.CheckString(2)
+		
+		switch key {
+		case "itemid":
+			L.Push(lua.LNumber(it.item.ID))
+			return 1
+		case "actionid":
+			if it.item.Attr != nil && it.item.Attr.ActionID != nil {
+				L.Push(lua.LNumber(*it.item.Attr.ActionID))
+			} else {
+				L.Push(lua.LNumber(0))
+			}
+			return 1
+		case "type", "count":
+			L.Push(lua.LNumber(it.item.Count))
+			return 1
+		case "uid":
+			if it.item.Attr != nil && it.item.Attr.UniqueID != nil {
+				L.Push(lua.LNumber(*it.item.Attr.UniqueID))
+			} else {
+				L.Push(lua.LNumber(0))
+			}
+			return 1
+		}
+		
+		// Fallback to method
+		val := methodTable.RawGetString(key)
+		L.Push(val)
+		return 1
+	}))
 
 	e.setClassConstructor("Item", e.itemCreate, methods)
 }
@@ -89,6 +124,11 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			}
 			
 			L.Push(lua.LBool(ok))
+			return 1
+		},
+		"getPosition": func(L *lua.LState) int {
+			it := checkItem(L)
+			pushPosition(L, it.pos)
 			return 1
 		},
 		"getTile": stubItemMethod,

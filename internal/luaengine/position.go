@@ -117,4 +117,11 @@ func positionEq(L *lua.LState) int {
 
 var positionMethods = map[string]lua.LGFunction{
 	"isPosition": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
+	"sendSingleSoundEffect": func(L *lua.LState) int {
+		// Stub for sound effect
+		return 0
+	},
+	"sendMagicEffect": func(L *lua.LState) int {
+		return 0
+	},
 }

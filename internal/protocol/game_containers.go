@@ -119,7 +119,7 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 			g.openContainer(item)
 		}
 	} else if t.FloorChange != "" {
-		teleportPos := g.player.Pos
+		teleportPos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
 		switch t.FloorChange {
 		case "down":
 			teleportPos.Z++

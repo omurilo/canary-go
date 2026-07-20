@@ -5,6 +5,7 @@ import (
 	
 	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/creatures"
 )
 
 func checkNpc(L *lua.LState) *game.Npc {
@@ -202,6 +203,53 @@ func (e *Engine) npcOpenshopwindow(L *lua.LState) int {
 }
 
 func npcOpenshopwindowtable(L *lua.LState) int {
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	p, _ := L.CheckUserData(2).Value.(*game.Player)
+	if p == nil {
+		return 0
+	}
+	
+	tbl := L.CheckTable(3)
+	var shopItems []creatures.ShopItem
+	
+	tbl.ForEach(func(key lua.LValue, val lua.LValue) {
+		if innerTbl, ok := val.(*lua.LTable); ok {
+			var si creatures.ShopItem
+			
+			if idVal := innerTbl.RawGetString("id"); idVal.Type() == lua.LTNumber {
+				si.ID = uint16(lua.LVAsNumber(idVal))
+			} else if idVal := innerTbl.RawGetString("itemId"); idVal.Type() == lua.LTNumber {
+				si.ID = uint16(lua.LVAsNumber(idVal))
+			}
+			
+			if buyVal := innerTbl.RawGetString("buy"); buyVal.Type() == lua.LTNumber {
+				si.BuyPrice = uint32(lua.LVAsNumber(buyVal))
+			}
+			
+			if sellVal := innerTbl.RawGetString("sell"); sellVal.Type() == lua.LTNumber {
+				si.SellPrice = uint32(lua.LVAsNumber(sellVal))
+			}
+			
+			if nameVal := innerTbl.RawGetString("name"); nameVal.Type() == lua.LTString {
+				si.Name = lua.LVAsString(nameVal)
+			}
+			
+			// SubType check if we support it
+			if subTypeVal := innerTbl.RawGetString("subType"); subTypeVal.Type() == lua.LTNumber {
+				si.SubType = uint8(lua.LVAsNumber(subTypeVal))
+			}
+			
+			if si.ID != 0 {
+				shopItems = append(shopItems, si)
+			}
+		}
+	})
+	
+	p.SendOpenShop(n, shopItems)
+	
 	L.Push(lua.LTrue)
 	return 1
 }
