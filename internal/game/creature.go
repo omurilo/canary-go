@@ -18,6 +18,7 @@ type Creature interface {
 	GetLightLevel() uint8
 	GetLightColor() uint8
 	GetSpeed() uint16
+	GetCreatureType() uint8 // 0=Player, 1=Monster, 2=NPC
 }
 
 type BaseCreature struct {
@@ -72,4 +73,5 @@ func (c *BaseCreature) GetOutfit() Outfit { return c.Outfit }
 func (c *BaseCreature) GetLightLevel() uint8 { return c.LightLevel }
 func (c *BaseCreature) GetLightColor() uint8 { return c.LightColor }
 func (c *BaseCreature) GetSpeed() uint16 { return c.Speed }
+func (c *BaseCreature) GetCreatureType() uint8 { return 0 } // Player by default
 

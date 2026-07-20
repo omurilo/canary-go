@@ -4,12 +4,24 @@
 package luaengine
 
 import (
+	"fmt"
 	"log/slog"
+	"os"
+	"regexp"
 	"sync"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
+
+// reBackslashZ matches \z followed by optional whitespace (including newlines).
+// This is a Lua 5.3 string escape that gopher-lua (5.1) doesn't support.
+var reBackslashZ = regexp.MustCompile(`\\z\s*`)
+
+// preprocessLuaSource converts Lua 5.3 \z continuation to Lua 5.1 compatible code.
+func preprocessLuaSource(src string) string {
+	return reBackslashZ.ReplaceAllString(src, "")
+}
 
 // Engine owns a Lua state guarded by a mutex (gopher-lua states are not
 // goroutine-safe).
@@ -36,10 +48,16 @@ func (e *Engine) Close() {
 }
 
 // DoFile executes a Lua script file under the engine lock.
+// It preprocesses \z continuation sequences (Lua 5.3) that gopher-lua (5.1) doesn't support.
 func (e *Engine) DoFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+	src := preprocessLuaSource(string(data))
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.L.DoFile(path)
+	return e.L.DoString(src)
 }
 
 // DoString executes a Lua chunk under the engine lock.

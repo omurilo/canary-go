@@ -41,3 +41,5 @@ func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {
 func (m *Monster) ChangeTargetDistance(distance int32) {
 	m.TargetDistance = distance
 }
+
+func (m *Monster) GetCreatureType() uint8 { return 1 } // CREATURETYPE_MONSTER

@@ -115,6 +115,70 @@ func RegisterEnums(L *lua.LState) {
 		"ZONE_PVP":        2,
 		"ZONE_NOLOGOUT":   3,
 		"ZONE_NORMAL":     4,
+
+		// Bestiary Races
+		"BESTY_RACE_AMPHIBIC": 1,
+		"BESTY_RACE_DEMON":    2,
+		"BESTY_RACE_DRAGON":   3,
+		"BESTY_RACE_GIANT":    4,
+		"BESTY_RACE_HUMAN":    5,
+		"BESTY_RACE_HUMANOID": 6,
+		"BESTY_RACE_MAGICAL":  7,
+		"BESTY_RACE_MAMMAL":   8,
+		"BESTY_RACE_REPTILE":  9,
+		"BESTY_RACE_SLIME":    10,
+		"BESTY_RACE_UNDEAD":   11,
+		"BESTY_RACE_VERMIN":   12,
+
+		// Creature Types
+		"CREATURETYPE_PLAYER":   0,
+		"CREATURETYPE_MONSTER":  1,
+		"CREATURETYPE_NPC":      2,
+		"CREATURETYPE_SUMMON_OWN":    3,
+		"CREATURETYPE_SUMMON_OTHERS": 4,
+
+		// Directions
+		"DIRECTION_NORTH":     0,
+		"DIRECTION_EAST":      1,
+		"DIRECTION_SOUTH":     2,
+		"DIRECTION_WEST":      3,
+		"DIRECTION_DIAGONAL_MASK": 4,
+		"DIRECTION_SOUTHWEST": 4,
+		"DIRECTION_SOUTHEAST": 5,
+		"DIRECTION_NORTHWEST": 6,
+		"DIRECTION_NORTHEAST": 7,
+
+		// Return values
+		"RETURNVALUE_NOERROR":         0,
+		"RETURNVALUE_NOTPOSSIBLE":     1,
+		"RETURNVALUE_NOTENOUGHROOM":   2,
+		"RETURNVALUE_PLAYERISPZLOCKED": 3,
+
+		// Condition types
+		"CONDITION_NONE":              0,
+		"CONDITION_POISON":            1,
+		"CONDITION_FIRE":              2,
+		"CONDITION_ENERGY":            3,
+		"CONDITION_BLEEDING":          4,
+		"CONDITION_HASTE":             5,
+		"CONDITION_PARALYZE":          6,
+		"CONDITION_OUTFIT":            7,
+		"CONDITION_INVISIBLE":         8,
+		"CONDITION_LIGHT":             9,
+		"CONDITION_MANASHIELD":        10,
+		"CONDITION_INFIGHT":           11,
+		"CONDITION_DRUNK":             12,
+		"CONDITION_EXHAUST":           13,
+		"CONDITION_REGENERATION":      14,
+		"CONDITION_SOUL":              15,
+		"CONDITION_DROWN":             16,
+		"CONDITION_MUTED":             17,
+		"CONDITION_CHANNELMUTEDTICKS": 18,
+		"CONDITION_YELLTICKS":         19,
+		"CONDITION_ATTRIBUTES":        20,
+		"CONDITION_FREEZING":          21,
+		"CONDITION_DAZZLED":           22,
+		"CONDITION_CURSED":            23,
 	}
 
 	for k, v := range enums {

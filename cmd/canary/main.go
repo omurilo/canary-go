@@ -124,6 +124,7 @@ func run(o runOpts, log *slog.Logger) error {
 	world := game.NewWorld()
 
 	creatureTypes := creatures.NewTypeRegistry()
+	world.TypeRegistry = creatureTypes
 	if cfg.DataPack != "" {
 		if err := creatureTypes.LoadMonsters(filepath.Join(cfg.DataPack, "monster")); err != nil {
 			log.Warn("loading monster types", "err", err)

@@ -44,3 +44,5 @@ func (n *Npc) Say(text string) {
 func (n *Npc) TurnToCreature(c Creature) {
 	// Logic for NPC to turn to a creature
 }
+
+func (n *Npc) GetCreatureType() uint8 { return 2 } // CREATURETYPE_NPC

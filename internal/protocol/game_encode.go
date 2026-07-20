@@ -105,7 +105,7 @@ func (g *GameProtocol) addCreature(w *netmsg.Writer, c game.Creature) {
 		w.AddU16(creatureNew)
 		w.AddU32(0) // removedKnownId (cache not full)
 		w.AddU32(c.GetID())
-		w.AddByte(0) // creatureType: PLAYER (0 for now)
+		w.AddByte(c.GetCreatureType()) // creatureType: 0=Player, 1=Monster, 2=NPC
 		w.AddString(c.GetName())
 	}
 
@@ -126,8 +126,8 @@ func (g *GameProtocol) addCreature(w *netmsg.Writer, c game.Creature) {
 	if !known {
 		w.AddByte(0) // guild emblem
 	}
-	w.AddByte(0)    // creature type (again)
-	w.AddByte(0)    // vocation client id (PLAYER)
+	w.AddByte(c.GetCreatureType()) // creature type (again)
+	w.AddByte(0)                   // vocation client id
 	w.AddByte(0)    // speech bubble
 	w.AddByte(0xFF) // mark (unmarked)
 	w.AddByte(0)    // inspection type

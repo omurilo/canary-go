@@ -124,3 +124,4 @@ func (p *Player) GetOutfit() Outfit { return p.Outfit }
 func (p *Player) GetLightLevel() uint8 { return p.LightLevel }
 func (p *Player) GetLightColor() uint8 { return p.LightColor }
 func (p *Player) GetSpeed() uint16 { return p.Speed }
+func (p *Player) GetCreatureType() uint8 { return 0 } // CREATURETYPE_PLAYER
