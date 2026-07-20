@@ -205,6 +205,10 @@ func RegisterEnums(L *lua.LState) {
 		"CONDITION_FREEZING":          21,
 		"CONDITION_DAZZLED":           22,
 		"CONDITION_CURSED":            23,
+
+		"FORGE_NORMAL_MONSTER":     0,
+		"FORGE_INFLUENCED_MONSTER": 1,
+		"FORGE_FIENDISH_MONSTER":   2,
 	}
 
 	for k, v := range enums {

@@ -21,16 +21,16 @@ func checkNpc(L *lua.LState) *game.Npc {
 func (e *Engine) registerNpc() {
 	mt := e.L.NewTypeMetatable("Npc")
 	// Npc IS-A Creature: expose all creature methods, npc-specific win.
-	idx := e.L.NewTable()
-	e.L.SetFuncs(idx, creatureMethods)
-	e.L.SetFuncs(idx, npcMethods)
-	e.L.SetField(mt, "__index", idx)
+	e.L.SetFuncs(mt, creatureMethods)
+	e.L.SetFuncs(mt, npcMethods)
+	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "__index", mt)
+	// idx
+	e.L.SetFuncs(mt, creatureMethods)
+	e.L.SetFuncs(mt, npcMethods)
+	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
 
 	// Override methods that need the engine/world instance
-	e.L.SetField(idx, "say", e.L.NewFunction(e.npcSay))
-	e.L.SetField(idx, "openShopWindow", e.L.NewFunction(e.npcOpenshopwindow))
-	e.L.SetField(idx, "isMerchant", e.L.NewFunction(e.npcIsmerchant))
-	e.L.SetField(idx, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
 }
 
 // npcIsmerchant reports whether the NPC's type defines shop items. NpcHandler:

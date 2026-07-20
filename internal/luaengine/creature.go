@@ -136,7 +136,6 @@ func (e *Engine) registerCreatureType() {
 	idx := e.L.SetFuncs(e.L.NewTable(), creatureMethods)
 	// teleportTo needs the world (to broadcast the jump), so it's engine-bound.
 	e.L.SetField(idx, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
-	e.L.SetField(mt, "__index", idx)
 }
 
 var creatureMethods = map[string]lua.LGFunction{

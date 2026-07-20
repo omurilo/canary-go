@@ -1,0 +1,15 @@
+data-otservbr-global/lib filter=lfs diff=lfs merge=lfs -text
+data-otservbr-global/migrations filter=lfs diff=lfs merge=lfs -text
+data-otservbr-global/monster filter=lfs diff=lfs merge=lfs -text
+data-otservbr-global/npc filter=lfs diff=lfs merge=lfs -text
+data-otservbr-global/raids filter=lfs diff=lfs merge=lfs -text
+data-otservbr-global/scripts filter=lfs diff=lfs merge=lfs -text
+data-otservbr-global/startup filter=lfs diff=lfs merge=lfs -text
+data-otservbr-global/world filter=lfs diff=lfs merge=lfs -text
+data-canary/lib filter=lfs diff=lfs merge=lfs -text
+data-canary/migrations filter=lfs diff=lfs merge=lfs -text
+data-canary/monster filter=lfs diff=lfs merge=lfs -text
+data-canary/npc filter=lfs diff=lfs merge=lfs -text
+data-canary/raids filter=lfs diff=lfs merge=lfs -text
+data-canary/scripts filter=lfs diff=lfs merge=lfs -text
+data-canary/world filter=lfs diff=lfs merge=lfs -text

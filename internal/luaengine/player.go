@@ -21,11 +21,10 @@ func (e *Engine) registerPlayerType() {
 	// Player IS-A Creature (C++ Player : Creature), so it must expose every
 	// Creature method (getId, getPosition, getHealth, say, teleportTo, ...).
 	// Layer creature methods first, then let player-specific methods override.
-	idx := e.L.NewTable()
-	e.L.SetFuncs(idx, creatureMethods)
-	e.L.SetFuncs(idx, playerMethods)
-	e.L.SetField(idx, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
-	e.L.SetField(mt, "__index", idx)
+	e.L.SetFuncs(mt, creatureMethods)
+	e.L.SetFuncs(mt, playerMethods)
+	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "__index", mt)
 }
 
 var playerMethods = map[string]lua.LGFunction{
@@ -1762,7 +1761,17 @@ func playerGetvocation(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.Vocation))
+	ud := L.NewTable()
+	mt := L.NewTable()
+	L.SetField(mt, "__index", L.NewFunction(func(L *lua.LState) int {
+		L.Push(L.NewFunction(func(L *lua.LState) int {
+			L.Push(lua.LNumber(0))
+			return 1
+		}))
+		return 1
+	}))
+	L.SetMetatable(ud, mt)
+	L.Push(ud)
 	return 1
 }
 

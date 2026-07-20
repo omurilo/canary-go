@@ -59,6 +59,7 @@ func (e *Engine) registerAPI() {
 	e.registerMonsterType()
 	e.registerNpcType()
 	e.registerNetworkMessage()
+	e.registerBank()
 
 	linkClasses := func(child, parent string) {
 		childMt, _ := L.GetTypeMetatable(child).(*lua.LTable)
@@ -84,7 +85,16 @@ func (e *Engine) registerAPI() {
 	// Mock constructors for unused revscriptsys classes so scripts don't crash
 	mockClass := func(name string) {
 		mt := L.NewTypeMetatable(name)
-		L.SetField(mt, "__index", L.NewTable())
+		
+		idxTable := L.NewTable()
+		idxMt := L.NewTable()
+		L.SetField(idxMt, "__index", L.NewFunction(func(L *lua.LState) int {
+			L.Push(L.NewFunction(func(L *lua.LState) int { return 0 }))
+			return 1
+		}))
+		L.SetMetatable(idxTable, idxMt)
+		
+		L.SetField(mt, "__index", idxTable)
 		L.SetField(mt, "__newindex", L.NewFunction(func(L *lua.LState) int { return 0 }))
 		
 		// The constructor (__call) returns a new userdata
@@ -103,6 +113,25 @@ func (e *Engine) registerAPI() {
 	mockClass("CreatureEvent")
 	mockClass("GlobalEvent")
 	mockClass("Weapon")
+	mockClass("Result")
+	mockClass("Achievement")
+	mockClass("BestiaryCharm")
+	mockClass("ItemTier")
+	mockClass("Spawns")
+	mockClass("BedItem")
+	mockClass("DropLoot")
+
+	// rawgetmetatable allows scripts (like revscriptsys) to retrieve the type metatable
+	L.SetGlobal("rawgetmetatable", L.NewFunction(func(L *lua.LState) int {
+		name := L.CheckString(1)
+		mt := L.GetTypeMetatable(name)
+		if mt != lua.LNil {
+			L.Push(mt)
+		} else {
+			L.Push(lua.LNil)
+		}
+		return 1
+	}))
 	
 	// Ensure these class tables exist so scripts can inject methods into them (e.g. Player.feed = ...)
 	ensureClassTable := func(name string) {
@@ -119,6 +148,13 @@ func (e *Engine) registerAPI() {
 			mt := L.NewTypeMetatable(name + "_ClassDummy")
 			// Dummy __call returning nil so scripts don't crash when calling Player(cid)
 			L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int { return 0 }))
+			
+			// Dummy __index returning a dummy function so arbitrary method calls don't crash
+			L.SetField(mt, "__index", L.NewFunction(func(L *lua.LState) int {
+				L.Push(L.NewFunction(func(L *lua.LState) int { return 0 }))
+				return 1
+			}))
+
 			L.SetMetatable(classTable, mt)
 			L.SetGlobal(name, classTable)
 		}
@@ -164,6 +200,7 @@ func (e *Engine) registerAPI() {
 	ensureClassTable("Variant")
 	ensureClassTable("Condition")
 	ensureClassTable("Combat")
+	ensureClassTable("Zone")
 
 	// configManager / configKeys mirror the C++ globals that expose config.lua.
 	// The full server reads real config values here; this slice provides safe
