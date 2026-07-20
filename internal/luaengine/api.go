@@ -85,8 +85,16 @@ func (e *Engine) registerAPI() {
 	
 	// Ensure these class tables exist so scripts can inject methods into them (e.g. Player.feed = ...)
 	ensureClassTable := func(name string) {
-		if L.GetGlobal(name).Type() == lua.LTNil {
-			classTable := L.NewTable()
+		if L.GetGlobal(name) == lua.LNil {
+			var classTable *lua.LTable
+			if typeMt, ok := L.GetTypeMetatable(name).(*lua.LTable); ok {
+				if idx := L.RawGet(typeMt, lua.LString("__index")); idx.Type() == lua.LTTable {
+					classTable = idx.(*lua.LTable)
+				}
+			}
+			if classTable == nil {
+				classTable = L.NewTable()
+			}
 			mt := L.NewTypeMetatable(name + "_ClassDummy")
 			// Dummy __call returning nil so scripts don't crash when calling Player(cid)
 			L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int { return 0 }))
@@ -100,9 +108,21 @@ func (e *Engine) registerAPI() {
 	// scripts rely on Player(creature):getPosition() etc. A dummy __call here
 	// would return nil and crash those scripts.
 	setCreatureConstructor := func(name string) {
-		classTable := L.NewTable()
+		var classTable *lua.LTable
+		if typeMt, ok := L.GetTypeMetatable(name).(*lua.LTable); ok {
+			if idx := L.RawGet(typeMt, lua.LString("__index")); idx.Type() == lua.LTTable {
+				classTable = idx.(*lua.LTable)
+			}
+		}
+		if classTable == nil {
+			classTable = L.NewTable()
+		}
+
 		mt := L.NewTypeMetatable(name + "_ClassCtor")
 		L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int {
+			if L.GetTop() >= 1 {
+				L.Remove(1)
+			}
 			return e.creatureConstructorCall(L, name)
 		}))
 		// Keep field injection working (e.g. Player.feed = ...) on the table.
@@ -173,13 +193,19 @@ func (e *Engine) SetGameFunc(name string, fn lua.LGFunction) {
 // setClassConstructor registers a global table with a __call metamethod so that
 // scripts can use `Class(args)` to construct new instances. This matches how Canary C++
 // exports constructors like Action, MoveEvent, Spell, etc.
-func (e *Engine) setClassConstructor(name string, constructor lua.LGFunction, methods map[string]lua.LGFunction) {
+func (e *Engine) setClassConstructor(name string, constructor lua.LGFunction, methods map[string]lua.LGFunction) *lua.LTable {
 	L := e.L
-	mt := L.NewTypeMetatable(name + "_Class")
-	// gopher-lua's __call metamethod prepends the callable (the class table)
-	// itself as argument #1. Strip it so constructors receive their real
-	// arguments at position 1 — matching how they're written and how the C++
-	// Canary API is called, e.g. Position(x, y, z) / TalkAction(words).
+	var classTable *lua.LTable
+	if typeMt, ok := L.GetTypeMetatable(name).(*lua.LTable); ok {
+		if idx := L.RawGet(typeMt, lua.LString("__index")); idx.Type() == lua.LTTable {
+			classTable = idx.(*lua.LTable)
+		}
+	}
+	if classTable == nil {
+		classTable = L.NewTable()
+	}
+
+	mt := L.NewTypeMetatable(name + "_ClassCtor")
 	call := func(L *lua.LState) int {
 		if L.GetTop() >= 1 {
 			L.Remove(1)
@@ -188,10 +214,10 @@ func (e *Engine) setClassConstructor(name string, constructor lua.LGFunction, me
 	}
 	L.SetField(mt, "__call", L.NewFunction(call))
 
-	classTable := L.NewTable()
 	if methods != nil {
 		L.SetFuncs(classTable, methods)
 	}
 	L.SetMetatable(classTable, mt)
 	L.SetGlobal(name, classTable)
+	return classTable
 }

@@ -105,7 +105,7 @@ func (e *Engine) CallAction(a *actions.Action, player *game.Player, item *game.I
 	L.SetMetatable(playerUd, L.GetTypeMetatable("Player"))
 
 	itemUd := L.NewUserData()
-	itemUd.Value = item
+	itemUd.Value = luaItem{item: item, pos: fromPos}
 	L.SetMetatable(itemUd, L.GetTypeMetatable("Item"))
 
 	fromPosUd := L.NewUserData()
@@ -115,7 +115,7 @@ func (e *Engine) CallAction(a *actions.Action, player *game.Player, item *game.I
 	var targetUd lua.LValue = lua.LNil
 	if targetItem != nil {
 		ud := L.NewUserData()
-		ud.Value = targetItem
+		ud.Value = luaItem{item: targetItem, pos: toPos}
 		L.SetMetatable(ud, L.GetTypeMetatable("Item"))
 		targetUd = ud
 	}

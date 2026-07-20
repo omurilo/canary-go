@@ -505,8 +505,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		w := netmsg.NewWriter()
 		w.AddByte(opPingBack)
 		g.SendToClient(w)
-	case inPong:
-		// Reply to our own keep-alive ping; nothing to do.
+	case inPong, 0x60, 0xBE:
+		// Reply to our own keep-alive ping, or safely ignored opcodes (imbuements/cancel attack).
 	case inWalkNorth:
 		g.manualWalk(game.DirNorth)
 	case inWalkEast:
