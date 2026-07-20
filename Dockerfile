@@ -5,12 +5,12 @@ FROM golang:1.25-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
-COPY / ./
 
 # Install protoc and go protobuf compiler
 RUN apk add --no-cache protobuf bash
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 
+COPY / ./
 # Generate protobufs for appearances
 RUN ./scripts/generate_appearances.sh
 
@@ -28,4 +28,4 @@ COPY scripts /app/scripts
 USER canary
 EXPOSE 7171 7172
 ENTRYPOINT ["/app/canary"]
-CMD ["-config", "config.lua", "-schema", "schema/mysql.sql", "-scripts", "scripts", "-migrate", "-seed"]
+CMD ["-config", "config.lua", "-schema", "schema/mysql.sql", "-scripts", "scripts", "-appearances", "data/items/appearances.dat", "-migrate", "-seed"]
