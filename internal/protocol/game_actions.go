@@ -329,7 +329,7 @@ func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text st
 		w.AddByte(0) // Show (Traded)
 		w.AddU16(speaker.Level)
 		w.AddByte(talkType)
-		w.AddPosition(netmsg.Position{X: speaker.Pos.X, Y: speaker.Pos.Y, Z: speaker.Pos.Z})
+		appendSayLocus(w, talkType, speaker.Pos, 0)
 		w.AddString(text)
 		gp.SendToClient(w)
 	}
