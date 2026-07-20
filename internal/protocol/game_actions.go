@@ -320,6 +320,17 @@ func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 }
 
 func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text string) {
+	// Player→NPC speech (PRIVATE_PN) is routed ONLY to NPC spectators, never
+	// echoed to player clients (C++ Game::playerSay uses npcsSpectators). Echoing
+	// it — with or without a position — crashes the client, so deliver it to NPCs
+	// and stop.
+	if talkType == talkTypePrivatePN {
+		for _, n := range g.deps.World.SpectatingNpcs(speaker.Pos) {
+			g.deps.Lua.CallNpcOnCreatureSay(n, speaker, talkType, text)
+		}
+		return
+	}
+
 	g.statementID++
 	send := func(gp *GameProtocol) {
 		w := netmsg.NewWriter()
@@ -329,7 +340,9 @@ func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text st
 		w.AddByte(0) // Show (Traded)
 		w.AddU16(speaker.Level)
 		w.AddByte(talkType)
-		appendSayLocus(w, talkType, speaker.Pos, 0)
+		// Player speech (say/whisper/yell) travels the sendCreatureSay path,
+		// which always carries a position.
+		w.AddPosition(netmsg.Position{X: speaker.Pos.X, Y: speaker.Pos.Y, Z: speaker.Pos.Z})
 		w.AddString(text)
 		gp.SendToClient(w)
 	}

@@ -5,41 +5,14 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
-// sayHasPosition reports whether a 0xAA creature-say of this talk type carries a
-// trailing position (local speech: say/whisper/yell/spell/monster). Mirrors the
-// C++ ProtocolGame::sendCreatureSay path.
-func sayHasPosition(talkType byte) bool {
-	switch talkType {
-	case 1, 2, 3, 9, 36, 37: // SAY, WHISPER, YELL, SPELL_USE, MONSTER_SAY, MONSTER_YELL
-		return true
-	}
-	return false
-}
+// talkTypePrivatePN is the player→NPC speech class (TALKTYPE_PRIVATE_PN). The
+// server delivers it only to NPC spectators, never to player clients — echoing
+// it to a client crashes it (unexpected 0xAA form).
+const talkTypePrivatePN = 12
 
-// sayHasChannel reports whether a 0xAA creature-say carries a trailing channel
-// id instead of a position (ProtocolGame::sendToChannel).
-func sayHasChannel(talkType byte) bool {
-	switch talkType {
-	case 6, 7, 8, 14, 0xFF: // CHANNEL_MANAGER, CHANNEL_Y, CHANNEL_O, CHANNEL_R1, CHANNEL_R2
-		return true
-	}
-	return false
-}
-
-// appendSayLocus writes the position/channel-id/nothing tail that follows the
-// talk-type byte in a 0xAA packet, matching the per-type C++ wire format. Every
-// other (private/NPC) type carries neither — sending a spurious position there
-// desyncs the client's parser and crashes it.
-func appendSayLocus(w *netmsg.Writer, talkType byte, pos game.Position, channelID uint16) {
-	switch {
-	case sayHasPosition(talkType):
-		w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
-	case sayHasChannel(talkType):
-		w.AddU16(channelID)
-	}
-}
-
-// BroadcastCreatureSay sends a creature speech to spectators.
+// BroadcastCreatureSay sends a creature speech to spectators. Creature/NPC
+// speech goes through the C++ sendCreatureSay path, which ALWAYS carries a
+// position (including NPC PRIVATE_NP replies), so we always append it.
 func BroadcastCreatureSay(w *game.World, c game.Creature, talkType byte, text string) {
 	for _, s := range w.Spectators(c.GetPosition(), c.GetID()) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
@@ -52,7 +25,7 @@ func BroadcastCreatureSay(w *game.World, c game.Creature, talkType byte, text st
 			// For players we would send their level, but for NPC we just send 0.
 			msg.AddU16(0)
 			msg.AddByte(talkType)
-			appendSayLocus(msg, talkType, c.GetPosition(), 0)
+			msg.AddPosition(netmsg.Position{X: c.GetPosition().X, Y: c.GetPosition().Y, Z: c.GetPosition().Z})
 			msg.AddString(text)
 			gp.SendToClient(msg)
 		}
