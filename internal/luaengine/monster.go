@@ -21,6 +21,7 @@ func (e *Engine) registerMonster() {
 	idx := e.L.NewTable()
 	e.L.SetFuncs(idx, creatureMethods)
 	e.L.SetFuncs(idx, monsterMethods)
+	e.L.SetField(idx, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
 	e.L.SetField(mt, "__index", idx)
 }
 

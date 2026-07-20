@@ -133,7 +133,10 @@ func outfitToTable(L *lua.LState, o game.Outfit) *lua.LTable {
 // registerCreatureType registers the Creature userdata type.
 func (e *Engine) registerCreatureType() {
 	mt := e.L.NewTypeMetatable("Creature")
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), creatureMethods))
+	idx := e.L.SetFuncs(e.L.NewTable(), creatureMethods)
+	// teleportTo needs the world (to broadcast the jump), so it's engine-bound.
+	e.L.SetField(idx, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "__index", idx)
 }
 
 var creatureMethods = map[string]lua.LGFunction{
@@ -189,7 +192,6 @@ var creatureMethods = map[string]lua.LGFunction{
 	"removeCondition": creatureRemovecondition,
 	"hasCondition": creatureHascondition,
 	"remove": creatureRemove,
-	"teleportTo": creatureTeleportto,
 	"say": creatureSay,
 	"getDamageMap": creatureGetdamagemap,
 	"getSummons": creatureGetsummons,
@@ -649,21 +651,36 @@ func creatureSettarget(L *lua.LState) int {
 	return 0
 }
 
-func creatureTeleportto(L *lua.LState) int {
+// creatureTeleportto relocates a creature to a Position (userdata) or {x,y,z}
+// table and broadcasts the jump so the client actually moves (scripted travel).
+func (e *Engine) creatureTeleportto(L *lua.LState) int {
 	c := checkCreature(L)
 	if c == nil {
 		return 0
 	}
-	// pos is a table at index 2
-	posTable := L.CheckTable(2)
-	pos := game.Position{
-		X: uint16(L.GetField(posTable, "x").(lua.LNumber)),
-		Y: uint16(L.GetField(posTable, "y").(lua.LNumber)),
-		Z: uint8(L.GetField(posTable, "z").(lua.LNumber)),
+	var pos game.Position
+	switch v := L.Get(2); v.Type() {
+	case lua.LTUserData:
+		if p, ok := v.(*lua.LUserData).Value.(game.Position); ok {
+			pos = p
+		}
+	case lua.LTTable:
+		t := v.(*lua.LTable)
+		pos = game.Position{
+			X: uint16(lua.LVAsNumber(L.GetField(t, "x"))),
+			Y: uint16(lua.LVAsNumber(L.GetField(t, "y"))),
+			Z: uint8(lua.LVAsNumber(L.GetField(t, "z"))),
+		}
+	default:
+		L.Push(lua.LFalse)
+		return 1
 	}
 
-	c.SetPosition(pos)
-
+	if e.world != nil {
+		game.GlobalDispatcher.AddEvent(0, func() { e.world.TeleportCreature(c, pos) })
+	} else {
+		c.SetPosition(pos)
+	}
 	L.Push(lua.LTrue)
 	return 1
 }

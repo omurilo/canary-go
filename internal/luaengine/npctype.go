@@ -56,10 +56,50 @@ func (e *Engine) registerNpcType() {
 				}
 			}
 
+			// npcConfig.shop = { { itemName=, clientId=, buy=, sell=, subType= }, ... }
+			// Most merchant NPCs declare their catalog this way (rather than via
+			// npcType:addShopItem), so parse it into ShopItems — isMerchant() and
+			// openShopWindow() read from here.
+			if shopVal := table.RawGetString("shop"); shopVal.Type() == lua.LTTable {
+				n.ShopItems = nil
+				shopVal.(*lua.LTable).ForEach(func(_, v lua.LValue) {
+					entry, ok := v.(*lua.LTable)
+					if !ok {
+						return
+					}
+					item := creatures.ShopItem{}
+					if x := entry.RawGetString("clientId"); x.Type() == lua.LTNumber {
+						item.ID = uint16(lua.LVAsNumber(x))
+					}
+					if x := entry.RawGetString("itemId"); x.Type() == lua.LTNumber && item.ID == 0 {
+						item.ID = uint16(lua.LVAsNumber(x))
+					}
+					if x := entry.RawGetString("itemName"); x.Type() == lua.LTString {
+						item.Name = x.String()
+					}
+					if x := entry.RawGetString("name"); x.Type() == lua.LTString && item.Name == "" {
+						item.Name = x.String()
+					}
+					if x := entry.RawGetString("subType"); x.Type() == lua.LTNumber {
+						item.SubType = uint8(lua.LVAsNumber(x))
+					}
+					if x := entry.RawGetString("count"); x.Type() == lua.LTNumber && item.SubType == 0 {
+						item.SubType = uint8(lua.LVAsNumber(x))
+					}
+					if x := entry.RawGetString("buy"); x.Type() == lua.LTNumber {
+						item.BuyPrice = uint32(lua.LVAsNumber(x))
+					}
+					if x := entry.RawGetString("sell"); x.Type() == lua.LTNumber {
+						item.SellPrice = uint32(lua.LVAsNumber(x))
+					}
+					n.ShopItems = append(n.ShopItems, item)
+				})
+			}
+
 			if e != nil && e.world != nil && e.world.TypeRegistry != nil {
 				e.world.TypeRegistry.Npcs[strings.ToLower(n.Name)] = n
 			}
-			
+
 			L.Push(lua.LTrue)
 			return 1
 		},

@@ -28,6 +28,27 @@ func (e *Engine) registerNpc() {
 	// Override methods that need the engine/world instance
 	e.L.SetField(idx, "say", e.L.NewFunction(e.npcSay))
 	e.L.SetField(idx, "openShopWindow", e.L.NewFunction(e.npcOpenshopwindow))
+	e.L.SetField(idx, "isMerchant", e.L.NewFunction(e.npcIsmerchant))
+	e.L.SetField(idx, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+}
+
+// npcIsmerchant reports whether the NPC's type defines shop items. NpcHandler:
+// tradeRequest only calls openShopWindow when this is true, so a merchant must
+// answer true here for "trade" to open the shop.
+func (e *Engine) npcIsmerchant(L *lua.LState) int {
+	n := checkNpc(L)
+	if n == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	merchant := false
+	if e.world != nil && e.world.TypeRegistry != nil {
+		if nt := e.world.TypeRegistry.Npcs[strings.ToLower(n.Name)]; nt != nil && len(nt.ShopItems) > 0 {
+			merchant = true
+		}
+	}
+	L.Push(lua.LBool(merchant))
+	return 1
 }
 
 var npcMethods = map[string]lua.LGFunction{
@@ -52,7 +73,6 @@ var npcMethods = map[string]lua.LGFunction{
 	"openShopWindowTable": npcOpenshopwindowtable,
 	"closeShopWindow": npcCloseshopwindow,
 	"getShopItem": npcGetshopitem,
-	"isMerchant": npcIsmerchant,
 	"turn": npcTurn,
 	"follow": npcFollow,
 	"sellItem": npcSellitem,
@@ -127,12 +147,6 @@ func npcIsinteractingwithplayer(L *lua.LState) int {
 	return 1
 }
 
-func npcIsmerchant(L *lua.LState) int {
-	// Merchant status isn't tracked on the runtime Npc yet; NPCs that trade do
-	// so via their onBuyItem/onSellItem callbacks rather than this flag.
-	L.Push(lua.LFalse)
-	return 1
-}
 
 func npcIsnpc(L *lua.LState) int {
 	L.Push(lua.LTrue)

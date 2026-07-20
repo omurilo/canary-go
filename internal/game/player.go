@@ -44,6 +44,7 @@ type Player struct {
 
 	Level      uint16
 	Experience uint64
+	BankBalance uint64 // players.balance — bank money
 	Health     uint32
 	MaxHealth  uint32
 	Mana       uint32
@@ -137,6 +138,11 @@ func (p *Player) SendOpenShop(npc Creature, items []creatures.ShopItem) {
 		w := netmsg.NewWriter()
 		w.AddByte(0x7A) // opOpenShop
 		w.AddString(npc.GetName())
+		// Modern (13.x) layout: currency item id + currency name precede the
+		// item count (ProtocolGame::sendShop). Omitting them desyncs the client's
+		// parser. Default to gold coin (client id 3031).
+		w.AddU16(3031)
+		w.AddString("")
 		w.AddU16(uint16(len(items)))
 		for _, item := range items {
 			w.AddU16(item.ID)

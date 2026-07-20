@@ -13,7 +13,7 @@ import (
 func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) {
 	const q = `SELECT p.id, p.account_id, p.name, p.level, p.vocation, p.sex,
 	                  p.health, p.healthmax, p.mana, p.manamax, p.experience,
-	                  p.maglevel, p.soul, p.cap,
+	                  p.maglevel, p.soul, p.cap, p.balance,
 	                  p.looktype, p.lookhead, p.lookbody, p.looklegs, p.lookfeet,
 	                  p.lookaddons,
 	                  p.posx, p.posy, p.posz, p.town_id,
@@ -30,7 +30,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	err := d.SQL.QueryRowContext(ctx, q, name).Scan(
 		&p.DBID, &p.AccountID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
 		&p.Health, &p.MaxHealth, &p.Mana, &p.MaxMana, &p.Experience,
-		&p.MagLevel, &p.Soul, &capValue,
+		&p.MagLevel, &p.Soul, &capValue, &p.BankBalance,
 		&lookType, &lookHead, &lookBody, &lookLegs, &lookFeet, &lookAddons,
 		&posx, &posy, &posz, &townID,
 		&p.Skills[game.SkillFist], &p.Skills[game.SkillClub], &p.Skills[game.SkillSword],
@@ -74,14 +74,14 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	const q = `UPDATE players SET
 	              level=?, experience=?, health=?, healthmax=?,
-	              mana=?, manamax=?, soul=?, cap=?,
+	              mana=?, manamax=?, soul=?, cap=?, balance=?,
 	              posx=?, posy=?, posz=?,
 	              looktype=?, lookhead=?, lookbody=?, looklegs=?,
 	              lookfeet=?, lookaddons=?
 	           WHERE id=?`
 	_, err := d.SQL.ExecContext(ctx, q,
 		p.Level, p.Experience, p.Health, p.MaxHealth,
-		p.Mana, p.MaxMana, p.Soul, p.Capacity,
+		p.Mana, p.MaxMana, p.Soul, p.Capacity, p.BankBalance,
 		p.Pos.X, p.Pos.Y, p.Pos.Z,
 		p.Outfit.LookType, p.Outfit.Head, p.Outfit.Body, p.Outfit.Legs,
 		p.Outfit.Feet, p.Outfit.Addons,

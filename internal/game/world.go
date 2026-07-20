@@ -370,6 +370,23 @@ func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 	return dest, true
 }
 
+// TeleportCreature relocates c to an arbitrary destination and notifies
+// spectators via OnCreatureMove (BroadcastCreatureMove handles the far-move
+// remove/appear so the client actually sees the jump). Unlike TryMove it does
+// not require the destination to be adjacent. Used by scripted travel/teleport.
+func (w *World) TeleportCreature(c Creature, dest Position) {
+	w.mu.Lock()
+	oldPos := c.GetPosition()
+	oldTileIndex := w.removeCreatureFromTile(c)
+	c.SetPosition(dest)
+	w.addCreatureToTile(c)
+	w.mu.Unlock()
+
+	if w.OnCreatureMove != nil {
+		w.OnCreatureMove(c, oldPos, dest, oldTileIndex)
+	}
+}
+
 // TryMoveCreature validates and applies a directional step for any creature, returning the new position
 // and whether the move succeeded.
 func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {

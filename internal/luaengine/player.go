@@ -24,6 +24,7 @@ func (e *Engine) registerPlayerType() {
 	idx := e.L.NewTable()
 	e.L.SetFuncs(idx, creatureMethods)
 	e.L.SetFuncs(idx, playerMethods)
+	e.L.SetField(idx, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
 	e.L.SetField(mt, "__index", idx)
 }
 
@@ -142,6 +143,9 @@ var playerMethods = map[string]lua.LGFunction{
 	"getMaxSoul": playerGetmaxsoul,
 	"getBankBalance": playerGetbankbalance,
 	"setBankBalance": playerSetbankbalance,
+	"removeMoneyBank": playerRemovemoneybank,
+	"depositMoney": playerDepositmoney,
+	"withdrawMoney": playerWithdrawmoney,
 	"getStorageValue": playerGetstoragevalue,
 	"setStorageValue": playerSetstoragevalue,
 	"sendCancelMessage": func(L *lua.LState) int { return 0 },
@@ -819,11 +823,64 @@ func playerGetbackpack(L *lua.LState) int {
 }
 
 func playerGetbankbalance(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.BankBalance))
+	return 1
+}
+
+// playerRemovemoneybank removes cost from the bank balance (NPC travel/bank
+// flows use removeMoneyBank). Returns false without deducting when the balance
+// is insufficient.
+func playerRemovemoneybank(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	cost := L.CheckNumber(2)
+	if cost <= 0 {
+		L.Push(lua.LTrue)
+		return 1
+	}
+	if p.BankBalance < uint64(cost) {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	p.BankBalance -= uint64(cost)
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func playerDepositmoney(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	if amount := L.CheckNumber(2); amount > 0 {
+		p.BankBalance += uint64(amount)
+	}
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func playerWithdrawmoney(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	amount := L.CheckNumber(2)
+	if amount > 0 && p.BankBalance >= uint64(amount) {
+		p.BankBalance -= uint64(amount)
+		L.Push(lua.LTrue)
+		return 1
+	}
+	L.Push(lua.LBool(amount <= 0))
 	return 1
 }
 
@@ -2447,10 +2504,16 @@ func playerSetaccounttype(L *lua.LState) int {
 }
 
 func playerSetbankbalance(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	bal := L.CheckNumber(2)
+	if bal < 0 {
+		bal = 0
+	}
+	p.BankBalance = uint64(bal)
+	L.Push(lua.LTrue)
 	return 1
 }
 
