@@ -86,22 +86,19 @@ func (e *CombatEngine) regenTick() {
 		if p.RegenTicks < 0 {
 			p.RegenTicks = 0
 		}
-		changed := false
 		if p.Health < p.MaxHealth {
 			p.AddHealth(1)
-			changed = true
-		}
-		if p.Mana < p.MaxMana {
-			p.AddMana(1)
-			changed = true
-		}
-		if changed {
 			if e.world.OnCreatureHealthChange != nil {
 				e.world.OnCreatureHealthChange(p)
 			}
-			if e.world.OnPlayerStatsChange != nil {
-				e.world.OnPlayerStatsChange(p)
-			}
+		}
+		if p.Mana < p.MaxMana {
+			p.AddMana(1)
+		}
+		// Always refresh stats while food is active so the client's food timer
+		// counts down and HP/mana/soul stay in sync.
+		if e.world.OnPlayerStatsChange != nil {
+			e.world.OnPlayerStatsChange(p)
 		}
 	}
 	GlobalDispatcher.AddEvent(regenInterval, e.regenTick)

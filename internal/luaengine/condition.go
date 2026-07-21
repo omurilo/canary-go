@@ -65,6 +65,9 @@ func (c *luaCondition) setTicks(t int32) {
 	c.ticks = t
 	if c.boundPlayer != nil && c.rawType == conditionRegeneration {
 		c.boundPlayer.RegenTicks = t
+		if c.boundPlayer.Session != nil {
+			c.boundPlayer.Session.SendStats() // refresh the client's food timer
+		}
 	}
 }
 

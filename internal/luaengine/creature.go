@@ -299,6 +299,9 @@ func creatureAddcondition(L *lua.LState) int {
 		if pud, ok := L.Get(1).(*lua.LUserData); ok {
 			if p, ok := pud.Value.(*game.Player); ok {
 				p.RegenTicks = cond.getTicks()
+				if p.Session != nil {
+					p.Session.SendStats() // refresh the client's food timer
+				}
 				L.Push(lua.LTrue)
 				return 1
 			}

@@ -460,8 +460,17 @@ func (g *GameProtocol) addStats(w *netmsg.Writer) {
 	w.AddByte(p.Soul)
 	w.AddU16(2520) // stamina minutes
 	w.AddU16(p.Speed)
-	w.AddU16(0)  // regeneration seconds
-	w.AddU16(0)  // offline training minutes
+	// Food/regeneration time in seconds (RegenTicks is milliseconds). Shown as
+	// the "food" timer in the client's character status.
+	regenSecs := uint32(0)
+	if p.RegenTicks > 0 {
+		regenSecs = uint32(p.RegenTicks) / 1000
+	}
+	if regenSecs > 0xFFFF {
+		regenSecs = 0xFFFF
+	}
+	w.AddU16(uint16(regenSecs)) // regeneration seconds
+	w.AddU16(0)                 // offline training minutes
 	w.AddU16(0)  // xp boost time
 	w.AddByte(1) // can buy xp boost
 	w.AddU32(0)  // mana shield
