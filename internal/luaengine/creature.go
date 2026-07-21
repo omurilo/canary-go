@@ -74,6 +74,53 @@ func (e *Engine) creatureConstructorCall(L *lua.LState, kind string) int {
 // when c is nil or doesn't match the requested concrete kind, so the caller
 // can push nil — mirroring the C++ Player(cid)/Npc(cid) casts that yield nil
 // on a type mismatch.
+// creatureGetplayer returns the creature userdata itself when it wraps a
+// *game.Player, else nil (mirrors Creature::getPlayer).
+func creatureGetplayer(L *lua.LState) int {
+	ud := L.CheckUserData(1)
+	if _, ok := ud.Value.(*game.Player); ok {
+		L.Push(ud)
+		return 1
+	}
+	L.Push(lua.LNil)
+	return 1
+}
+
+func creatureGetmonster(L *lua.LState) int {
+	ud := L.CheckUserData(1)
+	if _, ok := ud.Value.(*game.Monster); ok {
+		L.Push(ud)
+		return 1
+	}
+	L.Push(lua.LNil)
+	return 1
+}
+
+func creatureGetnpc(L *lua.LState) int {
+	ud := L.CheckUserData(1)
+	if _, ok := ud.Value.(*game.Npc); ok {
+		L.Push(ud)
+		return 1
+	}
+	L.Push(lua.LNil)
+	return 1
+}
+
+// metatableForCreature returns the most specific Lua metatable name for a
+// creature so type predicates (isPlayer/isMonster/isNpc) resolve correctly.
+func metatableForCreature(c game.Creature) string {
+	switch c.(type) {
+	case *game.Player:
+		return "Player"
+	case *game.Npc:
+		return "Npc"
+	case *game.Monster:
+		return "Monster"
+	default:
+		return "Creature"
+	}
+}
+
 func (e *Engine) pushCreatureAs(L *lua.LState, c game.Creature, kind string) bool {
 	if c == nil {
 		return false
@@ -152,6 +199,15 @@ var creatureMethods = map[string]lua.LGFunction{
 	"unregisterEvent": creatureUnregisterevent,
 	"isRemoved": creatureIsremoved,
 	"isCreature": creatureIscreature,
+	// Native down-casts: `creature:getPlayer()` etc. return self when the
+	// underlying Go type matches, else nil. Many scripts start with
+	// `local player = creature:getPlayer()` (e.g. the temple/citizen movement),
+	// so these must be real methods on the metatable, not just the Lua-lib
+	// versions on the global Creature table (which revscriptsys never resolves).
+	"getPlayer":   creatureGetplayer,
+	"getMonster":  creatureGetmonster,
+	"getNpc":      creatureGetnpc,
+	"getCreature": func(L *lua.LState) int { L.Push(L.Get(1)); return 1 },
 	"isInGhostMode": creatureIsinghostmode,
 	"isHealthHidden": creatureIshealthhidden,
 	"isImmune": creatureIsimmune,

@@ -5,6 +5,33 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
+// sendFullMapAt re-centres the client's map on pos with a full map description
+// (opcode 0x64). Used after a teleport (Lua teleportTo, temple respawn) so the
+// player's own screen follows the jump.
+func (g *GameProtocol) sendFullMapAt(pos game.Position) {
+	w := netmsg.NewWriter()
+	w.AddByte(opFullMap)
+	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
+	g.addMapDescription(w, int(pos.X)-viewportX, int(pos.Y)-viewportY, pos.Z, mapWidth, mapHeight)
+	g.SendToClient(w)
+}
+
+// chebyshev is the max-axis distance between two positions on the same floor.
+func chebyshev(a, b game.Position) int {
+	dx := int(a.X) - int(b.X)
+	if dx < 0 {
+		dx = -dx
+	}
+	dy := int(a.Y) - int(b.Y)
+	if dy < 0 {
+		dy = -dy
+	}
+	if dx > dy {
+		return dx
+	}
+	return dy
+}
+
 // sendReLoginWindow sends the death dialog (0x28), mirroring
 // ProtocolGame::sendReLoginWindow. The client shows "You are dead." with a
 // button that reconnects the character, which then logs in at the temple.

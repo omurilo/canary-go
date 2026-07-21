@@ -34,6 +34,19 @@ func BroadcastCreatureSay(w *game.World, c game.Creature, talkType byte, text st
 
 // BroadcastCreatureMove tells spectators about a creature's movement.
 func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position, newPos game.Position, oldTileIndex int) {
+	// A far move (teleport: different floor or beyond an adjacent step) has no
+	// client-side map shift, so the moved player's OWN client must be re-centred
+	// with a full map description. Normal 1-tile walks are handled by walk()
+	// and skipped here. Without this, Lua teleportTo (temple/citizen, quest
+	// teleports) moved the player server-side but their screen never updated.
+	if p, ok := c.(*game.Player); ok {
+		if oldPos.Z != newPos.Z || chebyshev(oldPos, newPos) > 1 {
+			if gp, ok := p.Session.(*GameProtocol); ok {
+				gp.sendFullMapAt(newPos)
+			}
+		}
+	}
+
 	visited := map[uint32]bool{c.GetID(): true}
 
 	for _, s := range w.Spectators(oldPos, c.GetID()) {

@@ -108,13 +108,17 @@ func (e *Engine) CallStepIn(m *moveevents.MoveEvent, creature game.Creature, ite
 		return false
 	}
 
+	// Wrap the creature with its CONCRETE type's metatable so type predicates
+	// resolve — StepIn scripts commonly do `creature:getPlayer()` which is
+	// `self:isPlayer() and self or nil`; with the generic "Creature" metatable
+	// isPlayer() is absent and getPlayer() returns nil, silently aborting the
+	// script (this is why the citizen/temple set-town movement did nothing).
 	creatureUd := L.NewUserData()
 	creatureUd.Value = creature
-	L.SetMetatable(creatureUd, L.GetTypeMetatable("Creature"))
-	// If it's a player, we might want to attach Player metatable, but Creature is standard for onStepIn
+	L.SetMetatable(creatureUd, L.GetTypeMetatable(metatableForCreature(creature)))
 
 	itemUd := L.NewUserData()
-	itemUd.Value = item
+	itemUd.Value = luaItem{item: item, pos: pos}
 	L.SetMetatable(itemUd, L.GetTypeMetatable("Item"))
 
 	posUd := L.NewUserData()
