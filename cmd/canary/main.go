@@ -247,6 +247,16 @@ func run(o runOpts, log *slog.Logger) error {
 	world.OnPlayerStatsChange = func(p *game.Player) {
 		protocol.SendPlayerStats(p)
 	}
+	world.OnPlayerDeath = func(p *game.Player, killer game.Creature) {
+		protocol.HandlePlayerDeath(world, p, killer)
+		// Persist the penalty immediately so a crash/relog can't revert it.
+		if err := database.SavePlayer(context.Background(), p); err != nil {
+			log.Warn("save on death failed", "player", p.Name, "err", err)
+		}
+	}
+	world.OnShieldUpdate = func(viewer, target *game.Player) {
+		protocol.SendPartyShield(viewer, target)
+	}
 	world.OnMagicEffect = func(pos game.Position, effect uint16) {
 		protocol.BroadcastMagicEffect(world, pos, effect)
 	}

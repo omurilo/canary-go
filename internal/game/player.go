@@ -126,6 +126,12 @@ type Player struct {
 	MagLevelPercent uint8
 	LevelPercent    uint8
 
+	// Party is the party this player belongs to (as leader or member), nil when
+	// ungrouped. partyInvitations are parties that have invited this player but
+	// which they have not yet joined.
+	Party            *Party
+	partyInvitations []*Party
+
 	TargetID uint32
 	ShopOwnerID uint32 // ID of the NPC currently being traded with
 

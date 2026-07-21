@@ -38,6 +38,16 @@ type World struct {
 	// experience/level changes, e.g. on a monster kill.
 	OnPlayerStatsChange func(p *Player)
 
+	// OnPlayerDeath is fired when a player's health reaches 0. The protocol
+	// layer applies the death penalty, teleports the player to their temple,
+	// and refreshes the client (the model-side penalty is applied before this
+	// callback runs).
+	OnPlayerDeath func(p *Player, killer Creature)
+
+	// OnShieldUpdate asks the protocol layer to send `viewer` a party-shield
+	// packet (0x91) for `target`, using viewer.PartyShield(target).
+	OnShieldUpdate func(viewer *Player, target *Player)
+
 	// OnItemDecay is triggered when an item transforms due to decay.
 	OnItemDecay func(pos Position, stackPos uint8, oldItem, newItem *Item)
 

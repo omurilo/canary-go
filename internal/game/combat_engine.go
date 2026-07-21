@@ -269,8 +269,31 @@ func rollLoot(loot []creatures.LootBlock) []*Item {
 // tile and remove the creature from the world. Loot and experience are left to
 // the loot/xp agent (see the TODO hooks below).
 func (e *CombatEngine) handleDeath(victim, killer Creature) {
-	// Player death is a separate milestone (respawn at temple, skill loss);
-	// only monsters die-and-corpse here.
+	// Any player targeting the dead creature loses the target (applies to both
+	// player and monster deaths).
+	for _, p := range e.world.Players() {
+		if p.TargetID == victim.GetID() {
+			p.SetAttackTarget(0)
+			if e.world.OnTargetLost != nil {
+				e.world.OnTargetLost(p)
+			}
+		}
+	}
+
+	// Player death: apply the penalty and hand off to the protocol layer for
+	// the temple respawn + client refresh.
+	if p, ok := victim.(*Player); ok {
+		p.ApplyDeathPenalty()
+		if e.world.OnPlayerDeath != nil {
+			e.world.OnPlayerDeath(p, killer)
+		}
+		e.mu.Lock()
+		delete(e.lastAttack, victim.GetID())
+		e.mu.Unlock()
+		return
+	}
+
+	// Non-player, non-monster creatures (e.g. NPCs) don't die-and-corpse here.
 	if victim.GetCreatureType() != 1 { // 1 == CREATURETYPE_MONSTER
 		return
 	}
@@ -280,16 +303,6 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	corpseID := uint16(defaultCorpseID)
 	if m, ok := victim.(*Monster); ok && m.CorpseID != 0 {
 		corpseID = m.CorpseID
-	}
-
-	// Any player targeting the dead creature loses the target.
-	for _, p := range e.world.Players() {
-		if p.TargetID == victim.GetID() {
-			p.SetAttackTarget(0)
-			if e.world.OnTargetLost != nil {
-				e.world.OnTargetLost(p)
-			}
-		}
 	}
 
 	// Award experience to the killer. Basic version of Creature::onDeath's

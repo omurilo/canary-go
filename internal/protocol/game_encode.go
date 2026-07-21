@@ -122,7 +122,15 @@ func (g *GameProtocol) addCreature(w *netmsg.Writer, c game.Creature) {
 
 	w.AddByte(0) // creature icons count
 	w.AddByte(0) // skull
-	w.AddByte(0) // party shield
+	// Party shield: computed from the viewer's relationship to the target when
+	// both are players, else none.
+	shield := byte(game.ShieldNone)
+	if g.player != nil {
+		if target, ok := c.(*game.Player); ok {
+			shield = g.player.PartyShield(target)
+		}
+	}
+	w.AddByte(shield) // party shield
 	if !known {
 		w.AddByte(0) // guild emblem
 	}

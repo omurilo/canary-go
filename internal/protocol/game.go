@@ -78,6 +78,14 @@ const (
 	inBuyItem        = 0x7A
 	inSellItem       = 0x7B
 	inCloseShop      = 0x7C
+	// Inbound party opcodes (0xA3..0xA8). NOTE: 0xA3 collides with the OUTBOUND
+	// opCancelTarget const — these are a separate inbound namespace.
+	inInviteToParty        = 0xA3
+	inJoinParty            = 0xA4
+	inRevokePartyInvite    = 0xA5
+	inPassPartyLeadership  = 0xA6
+	inLeaveParty           = 0xA7
+	inEnableSharedPartyExp = 0xA8
 )
 
 // GameProtocol is one game-server session.
@@ -576,6 +584,18 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseSellItem(r)
 	case inCloseShop:
 		g.parseCloseShop(r)
+	case inInviteToParty:
+		g.deps.World.PlayerInviteToParty(g.player.ID, r.GetU32())
+	case inJoinParty:
+		g.deps.World.PlayerJoinParty(g.player.ID, r.GetU32())
+	case inRevokePartyInvite:
+		g.deps.World.PlayerRevokePartyInvitation(g.player.ID, r.GetU32())
+	case inPassPartyLeadership:
+		g.deps.World.PlayerPassPartyLeadership(g.player.ID, r.GetU32())
+	case inLeaveParty:
+		g.deps.World.PlayerLeaveParty(g.player.ID)
+	case inEnableSharedPartyExp:
+		g.deps.World.PlayerEnableSharedPartyExperience(g.player.ID, r.GetByte() == 1)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
 	default:

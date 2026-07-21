@@ -63,6 +63,13 @@ func (s *conditionStore) HasCondition(t combat.ConditionType) bool {
 	return false
 }
 
+// ClearConditions removes every active condition (used on death).
+func (s *conditionStore) ClearConditions() {
+	s.condMu.Lock()
+	defer s.condMu.Unlock()
+	s.conditions = nil
+}
+
 // Conditions returns a snapshot of the creature's active conditions.
 func (s *conditionStore) Conditions() []combat.Condition {
 	s.condMu.Lock()

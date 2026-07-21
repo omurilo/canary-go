@@ -56,12 +56,17 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		// a single column (only mount outfit colors), so it defaults to 0.
 	}
 	p.Pos = game.Position{X: posx, Y: posy, Z: posz}
+	p.TownID = uint16(townID)
 
-	if p.Pos.X == 0 && p.Pos.Y == 0 {
-		if temple, err := d.TownTemple(ctx, townID); err == nil {
+	// Resolve the town temple: it seeds the position when unset and is always
+	// stored as LoginPosition so death can respawn the player there.
+	if temple, err := d.TownTemple(ctx, townID); err == nil {
+		p.LoginPosition = temple
+		if p.Pos.X == 0 && p.Pos.Y == 0 {
 			p.Pos = temple
 		}
 	}
+	p.SkillLoss = true
 
 	if err := d.LoadPlayerItems(ctx, p); err != nil {
 		return nil, err

@@ -42,6 +42,7 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetField(mt, "sendContainer", e.L.NewFunction(e.playerSendcontainer))
 	e.L.SetField(mt, "sendUpdateContainer", e.L.NewFunction(e.playerSendupdatecontainer))
 	e.L.SetField(mt, "addItemBatchToPaginedContainer", e.L.NewFunction(e.playerAdditembatchtopaginedcontainer))
+	e.L.SetField(mt, "getParty", e.L.NewFunction(e.playerGetparty))
 	e.L.SetField(mt, "__index", mt)
 }
 
@@ -186,7 +187,8 @@ var playerMethods = map[string]lua.LGFunction{
 	"getSlotItem": playerGetslotitem,
 	"getBackpack": playerGetbackpack,
 	"getLootPouch": playerGetlootpouch,
-	"getParty": playerGetparty,
+	// getParty is registered as an engine-method override in registerPlayerType
+	// (it needs e to build the Party userdata).
 	"addOutfit": playerAddoutfit,
 	"addOutfitAddon": playerAddoutfitaddon,
 	"removeOutfit": playerRemoveoutfit,
@@ -1068,11 +1070,12 @@ func playerGetcontainerindex(L *lua.LState) int {
 }
 
 func playerGetdeathpenalty(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.GetDeathPenalty()))
 	return 1
 }
 
@@ -1518,8 +1521,13 @@ func playerGetofflinetrainingtime(L *lua.LState) int {
 	return 1
 }
 
-func playerGetparty(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+func (e *Engine) playerGetparty(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil || p.Party == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	e.pushParty(L, p.Party)
 	return 1
 }
 
@@ -2191,10 +2199,9 @@ func playerRemoveexperience(L *lua.LState) int {
 	}
 	exp := uint64(luaOptInt(L, 2))
 	game.GlobalDispatcher.AddEvent(0, func() {
-		if exp > p.Experience {
-			p.Experience = 0
-		} else {
-			p.Experience -= exp
+		p.RemoveExperience(exp) // subtracts and recomputes level downward
+		if p.Session != nil {
+			p.Session.SendStats()
 		}
 	})
 	L.Push(lua.LTrue)

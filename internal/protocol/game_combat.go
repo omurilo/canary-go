@@ -222,6 +222,24 @@ func SendPlayerStats(p *game.Player) {
 	}
 }
 
+// SendPartyShield sends `viewer` a party-shield packet (0x91) for `target`,
+// computed from viewer.PartyShield(target). Mirrors
+// ProtocolGame::sendCreatureShield.
+func SendPartyShield(viewer, target *game.Player) {
+	if viewer == nil || target == nil {
+		return
+	}
+	gp, ok := viewer.Session.(*GameProtocol)
+	if !ok {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0x91)
+	w.AddU32(target.ID)
+	w.AddByte(viewer.PartyShield(target))
+	gp.SendToClient(w)
+}
+
 // ucfirst upper-cases the first byte of s (matching C++ ucfirst for names).
 func ucfirst(s string) string {
 	if s == "" {
