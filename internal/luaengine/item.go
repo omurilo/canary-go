@@ -19,10 +19,18 @@ type luaItem struct {
 func (e *Engine) registerItem() {
 	mt := e.L.NewTypeMetatable(itemTypeName)
 	methods := e.itemMethods()
-	
+
+	// Store methods DIRECTLY on the metatable. The datapack's revscriptsys.lua
+	// overwrites Item.__index with an ItemIndex(self,key) that resolves methods
+	// via getmetatable(self)[key] (e.g. itemid -> methods.getId(self)); if the
+	// methods live only behind a custom __index function, that lookup returns
+	// nil and `item.itemid` crashes (revscriptsys.lua:66). See the same contract
+	// for Player/Monster/Npc.
+	e.L.SetFuncs(mt, methods)
+
 	// Create method table
 	methodTable := e.L.SetFuncs(e.L.NewTable(), methods)
-	
+
 	e.L.SetField(mt, "__index", e.L.NewFunction(func(L *lua.LState) int {
 		it := checkItem(L)
 		key := L.CheckString(2)
@@ -134,6 +142,21 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			L.Push(lua.LNumber(it.item.Count))
 			return 1
 		},
+		// getSubType/getUniqueId back revscriptsys ItemIndex's "type"/"uid" keys.
+		"getSubType": func(L *lua.LState) int {
+			it := checkItem(L)
+			L.Push(lua.LNumber(it.item.Count))
+			return 1
+		},
+		"getUniqueId": func(L *lua.LState) int {
+			it := checkItem(L)
+			if it.item.Attr != nil && it.item.Attr.UniqueID != nil {
+				L.Push(lua.LNumber(*it.item.Attr.UniqueID))
+			} else {
+				L.Push(lua.LNumber(0))
+			}
+			return 1
+		},
 		"moveTo": func(L *lua.LState) int {
 			it := checkItem(L)
 			dest := checkPosition(L, 2)
@@ -164,7 +187,15 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		"clone": stubItemMethod,
 		"split": stubItemMethod,
 		"remove": itemRemove,
-		"getActionId": stubItemMethod,
+		"getActionId": func(L *lua.LState) int {
+			it := checkItem(L)
+			if it.item.Attr != nil && it.item.Attr.ActionID != nil {
+				L.Push(lua.LNumber(*it.item.Attr.ActionID))
+			} else {
+				L.Push(lua.LNumber(0))
+			}
+			return 1
+		},
 		"setActionId": stubItemMethod,
 		"hasAttribute": stubItemMethod,
 		"getAttribute": stubItemMethod,

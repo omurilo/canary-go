@@ -21,6 +21,12 @@ func TestFoodActionRepro(t *testing.T) {
 		t.Skip("core datapack not present")
 	}
 	_ = e.DoFile(core + "/global.lua")
+	// revscriptsys.lua overrides the Item metatable __index with ItemIndex
+	// (getmetatable(self).getId(self)) — this is what made item.itemid crash at
+	// revscriptsys.lua:66. Load it so the test exercises the real path.
+	if _, err := os.Stat(core + "/libs/functions/revscriptsys.lua"); err == nil {
+		_ = e.DoFile(core + "/libs/functions/revscriptsys.lua")
+	}
 	if err := e.DoFile(foods); err != nil {
 		t.Fatalf("load foods.lua: %v", err)
 	}

@@ -16,6 +16,7 @@ type World struct {
 	Map            *Map
 	Towns          map[string]Position
 	TownsByID      map[uint16]Position // town id -> temple position (from the OTBM)
+	TownNames      map[uint16]string   // town id -> name (from the OTBM)
 	DefaultSpawn   Position
 	players        map[uint32]*Player
 	byName         map[string]*Player
@@ -78,6 +79,7 @@ func NewWorld() *World {
 		Map:          NewMap(),
 		Towns:        make(map[string]Position),
 		TownsByID:    make(map[uint16]Position),
+		TownNames:    make(map[uint16]string),
 		players:      make(map[uint32]*Player),
 		byName:       make(map[string]*Player),
 		creatures:    make(map[uint32]Creature),
@@ -95,6 +97,9 @@ func (w *World) TempleByTownID(id uint16) (Position, bool) {
 	p, ok := w.TownsByID[id]
 	return p, ok
 }
+
+// TownNameByID returns the town's name, or "" when unknown.
+func (w *World) TownNameByID(id uint16) string { return w.TownNames[id] }
 
 // TownTemple returns a town's temple position by (case-insensitive) name.
 func (w *World) TownTemple(name string) (Position, bool) {

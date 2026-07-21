@@ -23,6 +23,10 @@ func (e *Engine) registerContainer() {
 		combinedMethods[k] = v
 	}
 	
+	// Methods must live directly on the metatable so revscriptsys.lua's
+	// ItemIndex (getmetatable(self)[key]) resolves them — see registerItem.
+	e.L.SetFuncs(mt, combinedMethods)
+
 	indexTbl := e.L.NewTable()
 	for k, v := range combinedMethods {
 		e.L.SetField(indexTbl, k, e.L.NewFunction(v))

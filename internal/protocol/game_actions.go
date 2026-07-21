@@ -125,13 +125,13 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 		var stepInItems []*game.Item
 
 		if tile.Ground != nil {
-			if evt := moveevents.FindStepInByItemID(tile.Ground.ID); evt != nil {
+			if evt := findStepIn(tile.Ground); evt != nil {
 				stepInEvents = append(stepInEvents, evt)
 				stepInItems = append(stepInItems, tile.Ground)
 			}
 		}
 		for _, it := range tile.Items {
-			if evt := moveevents.FindStepInByItemID(it.ID); evt != nil {
+			if evt := findStepIn(it); evt != nil {
 				stepInEvents = append(stepInEvents, evt)
 				stepInItems = append(stepInItems, it)
 			}
@@ -159,6 +159,29 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 	}
 
 	return true
+}
+
+// findStepIn resolves a StepIn move-event for a tile item, checking its unique
+// id and action id (from the OTBM attributes) before the item id. Map-placed
+// movements like the citizen/temple "set town" tiles register only by unique
+// id, so an item-id-only lookup would never fire them.
+func findStepIn(it *game.Item) *moveevents.MoveEvent {
+	if it == nil {
+		return nil
+	}
+	if it.Attr != nil {
+		if it.Attr.UniqueID != nil {
+			if evt := moveevents.FindStepInByUniqueID(*it.Attr.UniqueID); evt != nil {
+				return evt
+			}
+		}
+		if it.Attr.ActionID != nil {
+			if evt := moveevents.FindStepInByActionID(*it.Attr.ActionID); evt != nil {
+				return evt
+			}
+		}
+	}
+	return moveevents.FindStepInByItemID(it.ID)
 }
 
 // autoWalkDir maps the client's auto-walk direction codes to game directions,

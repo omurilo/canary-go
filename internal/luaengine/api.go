@@ -61,6 +61,7 @@ func (e *Engine) registerAPI() {
 	e.registerNetworkMessage()
 	e.registerBank()
 	e.registerParty()
+	e.registerTown()
 
 	linkClasses := func(child, parent string) {
 		childMt, _ := L.GetTypeMetatable(child).(*lua.LTable)
