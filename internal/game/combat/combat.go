@@ -1,5 +1,9 @@
 package combat
 
+import (
+	"math/rand"
+)
+
 // CombatParams represents the configuration for a combat
 type CombatParams struct {
 	ConditionList []Condition
@@ -16,6 +20,25 @@ type CombatParams struct {
 	TargetCasterOrTopMost bool
 	Aggressive            bool
 	UseCharges            bool
+}
+
+func randInt(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	return rand.Intn(n)
+}
+
+// randomRange gets a random value between min and max
+func randomRange(min, max int) int32 {
+	lo, hi := min, max
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	if hi == lo {
+		return int32(lo)
+	}
+	return int32(lo + rand.Intn(hi-lo+1))
 }
 
 // Combat engine struct
@@ -173,7 +196,7 @@ func (c *Combat) RollValue(level, magicLevel int) int32 {
 	if hi == lo {
 		return int32(lo)
 	}
-	return int32(lo + randInt(hi-lo+1))
+	return int32(lo + rand.Intn(hi-lo+1))
 }
 
 // SetPlayerCombatValues sets the minimum and maximum damage formula values

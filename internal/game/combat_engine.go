@@ -7,6 +7,7 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/opentibiabr/canary-go/internal/game/vocations"
 )
 
 const (
@@ -77,7 +78,7 @@ func (e *CombatEngine) tick() {
 func (e *CombatEngine) resolveAttacks() {
 	// Players attack the creature they selected (player.TargetID).
 	for _, p := range e.world.Players() {
-		e.tryAttack(p, e.playerTarget(p), defaultPlayerAttackSpeed)
+		e.tryAttack(p, e.playerTarget(p), p.AttackSpeed())
 	}
 	// Monsters attack their AI target (set by the AI engine), each at its own
 	// melee interval (MonsterType attack block; default 2000ms).
@@ -118,7 +119,7 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 	if !e.ready(attacker.GetID(), interval) {
 		return
 	}
-	e.doMeleeHit(attacker, target)
+	e.doMeleeHit(combat.NewCombat(), attacker, target)
 }
 
 // ready reports whether the creature's attack cooldown has elapsed, and if so
@@ -135,7 +136,7 @@ func (e *CombatEngine) ready(id uint32, interval time.Duration) bool {
 	return true
 }
 
-func (e *CombatEngine) doMeleeHit(attacker, target Creature) {
+func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 	dmg := e.meleeDamage(attacker)
 
 	// Apply through the combat engine so the armor/condition/blocking hooks the
@@ -143,7 +144,6 @@ func (e *CombatEngine) doMeleeHit(attacker, target Creature) {
 	// primary value for non-healing damage and calls target.ChangeHealth,
 	// mirroring Creature::drainHealth -> changeHealth(-damage)
 	// (src/creatures/combat/combat.cpp, src/creatures/creature.cpp).
-	c := combat.NewCombat()
 	c.SetParam(combat.CombatParamType, uint32(combat.CombatPhysical))
 	c.DoCombatHealth(adaptCreature(attacker), adaptCreature(target), combat.CombatDamage{
 		PrimaryType:  combat.CombatPhysical,
@@ -182,9 +182,8 @@ func (e *CombatEngine) meleeDamage(attacker Creature) int {
 	switch a := attacker.(type) {
 	case *Player:
 		skill := int(a.Skills[SkillFist])
-		// TODO(vocations): pass the player's Vocation for the damage multiplier
-		// once a vocation registry is available; nil == x1.0 for now.
-		return combat.CalculateMeleeDamage(fistAttackValue, skill, 0, nil)
+		voc := vocations.GetVocation(uint32(a.Vocation))
+		return CalculateMeleeDamage(fistAttackValue, skill, 0, voc, int(a.Level))
 	case *Monster:
 		// Use the monster's real melee attack block. The Lua attack stores raw
 		// combat values (minDamage..maxDamage, typically <= 0, e.g. rat 0..-8);

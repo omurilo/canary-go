@@ -3,7 +3,7 @@ package luaengine
 import (
 	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
-
+	"github.com/opentibiabr/canary-go/internal/game/vocations"
 )
 
 func checkPlayer(L *lua.LState) *game.Player {
@@ -1809,15 +1809,32 @@ func playerGetvocation(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
+	voc := vocations.GetVocation(uint32(p.Vocation)) // assuming player has Vocation id
+	if voc == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
 	ud := L.NewTable()
 	mt := L.NewTable()
-	L.SetField(mt, "__index", L.NewFunction(func(L *lua.LState) int {
-		L.Push(L.NewFunction(func(L *lua.LState) int {
-			L.Push(lua.LNumber(0))
-			return 1
-		}))
+
+	L.SetField(ud, "getId", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(voc.ID))
 		return 1
 	}))
+	L.SetField(ud, "getName", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LString(voc.Name))
+		return 1
+	}))
+	L.SetField(ud, "getAttackSpeed", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(voc.AttackSpeed))
+		return 1
+	}))
+	L.SetField(ud, "getBaseSpeed", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(voc.BaseSpeed))
+		return 1
+	}))
+	
 	L.SetMetatable(ud, mt)
 	L.Push(ud)
 	return 1

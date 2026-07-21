@@ -1,38 +1,28 @@
-package combat
+package game
 
 import (
 	"math"
 	"math/rand"
-	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game/vocations"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
-// randInt returns a uniform int in [0, n). Guards n<=0 to avoid a panic.
-func randInt(n int) int {
-	if n <= 0 {
-		return 0
-	}
-	return rand.Intn(n)
-}
-
 // CalculateMeleeDamage returns damage value based on Tibia formulas from Canary.
-func CalculateMeleeDamage(attack int, skill int, armor int, voc *vocations.Vocation) int {
+func CalculateMeleeDamage(attack int, skill int, armor int, voc *vocations.Vocation, level int) int {
 	multiplier := 1.0
 	if voc != nil {
 		multiplier = voc.Formula.MeleeDamage
 	}
 
-	maxDamage := math.Ceil(float64(skill+4) * float64(attack) * 0.0605 * multiplier)
+	// Modern Canary formula (attack * skill * vocationMeleeMult) / 50 + (level / 5)
+	baseDamage := (float64(attack) * float64(skill) * multiplier) / 50.0
+	levelBonus := float64(level) / 5.0
+	maxDamage := math.Ceil(baseDamage + levelBonus)
+
 	if maxDamage <= 0 {
 		return 0
 	}
 
-	// Damage range is [0, maxDamage]
 	dmg := rand.Intn(int(maxDamage) + 1)
 
 	armorReduction := 0
@@ -49,13 +39,16 @@ func CalculateMeleeDamage(attack int, skill int, armor int, voc *vocations.Vocat
 	return dmg
 }
 
-func CalculateDistanceDamage(attack int, skill int, armor int, voc *vocations.Vocation) int {
+func CalculateDistanceDamage(attack int, skill int, armor int, voc *vocations.Vocation, level int) int {
 	multiplier := 1.0
 	if voc != nil {
 		multiplier = voc.Formula.DistDamage
 	}
 
-	maxDamage := math.Ceil(float64(skill+4) * float64(attack) * 0.0605 * multiplier)
+	baseDamage := (float64(attack) * float64(skill) * multiplier) / 50.0
+	levelBonus := float64(level) / 5.0
+	maxDamage := math.Ceil(baseDamage + levelBonus)
+
 	if maxDamage <= 0 {
 		return 0
 	}

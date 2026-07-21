@@ -18,7 +18,7 @@ type TalkAction struct {
 
 var (
 	talkActionsMu sync.RWMutex
-	byWords       = make(map[string]*TalkAction)
+	all           []*TalkAction
 )
 
 // Register adds the talkaction to the global registry.
@@ -26,25 +26,57 @@ func Register(t *TalkAction) {
 	talkActionsMu.Lock()
 	defer talkActionsMu.Unlock()
 	if t.Words != "" {
-		byWords[strings.ToLower(t.Words)] = t
+		all = append(all, t)
 	}
 }
 
-// FindByWords returns the talkaction registered for the given words, or nil.
-func FindByWords(words string) *TalkAction {
+// FindByWords finds the longest matching talkaction and returns it along with the unparsed param.
+func FindByWords(words string) (*TalkAction, string) {
 	talkActionsMu.RLock()
 	defer talkActionsMu.RUnlock()
-	wordsLow := strings.ToLower(words)
-	// Try exact match first
-	if t, ok := byWords[wordsLow]; ok {
-		return t
-	}
-	// Try prefix match (for commands like "/z 1")
-	// If space is the separator, etc. For now just checking if words starts with the registered talkaction words followed by space
-	for k, t := range byWords {
-		if strings.HasPrefix(wordsLow, k+" ") {
-			return t
+
+	lower := strings.ToLower(words)
+	var result *TalkAction
+	for _, t := range all {
+		w := strings.ToLower(t.Words)
+		if len(lower) >= len(w) && lower[:len(w)] == w {
+			if result == nil || len(w) > len(result.Words) {
+				// Must either match exactly, or have the talkaction's separator next
+				if len(lower) == len(w) {
+					result = t
+					break
+				}
+				sepLen := len(t.Separator)
+				if sepLen == 0 {
+					// Fallback: If separator is empty string (""), default to space in Lua, but here just assume it requires space to separate.
+					// Actually, Canary defaults separator to `""` in Lua which means " ". Let's check:
+					// wait, if separator is "", it means no separator is enforced, it just takes the rest.
+					// But let's check t.Separator. If it's " ", it expects a space.
+					result = t
+				} else if len(lower) >= len(w)+sepLen && lower[len(w):len(w)+sepLen] == t.Separator {
+					result = t
+				}
+			}
 		}
 	}
-	return nil
+
+	if result == nil {
+		return nil, ""
+	}
+
+	param := ""
+	prefix := result.Words
+	if len(words) > len(prefix) {
+		paramStr := words[len(prefix):]
+		sep := result.Separator
+		if sep == `""` || sep == "" {
+			sep = " " // Default separator is space if empty
+		}
+		if strings.HasPrefix(paramStr, sep) {
+			paramStr = paramStr[len(sep):]
+		}
+		param = strings.TrimSpace(paramStr)
+	}
+
+	return result, param
 }

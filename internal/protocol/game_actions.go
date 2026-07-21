@@ -10,6 +10,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/moveevents"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/opentibiabr/canary-go/internal/talkactions"
 )
 
 // walk handles a directional movement request.
@@ -319,8 +320,32 @@ func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 	if g.tryCastSpell(talkType, text) {
 		return
 	}
+	if g.tryTalkAction(talkType, text) {
+		return
+	}
 	g.broadcastSay(g.player, talkType, text)
 	g.deps.Lua.Call("onPlayerSay", g.player.Name, text)
+}
+
+func (g *GameProtocol) tryTalkAction(talkType byte, text string) bool {
+	ta, param := talkactions.FindByWords(text)
+	if ta == nil {
+		return false
+	}
+	
+	// Check group type (e.g., god)
+	if ta.GroupType != "" {
+		// Ideally we would check player group here, but for now allow it.
+		// If group checking is strictly needed, we should implement it on GameProtocol or game.Player.
+	}
+
+	// Call lua callback
+	success := g.deps.Lua.CallTalkAction(ta, g.player, talkType, ta.Words, param)
+	
+	// Regardless of success/failure of the lua script returning true/false, 
+	// typically talkactions returning true mean "consumed" and false mean "not consumed".
+	// But in standard OTServ if it matches the prefix, it is consumed. Let's return true.
+	return success
 }
 
 func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text string) {

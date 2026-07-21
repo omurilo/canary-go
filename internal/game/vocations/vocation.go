@@ -13,6 +13,11 @@ type VocationFormula struct {
 	Armor       float64 `xml:"armor,attr"`
 }
 
+type VocationSkill struct {
+	ID         int     `xml:"id,attr"`
+	Multiplier float64 `xml:"multiplier,attr"`
+}
+
 type Vocation struct {
 	ID             uint32          `xml:"id,attr"`
 	Name           string          `xml:"name,attr"`
@@ -20,7 +25,11 @@ type Vocation struct {
 	GainHPAmount   int             `xml:"gainhpamount,attr"`
 	GainManaTicks  int             `xml:"gainmanaticks,attr"`
 	GainManaAmount int             `xml:"gainmanaamount,attr"`
+	AttackSpeed    int             `xml:"attackspeed,attr"`
+	ManaMultiplier float64         `xml:"manamultiplier,attr"`
+	BaseSpeed      int             `xml:"basespeed,attr"`
 	Formula        VocationFormula `xml:"formula"`
+	Skills         []VocationSkill `xml:"skill"`
 }
 
 type VocationsList struct {

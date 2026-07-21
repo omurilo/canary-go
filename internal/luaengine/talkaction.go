@@ -1,8 +1,6 @@
 package luaengine
 
 import (
-	"strings"
-
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/talkactions"
 	lua "github.com/yuin/gopher-lua"
@@ -78,7 +76,7 @@ func talkActionRegister(L *lua.LState) int {
 }
 
 // CallTalkAction executes the talkaction's OnSayFunc.
-func (e *Engine) CallTalkAction(t *talkactions.TalkAction, player *game.Player, typeID byte, words string) bool {
+func (e *Engine) CallTalkAction(t *talkactions.TalkAction, player *game.Player, typeID byte, words string, param string) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -91,12 +89,6 @@ func (e *Engine) CallTalkAction(t *talkactions.TalkAction, player *game.Player, 
 	playerUd := L.NewUserData()
 	playerUd.Value = player
 	L.SetMetatable(playerUd, L.GetTypeMetatable("Player"))
-
-	param := ""
-	prefix := t.Words
-	if len(words) > len(prefix) && strings.HasPrefix(strings.ToLower(words), strings.ToLower(prefix)) {
-		param = strings.TrimSpace(words[len(prefix):])
-	}
 
 	err := L.CallByParam(lua.P{Fn: t.OnSayFunc, NRet: 1, Protect: true},
 		playerUd, lua.LString(words), lua.LString(param), lua.LNumber(typeID))

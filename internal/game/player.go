@@ -2,9 +2,11 @@ package game
 
 import (
 	"strings"
+	"time"
 
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/opentibiabr/canary-go/internal/game/vocations"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -133,6 +135,7 @@ type Player struct {
 	partyInvitations []*Party
 
 	TargetID uint32
+	target   Creature
 	ShopOwnerID uint32 // ID of the NPC currently being traded with
 
 
@@ -363,8 +366,15 @@ func (p *Player) AddExperience(exp uint64) {
 	}
 }
 
-func (p *Player) GetTarget() Creature { return nil } // Stub for target
-func (p *Player) SetTarget(target Creature) {}
+func (p *Player) GetTarget() Creature { return p.target }
+func (p *Player) SetTarget(target Creature) {
+	p.target = target
+	if target != nil {
+		p.TargetID = target.GetID()
+	} else {
+		p.TargetID = 0
+	}
+}
 func (p *Player) SetAttackTarget(id uint32) { p.TargetID = id }
 func (p *Player) ChangeTargetDistance(distance int32) {}
 func (p *Player) GetPosition() Position { return p.Pos }
@@ -376,6 +386,14 @@ func (p *Player) GetLightLevel() uint8 { return p.LightLevel }
 func (p *Player) GetLightColor() uint8 { return p.LightColor }
 func (p *Player) GetSpeed() uint16 { return p.Speed }
 func (p *Player) GetCreatureType() uint8 { return 0 } // CREATURETYPE_PLAYER
+
+func (p *Player) AttackSpeed() time.Duration {
+	voc := vocations.GetVocation(uint32(p.Vocation))
+	if voc != nil && voc.AttackSpeed > 0 {
+		return time.Duration(voc.AttackSpeed) * time.Millisecond
+	}
+	return 2000 * time.Millisecond
+}
 
 // GetMana/GetMaxMana/AddMana expose the player's mana pool for the combat
 // adapter. AddMana clamps like Creature::changeMana (src/creatures/creature.cpp).
