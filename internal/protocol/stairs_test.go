@@ -70,3 +70,43 @@ func TestStairAscendAndFlat(t *testing.T) {
 		t.Errorf("diagonal move should not be a stair move")
 	}
 }
+
+func fcCatalog() *items.Catalog {
+	return items.NewCatalog(
+		&items.ItemType{ID: 10, Name: "downstair", FloorChange: "down"},
+		&items.ItemType{ID: 11, Name: "upstair-north", FloorChange: "north"},
+		&items.ItemType{ID: 12, Name: "ground-north", FloorChange: "north"},
+	)
+}
+
+func TestFloorChangeDownWithOffset(t *testing.T) {
+	cat := fcCatalog()
+	m := game.NewMap()
+	// Step onto a "down" stair at (100,100,7).
+	m.SetTile(game.Position{X: 100, Y: 100, Z: 7}, &game.Tile{Ground: &game.Item{ID: 10}})
+	// The tile directly below (z 8) carries a "north" floor-change → dy++.
+	m.SetTile(game.Position{X: 100, Y: 100, Z: 8}, &game.Tile{Ground: &game.Item{ID: 12}})
+
+	dest, ok := floorChangeDestination(m, cat, game.Position{X: 100, Y: 100, Z: 7})
+	if !ok {
+		t.Fatalf("expected a down floor change")
+	}
+	if dest != (game.Position{X: 100, Y: 101, Z: 8}) {
+		t.Errorf("down dest = %+v, want (100,101,8) [north offset dy++]", dest)
+	}
+}
+
+func TestFloorChangeUp(t *testing.T) {
+	cat := fcCatalog()
+	m := game.NewMap()
+	// Step onto an up-ramp with "north" → z-1, dy--.
+	m.SetTile(game.Position{X: 100, Y: 100, Z: 7}, &game.Tile{Ground: &game.Item{ID: 11}})
+
+	dest, ok := floorChangeDestination(m, cat, game.Position{X: 100, Y: 100, Z: 7})
+	if !ok {
+		t.Fatalf("expected an up floor change")
+	}
+	if dest != (game.Position{X: 100, Y: 99, Z: 6}) {
+		t.Errorf("up dest = %+v, want (100,99,6)", dest)
+	}
+}

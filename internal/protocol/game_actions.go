@@ -22,15 +22,17 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 
 	oldStack := g.StackPosOf(oldPos, p.ID)
 
-	// Stairs/ramps (height-based) change the floor as part of a normal step and
-	// must be resolved BEFORE the flat walkability check — the destination tile
-	// on the current floor often has no ground. Mirrors Game::internalMoveCreature.
+	// Floor changes are resolved BEFORE the flat walkability check — the tile
+	// you step onto often has no ground on the current floor (a hole) or is an
+	// up-ramp that redirects you elsewhere. Two mechanisms, mirroring C++:
+	//   1. height-based stairs/ramps (Game::internalMoveCreature), and
+	//   2. explicit floor-change tiles with directional flags (Tile::queryDestination).
 	if dest, ok := g.resolveStairMove(dir); ok {
-		p.Direction = dir
-		g.broadcastRemove(p)
-		g.deps.World.SetPosition(p, dest)
-		g.sendFullMapAt(dest)
-		g.broadcastAppear(p)
+		g.floorChangeMove(dest, dir)
+		return true
+	}
+	if dest, ok := g.resolveFloorChange(p.Pos.Offset(dir)); ok {
+		g.floorChangeMove(dest, dir)
 		return true
 	}
 
@@ -41,63 +43,11 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 		w.AddByte(0xB5) // walk cancel
 		w.AddByte(byte(p.Direction))
 		g.SendToClient(w)
-		
+
 		g.player.SendTextMessage(0x14, "Sorry, not possible.") // MESSAGE_STATUS_SMALL
 		return false
 	}
 
-	// Floor change check
-	var floorChange string
-	if tile := g.deps.World.Map.GetTile(newPos); tile != nil {
-		if tile.Ground != nil {
-			if t := g.deps.Items.Get(tile.Ground.ID); t != nil && t.FloorChange != "" {
-				floorChange = t.FloorChange
-			}
-		}
-		for _, it := range tile.Items {
-			if t := g.deps.Items.Get(it.ID); t != nil && t.FloorChange != "" {
-				floorChange = t.FloorChange
-			}
-		}
-	}
-
-	if floorChange != "" {
-		teleportPos := newPos
-		switch floorChange {
-		case "down":
-			teleportPos.Z++
-		case "north":
-			teleportPos.Z--
-			teleportPos.Y--
-		case "south":
-			teleportPos.Z--
-			teleportPos.Y++
-		case "east":
-			teleportPos.Z--
-			teleportPos.X++
-		case "west":
-			teleportPos.Z--
-			teleportPos.X--
-		case "southalt":
-			teleportPos.Z--
-			teleportPos.Y+=2
-		case "eastalt":
-			teleportPos.Z--
-			teleportPos.X+=2
-		}
-		
-		g.broadcastRemove(p)
-		g.deps.World.SetPosition(p, teleportPos)
-		
-		w := netmsg.NewWriter()
-		w.AddByte(opFullMap)
-		w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
-		g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight)
-		g.SendToClient(w)
-		
-		g.broadcastAppear(p)
-		return true
-	}
 	// Teleport item check: if any item on the destination tile has a teleport
 	// destination attribute (attrTeleDest), teleport the player there. Many
 	// map teleports store a (0,0,0) dest because their real behavior is driven
@@ -194,6 +144,132 @@ func findStepIn(it *game.Item) *moveevents.MoveEvent {
 		}
 	}
 	return moveevents.FindStepInByItemID(it.ID)
+}
+
+// floorChangeMove relocates the player to a different floor (stairs/ramps/holes)
+// and re-centres their client, broadcasting the vanish/appear to spectators.
+func (g *GameProtocol) floorChangeMove(dest game.Position, dir game.Direction) {
+	p := g.player
+	p.Direction = dir
+	g.broadcastRemove(p)
+	g.deps.World.SetPosition(p, dest)
+	g.sendFullMapAt(dest)
+	g.broadcastAppear(p)
+}
+
+// fcFlags is the set of directional floor-change flags aggregated over a tile's
+// items (from ItemType.FloorChange).
+type fcFlags struct {
+	down, north, south, east, west, southAlt, eastAlt bool
+	any                                               bool
+}
+
+// tileFC aggregates the floor-change flags of every item on a tile.
+func tileFC(cat *items.Catalog, t *game.Tile) fcFlags {
+	var f fcFlags
+	if t == nil {
+		return f
+	}
+	add := func(id uint16) {
+		it := cat.Get(id)
+		if it == nil || it.FloorChange == "" {
+			return
+		}
+		f.any = true
+		switch it.FloorChange {
+		case "down":
+			f.down = true
+		case "north":
+			f.north = true
+		case "south":
+			f.south = true
+		case "east":
+			f.east = true
+		case "west":
+			f.west = true
+		case "southalt":
+			f.southAlt = true
+		case "eastalt":
+			f.eastAlt = true
+		}
+	}
+	if t.Ground != nil {
+		add(t.Ground.ID)
+	}
+	for _, it := range t.Items {
+		add(it.ID)
+	}
+	return f
+}
+
+// resolveFloorChange mirrors Tile::queryDestination for a tile stepped onto:
+// a "down" floor-change descends (z+1) with a directional offset read from the
+// tile below and its neighbours; any up floor-change ascends (z-1) with its own
+// offset. Returns the redirected destination and true when a floor change applies.
+func (g *GameProtocol) resolveFloorChange(newPos game.Position) (game.Position, bool) {
+	return floorChangeDestination(g.deps.World.Map, g.deps.Items, newPos)
+}
+
+// floorChangeDestination is the pure floor-change resolver (extracted for tests).
+func floorChangeDestination(m *game.Map, cat *items.Catalog, newPos game.Position) (game.Position, bool) {
+	fc := tileFC(cat, m.GetTile(newPos))
+	if !fc.any {
+		return game.Position{}, false
+	}
+
+	if fc.down {
+		dx, dy := newPos.X, newPos.Y
+		dz := newPos.Z + 1
+		if tileFC(cat, m.GetTile(game.Position{X: dx, Y: dy - 1, Z: dz})).southAlt {
+			dy -= 2
+		} else if tileFC(cat, m.GetTile(game.Position{X: dx - 1, Y: dy, Z: dz})).eastAlt {
+			dx -= 2
+		} else {
+			d := tileFC(cat, m.GetTile(game.Position{X: dx, Y: dy, Z: dz}))
+			if d.north {
+				dy++
+			}
+			if d.south {
+				dy--
+			}
+			if d.southAlt {
+				dy -= 2
+			}
+			if d.east {
+				dx--
+			}
+			if d.eastAlt {
+				dx -= 2
+			}
+			if d.west {
+				dx++
+			}
+		}
+		return game.Position{X: dx, Y: dy, Z: dz}, true
+	}
+
+	// Up floor-change (north/south/east/west/alt on the stepped-onto tile).
+	dx, dy := newPos.X, newPos.Y
+	dz := newPos.Z - 1
+	if fc.north {
+		dy--
+	}
+	if fc.south {
+		dy++
+	}
+	if fc.east {
+		dx++
+	}
+	if fc.west {
+		dx--
+	}
+	if fc.southAlt {
+		dy += 2
+	}
+	if fc.eastAlt {
+		dx += 2
+	}
+	return game.Position{X: dx, Y: dy, Z: dz}, true
 }
 
 // resolveStairMove implements Tibia's height-based stair up/down for a walk
