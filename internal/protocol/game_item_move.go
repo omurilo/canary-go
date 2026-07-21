@@ -57,7 +57,19 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 
 	it := g.deps.Items.Get(item.ID)
 
-	// Validation
+	// Map item protection: non-pickupable items on the map can only be moved
+	// by god-level accounts (AccountType >= 5). This prevents normal players
+	// from dragging map decorations, walls, etc.
+	if fromPos.X != 0xFFFF && it != nil && !it.Pickupable {
+		if g.player.AccountType < 5 {
+			g.sendStatusText("You cannot move this object.")
+			g.revertMove(fromPos, toPos, spriteID)
+			return
+		}
+	}
+
+	// Validation: non-pickupable items can't be picked up to inventory even by gods
+	// (use /i command instead). This is Tibia's standard behavior.
 	if toPos.X == 0xFFFF {
 		if fromPos.X != 0xFFFF && it != nil && !it.Pickupable {
 			g.sendStatusText("You cannot take this object.")

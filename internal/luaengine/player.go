@@ -356,7 +356,8 @@ var playerMethods = map[string]lua.LGFunction{
 }
 
 func playerAddachievement(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -364,7 +365,8 @@ func playerAddachievement(L *lua.LState) int {
 }
 
 func playerAddachievementpoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -377,7 +379,8 @@ func playerAddanimusmastery(L *lua.LState) int {
 }
 
 func playerAddbadge(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -385,7 +388,8 @@ func playerAddbadge(L *lua.LState) int {
 }
 
 func playerAddbestiarykill(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -393,7 +397,8 @@ func playerAddbestiarykill(L *lua.LState) int {
 }
 
 func playerAddblessing(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -401,7 +406,8 @@ func playerAddblessing(L *lua.LState) int {
 }
 
 func playerAddbosstiarykill(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -409,7 +415,8 @@ func playerAddbosstiarykill(L *lua.LState) int {
 }
 
 func playerAddcharmpoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -417,7 +424,8 @@ func playerAddcharmpoints(L *lua.LState) int {
 }
 
 func playerAddcustomoutfit(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -440,7 +448,8 @@ func playerAddexperience(L *lua.LState) int {
 }
 
 func playerAddfamiliar(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -448,7 +457,8 @@ func playerAddfamiliar(L *lua.LState) int {
 }
 
 func playerAddforgedustlevel(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -456,7 +466,8 @@ func playerAddforgedustlevel(L *lua.LState) int {
 }
 
 func playerAddforgedusts(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -469,25 +480,28 @@ func playerAdditem(L *lua.LState) int {
 }
 
 func playerAdditembatchtopaginedcontainer(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerAdditemex(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerAdditemstash(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -519,7 +533,8 @@ func playerAddmana(L *lua.LState) int {
 }
 
 func playerAddmanaspent(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -527,7 +542,8 @@ func playerAddmanaspent(L *lua.LState) int {
 }
 
 func playerAddmapmark(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -535,7 +551,8 @@ func playerAddmapmark(L *lua.LState) int {
 }
 
 func playerAddminorcharmechoes(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -564,7 +581,8 @@ func playerAddmoney(L *lua.LState) int {
 }
 
 func playerAddmount(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -572,7 +590,8 @@ func playerAddmount(L *lua.LState) int {
 }
 
 func playerAddofflinetrainingtime(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -580,7 +599,8 @@ func playerAddofflinetrainingtime(L *lua.LState) int {
 }
 
 func playerAddofflinetrainingtries(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -588,7 +608,8 @@ func playerAddofflinetrainingtries(L *lua.LState) int {
 }
 
 func playerAddoutfit(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -596,7 +617,8 @@ func playerAddoutfit(L *lua.LState) int {
 }
 
 func playerAddoutfitaddon(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -604,7 +626,8 @@ func playerAddoutfitaddon(L *lua.LState) int {
 }
 
 func playerAddpremiumdays(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -612,7 +635,8 @@ func playerAddpremiumdays(L *lua.LState) int {
 }
 
 func playerAddpreycards(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -620,7 +644,8 @@ func playerAddpreycards(L *lua.LState) int {
 }
 
 func playerAddskilltries(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -648,16 +673,18 @@ func playerAddsoul(L *lua.LState) int {
 }
 
 func playerAddtaskhuntingpoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerAddtibiacoins(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -665,7 +692,8 @@ func playerAddtibiacoins(L *lua.LState) int {
 }
 
 func playerAddtitle(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -673,7 +701,8 @@ func playerAddtitle(L *lua.LState) int {
 }
 
 func playerAddtransferablecoins(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -681,7 +710,8 @@ func playerAddtransferablecoins(L *lua.LState) int {
 }
 
 func playerAddweaponexperience(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -689,7 +719,8 @@ func playerAddweaponexperience(L *lua.LState) int {
 }
 
 func playerApplyimbuementscroll(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -697,20 +728,22 @@ func playerApplyimbuementscroll(L *lua.LState) int {
 }
 
 func playerAvatartimer(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerCalculateflatdamagehealing(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -725,7 +758,8 @@ func playerCancast(L *lua.LState) int {
 }
 
 func playerCanlearnspell(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -734,7 +768,8 @@ func playerCanlearnspell(L *lua.LState) int {
 }
 
 func playerCanreceiveloot(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -743,7 +778,8 @@ func playerCanreceiveloot(L *lua.LState) int {
 }
 
 func playerChangename(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -751,7 +787,8 @@ func playerChangename(L *lua.LState) int {
 }
 
 func playerChannelsay(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -759,7 +796,8 @@ func playerChannelsay(L *lua.LState) int {
 }
 
 func playerCharmexpansion(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -767,7 +805,8 @@ func playerCharmexpansion(L *lua.LState) int {
 }
 
 func playerClearallimbuements(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -775,7 +814,8 @@ func playerClearallimbuements(L *lua.LState) int {
 }
 
 func playerClearspellcooldowns(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -783,7 +823,8 @@ func playerClearspellcooldowns(L *lua.LState) int {
 }
 
 func playerCloseforge(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -791,7 +832,8 @@ func playerCloseforge(L *lua.LState) int {
 }
 
 func playerCloseimbuementwindow(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -799,7 +841,8 @@ func playerCloseimbuementwindow(L *lua.LState) int {
 }
 
 func playerCreatetransactionsummary(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -807,7 +850,8 @@ func playerCreatetransactionsummary(L *lua.LState) int {
 }
 
 func playerFillharmony(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -815,7 +859,8 @@ func playerFillharmony(L *lua.LState) int {
 }
 
 func playerForgetspell(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -833,20 +878,22 @@ func playerGetaccountid(L *lua.LState) int {
 }
 
 func playerGetaccounttype(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetachievementpoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -960,47 +1007,52 @@ func playerGetbasemaxmana(L *lua.LState) int {
 }
 
 func playerGetbasexpgain(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetblessingcount(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetbossbonus(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetbosstiarykills(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetbosstiarylevel(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1015,11 +1067,12 @@ func playerGetcapacity(L *lua.LState) int {
 }
 
 func playerGetcharmchance(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1029,16 +1082,18 @@ func playerGetcharmmonstertype(L *lua.LState) int {
 }
 
 func playerGetcharmtier(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetclient(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1052,20 +1107,22 @@ func playerGetcontainerbyid(L *lua.LState) int {
 }
 
 func playerGetcontainerid(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetcontainerindex(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1115,74 +1172,82 @@ func playerGetexperience(L *lua.LState) int {
 }
 
 func playerGetfaction(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetfamiliarlooktype(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetfightmode(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetforgecores(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetforgedustlevel(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetforgedusts(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetforgeslivers(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetfreebackpackslots(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1197,11 +1262,12 @@ func playerGetfreecapacity(L *lua.LState) int {
 }
 
 func playerGetgrindingxpboost(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1226,16 +1292,18 @@ func playerGetguild(L *lua.LState) int {
 }
 
 func playerGetguildlevel(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetguildnick(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1244,29 +1312,32 @@ func playerGetguildnick(L *lua.LState) int {
 }
 
 func playerGetharmony(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetharmonydamage(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGethazardsystempoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1276,11 +1347,12 @@ func playerGethouse(L *lua.LState) int {
 }
 
 func playerGetidletime(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1290,7 +1362,8 @@ func playerGetinbox(L *lua.LState) int {
 }
 
 func playerGetinstantspells(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1299,11 +1372,12 @@ func playerGetinstantspells(L *lua.LState) int {
 }
 
 func playerGetip(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1313,16 +1387,18 @@ func playerGetitembyid(L *lua.LState) int {
 }
 
 func playerGetitemcount(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetkills(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1331,20 +1407,22 @@ func playerGetkills(L *lua.LState) int {
 }
 
 func playerGetlastloginsaved(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetlastlogout(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1359,7 +1437,8 @@ func playerGetlevel(L *lua.LState) int {
 }
 
 func playerGetlivestreamviewers(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1368,11 +1447,12 @@ func playerGetlivestreamviewers(L *lua.LState) int {
 }
 
 func playerGetlivestreamviewerscount(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1382,25 +1462,28 @@ func playerGetlootpouch(L *lua.LState) int {
 }
 
 func playerGetloyaltybonus(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetloyaltypoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetloyaltytitle(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1419,20 +1502,22 @@ func playerGetmagiclevel(L *lua.LState) int {
 }
 
 func playerGetmagicshieldcapacityflat(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetmagicshieldcapacitypercent(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1447,16 +1532,18 @@ func playerGetmana(L *lua.LState) int {
 }
 
 func playerGetmanaspent(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetmapshader(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1475,11 +1562,12 @@ func playerGetmaxmana(L *lua.LState) int {
 }
 
 func playerGetmaxsoul(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1504,20 +1592,22 @@ func playerGetname(L *lua.LState) int {
 }
 
 func playerGetofflinetrainingskill(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetofflinetrainingtime(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1532,47 +1622,52 @@ func (e *Engine) playerGetparty(L *lua.LState) int {
 }
 
 func playerGetpremiumdays(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetpreycards(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetpreyexperiencepercentage(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetpreylootpercentage(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetpronoun(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1582,7 +1677,8 @@ func playerGetreward(L *lua.LState) int {
 }
 
 func playerGetrewardlist(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1616,38 +1712,42 @@ func playerGetskilllevel(L *lua.LState) int {
 }
 
 func playerGetskillpercent(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetskilltries(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetskulltime(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetslotbossid(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1685,38 +1785,42 @@ func playerGetsoul(L *lua.LState) int {
 }
 
 func playerGetstamina(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetstaminaxpboost(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetstashcount(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetstashitemcount(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1736,25 +1840,28 @@ func playerGetstoreinbox(L *lua.LState) int {
 }
 
 func playerGettaskhuntingpoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGettibiacoins(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGettitles(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1768,38 +1875,42 @@ func playerGettown(L *lua.LState) int {
 }
 
 func playerGettransferablecoins(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetvipdays(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetviptime(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetvirtue(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
@@ -1841,16 +1952,18 @@ func playerGetvocation(L *lua.LState) int {
 }
 
 func playerGetvoucherxpboost(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetwheelspelladditionalarea(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1859,43 +1972,48 @@ func playerGetwheelspelladditionalarea(L *lua.LState) int {
 }
 
 func playerGetwheelspelladditionalduration(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetwheelspelladditionaltarget(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetxpboostpercent(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerGetxpboosttime(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerHasachievement(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1904,7 +2022,8 @@ func playerHasachievement(L *lua.LState) int {
 }
 
 func playerHasanimusmastery(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1913,7 +2032,8 @@ func playerHasanimusmastery(L *lua.LState) int {
 }
 
 func playerHasblessing(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1922,7 +2042,8 @@ func playerHasblessing(L *lua.LState) int {
 }
 
 func playerHaschasemode(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1931,7 +2052,8 @@ func playerHaschasemode(L *lua.LState) int {
 }
 
 func playerHasfamiliar(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1940,7 +2062,8 @@ func playerHasfamiliar(L *lua.LState) int {
 }
 
 func playerHasgroupflag(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1959,7 +2082,8 @@ func playerHaslearnedspell(L *lua.LState) int {
 }
 
 func playerHasmount(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1968,7 +2092,8 @@ func playerHasmount(L *lua.LState) int {
 }
 
 func playerHasoutfit(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1977,7 +2102,8 @@ func playerHasoutfit(L *lua.LState) int {
 }
 
 func playerHassecuremode(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1986,7 +2112,8 @@ func playerHassecuremode(L *lua.LState) int {
 }
 
 func playerInstantskillwod(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -1995,7 +2122,8 @@ func playerInstantskillwod(L *lua.LState) int {
 }
 
 func playerIslivestreamviewer(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -2004,7 +2132,8 @@ func playerIslivestreamviewer(L *lua.LState) int {
 }
 
 func playerIsmonsterbestiaryunlocked(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -2013,7 +2142,8 @@ func playerIsmonsterbestiaryunlocked(L *lua.LState) int {
 }
 
 func playerIsmonsterprey(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -2022,7 +2152,8 @@ func playerIsmonsterprey(L *lua.LState) int {
 }
 
 func playerIsoffline(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -2031,7 +2162,8 @@ func playerIsoffline(L *lua.LState) int {
 }
 
 func playerIsplayer(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LFalse)
 		return 1
 	}
@@ -2040,7 +2172,8 @@ func playerIsplayer(L *lua.LState) int {
 }
 
 func playerIspromoted(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -2049,7 +2182,8 @@ func playerIspromoted(L *lua.LState) int {
 }
 
 func playerIspzlocked(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -2058,16 +2192,18 @@ func playerIspzlocked(L *lua.LState) int {
 }
 
 func playerIstraining(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerIsuiexhausted(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -2076,7 +2212,8 @@ func playerIsuiexhausted(L *lua.LState) int {
 }
 
 func playerIsvip(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -2100,7 +2237,8 @@ func playerLearnspell(L *lua.LState) int {
 }
 
 func playerOnthinkwheelofdestiny(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2108,7 +2246,8 @@ func playerOnthinkwheelofdestiny(L *lua.LState) int {
 }
 
 func playerOpenchannel(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2116,7 +2255,8 @@ func playerOpenchannel(L *lua.LState) int {
 }
 
 func playerOpenforge(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2124,7 +2264,8 @@ func playerOpenforge(L *lua.LState) int {
 }
 
 func playerOpenimbuementwindow(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2132,7 +2273,8 @@ func playerOpenimbuementwindow(L *lua.LState) int {
 }
 
 func playerOpenmarket(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2140,7 +2282,8 @@ func playerOpenmarket(L *lua.LState) int {
 }
 
 func playerOpenstash(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2148,7 +2291,8 @@ func playerOpenstash(L *lua.LState) int {
 }
 
 func playerPopupfyi(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2156,7 +2300,8 @@ func playerPopupfyi(L *lua.LState) int {
 }
 
 func playerPreythirdslot(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -2165,7 +2310,8 @@ func playerPreythirdslot(L *lua.LState) int {
 }
 
 func playerReloaddata(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2173,7 +2319,8 @@ func playerReloaddata(L *lua.LState) int {
 }
 
 func playerRemoveachievement(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2181,7 +2328,8 @@ func playerRemoveachievement(L *lua.LState) int {
 }
 
 func playerRemoveachievementpoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2194,7 +2342,8 @@ func playerRemoveanimusmastery(L *lua.LState) int {
 }
 
 func playerRemoveblessing(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2202,7 +2351,8 @@ func playerRemoveblessing(L *lua.LState) int {
 }
 
 func playerRemovecustomoutfit(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2226,7 +2376,8 @@ func playerRemoveexperience(L *lua.LState) int {
 }
 
 func playerRemovefamiliar(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2234,7 +2385,8 @@ func playerRemovefamiliar(L *lua.LState) int {
 }
 
 func playerRemoveforgedustlevel(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2242,7 +2394,8 @@ func playerRemoveforgedustlevel(L *lua.LState) int {
 }
 
 func playerRemoveforgedusts(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2250,7 +2403,8 @@ func playerRemoveforgedusts(L *lua.LState) int {
 }
 
 func playerRemovegroupflag(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2258,7 +2412,8 @@ func playerRemovegroupflag(L *lua.LState) int {
 }
 
 func playerRemoveiconbakragore(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2266,7 +2421,8 @@ func playerRemoveiconbakragore(L *lua.LState) int {
 }
 
 func playerRemoveitem(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2290,7 +2446,8 @@ func playerRemovemoney(L *lua.LState) int {
 }
 
 func playerRemovemount(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2298,7 +2455,8 @@ func playerRemovemount(L *lua.LState) int {
 }
 
 func playerRemoveofflinetrainingtime(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2306,7 +2464,8 @@ func playerRemoveofflinetrainingtime(L *lua.LState) int {
 }
 
 func playerRemoveoutfit(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2314,7 +2473,8 @@ func playerRemoveoutfit(L *lua.LState) int {
 }
 
 func playerRemoveoutfitaddon(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2322,7 +2482,8 @@ func playerRemoveoutfitaddon(L *lua.LState) int {
 }
 
 func playerRemovepremiumdays(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2330,7 +2491,8 @@ func playerRemovepremiumdays(L *lua.LState) int {
 }
 
 func playerRemovepreystamina(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2338,7 +2500,8 @@ func playerRemovepreystamina(L *lua.LState) int {
 }
 
 func playerRemovereward(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2346,7 +2509,8 @@ func playerRemovereward(L *lua.LState) int {
 }
 
 func playerRemovestashitem(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2354,7 +2518,8 @@ func playerRemovestashitem(L *lua.LState) int {
 }
 
 func playerRemovetaskhuntingpoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2362,7 +2527,8 @@ func playerRemovetaskhuntingpoints(L *lua.LState) int {
 }
 
 func playerRemovetibiacoins(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2370,7 +2536,8 @@ func playerRemovetibiacoins(L *lua.LState) int {
 }
 
 func playerRemovetransferableandtibiacoins(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2378,7 +2545,8 @@ func playerRemovetransferableandtibiacoins(L *lua.LState) int {
 }
 
 func playerRemovetransferablecoins(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2386,7 +2554,8 @@ func playerRemovetransferablecoins(L *lua.LState) int {
 }
 
 func playerResetcharmsbestiary(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2394,7 +2563,8 @@ func playerResetcharmsbestiary(L *lua.LState) int {
 }
 
 func playerResetoldcharms(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2402,16 +2572,18 @@ func playerResetoldcharms(L *lua.LState) int {
 }
 
 func playerRevelationstagewod(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerSave(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2419,7 +2591,8 @@ func playerSave(L *lua.LState) int {
 }
 
 func playerSendambientsoundeffect(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2427,7 +2600,8 @@ func playerSendambientsoundeffect(L *lua.LState) int {
 }
 
 func playerSendblessstatus(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2435,7 +2609,8 @@ func playerSendblessstatus(L *lua.LState) int {
 }
 
 func playerSendbosstiarycooldowntimer(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2443,7 +2618,8 @@ func playerSendbosstiarycooldowntimer(L *lua.LState) int {
 }
 
 func playerSendchannelmessage(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2451,7 +2627,8 @@ func playerSendchannelmessage(L *lua.LState) int {
 }
 
 func playerSendcontainer(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2459,7 +2636,8 @@ func playerSendcontainer(L *lua.LState) int {
 }
 
 func playerSendcreatureappear(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2467,7 +2645,8 @@ func playerSendcreatureappear(L *lua.LState) int {
 }
 
 func playerSenddoublesoundeffect(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2475,7 +2654,8 @@ func playerSenddoublesoundeffect(L *lua.LState) int {
 }
 
 func playerSendhousewindow(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2483,7 +2663,8 @@ func playerSendhousewindow(L *lua.LState) int {
 }
 
 func playerSendiconbakragore(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2503,7 +2684,8 @@ func playerSendinventory(L *lua.LState) int {
 }
 
 func playerSendlootstats(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2511,7 +2693,8 @@ func playerSendlootstats(L *lua.LState) int {
 }
 
 func playerSendmusicsoundeffect(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2519,7 +2702,8 @@ func playerSendmusicsoundeffect(L *lua.LState) int {
 }
 
 func playerSendoutfitwindow(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2527,7 +2711,8 @@ func playerSendoutfitwindow(L *lua.LState) int {
 }
 
 func playerSendprivatemessage(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2535,7 +2720,8 @@ func playerSendprivatemessage(L *lua.LState) int {
 }
 
 func playerSendsinglesoundeffect(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2543,7 +2729,8 @@ func playerSendsinglesoundeffect(L *lua.LState) int {
 }
 
 func playerSendspellcooldown(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2551,7 +2738,8 @@ func playerSendspellcooldown(L *lua.LState) int {
 }
 
 func playerSendspellgroupcooldown(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2570,7 +2758,8 @@ func playerSendtextmessage(L *lua.LState) int {
 }
 
 func playerSendtutorial(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2578,7 +2767,8 @@ func playerSendtutorial(L *lua.LState) int {
 }
 
 func playerSendupdatecontainer(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2586,7 +2776,8 @@ func playerSendupdatecontainer(L *lua.LState) int {
 }
 
 func playerSetaccounttype(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2608,7 +2799,8 @@ func playerSetbankbalance(L *lua.LState) int {
 }
 
 func playerSetbasexpgain(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2616,7 +2808,8 @@ func playerSetbasexpgain(L *lua.LState) int {
 }
 
 func playerSetbosspoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2637,7 +2830,8 @@ func playerSetcapacity(L *lua.LState) int {
 }
 
 func playerSetcurrenttitle(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2645,7 +2839,8 @@ func playerSetcurrenttitle(L *lua.LState) int {
 }
 
 func playerSetdailyreward(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2653,7 +2848,8 @@ func playerSetdailyreward(L *lua.LState) int {
 }
 
 func playerSetedithouse(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2661,7 +2857,8 @@ func playerSetedithouse(L *lua.LState) int {
 }
 
 func playerSetfaction(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2669,7 +2866,8 @@ func playerSetfaction(L *lua.LState) int {
 }
 
 func playerSetfamiliarlooktype(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2677,7 +2875,8 @@ func playerSetfamiliarlooktype(L *lua.LState) int {
 }
 
 func playerSetforgedusts(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2685,7 +2884,8 @@ func playerSetforgedusts(L *lua.LState) int {
 }
 
 func playerSetghostmode(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2693,7 +2893,8 @@ func playerSetghostmode(L *lua.LState) int {
 }
 
 func playerSetgrindingxpboost(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2701,7 +2902,8 @@ func playerSetgrindingxpboost(L *lua.LState) int {
 }
 
 func playerSetgroup(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2709,7 +2911,8 @@ func playerSetgroup(L *lua.LState) int {
 }
 
 func playerSetgroupflag(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2717,7 +2920,8 @@ func playerSetgroupflag(L *lua.LState) int {
 }
 
 func playerSetguild(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2725,7 +2929,8 @@ func playerSetguild(L *lua.LState) int {
 }
 
 func playerSetguildlevel(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2733,7 +2938,8 @@ func playerSetguildlevel(L *lua.LState) int {
 }
 
 func playerSetguildnick(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2741,7 +2947,8 @@ func playerSetguildnick(L *lua.LState) int {
 }
 
 func playerSethazardsystempoints(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2749,7 +2956,8 @@ func playerSethazardsystempoints(L *lua.LState) int {
 }
 
 func playerSetkills(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2767,7 +2975,8 @@ func playerSetlevel(L *lua.LState) int {
 }
 
 func playerSetlivestreamviewers(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2775,7 +2984,8 @@ func playerSetlivestreamviewers(L *lua.LState) int {
 }
 
 func playerSetloyaltybonus(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2783,7 +2993,8 @@ func playerSetloyaltybonus(L *lua.LState) int {
 }
 
 func playerSetloyaltytitle(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2801,7 +3012,8 @@ func playerSetmagiclevel(L *lua.LState) int {
 }
 
 func playerSetmapshader(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2822,7 +3034,8 @@ func playerSetmaxmana(L *lua.LState) int {
 }
 
 func playerSetofflinetrainingskill(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2830,7 +3043,8 @@ func playerSetofflinetrainingskill(L *lua.LState) int {
 }
 
 func playerSetpronoun(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2838,7 +3052,8 @@ func playerSetpronoun(L *lua.LState) int {
 }
 
 func playerSetremovebosstime(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2846,7 +3061,8 @@ func playerSetremovebosstime(L *lua.LState) int {
 }
 
 func playerSetserene(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2879,7 +3095,8 @@ func playerSetskilllevel(L *lua.LState) int {
 }
 
 func playerSetskulltime(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2887,7 +3104,8 @@ func playerSetskulltime(L *lua.LState) int {
 }
 
 func playerSetspecialcontainersavailable(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2910,7 +3128,8 @@ func playerSetstamina(L *lua.LState) int {
 }
 
 func playerSetstaminaxpboost(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2928,7 +3147,8 @@ func playerSetstoragevalue(L *lua.LState) int {
 }
 
 func playerSettown(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2936,7 +3156,8 @@ func playerSettown(L *lua.LState) int {
 }
 
 func playerSettraining(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2944,7 +3165,8 @@ func playerSettraining(L *lua.LState) int {
 }
 
 func playerSetvirtue(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2962,7 +3184,8 @@ func playerSetvocation(L *lua.LState) int {
 }
 
 func playerSetvoucherxpboost(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2970,7 +3193,8 @@ func playerSetvoucherxpboost(L *lua.LState) int {
 }
 
 func playerSetxpboostpercent(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2978,7 +3202,8 @@ func playerSetxpboostpercent(L *lua.LState) int {
 }
 
 func playerSetxpboosttime(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2986,7 +3211,8 @@ func playerSetxpboosttime(L *lua.LState) int {
 }
 
 func playerShowtextdialog(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -2994,7 +3220,8 @@ func playerShowtextdialog(L *lua.LState) int {
 }
 
 func playerTakescreenshot(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -3002,7 +3229,8 @@ func playerTakescreenshot(L *lua.LState) int {
 }
 
 func playerTaskhuntingthirdslot(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
@@ -3011,7 +3239,8 @@ func playerTaskhuntingthirdslot(L *lua.LState) int {
 }
 
 func playerUnlockallcharmrunes(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -3019,7 +3248,8 @@ func playerUnlockallcharmrunes(L *lua.LState) int {
 }
 
 func playerUpdateconcoction(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -3027,7 +3257,8 @@ func playerUpdateconcoction(L *lua.LState) int {
 }
 
 func playerUpdatefood(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -3035,7 +3266,8 @@ func playerUpdatefood(L *lua.LState) int {
 }
 
 func playerFeed(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -3043,7 +3275,8 @@ func playerFeed(L *lua.LState) int {
 }
 
 func playerUpdatekilltracker(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -3051,7 +3284,8 @@ func playerUpdatekilltracker(L *lua.LState) int {
 }
 
 func playerUpdatesupplytracker(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -3059,7 +3293,8 @@ func playerUpdatesupplytracker(L *lua.LState) int {
 }
 
 func playerUpdateuiexhausted(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
@@ -3067,16 +3302,18 @@ func playerUpdateuiexhausted(L *lua.LState) int {
 }
 
 func playerUpgradespellswod(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // not modelled yet; safe default
+	L.Push(lua.LNumber(p.AccountType))
 	return 1
 }
 
 func playerWheelunlockscroll(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default

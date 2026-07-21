@@ -72,6 +72,7 @@ type Player struct {
 	ID        uint32 // creature id (assigned at spawn)
 	DBID      uint32 // players.id
 	AccountID uint32
+	AccountType uint8
 	Name      string
 
 	Pos       Position

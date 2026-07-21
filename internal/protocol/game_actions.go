@@ -86,6 +86,27 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 		g.broadcastAppear(p)
 		return true
 	}
+	// Teleport item check: if any item on the destination tile has a teleport
+	// destination attribute (attrTeleDest), teleport the player there.
+	if tile := g.deps.World.Map.GetTile(newPos); tile != nil {
+		for _, it := range tile.Items {
+			if it.Attr != nil && it.Attr.TeleDest != nil {
+				dest := *it.Attr.TeleDest
+				g.broadcastRemove(p)
+				g.deps.World.SetPosition(p, dest)
+
+				w := netmsg.NewWriter()
+				w.AddByte(opFullMap)
+				w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
+				g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight)
+				g.SendToClient(w)
+
+				g.sendMagicEffect(dest, 11) // CONST_ME_TELEPORT
+				g.broadcastAppear(p)
+				return true
+			}
+		}
+	}
 
 	// Self: shift the visible map in the walk direction.
 	g.SendCreatureMove(oldPos, oldStack, newPos)
@@ -333,10 +354,27 @@ func (g *GameProtocol) tryTalkAction(talkType byte, text string) bool {
 		return false
 	}
 	
-	// Check group type (e.g., god)
+	// Check group type (e.g., god). Canary DB schema account types:
+	// 1 = ACCOUNT_TYPE_NORMAL, 2 = ACCOUNT_TYPE_TUTOR,
+	// 3 = ACCOUNT_TYPE_SENIOR_TUTOR, 4 = ACCOUNT_TYPE_GAMEMASTER,
+	// 5 = ACCOUNT_TYPE_GOD
 	if ta.GroupType != "" {
-		// Ideally we would check player group here, but for now allow it.
-		// If group checking is strictly needed, we should implement it on GameProtocol or game.Player.
+		reqAcc := uint8(1)
+		switch strings.ToLower(ta.GroupType) {
+		case "tutor":
+			reqAcc = 2
+		case "senior tutor":
+			reqAcc = 3
+		case "gamemaster":
+			reqAcc = 4
+		case "community manager":
+			reqAcc = 5
+		case "god":
+			reqAcc = 5
+		}
+		if g.player.AccountType < reqAcc {
+			return false
+		}
 	}
 
 	// Call lua callback

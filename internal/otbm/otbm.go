@@ -346,6 +346,7 @@ func (p *parser) readItem() *game.Item {
 	r := p.r
 	id := r.u16()
 	count := uint16(0)
+	var teleDest *game.Position
 
 	// Item attributes.
 attrLoop:
@@ -363,9 +364,10 @@ attrLoop:
 		case attrHitChance:
 			_ = r.u8()
 		case attrTeleDest:
-			_ = r.u16()
-			_ = r.u16()
-			_ = r.u8()
+			tx := r.u16()
+			ty := r.u16()
+			tz := r.u8()
+			teleDest = &game.Position{X: tx, Y: ty, Z: tz}
 		case attrText, attrDesc, attrName, attrArticle, attrPluralName, attrSpecial, attrWrittenBy:
 			_ = r.str()
 		case attrWrittenDate:
@@ -383,6 +385,12 @@ attrLoop:
 	}
 
 	it := &game.Item{ID: id, Count: count}
+	if teleDest != nil {
+		if it.Attr == nil {
+			it.Attr = &game.ItemAttributes{}
+		}
+		it.Attr.TeleDest = teleDest
+	}
 
 	// Container children: nested item nodes become this item's contents.
 	for {

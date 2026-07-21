@@ -115,6 +115,7 @@ type ItemAttributes struct {
 	Tier           *uint8  // ATTR_TIER (40)      uint8
 	Amount         *uint16 // ATTR_AMOUNT (39)    uint16
 	Owner          *uint32 // ATTR_OWNER (43)     uint32
+	TeleDest       *Position // ATTR_TELE_DEST (8) x(u16) y(u16) z(u8)
 }
 
 // Outfit describes a creature's appearance.
