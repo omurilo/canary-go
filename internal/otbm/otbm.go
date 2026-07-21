@@ -117,15 +117,19 @@ func (r *reader) u64() uint64 {
 	return v
 }
 
-// str reads a u16-length string; the body is raw (not un-escaped).
+// str reads a u16-length string. The length prefix is the logical character
+// count; the body is escape-encoded like the rest of a node's properties, so it
+// MUST be read char-by-char through u8() (which un-escapes). Reading the body
+// raw leaves the cursor short by the number of escape bytes, desyncing every
+// subsequent attribute/node in the stream — that corruption is what sent some
+// teleports to a (0,0,0) "limbo" destination.
 func (r *reader) str() string {
 	n := int(r.u16())
-	if r.pos+n > len(r.data) {
-		n = len(r.data) - r.pos
+	b := make([]byte, 0, n)
+	for i := 0; i < n && !r.eof(); i++ {
+		b = append(b, r.u8())
 	}
-	s := string(r.data[r.pos : r.pos+n])
-	r.pos += n
-	return s
+	return string(b)
 }
 
 // peekRaw returns the next raw byte without consuming it.

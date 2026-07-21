@@ -52,6 +52,17 @@ func (m *Map) GetTile(pos Position) *Tile {
 	return m.tiles[pos]
 }
 
+// Range invokes fn for every loaded tile. fn returns false to stop early.
+func (m *Map) Range(fn func(pos Position, t *Tile) bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for pos, t := range m.tiles {
+		if !fn(pos, t) {
+			return
+		}
+	}
+}
+
 // SetTile stores a tile.
 func (m *Map) SetTile(pos Position, t *Tile) {
 	m.mu.Lock()

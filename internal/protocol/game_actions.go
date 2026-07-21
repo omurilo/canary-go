@@ -87,11 +87,18 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 		return true
 	}
 	// Teleport item check: if any item on the destination tile has a teleport
-	// destination attribute (attrTeleDest), teleport the player there.
+	// destination attribute (attrTeleDest), teleport the player there. Many
+	// map teleports store a (0,0,0) dest because their real behavior is driven
+	// by a Lua movement/action script — teleporting to that zero position would
+	// drop the player into the void ("limbo"). Only honor a static dest that
+	// points at a real, loaded tile.
 	if tile := g.deps.World.Map.GetTile(newPos); tile != nil {
 		for _, it := range tile.Items {
 			if it.Attr != nil && it.Attr.TeleDest != nil {
 				dest := *it.Attr.TeleDest
+				if (dest.X == 0 && dest.Y == 0) || g.deps.World.Map.GetTile(dest) == nil {
+					continue // scripted / invalid teleport — not a static jump
+				}
 				g.broadcastRemove(p)
 				g.deps.World.SetPosition(p, dest)
 
