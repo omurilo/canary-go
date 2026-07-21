@@ -60,6 +60,27 @@ func (e *Engine) refreshInventory(p *game.Player) {
 	p.Session.SendStats()
 }
 
+// playerSay broadcasts player speech (e.g. the "Munch." from eating food) to
+// spectators via the world, mirroring npcSay. Without this, player:say was a
+// no-op stub so scripted player speech never appeared.
+func (e *Engine) playerSay(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		return 0
+	}
+	text := L.CheckString(2)
+	talkType := byte(1) // TALKTYPE_SAY
+	if L.GetTop() >= 3 && L.Get(3).Type() == lua.LTNumber {
+		talkType = byte(L.ToNumber(3))
+	}
+	game.GlobalDispatcher.AddEvent(0, func() {
+		if e.world != nil && e.world.OnCreatureSay != nil {
+			e.world.OnCreatureSay(p, talkType, text)
+		}
+	})
+	return 0
+}
+
 func (e *Engine) playerGetitemcount(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {

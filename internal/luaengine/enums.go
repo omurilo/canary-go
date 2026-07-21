@@ -196,6 +196,12 @@ func RegisterEnums(L *lua.LState) {
 		"CONDITION_DRUNK":             12,
 		"CONDITION_EXHAUST":           13,
 		"CONDITION_REGENERATION":      14,
+		// Condition slot ids (ConditionId_t). Food scripts pass CONDITIONID_DEFAULT.
+		"CONDITIONID_DEFAULT": -1,
+		"CONDITIONID_COMBAT":  0,
+		// Sound effect used by the food action; sound playback is a no-op stub
+		// for now, but the constant must exist so the script doesn't pass nil.
+		"SOUND_EFFECT_TYPE_ACTION_EAT": 82,
 		"CONDITION_SOUL":              15,
 		"CONDITION_DROWN":             16,
 		"CONDITION_MUTED":             17,

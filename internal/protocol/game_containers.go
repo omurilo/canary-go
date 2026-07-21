@@ -58,7 +58,13 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	if action != nil {
 		gamePos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
 		originalPos := g.player.Pos
+		beforeCount := item.Count
 		if g.deps.Lua.CallAction(action, g.player, item, gamePos, nil, gamePos, false) {
+			// If the script consumed/changed the item (e.g. food, runes calling
+			// item:remove), reflect it on the client.
+			if item.Count != beforeCount {
+				g.reconcileUsedItem(item, pos, stackpos)
+			}
 			if g.player.Pos != originalPos {
 				teleportedTo := g.player.Pos
 				g.player.Pos = originalPos
@@ -168,6 +174,55 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		g.SendToClient(w)
 		
 		g.broadcastAppear(p)
+	}
+}
+
+// reconcileUsedItem updates the client after a use-action mutated an item's
+// stack count (e.g. eating food, using a rune). When the stack is emptied the
+// item is removed from its container/inventory slot; otherwise the reduced
+// stack is re-sent. `pos` is the item's source location as sent by the client
+// and `stackpos` is the map stack index (only used for map items).
+func (g *GameProtocol) reconcileUsedItem(item *game.Item, pos netmsg.Position, stackpos uint8) {
+	consumed := item.Count == 0
+	if pos.X == 0xFFFF {
+		if pos.Y >= 0x40 { // inside a container
+			cid := uint8(pos.Y - 0x40)
+			slot := uint8(pos.Z)
+			cont, ok := g.openContainerByCID(cid)
+			if !ok {
+				return
+			}
+			if consumed {
+				if int(slot) < len(cont.Contents) {
+					cont.Contents = append(cont.Contents[:slot], cont.Contents[slot+1:]...)
+				}
+				g.sendRemoveContainerItem(cid, slot, nil)
+				g.refreshContainerIfOpen(cont)
+			} else {
+				g.sendUpdateContainerItem(cid, slot, item)
+			}
+			return
+		}
+		// equipment slot
+		slot := uint8(pos.Y)
+		if slot == 0 || slot > 10 {
+			return
+		}
+		if consumed {
+			g.player.Inventory[slot] = nil
+			g.sendInventoryEmpty(slot)
+		} else {
+			g.sendInventoryItem(slot, item)
+		}
+		return
+	}
+	// On the map.
+	gp := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
+	if consumed {
+		g.deps.World.Map.RemoveItemPtr(gp, item)
+		g.broadcastRemoveTileThing(gp, stackpos)
+	} else {
+		g.broadcastUpdateTileThing(gp, stackpos, item)
 	}
 }
 

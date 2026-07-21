@@ -43,6 +43,7 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetField(mt, "sendUpdateContainer", e.L.NewFunction(e.playerSendupdatecontainer))
 	e.L.SetField(mt, "addItemBatchToPaginedContainer", e.L.NewFunction(e.playerAdditembatchtopaginedcontainer))
 	e.L.SetField(mt, "getParty", e.L.NewFunction(e.playerGetparty))
+	e.L.SetField(mt, "say", e.L.NewFunction(e.playerSay))
 	e.L.SetField(mt, "__index", mt)
 }
 

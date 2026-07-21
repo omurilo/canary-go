@@ -94,6 +94,33 @@ func stubItemMethod(L *lua.LState) int {
 	return 0
 }
 
+// itemRemove consumes `count` from the item's stack (default the whole stack),
+// mirroring Item::remove used by food/rune scripts. It only mutates the model
+// count here; the protocol layer that invoked the action reconciles the client
+// (removing the node and refreshing the container/slot) once the action
+// returns. Count 0 marks the item as fully consumed.
+func itemRemove(L *lua.LState) int {
+	it := checkItem(L)
+	if it.item == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	count := 1
+	if L.GetTop() >= 2 && L.Get(2).Type() == lua.LTNumber {
+		count = luaOptInt(L, 2)
+	}
+	if count < 1 {
+		count = 1
+	}
+	if int(it.item.Count) > count {
+		it.item.Count -= uint16(count)
+	} else {
+		it.item.Count = 0
+	}
+	L.Push(lua.LTrue)
+	return 1
+}
+
 func (e *Engine) itemMethods() map[string]lua.LGFunction {
 	return map[string]lua.LGFunction{
 		"isItem": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
@@ -136,7 +163,7 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		"getParent": stubItemMethod,
 		"clone": stubItemMethod,
 		"split": stubItemMethod,
-		"remove": stubItemMethod,
+		"remove": itemRemove,
 		"getActionId": stubItemMethod,
 		"setActionId": stubItemMethod,
 		"hasAttribute": stubItemMethod,
