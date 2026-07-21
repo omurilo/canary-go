@@ -89,7 +89,10 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 		}
 	case "showcharges":
 		it.ShowCharges = (attr.Value == "1")
-	case "capacity":
+	case "capacity", "containersize", "containerSize":
+		// Container slot count. Canary's items.xml uses `containersize`; the
+		// older `capacity` key is accepted too. Drives the 0x6E open-container
+		// window's free-slot count.
 		if v, err := strconv.ParseUint(attr.Value, 10, 32); err == nil {
 			it.Capacity = uint32(v)
 		}

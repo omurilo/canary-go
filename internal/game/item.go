@@ -42,13 +42,25 @@ type Item struct {
 // ContainerCapacity returns the container's slot capacity, preferring the
 // stored MaxSize and falling back to the catalog's ItemType.Capacity. catalog
 // may be nil (then only the stored MaxSize is used). Mirrors Container::capacity.
+// DefaultContainerCapacity is the slot count used for containers whose type
+// carries no explicit containersize (mirrors the C++ default). A standard
+// backpack overrides this via items.xml (e.g. 20).
+const DefaultContainerCapacity = 8
+
 func (i *Item) ContainerCapacity(catalog *items.Catalog) uint16 {
 	if i.MaxSize > 0 {
 		return i.MaxSize
 	}
 	if catalog != nil {
 		if t := catalog.Get(i.ID); t != nil {
-			return uint16(t.Capacity)
+			if t.Capacity > 0 {
+				return uint16(t.Capacity)
+			}
+			// A container with no explicit size still has the default capacity;
+			// never report 0 or the client shows a full, unexpandable window.
+			if t.IsContainer() {
+				return DefaultContainerCapacity
+			}
 		}
 	}
 	return 0

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	lua "github.com/yuin/gopher-lua"
 
@@ -172,7 +173,20 @@ func run(o runOpts, log *slog.Logger) error {
 		if catalog == nil {
 			return fmt.Errorf("map loading requires a valid appearances.dat (item metadata)")
 		}
-		res, err := otbm.Load(mapFilePath, catalog, world.Map)
+		// Retry the load a few times: on Docker Desktop (macOS) a large
+		// bind-mounted OTBM can be briefly unavailable right after container
+		// start, which would otherwise silently drop the server onto the
+		// synthetic field (sending every player/temple to 1000,1000).
+		var res *otbm.Result
+		var err error
+		for attempt := 1; attempt <= 5; attempt++ {
+			res, err = otbm.Load(mapFilePath, catalog, world.Map)
+			if err == nil {
+				break
+			}
+			log.Warn("OTBM load attempt failed; retrying", "file", mapFilePath, "attempt", attempt, "err", err)
+			time.Sleep(1 * time.Second)
+		}
 		if err != nil {
 			// A missing or unreadable map must not crash the server: the working
 			// vertical slice falls back to the synthetic spawn field so login and
