@@ -3,6 +3,8 @@ package game
 import (
 	"testing"
 	"time"
+
+	"github.com/opentibiabr/canary-go/internal/game/combat"
 )
 
 // newTestCreature-ish helpers: build a small world with two adjacent tiles.
@@ -35,7 +37,7 @@ func TestCombatEngine_MeleeHitDamagesTarget(t *testing.T) {
 	attacker.SetPosition(Position{X: 100, Y: 100, Z: 7})
 
 	before := monster.GetHealth()
-	e.doMeleeHit(attacker, monster)
+	e.doMeleeHit(combat.NewCombat(), attacker, monster)
 
 	if monster.GetHealth() >= before {
 		t.Fatalf("expected monster health to drop from %d, got %d", before, monster.GetHealth())

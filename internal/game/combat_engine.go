@@ -110,6 +110,13 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 	if target.GetHealth() == 0 {
 		return
 	}
+	// Monsters never harm players who cannot be attacked (staff/ghost),
+	// mirroring PlayerFlags_t::CannotBeAttacked.
+	if _, atkIsMonster := attacker.(*Monster); atkIsMonster {
+		if tp, ok := target.(*Player); ok && tp.CannotBeAttacked() {
+			return
+		}
+	}
 	// Melee reach: adjacent on the same floor, matching Position::areInRange<1,1>
 	// used by Weapon::useFist (src/items/weapons/weapons.cpp).
 	ap, tp := attacker.GetPosition(), target.GetPosition()

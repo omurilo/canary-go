@@ -292,7 +292,7 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 			if err != nil {
 				return nil, subType, err
 			}
-			attrs.TeleDest = &Position{X: tx, Y: ty, Z: tz}
+			a.TeleDest = &Position{X: tx, Y: ty, Z: tz}
 		case attrItem: // uint16
 			if err := ps.Skip(2); err != nil {
 				return nil, subType, err

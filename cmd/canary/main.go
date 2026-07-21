@@ -206,6 +206,7 @@ func run(o runOpts, log *slog.Logger) error {
 
 			for _, t := range res.Towns {
 				world.Towns[strings.ToLower(t.Name)] = t.Pos
+				world.TownsByID[uint16(t.ID)] = t.Pos
 			}
 			if len(res.Towns) > 0 {
 				spawn = res.Towns[0].Pos

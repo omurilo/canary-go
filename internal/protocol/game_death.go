@@ -1,32 +1,53 @@
 package protocol
 
-import "github.com/opentibiabr/canary-go/internal/game"
+import (
+	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/netmsg"
+)
 
-// HandlePlayerDeath runs the client-facing side of a player death: it announces
-// the death, teleports the player to their temple, and refreshes stats. The
-// model-side penalty (experience/level loss, vitals refill, condition strip)
-// has already been applied by game.Player.ApplyDeathPenalty before this runs.
-//
-// This is the pragmatic "instant respawn" flow: rather than the 0x28 relogin
-// dialog (which requires a full relog handshake), the player is moved straight
-// to the temple alive, which is non-freezing and immediately testable. The
-// 0x28 death window is a later refinement.
+// sendReLoginWindow sends the death dialog (0x28), mirroring
+// ProtocolGame::sendReLoginWindow. The client shows "You are dead." with a
+// button that reconnects the character, which then logs in at the temple.
+// Layout (modern): byte 0x28; byte 0x00 (>=1055); unfairFightReduction byte;
+// byte 0x00 death-redemption (>=1121).
+func (g *GameProtocol) sendReLoginWindow(unfairFightReduction uint8) {
+	w := netmsg.NewWriter()
+	w.AddByte(0x28)
+	w.AddByte(0x00)
+	w.AddByte(unfairFightReduction)
+	w.AddByte(0x00)
+	g.SendToClient(w)
+}
+
+// HandlePlayerDeath runs the client-facing side of a player death, matching the
+// C++ flow: the model-side penalty (experience/level loss, vitals refill,
+// condition strip) has already been applied by game.Player.ApplyDeathPenalty.
+// Here we announce the death, send the relogin window, move the character to
+// their temple (so the death save and the subsequent relogin place them there),
+// and despawn them from the world so the client's reconnect succeeds.
 func HandlePlayerDeath(world *game.World, p *game.Player, killer game.Creature) {
 	if p == nil {
 		return
 	}
+	// TemplePosition is the LoginPosition resolved (and walkability-checked)
+	// from the OTBM town at enter-world; fall back to the default spawn only if
+	// the tile went missing.
 	temple := p.TemplePosition()
-	if temple.X == 0 && temple.Y == 0 {
+	if world.Map.GetTile(temple) == nil {
 		temple = world.DefaultSpawn
 	}
 
-	p.SendTextMessage(messageStatus, "You are dead.")
-
 	if gp, ok := p.Session.(*GameProtocol); ok {
-		gp.teleport(temple)
-		gp.sendStats()
-	} else {
-		// Headless / no session: just relocate the model.
-		world.SetPosition(p, temple)
+		gp.player.SendTextMessage(messageStatus, "You are dead.")
+		// PvE deaths carry no unfair-fight reduction (100%).
+		gp.sendReLoginWindow(100)
 	}
+
+	// Despawn at the death location (broadcasts the removal to spectators) and
+	// only then relocate the model to the temple, so the tile bookkeeping and
+	// the persisted position are both correct. The client shows the death
+	// window and, on the button click, reconnects and logs in at the temple.
+	world.RemovePlayer(p.ID)
+	p.Pos = temple
+	p.Dead = false
 }

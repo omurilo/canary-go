@@ -526,6 +526,12 @@ func creatureIsimmune(L *lua.LState) int {
 }
 
 func creatureIsinghostmode(L *lua.LState) int {
+	if ud, ok := L.Get(1).(*lua.LUserData); ok {
+		if p, ok := ud.Value.(*game.Player); ok {
+			L.Push(lua.LBool(p.Ghost))
+			return 1
+		}
+	}
 	L.Push(lua.LFalse)
 	return 1
 }

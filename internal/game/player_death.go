@@ -65,6 +65,24 @@ func (p *Player) ApplyDeathPenalty() {
 	p.Dead = false
 }
 
+// Staff group ids that carry the cannotbeattacked flag (data/XML/groups.xml):
+// 4 = gamemaster, 5 = community manager, 6 = god.
+const firstProtectedGroup = 4
+
+// CannotBeAttacked reports whether monsters (and hostile combat) must ignore
+// this player, mirroring PlayerFlags_t::CannotBeAttacked. True for the staff
+// groups (gamemaster/community-manager/god), god-type accounts, and ghost mode.
+func (p *Player) CannotBeAttacked() bool {
+	if p.Ghost {
+		return true
+	}
+	if p.GroupID >= firstProtectedGroup {
+		return true
+	}
+	// accounts.type ACCOUNT_TYPE_GOD (5) as a fallback signal.
+	return p.AccountType >= 5
+}
+
 // TemplePosition returns where the player respawns after death: their stored
 // login/temple position, falling back to their current position when unset.
 func (p *Player) TemplePosition() Position {

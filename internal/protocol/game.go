@@ -301,10 +301,21 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 		return
 	}
 
-	// Relocate to the default spawn if the stored tile has no ground (e.g. a
-	// fresh character, or a stored position outside the loaded map).
+	// Resolve the player's temple (respawn point) from the OTBM towns. The SQL
+	// `towns` table only holds placeholder data, so trusting it sends dead
+	// players to a void tile ("limbo"); the OTBM town data has the real temple
+	// positions. Fall back to the default spawn when the town id is unknown or
+	// its tile is not walkable.
+	temple := g.deps.World.DefaultSpawn
+	if t, ok := g.deps.World.TempleByTownID(player.TownID); ok && g.deps.World.Map.GetTile(t).Walkable(g.deps.Items) {
+		temple = t
+	}
+	player.LoginPosition = temple
+
+	// Relocate to the temple if the stored tile has no ground (e.g. a fresh
+	// character, or a stored position outside the loaded map).
 	if !g.deps.World.Map.GetTile(player.Pos).Walkable(g.deps.Items) {
-		player.Pos = g.deps.World.DefaultSpawn
+		player.Pos = temple
 	}
 
 	if !g.deps.World.AddPlayer(player, g) {

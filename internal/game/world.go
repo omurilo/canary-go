@@ -15,6 +15,7 @@ type World struct {
 	mu             sync.RWMutex
 	Map            *Map
 	Towns          map[string]Position
+	TownsByID      map[uint16]Position // town id -> temple position (from the OTBM)
 	DefaultSpawn   Position
 	players        map[uint32]*Player
 	byName         map[string]*Player
@@ -76,6 +77,7 @@ func NewWorld() *World {
 	w := &World{
 		Map:          NewMap(),
 		Towns:        make(map[string]Position),
+		TownsByID:    make(map[uint16]Position),
 		players:      make(map[uint32]*Player),
 		byName:       make(map[string]*Player),
 		creatures:    make(map[uint32]Creature),
@@ -85,6 +87,13 @@ func NewWorld() *World {
 	w.Decay = NewDecayManager(w)
 	w.nextCreatureID.Store(0x10000000) // player creature ids start high, like TFS
 	return w
+}
+
+// TempleByTownID returns the temple position for a town id (from the OTBM),
+// used to respawn a player at the temple of the town they belong to.
+func (w *World) TempleByTownID(id uint16) (Position, bool) {
+	p, ok := w.TownsByID[id]
+	return p, ok
 }
 
 // TownTemple returns a town's temple position by (case-insensitive) name.

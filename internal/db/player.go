@@ -11,7 +11,7 @@ import (
 // LoadPlayer loads a character by name into a game.Player. The town temple is
 // used when the stored position is (0,0,0).
 func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) {
-	const q = `SELECT p.id, p.account_id, a.type as account_type, p.name, p.level, p.vocation, p.sex,
+	const q = `SELECT p.id, p.account_id, a.type as account_type, p.group_id, p.name, p.level, p.vocation, p.sex,
 	                  p.health, p.healthmax, p.mana, p.manamax, p.experience,
 	                  p.maglevel, p.soul, p.cap, p.balance,
 	                  p.looktype, p.lookhead, p.lookbody, p.looklegs, p.lookfeet,
@@ -28,7 +28,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	var posx, posy uint16
 	var posz uint8
 	err := d.SQL.QueryRowContext(ctx, q, name).Scan(
-		&p.DBID, &p.AccountID, &p.AccountType, &p.Name, &p.Level, &p.Vocation, &p.Sex,
+		&p.DBID, &p.AccountID, &p.AccountType, &p.GroupID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
 		&p.Health, &p.MaxHealth, &p.Mana, &p.MaxMana, &p.Experience,
 		&p.MagLevel, &p.Soul, &capValue, &p.BankBalance,
 		&lookType, &lookHead, &lookBody, &lookLegs, &lookFeet, &lookAddons,

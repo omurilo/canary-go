@@ -34,7 +34,9 @@ func (e *AIEngine) updateAI() {
 		if target != nil {
 			// Check if target is still valid
 			if targetPlayer, ok := target.(*Player); ok {
-				if e.world.PlayerByID(targetPlayer.GetID()) == nil || !c.GetPosition().InRangeOf(target.GetPosition()) {
+				if e.world.PlayerByID(targetPlayer.GetID()) == nil ||
+					targetPlayer.CannotBeAttacked() ||
+					!c.GetPosition().InRangeOf(target.GetPosition()) {
 					c.SetTarget(nil)
 				}
 			} else {
@@ -42,12 +44,17 @@ func (e *AIEngine) updateAI() {
 			}
 		}
 
-		// Aggro: Find a target if we don't have one
+		// Aggro: Find a target if we don't have one. Staff (god/gm/community
+		// manager) and ghosts cannot be attacked, so monsters never aggro them —
+		// mirroring PlayerFlags_t::CannotBeAttacked.
 		if c.GetTarget() == nil {
 			players := e.world.Spectators(c.GetPosition(), c.GetID())
 			var closest *Player
 			var minDist int = 1000
 			for _, p := range players {
+				if p.CannotBeAttacked() {
+					continue
+				}
 				dist := chebyshevDistance(c.GetPosition(), p.GetPosition())
 				if dist < minDist {
 					minDist = dist
