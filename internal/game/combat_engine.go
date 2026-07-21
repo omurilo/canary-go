@@ -66,8 +66,45 @@ func NewCombatEngine(w *World) *CombatEngine {
 }
 
 // Start begins the self-rescheduling combat loop.
+// regenInterval is how often food regeneration drains and heals.
+const regenInterval = 3 * time.Second
+
 func (e *CombatEngine) Start() {
 	GlobalDispatcher.AddEvent(combatTickInterval, e.tick)
+	GlobalDispatcher.AddEvent(regenInterval, e.regenTick)
+}
+
+// regenTick drains active food (CONDITION_REGENERATION) and regenerates a small
+// amount of HP/mana while it lasts, mirroring the regeneration condition. It is
+// a simplified fixed-rate gain (per-vocation gain amounts are a later milestone).
+func (e *CombatEngine) regenTick() {
+	for _, p := range e.world.Players() {
+		if p.RegenTicks <= 0 {
+			continue
+		}
+		p.RegenTicks -= int32(regenInterval / time.Millisecond)
+		if p.RegenTicks < 0 {
+			p.RegenTicks = 0
+		}
+		changed := false
+		if p.Health < p.MaxHealth {
+			p.AddHealth(1)
+			changed = true
+		}
+		if p.Mana < p.MaxMana {
+			p.AddMana(1)
+			changed = true
+		}
+		if changed {
+			if e.world.OnCreatureHealthChange != nil {
+				e.world.OnCreatureHealthChange(p)
+			}
+			if e.world.OnPlayerStatsChange != nil {
+				e.world.OnPlayerStatsChange(p)
+			}
+		}
+	}
+	GlobalDispatcher.AddEvent(regenInterval, e.regenTick)
 }
 
 func (e *CombatEngine) tick() {

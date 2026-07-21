@@ -1923,15 +1923,27 @@ func playerGetvocation(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	voc := vocations.GetVocation(uint32(p.Vocation)) // assuming player has Vocation id
+	voc := vocations.GetVocation(uint32(p.Vocation))
 	if voc == nil {
-		L.Push(lua.LNil)
-		return 1
+		// Fall back to a default vocation so callers (e.g. Player.feed, which
+		// needs the HP/mana gain rates) still work for characters whose vocation
+		// isn't in the registry. Defaults mirror the "None" vocation regen.
+		voc = &vocations.Vocation{
+			ID: uint32(p.Vocation), Name: "None",
+			GainHPAmount: 1, GainHPTicks: 6, GainManaAmount: 1, GainManaTicks: 6,
+			AttackSpeed: 2000, BaseSpeed: 220,
+		}
 	}
 
 	ud := L.NewTable()
 	mt := L.NewTable()
 
+	num := func(name string, v int) {
+		L.SetField(ud, name, L.NewFunction(func(L *lua.LState) int {
+			L.Push(lua.LNumber(v))
+			return 1
+		}))
+	}
 	L.SetField(ud, "getId", L.NewFunction(func(L *lua.LState) int {
 		L.Push(lua.LNumber(voc.ID))
 		return 1
@@ -1940,15 +1952,14 @@ func playerGetvocation(L *lua.LState) int {
 		L.Push(lua.LString(voc.Name))
 		return 1
 	}))
-	L.SetField(ud, "getAttackSpeed", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LNumber(voc.AttackSpeed))
-		return 1
-	}))
-	L.SetField(ud, "getBaseSpeed", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LNumber(voc.BaseSpeed))
-		return 1
-	}))
-	
+	num("getAttackSpeed", voc.AttackSpeed)
+	num("getBaseSpeed", voc.BaseSpeed)
+	// Health/mana regeneration rates consumed by Player.feed.
+	num("getHealthGainAmount", voc.GainHPAmount)
+	num("getHealthGainTicks", voc.GainHPTicks)
+	num("getManaGainAmount", voc.GainManaAmount)
+	num("getManaGainTicks", voc.GainManaTicks)
+
 	L.SetMetatable(ud, mt)
 	L.Push(ud)
 	return 1

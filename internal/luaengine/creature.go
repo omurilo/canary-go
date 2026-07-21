@@ -234,7 +234,23 @@ func creatureAddcondition(L *lua.LState) int {
 		return 0
 	}
 	cond, ok := ud.Value.(*luaCondition)
-	if !ok || cond.condType == combat.ConditionNone {
+	if !ok {
+		return 0
+	}
+	// Food/regeneration is tracked as RegenTicks on the player, not in the
+	// generic combat condition store.
+	if cond.rawType == conditionRegeneration {
+		if pud, ok := L.Get(1).(*lua.LUserData); ok {
+			if p, ok := pud.Value.(*game.Player); ok {
+				p.RegenTicks = cond.getTicks()
+				L.Push(lua.LTrue)
+				return 1
+			}
+		}
+		L.Push(lua.LTrue)
+		return 1
+	}
+	if cond.condType == combat.ConditionNone {
 		return 0
 	}
 	holder.AddCondition(&combat.ConditionGeneric{Type: cond.condType, Ticks: cond.ticks})
@@ -288,8 +304,24 @@ func creatureGetbasespeed(L *lua.LState) int {
 }
 
 func creatureGetcondition(L *lua.LState) int {
-	// Returns the condition object; the store keeps them but doesn't expose a
-	// lookup-by-type yet, so report absence (nil) rather than a wrong object.
+	c := checkCreature(L)
+	condType := luaOptInt(L, 2)
+	// Food/regeneration: return a condition bound to the player's RegenTicks so
+	// the food script can read getTicks() and accumulate via setTicks(). Only
+	// report presence when there is active food, matching C++ getCondition.
+	if condType == conditionRegeneration {
+		if ud, ok := L.Get(1).(*lua.LUserData); ok {
+			if p, ok := ud.Value.(*game.Player); ok && p.RegenTicks > 0 {
+				lc := &luaCondition{rawType: conditionRegeneration, boundPlayer: p}
+				cud := L.NewUserData()
+				cud.Value = lc
+				L.SetMetatable(cud, L.GetTypeMetatable(luaConditionTypeName))
+				L.Push(cud)
+				return 1
+			}
+		}
+	}
+	_ = c
 	L.Push(lua.LNil)
 	return 1
 }

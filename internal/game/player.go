@@ -101,6 +101,12 @@ type Player struct {
 	MagLevel uint16
 	Skills   [SkillCount]uint16
 
+	// RegenTicks is the remaining food/regeneration time in milliseconds
+	// (CONDITION_REGENERATION). Eating food adds to it; the regen ticker drains
+	// it while healing HP/mana. The "You are full" cap is enforced in the food
+	// script from this value.
+	RegenTicks int32
+
 	Outfit Outfit
 
 	LightLevel uint8

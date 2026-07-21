@@ -1,9 +1,13 @@
 package luaengine
 
 import (
+	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 	lua "github.com/yuin/gopher-lua"
 )
+
+// conditionRegeneration is the Lua CONDITION_REGENERATION enum value (enums.go).
+const conditionRegeneration = 14
 
 // This is a minimal port of the Lua Condition bindings
 // (src/lua/functions/creatures/combat/condition_functions.cpp). It captures the
@@ -17,9 +21,16 @@ import (
 const luaConditionTypeName = "Condition"
 
 // luaCondition wraps the combat condition type plus captured parameters.
+// rawType keeps the original Lua CONDITION_* value (needed to recognise
+// CONDITION_REGENERATION, which has no combat.ConditionType mapping). When
+// boundPlayer is set (a regeneration condition returned by getCondition),
+// getTicks/setTicks read and write that player's RegenTicks so the food script's
+// accumulate-and-check logic works against live state.
 type luaCondition struct {
-	condType combat.ConditionType
-	ticks    int32
+	condType    combat.ConditionType
+	rawType     int
+	ticks       int32
+	boundPlayer *game.Player
 }
 
 func (e *Engine) registerCondition() {
@@ -31,13 +42,30 @@ func (e *Engine) registerCondition() {
 func conditionConstructor(L *lua.LState) int {
 	c := &luaCondition{}
 	if L.GetTop() >= 1 && L.Get(2).Type() == lua.LTNumber {
-		c.condType = luaToConditionType(luaOptInt(L, 2))
+		c.rawType = luaOptInt(L, 2)
+		c.condType = luaToConditionType(c.rawType)
 	}
 	ud := L.NewUserData()
 	ud.Value = c
 	L.SetMetatable(ud, L.GetTypeMetatable(luaConditionTypeName))
 	L.Push(ud)
 	return 1
+}
+
+// getTicks/setTicks read/write the bound player's RegenTicks for a regeneration
+// condition, else the local ticks value.
+func (c *luaCondition) getTicks() int32 {
+	if c.boundPlayer != nil && c.rawType == conditionRegeneration {
+		return c.boundPlayer.RegenTicks
+	}
+	return c.ticks
+}
+
+func (c *luaCondition) setTicks(t int32) {
+	c.ticks = t
+	if c.boundPlayer != nil && c.rawType == conditionRegeneration {
+		c.boundPlayer.RegenTicks = t
+	}
 }
 
 func checkCondition(L *lua.LState, n int) *luaCondition {
@@ -54,18 +82,18 @@ var conditionMethods = map[string]lua.LGFunction{
 		c := checkCondition(L, 1)
 		// CONDITION_PARAM_TICKS == 2 (creatures_definitions.hpp).
 		if luaOptInt(L, 2) == 2 {
-			c.ticks = int32(luaOptInt(L, 3))
+			c.setTicks(int32(luaOptInt(L, 3)))
 		}
 		return 0
 	},
 	"setTicks": func(L *lua.LState) int {
 		c := checkCondition(L, 1)
-		c.ticks = int32(luaOptInt(L, 2))
+		c.setTicks(int32(luaOptInt(L, 2)))
 		return 0
 	},
 	"getTicks": func(L *lua.LState) int {
 		c := checkCondition(L, 1)
-		L.Push(lua.LNumber(c.ticks))
+		L.Push(lua.LNumber(c.getTicks()))
 		return 1
 	},
 	"getType": func(L *lua.LState) int {

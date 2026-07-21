@@ -351,6 +351,7 @@ func (p *parser) readItem() *game.Item {
 	id := r.u16()
 	count := uint16(0)
 	var teleDest *game.Position
+	var actionID, uniqueID *uint16
 
 	// Item attributes.
 attrLoop:
@@ -361,7 +362,15 @@ attrLoop:
 			count = uint16(r.u8())
 		case attrCharges:
 			count = r.u16()
-		case attrActionID, attrUniqueID, attrDepotID:
+		case attrActionID:
+			v := r.u16()
+			actionID = &v
+		case attrUniqueID:
+			// The unique id keys map-placed movements/actions (e.g. the temple
+			// "citizen" set-town tiles register by uid); it must be stored.
+			v := r.u16()
+			uniqueID = &v
+		case attrDepotID:
 			_ = r.u16()
 		case attrHouseDoorID, attrDecayState, attrShootRange:
 			_ = r.u8()
@@ -389,11 +398,12 @@ attrLoop:
 	}
 
 	it := &game.Item{ID: id, Count: count}
-	if teleDest != nil {
-		if it.Attr == nil {
-			it.Attr = &game.ItemAttributes{}
+	if teleDest != nil || actionID != nil || uniqueID != nil {
+		it.Attr = &game.ItemAttributes{
+			TeleDest: teleDest,
+			ActionID: actionID,
+			UniqueID: uniqueID,
 		}
-		it.Attr.TeleDest = teleDest
 	}
 
 	// Container children: nested item nodes become this item's contents.
