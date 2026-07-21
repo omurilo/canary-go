@@ -101,6 +101,10 @@ type Player struct {
 	MagLevel uint16
 	Skills   [SkillCount]uint16
 
+	// SpeedBonus is the temporary speed delta from conditions (haste/paralyze).
+	// Added on top of the level-scaled base speed (see GetBaseSpeed).
+	SpeedBonus int32
+
 	// RegenTicks is the remaining food/regeneration time in milliseconds
 	// (CONDITION_REGENERATION). Eating food adds to it; the regen ticker drains
 	// it while healing HP/mana. The "You are full" cap is enforced in the food
@@ -393,7 +397,32 @@ func (p *Player) SetDirection(dir Direction) { p.Direction = dir }
 func (p *Player) GetOutfit() Outfit { return p.Outfit }
 func (p *Player) GetLightLevel() uint8 { return p.LightLevel }
 func (p *Player) GetLightColor() uint8 { return p.LightColor }
-func (p *Player) GetSpeed() uint16 { return p.Speed }
+// GetBaseSpeed returns the level-scaled base speed, mirroring
+// Player::updateBaseSpeed: vocation base speed + (level - 1). The vocation base
+// speed defaults to 110 (Canary's "None" vocation) when the registry is empty.
+func (p *Player) GetBaseSpeed() uint16 {
+	base := 110
+	if voc := vocations.GetVocation(uint32(p.Vocation)); voc != nil && voc.BaseSpeed > 0 {
+		base = voc.BaseSpeed
+	}
+	lvl := int(p.Level)
+	if lvl < 1 {
+		lvl = 1
+	}
+	speed := base + (lvl - 1) + int(p.SpeedBonus)
+	if speed < 0 {
+		speed = 0
+	}
+	if speed > 0xFFFF {
+		speed = 0xFFFF
+	}
+	return uint16(speed)
+}
+
+// GetSpeed returns the player's current movement speed: the level-scaled base
+// plus temporary bonuses (haste). This is what the client and the step-duration
+// pacing use.
+func (p *Player) GetSpeed() uint16 { return p.GetBaseSpeed() }
 func (p *Player) GetCreatureType() uint8 { return 0 } // CREATURETYPE_PLAYER
 
 func (p *Player) AttackSpeed() time.Duration {

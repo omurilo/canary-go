@@ -25,6 +25,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/events"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/game/spawns"
+	"github.com/opentibiabr/canary-go/internal/game/vocations"
 	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/luaengine"
 	"github.com/opentibiabr/canary-go/internal/network"
@@ -142,6 +143,17 @@ func run(o runOpts, log *slog.Logger) error {
 			log.Warn("loading npc types", "err", err)
 		} else {
 			log.Info("loaded npc types", "count", len(creatureTypes.Npcs))
+		}
+	}
+
+	// Load vocations (base speed, attack speed, HP/mana/cap gains). Without this
+	// the registry is empty and players fall back to defaults (base speed 110).
+	if cfg.Core != "" {
+		vocFile := filepath.Join(cfg.Core, "XML", "vocations.xml")
+		if err := vocations.LoadVocations(vocFile); err != nil {
+			log.Warn("vocations not loaded", "path", vocFile, "err", err)
+		} else {
+			log.Info("loaded vocations", "path", vocFile)
 		}
 	}
 

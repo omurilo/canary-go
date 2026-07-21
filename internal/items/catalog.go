@@ -51,6 +51,11 @@ type ItemType struct {
 	GroundSpeed uint16
 	BlockSolid  bool // unpass: blocks walking
 	Pickupable  bool
+	// HasHeight marks items with an elevation (appearances height flag). A tile
+	// with 3+ stacked HasHeight items is a "step" the player can climb up from,
+	// and one below an empty tile is a step to descend onto (Tibia stair logic,
+	// Tile::hasHeight / Game::internalMoveCreature).
+	HasHeight bool
 
 	// AlwaysOnTopOrder mirrors ItemType::alwaysOnTopOrder (items.cpp): clip=1,
 	// bottom=2, top=3, else 0. Items with order > 0 stack BELOW creatures on a
@@ -191,6 +196,9 @@ func Load(path string) (*Catalog, error) {
 			it.WrapKit = f.GetWrapkit()
 			it.BlockSolid = f.GetUnpass()
 			it.Pickupable = f.GetTake()
+			if h := f.GetHeight(); h != nil && h.GetElevation() > 0 {
+				it.HasHeight = true
+			}
 			it.ForceUse = f.GetForceuse()
 			switch {
 			case f.GetClip():

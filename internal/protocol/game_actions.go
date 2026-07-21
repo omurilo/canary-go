@@ -22,6 +22,18 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 
 	oldStack := g.StackPosOf(oldPos, p.ID)
 
+	// Stairs/ramps (height-based) change the floor as part of a normal step and
+	// must be resolved BEFORE the flat walkability check — the destination tile
+	// on the current floor often has no ground. Mirrors Game::internalMoveCreature.
+	if dest, ok := g.resolveStairMove(dir); ok {
+		p.Direction = dir
+		g.broadcastRemove(p)
+		g.deps.World.SetPosition(p, dest)
+		g.sendFullMapAt(dest)
+		g.broadcastAppear(p)
+		return true
+	}
+
 	newPos, ok := g.deps.World.TryMove(p, dir)
 	if !ok {
 		// Cancel walk: restore client to current direction.
@@ -184,6 +196,51 @@ func findStepIn(it *game.Item) *moveevents.MoveEvent {
 	return moveevents.FindStepInByItemID(it.ID)
 }
 
+// resolveStairMove implements Tibia's height-based stair up/down for a walk
+// step (Game::internalMoveCreature): climbing off a 3-height tile onto a lower
+// floor with ground, or descending onto a tile whose floor-below is a 3-height
+// step. Returns the z-adjusted destination and true when a floor change applies.
+// Only cardinal moves trigger stairs (diagonal moves never change floor).
+func (g *GameProtocol) resolveStairMove(dir game.Direction) (game.Position, bool) {
+	return stairDestination(g.deps.World.Map, g.deps.Items, g.player.Pos, dir)
+}
+
+// stairDestination is the pure floor-change resolver used by resolveStairMove
+// (extracted for testing).
+func stairDestination(m *game.Map, cat *items.Catalog, cur game.Position, dir game.Direction) (game.Position, bool) {
+	if dir >= game.DirSW { // diagonal
+		return game.Position{}, false
+	}
+	dest := cur.Offset(dir) // horizontal step, same floor
+
+	// Try to go UP: standing on a step (height>=3), the tile above us is
+	// open, and the destination one floor up has walkable ground.
+	if cur.Z != 8 {
+		if curTile := m.GetTile(cur); curTile != nil && curTile.HeightCount(cat) >= 3 {
+			above := m.GetTile(game.Position{X: cur.X, Y: cur.Y, Z: cur.Z - 1})
+			if above == nil || (above.Ground == nil && !above.BlocksSolid(cat)) {
+				up := game.Position{X: dest.X, Y: dest.Y, Z: dest.Z - 1}
+				if t := m.GetTile(up); t != nil && t.Ground != nil && !t.BlocksSolid(cat) {
+					return up, true
+				}
+			}
+		}
+	}
+
+	// Try to go DOWN: the destination on this floor is open (no ground), and the
+	// tile one floor below it is a step (height>=3).
+	if cur.Z != 7 {
+		destTile := m.GetTile(dest)
+		if destTile == nil || (destTile.Ground == nil && !destTile.BlocksSolid(cat)) {
+			down := game.Position{X: dest.X, Y: dest.Y, Z: dest.Z + 1}
+			if t := m.GetTile(down); t != nil && t.HeightCount(cat) >= 3 {
+				return down, true
+			}
+		}
+	}
+	return game.Position{}, false
+}
+
 // autoWalkDir maps the client's auto-walk direction codes to game directions,
 // mirroring ProtocolGame::translateAutoWalkDirection.
 func autoWalkDir(raw byte) (game.Direction, bool) {
@@ -278,7 +335,7 @@ func (g *GameProtocol) walkPath(dirs []game.Direction, gen uint64) {
 // stepDuration mirrors Creature::getStepDuration: ceil(1000*groundSpeed/speed to
 // the server beat), tripled on the diagonal.
 func (g *GameProtocol) stepDuration(dir game.Direction) time.Duration {
-	speed := g.player.Speed
+	speed := g.player.GetSpeed()
 	if speed == 0 {
 		speed = 220
 	}

@@ -3,6 +3,7 @@ package luaengine
 import (
 	"log/slog"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/opentibiabr/canary-go/internal/actions"
@@ -21,14 +22,15 @@ func TestFoodActionRepro(t *testing.T) {
 		t.Skip("core datapack not present")
 	}
 	_ = e.DoFile(core + "/global.lua")
-	// revscriptsys.lua overrides the Item metatable __index with ItemIndex
-	// (getmetatable(self).getId(self)) — this is what made item.itemid crash at
-	// revscriptsys.lua:66. player.lua defines the real Player.feed (food regen
-	// accumulation). Load both so the test exercises the real production path.
-	if _, err := os.Stat(core + "/libs/functions/revscriptsys.lua"); err == nil {
-		_ = e.DoFile(core + "/libs/functions/revscriptsys.lua")
-	}
-	_ = e.DoFile(core + "/libs/functions/player.lua")
+	// Load the full data/libs tree (compat + functions + revscriptsys) the way
+	// the server does, so the test exercises the real Player.feed/getCondition
+	// path with any interfering overrides present.
+	_ = filepath.Walk(core+"/libs", func(path string, info os.FileInfo, err error) error {
+		if err == nil && info != nil && !info.IsDir() && filepath.Ext(path) == ".lua" {
+			_ = e.DoFile(path)
+		}
+		return nil
+	})
 	if err := e.DoFile(foods); err != nil {
 		t.Fatalf("load foods.lua: %v", err)
 	}

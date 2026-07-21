@@ -34,6 +34,45 @@ func (t *Tile) Walkable(catalog *items.Catalog) bool {
 	return true
 }
 
+// HeightCount returns how many items on the tile (ground + stack) carry the
+// height/elevation flag, mirroring Tile::hasHeight's accumulation. Stairs/ramps
+// are tiles with 3+ such items.
+func (t *Tile) HeightCount(catalog *items.Catalog) int {
+	if t == nil || catalog == nil {
+		return 0
+	}
+	n := 0
+	if t.Ground != nil {
+		if ct := catalog.Get(t.Ground.ID); ct != nil && ct.HasHeight {
+			n++
+		}
+	}
+	for _, it := range t.Items {
+		if ct := catalog.Get(it.ID); ct != nil && ct.HasHeight {
+			n++
+		}
+	}
+	return n
+}
+
+// BlocksSolid reports whether the tile's ground or items block movement.
+func (t *Tile) BlocksSolid(catalog *items.Catalog) bool {
+	if t == nil || catalog == nil {
+		return false
+	}
+	if t.Ground != nil {
+		if ct := catalog.Get(t.Ground.ID); ct != nil && ct.BlockSolid {
+			return true
+		}
+	}
+	for _, it := range t.Items {
+		if ct := catalog.Get(it.ID); ct != nil && ct.BlockSolid {
+			return true
+		}
+	}
+	return false
+}
+
 // Map is a sparse tile store keyed by position.
 type Map struct {
 	mu    sync.RWMutex
