@@ -1,5 +1,7 @@
 package game
 
+import "github.com/opentibiabr/canary-go/internal/items"
+
 // Item is an item instance: a client item id, a stack count/subtype, and the
 // decoded OTBR attribute blob (see ItemAttributes).
 //
@@ -24,6 +26,60 @@ type Item struct {
 	// Contents holds the items inside a container item (chest, bag, ...), in
 	// stack order. Empty for non-containers.
 	Contents []*Item
+
+	// Container metadata, mirroring C++ Container. MaxSize/MaxItems are the
+	// per-slot capacities (Container::capacity / m_maxItems); they default to 0
+	// and callers should fall back to ItemType.Capacity via ContainerCapacity.
+	// Unlocked/Pagination drive the 0x6E open-container packet bytes. Parent is
+	// the holding container/cylinder, needed for hasParent() and auto-close.
+	MaxSize    uint16
+	MaxItems   uint16
+	Unlocked   bool
+	Pagination bool
+	Parent     *Item
+}
+
+// ContainerCapacity returns the container's slot capacity, preferring the
+// stored MaxSize and falling back to the catalog's ItemType.Capacity. catalog
+// may be nil (then only the stored MaxSize is used). Mirrors Container::capacity.
+func (i *Item) ContainerCapacity(catalog *items.Catalog) uint16 {
+	if i.MaxSize > 0 {
+		return i.MaxSize
+	}
+	if catalog != nil {
+		if t := catalog.Get(i.ID); t != nil {
+			return uint16(t.Capacity)
+		}
+	}
+	return 0
+}
+
+// IsContainer reports whether this item is a container per the catalog.
+func (i *Item) IsContainer(catalog *items.Catalog) bool {
+	if catalog == nil {
+		return len(i.Contents) > 0
+	}
+	if t := catalog.Get(i.ID); t != nil {
+		return t.IsContainer()
+	}
+	return false
+}
+
+// HoldingCount returns the total number of items held recursively in this
+// container (mirrors Container::getItemHoldingCount). Guards against cycles via
+// a visited set is unnecessary for the acyclic inventory tree.
+func (i *Item) HoldingCount() int {
+	total := 0
+	for _, child := range i.Contents {
+		if child == nil {
+			continue
+		}
+		total++
+		if len(child.Contents) > 0 {
+			total += child.HoldingCount()
+		}
+	}
+	return total
 }
 
 // ItemAttributes is the structured form of the OTBR ATTR_* TLV blob stored in

@@ -26,6 +26,22 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetFuncs(mt, creatureMethods)
 	e.L.SetFuncs(mt, playerMethods)
 	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	// Inventory bindings that need the item catalog (name->id, stack size,
+	// container capacity) override the package-level stubs. Same pattern as
+	// teleportTo: SetField wins over the SetFuncs map because __index == mt.
+	e.L.SetField(mt, "getItemCount", e.L.NewFunction(e.playerGetitemcount))
+	e.L.SetField(mt, "getItemById", e.L.NewFunction(e.playerGetitembyid))
+	e.L.SetField(mt, "addItem", e.L.NewFunction(e.playerAdditem))
+	e.L.SetField(mt, "addItemEx", e.L.NewFunction(e.playerAdditemex))
+	e.L.SetField(mt, "removeItem", e.L.NewFunction(e.playerRemoveitem))
+	e.L.SetField(mt, "getFreeBackpackSlots", e.L.NewFunction(e.playerGetfreebackpackslots))
+	// Container bindings (open-container state shared with the protocol layer).
+	e.L.SetField(mt, "getContainerId", e.L.NewFunction(e.playerGetcontainerid))
+	e.L.SetField(mt, "getContainerById", e.L.NewFunction(e.playerGetcontainerbyid))
+	e.L.SetField(mt, "getContainerIndex", e.L.NewFunction(e.playerGetcontainerindex))
+	e.L.SetField(mt, "sendContainer", e.L.NewFunction(e.playerSendcontainer))
+	e.L.SetField(mt, "sendUpdateContainer", e.L.NewFunction(e.playerSendupdatecontainer))
+	e.L.SetField(mt, "addItemBatchToPaginedContainer", e.L.NewFunction(e.playerAdditembatchtopaginedcontainer))
 	e.L.SetField(mt, "__index", mt)
 }
 
@@ -530,9 +546,19 @@ func playerAddmoney(L *lua.LState) int {
 		return 0
 	}
 	amount := uint64(L.CheckNumber(2))
+	// C++ returns three values: success(bool), addedMoney(int), returnValue(int).
+	// We always fully add, mirroring Game::addMoney's success path.
+	if amount == 0 {
+		L.Push(lua.LTrue)
+		L.Push(lua.LNumber(0))
+		L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR
+		return 3
+	}
 	p.AddMoney(amount)
 	L.Push(lua.LTrue)
-	return 1
+	L.Push(lua.LNumber(amount))
+	L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR
+	return 3
 }
 
 func playerAddmount(L *lua.LState) int {
@@ -851,12 +877,8 @@ func playerRemovemoneybank(L *lua.LState) int {
 		L.Push(lua.LTrue)
 		return 1
 	}
-	if p.BankBalance < uint64(cost) {
-		L.Push(lua.LFalse)
-		return 1
-	}
-	p.BankBalance -= uint64(cost)
-	L.Push(lua.LTrue)
+	// Pay from inventory first, then the bank (mirrors the Lua removeMoneyBank).
+	L.Push(lua.LBool(p.RemoveMoney(uint64(cost), true)))
 	return 1
 }
 
@@ -866,9 +888,19 @@ func playerDepositmoney(L *lua.LState) int {
 		L.Push(lua.LFalse)
 		return 1
 	}
-	if amount := L.CheckNumber(2); amount > 0 {
-		p.BankBalance += uint64(amount)
+	// Move inventory cash into the bank (never credit without debiting).
+	// Normally shadowed by the Lua Bank.deposit wrapper; kept correct so it
+	// can't create money if the shadow ever goes away.
+	amount := uint64(L.CheckNumber(2))
+	if amount == 0 {
+		L.Push(lua.LTrue)
+		return 1
 	}
+	if !p.RemoveMoney(amount, false) {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	p.BankBalance += amount
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -880,12 +912,18 @@ func playerWithdrawmoney(L *lua.LState) int {
 		return 1
 	}
 	amount := L.CheckNumber(2)
-	if amount > 0 && p.BankBalance >= uint64(amount) {
-		p.BankBalance -= uint64(amount)
+	if amount <= 0 {
 		L.Push(lua.LTrue)
 		return 1
 	}
-	L.Push(lua.LBool(amount <= 0))
+	// Debit the bank and credit inventory coins (never debit without crediting).
+	if p.BankBalance < uint64(amount) {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	p.BankBalance -= uint64(amount)
+	p.AddMoney(uint64(amount))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -970,7 +1008,7 @@ func playerGetcapacity(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.Capacity))
+	L.Push(lua.LNumber(p.GetCapacity()))
 	return 1
 }
 
@@ -1151,7 +1189,7 @@ func playerGetfreecapacity(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.Capacity))
+	L.Push(lua.LNumber(p.GetFreeCapacity()))
 	return 1
 }
 
@@ -2217,7 +2255,13 @@ func playerRemovemoney(L *lua.LState) int {
 		return 0
 	}
 	amount := uint64(L.CheckNumber(2))
-	L.Push(lua.LBool(p.RemoveMoney(amount)))
+	// C++ signature: removeMoney(money[, flags=0[, useBank=true]]). arg 3 flags
+	// are unmodelled; arg 4 useBank defaults to true.
+	useBank := true
+	if L.GetTop() >= 4 && L.Get(4).Type() == lua.LTBool {
+		useBank = lua.LVAsBool(L.Get(4))
+	}
+	L.Push(lua.LBool(p.RemoveMoney(amount, useBank)))
 	return 1
 }
 
@@ -2423,10 +2467,14 @@ func playerSendiconbakragore(L *lua.LState) int {
 }
 
 func playerSendinventory(L *lua.LState) int {
-	if checkPlayer(L) == nil {
+	p := checkPlayer(L)
+	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	if p.Session != nil {
+		p.Session.SendInventoryIds()
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -2557,6 +2605,9 @@ func playerSetcapacity(L *lua.LState) int {
 		return 0
 	}
 	p.Capacity = uint32(luaOptInt(L, 2))
+	if p.Session != nil {
+		p.Session.SendStats()
+	}
 	L.Push(lua.LTrue)
 	return 1
 }

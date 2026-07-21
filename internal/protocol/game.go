@@ -99,8 +99,32 @@ type GameProtocol struct {
 
 	actionMu sync.Mutex    // serializes player movement (walk/turn/auto-walk step)
 	walkGen  atomic.Uint64 // bumping cancels the in-flight auto-walk path
+}
 
-	containers map[uint8]*game.Item // open containers by client container id (0-15)
+// openContainerByCID returns the container open under a client cid, preserving
+// the (item, ok) shape callers expect. The open-container state is the single
+// source of truth on game.Player (see Player.openContainers).
+func (g *GameProtocol) openContainerByCID(cid uint8) (*game.Item, bool) {
+	if g.player == nil {
+		return nil, false
+	}
+	c := g.player.GetContainerByID(cid)
+	return c, c != nil
+}
+
+// rangeContainers returns a snapshot of the open containers as cid->item for
+// iteration.
+func (g *GameProtocol) rangeContainers() map[uint8]*game.Item {
+	out := map[uint8]*game.Item{}
+	if g.player == nil {
+		return out
+	}
+	for cid, oc := range g.player.OpenContainersSnapshot() {
+		if oc.Container != nil {
+			out[cid] = oc.Container
+		}
+	}
+	return out
 }
 
 // NewGameFactory returns a factory building GameProtocol instances.
@@ -110,7 +134,6 @@ func NewGameFactory(deps *Deps) network.ProtocolFactory {
 			deps:       deps,
 			known:      make(map[uint32]bool),
 			pingStop:   make(chan struct{}),
-			containers: make(map[uint8]*game.Item),
 		}
 	}
 }

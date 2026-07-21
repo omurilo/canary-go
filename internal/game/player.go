@@ -8,12 +8,45 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
-// Session is implemented by the game protocol connection so the world can push
-// updates to a player's client.
+// Session is implemented by the game protocol connection so the world and the
+// Lua engine can push updates to a player's client after model mutations.
 type Session interface {
 	SendToClient(w *netmsg.Writer)
 	Player() *Player
+
+	// Inventory / stats refresh (Phase 1).
+	SendInventoryItem(slot uint8, it *Item) // 0x78
+	SendInventoryEmpty(slot uint8)          // 0x79
+	SendInventoryIds()                      // 0xF5 aggregated id/tier/count list
+	SendStats()                             // 0xA0 player stats
+
+	// Container windows (Phase 2). OpenContainer allocates/reuses a client cid
+	// and pushes 0x6E; RefreshContainer re-sends 0x6E for every open window
+	// showing c; CloseContainer unregisters and pushes 0x6F.
+	OpenContainer(c *Item)
+	RefreshContainer(c *Item)
+	CloseClientContainer(cid uint8)
+
+	// Shop (Phase 4).
+	SendCloseShop() // 0x7C
 }
+
+// Equipment slot indices (CONST_SLOT_*). Slot 0 is "wherever" (auto-place).
+const (
+	ConstSlotWhereever = 0
+	ConstSlotHead      = 1
+	ConstSlotNecklace  = 2
+	ConstSlotBackpack  = 3
+	ConstSlotArmor     = 4
+	ConstSlotRight     = 5
+	ConstSlotLeft      = 6
+	ConstSlotLegs      = 7
+	ConstSlotFeet      = 8
+	ConstSlotRing      = 9
+	ConstSlotAmmo      = 10
+	ConstSlotFirst     = ConstSlotHead
+	ConstSlotLast      = ConstSlotAmmo
+)
 
 // Skill indexes match the client skill order.
 type Skill int
@@ -50,7 +83,12 @@ type Player struct {
 	Mana       uint32
 	MaxMana    uint32
 	Soul       uint8
-	Capacity   uint32 // free capacity (in the client unit)
+	// Capacity is the player's TOTAL base capacity (players.cap column), in the
+	// client unit (hundredths of an oz). Free capacity = Capacity + BonusCapacity
+	// - InventoryWeight (see GetCapacity/GetFreeCapacity).
+	Capacity        uint32
+	BonusCapacity   uint32 // additive bonus (equipment/wheel/varStats — stubbed 0)
+	InventoryWeight uint32 // cached total weight of all carried items
 	Speed      uint16
 	Vocation   uint16
 	Sex        uint8
@@ -64,8 +102,29 @@ type Player struct {
 	LightColor uint8
 
 	// Inventory holds equipment slots 1..10 (CONST_SLOT_HEAD..CONST_SLOT_AMMO);
-	// index 0 is unused. Persistence of these is a later milestone.
+	// index 0 is unused. Slot 11 (store inbox, CONST_SLOT_LAST) is intentionally
+	// omitted. Persistence of these is a later milestone.
 	Inventory [11]*Item
+
+	// openContainers mirrors C++ Player::openContainers: the client container
+	// windows currently open, keyed by client container id (0..15). Index is the
+	// pagination scroll offset. This is the single source of truth the protocol
+	// layer reads/writes via the Session.
+	openContainers map[uint8]OpenContainer
+
+	// Death / respawn state (Phase 5). LoginPosition is the temple the player
+	// returns to on death; TownID selects it. SkillLoss gates the exp/skill
+	// penalty. Blessings/SkillTries/ManaSpent feed the penalty math.
+	TownID          uint16
+	LoginPosition   Position
+	Dead            bool
+	SkillLoss       bool
+	Skull           uint8
+	Blessings       [8]uint8
+	SkillTries      [SkillCount]uint64
+	ManaSpent       uint64
+	MagLevelPercent uint8
+	LevelPercent    uint8
 
 	TargetID uint32
 	ShopOwnerID uint32 // ID of the NPC currently being traded with
@@ -170,6 +229,12 @@ func (p *Player) SendOpenShop(npc Creature, items []creatures.ShopItem) {
 		inv.AddU64(p.GetMoney())
 		p.Session.SendToClient(inv)
 	}
+}
+
+// CloseShop clears the player's active shop binding. Mirrors
+// Player::closeShopWindow (the NPC-side onCloseChannel is fired by the caller).
+func (p *Player) CloseShop() {
+	p.ShopOwnerID = 0
 }
 
 // GamemasterOutfit sets a default outfit if none was loaded.

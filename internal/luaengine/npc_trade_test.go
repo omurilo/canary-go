@@ -21,6 +21,17 @@ type recordSession struct {
 func (s *recordSession) SendToClient(w *netmsg.Writer) { s.sent = append(s.sent, append([]byte(nil), w.Bytes()...)) }
 func (s *recordSession) Player() *game.Player          { return s.p }
 
+// The remaining game.Session methods are no-ops for the trade test; it only
+// asserts on raw packets captured via SendToClient.
+func (s *recordSession) SendInventoryItem(uint8, *game.Item) {}
+func (s *recordSession) SendInventoryEmpty(uint8)            {}
+func (s *recordSession) SendInventoryIds()                   {}
+func (s *recordSession) SendStats()                          {}
+func (s *recordSession) OpenContainer(*game.Item)            {}
+func (s *recordSession) RefreshContainer(*game.Item)         {}
+func (s *recordSession) CloseClientContainer(uint8)          {}
+func (s *recordSession) SendCloseShop()                      {}
+
 // TestNpcTradeOpensShop drives the full post-greeting interaction: greet the
 // merchant, then say "trade", and assert the shop-open packet (0x7A) is sent.
 // This guards the interaction-state fix (isInteractingWithPlayer) plus the

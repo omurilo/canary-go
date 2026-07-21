@@ -1,9 +1,14 @@
 package game
 
+// Coin item ids match src/utils/utils_definitions.hpp (ITEM_GOLD_COIN=3031,
+// ITEM_PLATINUM_COIN=3035, ITEM_CRYSTAL_COIN=3043) and data/items/items.xml.
+// These are the modern (13.x) server ids; the old 7.x ids (2148/2152/2160)
+// point at unrelated items in this datapack, which silently broke every money
+// and bank operation.
 const (
-	GoldCoinID     = 2148
-	PlatinumCoinID = 2152
-	CrystalCoinID  = 2160
+	GoldCoinID     = 3031
+	PlatinumCoinID = 3035
+	CrystalCoinID  = 3043
 )
 
 func coinValue(id uint16) uint64 {
@@ -37,18 +42,29 @@ func (p *Player) GetMoney() uint64 {
 	return GetMoney(p.Inventory[:])
 }
 
-func (p *Player) RemoveMoney(amount uint64) bool {
-	total := p.GetMoney()
-	if total < amount {
+// RemoveMoney removes `amount` worth of coins, mirroring Game::removeMoney with
+// useBalance: it spends inventory coins first (returning change), and when
+// useBank is set and inventory alone is insufficient it debits the bank for the
+// remainder. It returns false and mutates nothing when inventory+bank < amount.
+func (p *Player) RemoveMoney(amount uint64, useBank bool) bool {
+	inv := p.GetMoney()
+	bank := uint64(0)
+	if useBank {
+		bank = p.BankBalance
+	}
+	if inv+bank < amount {
 		return false
 	}
 
-	// Delete all coins in the inventory and its containers
+	// Remove all inventory coins; we re-add change (pure-inventory case) below.
 	p.deleteAllCoins(p.Inventory[:])
 
-	// Add the remaining change back to the player
-	p.AddMoney(total - amount)
-
+	if inv >= amount {
+		p.AddMoney(inv - amount)
+		return true
+	}
+	// Inventory covered `inv`; debit the shortfall from the bank.
+	p.BankBalance -= amount - inv
 	return true
 }
 

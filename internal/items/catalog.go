@@ -35,6 +35,11 @@ type ItemType struct {
 	Group       Group
 
 	Stackable             bool
+	// StackSize is the maximum count a single stack of this type may hold
+	// (C++ ItemType::stackSize). Stackable/cumulative types default to 100;
+	// non-stackable types are 1. Consumed by inventory add splitting, shop
+	// delivery, and coin conversion.
+	StackSize             uint16
 	Podium                bool
 	UpgradeClassification uint8
 	Expire                bool
@@ -99,6 +104,25 @@ type Catalog struct {
 	byName map[string]uint16 // lower-cased name -> first id seen
 }
 
+// NewCatalog builds a catalog from an explicit set of item types, indexing them
+// by id and (first-seen) name. Primarily for tests and synthetic setups; the
+// production path is Load.
+func NewCatalog(types ...*ItemType) *Catalog {
+	c := &Catalog{byID: make(map[uint16]*ItemType), byName: make(map[string]uint16)}
+	for _, t := range types {
+		if t == nil {
+			continue
+		}
+		c.byID[t.ID] = t
+		if t.Name != "" {
+			if lname := strings.ToLower(t.Name); c.byName[lname] == 0 {
+				c.byName[lname] = t.ID
+			}
+		}
+	}
+	return c
+}
+
 // IDByName resolves an item id from its (case-insensitive) name, mirroring
 // Item::items.getItemIdByName used by the C++ loot loader. Returns (0, false)
 // when unknown.
@@ -154,6 +178,11 @@ func Load(path string) (*Catalog, error) {
 				it.Group = GroupSplash
 			}
 			it.Stackable = f.GetCumulative()
+			if it.Stackable {
+				it.StackSize = 100
+			} else {
+				it.StackSize = 1
+			}
 			it.Podium = f.GetShowOffSocket()
 			it.Expire = f.GetExpire()
 			it.ExpireStop = f.GetExpirestop()

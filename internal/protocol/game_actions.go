@@ -5,7 +5,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/moveevents"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
@@ -436,7 +438,7 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 		if pos.Y >= 0x40 {
 			// Container
 			cid := uint8(pos.Y - 0x40)
-			if cont, ok := g.containers[cid]; ok {
+			if cont, ok := g.openContainerByCID(cid); ok {
 				fromSlot := int(pos.Z)
 				if fromSlot < len(cont.Contents) {
 					item = cont.Contents[fromSlot]
@@ -536,24 +538,16 @@ func (g *GameProtocol) sendCancelTarget() {
 }
 
 func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
+	// Modern (13.x) layout: itemId U16, count(subType) U8, amount U16,
+	// ignoreCap U8, inBackpacks U8. Reading amount as a byte (the old bug)
+	// desynced every subsequent packet.
 	itemID := r.GetU16()
 	subType := r.GetByte()
-	amount := r.GetByte()
-	_ = r.GetByte() // ignoreCapacity
-	_ = r.GetByte() // buyWithBackpacks
+	amount := r.GetU16()
+	_ = r.GetByte() // ignoreCapacity (capacity is not gated yet)
+	_ = r.GetByte() // buyWithBackpacks (shopping bags not modelled yet)
 
-	npcID := g.player.ShopOwnerID
-	if npcID == 0 {
-		return
-	}
-
-	npcCreature := g.deps.World.CreatureByID(npcID)
-	npc, ok := npcCreature.(*game.Npc)
-	if !ok {
-		return
-	}
-
-	nType := g.deps.World.TypeRegistry.Npcs[strings.ToLower(npc.Name)]
+	nType := g.shopOwnerType()
 	if nType == nil {
 		return
 	}
@@ -567,81 +561,149 @@ func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 			break
 		}
 	}
-
 	if !found || price == 0 {
 		g.player.SendTextMessage(0x13, "This item is not available.")
 		return
 	}
 
+	// Cap amounts like the client (stackable ≤ 10000, non-stackable ≤ 100).
+	it := g.deps.Items.Get(itemID)
+	stackable := it != nil && it.Stackable
+	maxAmount := uint16(100)
+	if stackable {
+		maxAmount = 10000
+	}
+	if amount == 0 {
+		return
+	}
+	if amount > maxAmount {
+		amount = maxAmount
+	}
+
 	totalCost := uint64(price) * uint64(amount)
-	if g.player.BankBalance < totalCost {
-		g.player.SendTextMessage(0x13, "You do not have enough money in your bank account.")
+	// Funds: inventory coins first, bank as fallback (Game::removeMoney useBalance).
+	if g.player.GetMoney()+g.player.BankBalance < totalCost {
+		g.player.SendTextMessage(0x13, "You do not have enough money.")
 		return
 	}
 
-	g.player.BankBalance -= totalCost
-
-	// Attempt to put in backpack (Slot 3)
-	bp := g.player.Inventory[3]
-	addedCount := uint16(0)
-	
-	// Fast path: if no backpack, or if we need a place, just create and dump to backpack contents
-	if bp != nil {
-		it := g.deps.Items.Get(itemID)
-		stackable := it != nil && it.Stackable
-		if stackable {
-			// Stackable: one entry with the full count (client shows a stack).
-			item := &game.Item{ID: itemID, Count: uint16(amount)}
-			bp.Contents = append(bp.Contents, item)
-			addedCount = uint16(amount)
-		} else {
-			for i := 0; i < int(amount); i++ {
-				bp.Contents = append(bp.Contents, &game.Item{ID: itemID, Count: 1})
-				addedCount++
-			}
-		}
-		g.player.SendTextMessage(0x14, fmt.Sprintf("Bought %dx for %d gold.", amount, totalCost))
-		// Reflect the purchase in the client: refresh the backpack window (if
-		// open) and its inventory slot so the items actually appear.
-		g.refreshContainerIfOpen(bp)
-		g.sendInventoryItem(3, bp)
-		g.sendStats()
-		g.sendShopGoods()
-	} else {
-		g.player.SendTextMessage(0x13, "You do not have a backpack to store this item.")
-		g.player.BankBalance += totalCost
+	// Deliver first so we only charge for what actually fit.
+	placed, _ := g.player.InternalAddItem(g.deps.Items, itemID, uint32(amount), int(subType), game.ConstSlotWhereever)
+	deliveredCount := deliveredUnits(placed)
+	if deliveredCount == 0 {
+		g.player.SendTextMessage(0x13, "You do not have enough room to carry this item.")
+		return
 	}
+	charge := uint64(price) * uint64(deliveredCount)
+	if !g.player.RemoveMoney(charge, true) {
+		g.player.SendTextMessage(0x13, "You do not have enough money.")
+		return
+	}
+
+	g.player.SendTextMessage(0x14, fmt.Sprintf("Bought %dx %s for %d gold.", deliveredCount, itemName(it, itemID), charge))
+	g.refreshAfterTrade()
+}
+
+// deliveredUnits sums the stack counts of the items actually placed by a buy.
+func deliveredUnits(placed []*game.Item) uint32 {
+	var n uint32
+	for _, it := range placed {
+		if it == nil {
+			continue
+		}
+		if it.Count == 0 {
+			n++
+		} else {
+			n += uint32(it.Count)
+		}
+	}
+	return n
+}
+
+func itemName(it *items.ItemType, id uint16) string {
+	if it != nil && it.Name != "" {
+		return it.Name
+	}
+	return fmt.Sprintf("item %d", id)
+}
+
+// shopOwnerType returns the NPC type the player is currently trading with, or
+// nil when there is no valid shop owner in range.
+func (g *GameProtocol) shopOwnerType() *creatures.NpcType {
+	if g.player == nil || g.player.ShopOwnerID == 0 {
+		return nil
+	}
+	npc, ok := g.deps.World.CreatureByID(g.player.ShopOwnerID).(*game.Npc)
+	if !ok {
+		// Owner vanished — close the shop client-side.
+		g.player.CloseShop()
+		g.SendCloseShop()
+		return nil
+	}
+	// Auto-close when the NPC walks out of interaction range (same floor,
+	// chebyshev distance > 4), mirroring getInteractableShopOwner.
+	if !sameFloorWithin(g.player.Pos, npc.GetPosition(), 4) {
+		g.player.CloseShop()
+		g.SendCloseShop()
+		return nil
+	}
+	return g.deps.World.TypeRegistry.Npcs[strings.ToLower(npc.Name)]
+}
+
+func sameFloorWithin(a, b game.Position, dist int) bool {
+	if a.Z != b.Z {
+		return false
+	}
+	dx := int(a.X) - int(b.X)
+	dy := int(a.Y) - int(b.Y)
+	if dx < 0 {
+		dx = -dx
+	}
+	if dy < 0 {
+		dy = -dy
+	}
+	return dx <= dist && dy <= dist
+}
+
+// refreshAfterTrade re-sends the inventory, open containers, stats, and shop
+// resource/goods lists after a buy or sell, in the order the client expects
+// (container/slot refresh, then stats, then 0xEE balances + 0x7B goods).
+func (g *GameProtocol) refreshAfterTrade() {
+	p := g.player
+	p.UpdateInventoryWeight(g.deps.Items)
+	for slot := game.ConstSlotFirst; slot <= game.ConstSlotLast; slot++ {
+		if item := p.Inventory[slot]; item != nil {
+			g.sendInventoryItem(uint8(slot), item)
+		} else {
+			g.sendInventoryEmpty(uint8(slot))
+		}
+	}
+	for _, c := range g.rangeContainers() {
+		g.refreshContainerIfOpen(c)
+	}
+	g.sendStats()
+	g.sendShopGoods()
 }
 
 // refreshContainerIfOpen re-sends a container's window to the client when the
 // player currently has it open, so item add/remove is reflected live.
 func (g *GameProtocol) refreshContainerIfOpen(container *game.Item) {
-	for cid, open := range g.containers {
+	for cid, open := range g.rangeContainers() {
 		if open == container {
-			g.sendContainer(cid, container, false)
+			g.sendContainer(cid, container, container.Parent != nil)
 			return
 		}
 	}
 }
 
 func (g *GameProtocol) parseSellItem(r *netmsg.Reader) {
+	// Modern layout: itemId U16, count(subType) U8, amount U16, ignoreEquipped U8.
 	itemID := r.GetU16()
 	subType := r.GetByte()
-	amount := r.GetByte()
+	amount := r.GetU16()
 	_ = r.GetByte() // ignoreEquipped
 
-	npcID := g.player.ShopOwnerID
-	if npcID == 0 {
-		return
-	}
-
-	npcCreature := g.deps.World.CreatureByID(npcID)
-	npc, ok := npcCreature.(*game.Npc)
-	if !ok {
-		return
-	}
-
-	nType := g.deps.World.TypeRegistry.Npcs[strings.ToLower(npc.Name)]
+	nType := g.shopOwnerType()
 	if nType == nil {
 		return
 	}
@@ -655,47 +717,47 @@ func (g *GameProtocol) parseSellItem(r *netmsg.Reader) {
 			break
 		}
 	}
-
 	if !found || price == 0 {
 		g.player.SendTextMessage(0x13, "This NPC does not buy this item.")
 		return
 	}
-
-	// For 75% parity: just assume the player has it in the backpack and remove it
-	bp := g.player.Inventory[3]
-	if bp == nil {
-		g.player.SendTextMessage(0x13, "You do not have this item.")
+	if amount == 0 {
 		return
 	}
 
-	removedAmount := uint8(0)
-	for i := len(bp.Contents) - 1; i >= 0; i-- {
-		if bp.Contents[i].ID == itemID {
-			if subType == 0 || uint8(bp.Contents[i].Count) == subType {
-				// Remove item
-				bp.Contents = append(bp.Contents[:i], bp.Contents[i+1:]...)
-				removedAmount++
-				if removedAmount == amount {
-					break
-				}
-			}
-		}
+	// Scan the whole inventory tree (skipping tiered items) and remove up to
+	// `amount`, mirroring Npc::removeItemsFromInventory.
+	sub := -1
+	if subType != 0 {
+		sub = int(subType)
 	}
-
-	if removedAmount == 0 {
-		g.player.SendTextMessage(0x13, "You do not have this item.")
+	sold := g.player.RemoveForSale(g.deps.Items, itemID, uint32(amount), sub)
+	if sold == 0 {
+		g.player.SendTextMessage(0x13, "You do not have so many of this item.")
 		return
 	}
 
-	totalGain := uint64(price) * uint64(removedAmount)
-	g.player.BankBalance += totalGain
-	g.player.SendTextMessage(0x14, fmt.Sprintf("Sold %d items for %d gold.", removedAmount, totalGain))
-	g.refreshContainerIfOpen(bp)
-	g.sendInventoryItem(3, bp)
-	g.sendStats()
-	g.sendShopGoods()
+	totalGain := uint64(price) * uint64(sold)
+	// Proceeds go to inventory coins (visible to the player). AUTOBANK routing
+	// to the bank is a config-driven follow-up.
+	g.player.AddMoney(totalGain)
+
+	it := g.deps.Items.Get(itemID)
+	g.player.SendTextMessage(0x14, fmt.Sprintf("Sold %dx %s for %d gold.", sold, itemName(it, itemID), totalGain))
+	g.refreshAfterTrade()
 }
 
 func (g *GameProtocol) parseCloseShop(r *netmsg.Reader) {
-	// client closed the shop, nothing needed unless we store the state
+	if g.player == nil {
+		return
+	}
+	npcID := g.player.ShopOwnerID
+	g.player.CloseShop()
+	// Fire the NPC's onCloseChannel so dialogue state resets, mirroring
+	// Npc::onPlayerCloseChannel.
+	if npcID != 0 {
+		if npc, ok := g.deps.World.CreatureByID(npcID).(*game.Npc); ok {
+			g.deps.Lua.CallNpcCloseChannel(npc, g.player)
+		}
+	}
 }

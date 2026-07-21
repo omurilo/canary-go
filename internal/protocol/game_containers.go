@@ -25,7 +25,7 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	if pos.X == 0xFFFF {
 		if pos.Y >= 0x40 {
 			cid := uint8(pos.Y - 0x40)
-			if cont, ok := g.containers[cid]; ok {
+			if cont, ok := g.openContainerByCID(cid); ok {
 				fromSlot := int(pos.Z)
 				if fromSlot < len(cont.Contents) {
 					item = cont.Contents[fromSlot]
@@ -113,8 +113,8 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 
 	if t.IsContainer() {
 		if pos.X == 0xFFFF {
-			g.containers[index] = item
-			g.sendContainer(index, item, false)
+			g.player.OpenContainerAt(index, item)
+			g.sendContainer(index, item, item.Parent != nil)
 		} else {
 			g.openContainer(item)
 		}
@@ -186,28 +186,14 @@ func findTileItem(tile *game.Tile, id uint16) *game.Item {
 
 // openContainer assigns a client container id and sends the container window.
 func (g *GameProtocol) openContainer(item *game.Item) {
-	for cid, open := range g.containers {
-		if open == item { // already open — just refresh it
-			g.sendContainer(cid, item, false)
-			return
-		}
+	if g.player == nil {
+		return
 	}
-	cid := g.nextContainerID()
-	if cid == 0xFF {
+	cid := g.player.AddContainer(item) // reuses an existing cid or allocates one
+	if cid < 0 {
 		return // all 16 container slots in use
 	}
-	g.containers[cid] = item
-	g.sendContainer(cid, item, false)
-}
-
-// nextContainerID returns the lowest free container id (0-15), or 0xFF if none.
-func (g *GameProtocol) nextContainerID() uint8 {
-	for i := uint8(0); i < 16; i++ {
-		if _, ok := g.containers[i]; !ok {
-			return i
-		}
-	}
-	return 0xFF
+	g.sendContainer(uint8(cid), item, item.Parent != nil)
 }
 
 // sendContainer sends the container window (0x6E), mirroring the modern layout of
@@ -225,12 +211,23 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 		}
 	}
 	contents := item.Contents
-	capacity := len(contents)
-	if capacity < 8 {
-		capacity = 8
+	// Real container capacity (Container::capacity), clamped to at least the
+	// number of items currently shown and to the byte range the packet allows.
+	capacity := int(item.ContainerCapacity(g.deps.Items))
+	if capacity < len(contents) {
+		capacity = len(contents)
+	}
+	if capacity < 1 {
+		capacity = 1
 	}
 	if capacity > 0xFF {
 		capacity = 0xFF
+	}
+	unlocked := byte(1) // drag & drop allowed unless explicitly locked
+	pagination := boolByte(item.Pagination)
+	firstIndex := uint16(0)
+	if g.player != nil {
+		firstIndex = g.player.GetContainerIndex(cid)
 	}
 	page := len(contents)
 	if page > 0xFF {
@@ -245,10 +242,10 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 	w.AddByte(byte(capacity))
 	w.AddByte(boolByte(hasParent))
 	w.AddByte(0) // depot search available
-	w.AddByte(1) // unlocked (drag & drop)
-	w.AddByte(0) // has pagination
+	w.AddByte(unlocked)
+	w.AddByte(pagination)
 	w.AddU16(uint16(len(contents)))
-	w.AddU16(0) // first index
+	w.AddU16(firstIndex)
 	w.AddByte(byte(page))
 	for i := 0; i < page; i++ {
 		g.addItem(w, contents[i])
@@ -264,7 +261,9 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 // parseCloseContainer handles a close-container request (0x87) and confirms it.
 func (g *GameProtocol) parseCloseContainer(r *netmsg.Reader) {
 	cid := r.GetByte()
-	delete(g.containers, cid)
+	if g.player != nil {
+		g.player.CloseContainer(cid)
+	}
 	w := netmsg.NewWriter()
 	w.AddByte(opContainerClose)
 	w.AddByte(cid)

@@ -341,6 +341,47 @@ func npcTurntocreature(L *lua.LState) int {
 }
 
 
+// CallNpcCloseChannel fires the NPC's onCloseChannel callback (if defined) when
+// a player closes the shop/trade window, mirroring Npc::onPlayerCloseChannel so
+// the dialogue module can reset its per-player topic state.
+func (e *Engine) CallNpcCloseChannel(npc *game.Npc, player *game.Player) {
+	if npc == nil || player == nil {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.npcCallbacksMu.Lock()
+	if e.npcCallbacks == nil {
+		e.npcCallbacksMu.Unlock()
+		return
+	}
+	callbacks, ok := e.npcCallbacks[strings.ToLower(npc.Name)]
+	if !ok || callbacks["onCloseChannel"] == nil {
+		e.npcCallbacksMu.Unlock()
+		return
+	}
+	fn := callbacks["onCloseChannel"]
+	e.npcCallbacksMu.Unlock()
+
+	L := e.L
+	L.Push(fn)
+
+	udNpc := L.NewUserData()
+	udNpc.Value = npc
+	L.SetMetatable(udNpc, L.GetTypeMetatable("Npc"))
+	L.Push(udNpc)
+
+	udPlayer := L.NewUserData()
+	udPlayer.Value = player
+	L.SetMetatable(udPlayer, L.GetTypeMetatable("Player"))
+	L.Push(udPlayer)
+
+	if err := L.PCall(2, 0, nil); err != nil {
+		e.log.Error("lua npc onCloseChannel", "npc", npc.Name, "err", err)
+	}
+}
+
 func (e *Engine) CallNpcOnCreatureSay(npc *game.Npc, player *game.Player, talkType byte, text string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
