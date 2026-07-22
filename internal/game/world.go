@@ -30,6 +30,7 @@ type World struct {
 	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldTileIndex int)
 	OnCreatureAppear func(c Creature)
 	OnCreatureRemove func(c Creature)
+	OnGhostModeChange func(p *Player)
 
 	// Combat hooks, populated by the protocol layer so the combat engine can
 	// push updates to clients without importing the protocol package.

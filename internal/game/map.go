@@ -49,18 +49,10 @@ func (t *Tile) WalkableFor(mover Creature, catalog *items.Catalog, worldType uin
 				if otherPlayer.Ghost {
 					continue
 				}
-				if isMoverPlayer {
-					// Both are players! Check if walkthrough is allowed:
-					if t.IsProtectionZone() {
-						continue
-					}
-					if worldType == 1 || worldType == 0 { // WORLD_TYPE_NO_PVP or Optional-PVP
-						continue
-					}
-					if moverPlayer.GroupID >= 3 {
-						continue
-					}
+				if isMoverPlayer && moverPlayer.GroupID >= 3 {
+					continue
 				}
+				// Normal players cannot occupy the same tile as another non-ghost player.
 				return false
 			} else {
 				return false

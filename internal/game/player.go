@@ -641,6 +641,16 @@ func (p *Player) AddCondition(c combat.Condition) {
 
 func (p *Player) GetWorld() *World { return p.World }
 
+func (p *Player) SetGhostMode(ghost bool) {
+	if p.Ghost == ghost {
+		return
+	}
+	p.Ghost = ghost
+	if p.World != nil && p.World.OnGhostModeChange != nil {
+		p.World.OnGhostModeChange(p)
+	}
+}
+
 func (p *Player) NotifyIconsChange() {
 	if p.Session != nil {
 		p.Session.SendIcons()

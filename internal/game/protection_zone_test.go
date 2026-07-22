@@ -202,10 +202,19 @@ func TestWalkthrough_TryMove(t *testing.T) {
 	tile2.Creatures = append(tile2.Creatures, p2)
 	w.Map.SetTile(Position{X: 100, Y: 101, Z: 7}, tile2)
 
-	// In Protection Zone, p2 should be able to walk into tile1 (DirNorth)
+	// Two normal players cannot occupy the exact same tile
 	pos, ok := w.TryMove(p2, DirNorth)
+	if ok {
+		t.Fatalf("expected p2 to NOT walk into tile containing p1, but got ok=%v, pos=%v", ok, pos)
+	}
+
+	// GM (GroupID >= 3) can walk through
+	gm := &Player{GroupID: 3}
+	gm.SetPosition(Position{X: 100, Y: 101, Z: 7})
+	tile2.Creatures = []Creature{gm}
+	pos, ok = w.TryMove(gm, DirNorth)
 	if !ok || pos != (Position{X: 100, Y: 100, Z: 7}) {
-		t.Fatalf("expected p2 to walk into tile containing p1 in Protection Zone, got ok=%v, pos=%v", ok, pos)
+		t.Fatalf("expected GM to walk through p1, got ok=%v, pos=%v", ok, pos)
 	}
 }
 

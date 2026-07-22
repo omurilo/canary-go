@@ -3346,7 +3346,7 @@ func playerSetghostmode(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	p.Ghost = luaOptBool(L, 2)
+	p.SetGhostMode(luaOptBool(L, 2))
 	L.Push(lua.LTrue)
 	return 1
 }

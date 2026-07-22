@@ -312,10 +312,13 @@ func (g *GameProtocol) StackPosOf(pos game.Position, creatureID uint32) uint8 {
 			}
 		}
 		for i := len(tile.Creatures) - 1; i >= 0; i-- {
-			if tile.Creatures[i].GetID() == creatureID {
+			c := tile.Creatures[i]
+			if c.GetID() == creatureID {
 				return uint8(stack)
 			}
-			stack++
+			if g.canSeeCreature(c) {
+				stack++
+			}
 		}
 	}
 	return uint8(stack)

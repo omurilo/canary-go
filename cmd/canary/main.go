@@ -257,6 +257,9 @@ func run(o runOpts, log *slog.Logger) error {
 	world.OnCreatureRemove = func(c game.Creature) {
 		protocol.BroadcastCreatureRemove(world, c)
 	}
+	world.OnGhostModeChange = func(p *game.Player) {
+		protocol.BroadcastGhostModeChange(world, p)
+	}
 	world.OnCreatureHealthChange = func(c game.Creature) {
 		protocol.BroadcastCreatureHealth(world, c)
 	}

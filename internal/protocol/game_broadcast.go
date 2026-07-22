@@ -62,7 +62,6 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 			// Stack position in the old tile
 			oldStack := gp.StackPosWithIndex(oldPos, oldTileIndex)
 			gp.SendCreatureMove(oldPos, oldStack, newPos)
-			gp.SendCreatureWalkthrough(c, gp.canWalkthroughEx(gp.player, c))
 		} else {
 			oldStack := gp.StackPosWithIndex(oldPos, oldTileIndex)
 			gp.SendRemoveCreatureAt(oldPos, oldStack)
@@ -75,7 +74,6 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 		}
 		visited[s.ID] = true
 		gp.SendAppendCreature(c, newPos)
-		gp.SendCreatureWalkthrough(c, gp.canWalkthroughEx(gp.player, c))
 	}
 }
 
@@ -84,7 +82,6 @@ func BroadcastCreatureAppear(w *game.World, c game.Creature) {
 	for _, s := range w.Spectators(c.GetPosition(), c.GetID()) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
 			gp.SendAppendCreature(c, c.GetPosition())
-			gp.SendCreatureWalkthrough(c, gp.canWalkthroughEx(gp.player, c))
 		}
 	}
 }
@@ -95,6 +92,27 @@ func BroadcastCreatureRemove(w *game.World, c game.Creature) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
 			stack := gp.StackPosOf(c.GetPosition(), c.GetID())
 			gp.SendRemoveCreatureAt(c.GetPosition(), stack)
+		}
+	}
+}
+
+// BroadcastGhostModeChange notifies spectators when a player toggles ghost mode.
+func BroadcastGhostModeChange(w *game.World, p *game.Player) {
+	for _, s := range w.Spectators(p.Pos, p.ID) {
+		gp, ok := s.Session.(*GameProtocol)
+		if !ok || s.ID == p.ID {
+			continue
+		}
+		if p.Ghost {
+			if !gp.canSeeCreature(p) {
+				stack := gp.StackPosOf(p.Pos, p.ID)
+				gp.SendRemoveCreatureAt(p.Pos, stack)
+				gp.known[p.ID] = false
+			}
+		} else {
+			if gp.canSeeCreature(p) {
+				gp.SendAppendCreature(p, p.Pos)
+			}
 		}
 	}
 }
