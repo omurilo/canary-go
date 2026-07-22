@@ -1,6 +1,8 @@
 package luaengine
 
 import (
+	"strings"
+
 	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/game/vocations"
@@ -52,6 +54,7 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetField(mt, "setTown", e.L.NewFunction(e.playerSettown))
 	e.L.SetField(mt, "getTown", e.L.NewFunction(e.playerGettown))
 	e.L.SetField(mt, "__index", mt)
+	e.registerKVStoreType()
 }
 
 var playerMethods = map[string]lua.LGFunction{
@@ -2314,7 +2317,159 @@ func playerIsvip(L *lua.LState) int {
 }
 
 func playerKv(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		return 0
+	}
+	kv := &LuaKVStore{
+		Player: p,
+		Scope:  []string{},
+	}
+	ud := L.NewUserData()
+	ud.Value = kv
+	L.SetMetatable(ud, L.GetTypeMetatable("LuaKVStore"))
+	L.Push(ud)
+	return 1
+}
+
+type LuaKVStore struct {
+	Player *game.Player
+	Scope  []string
+}
+
+func checkKVStore(L *lua.LState) *LuaKVStore {
+	ud := L.CheckUserData(1)
+	if v, ok := ud.Value.(*LuaKVStore); ok {
+		return v
+	}
+	L.ArgError(1, "LuaKVStore expected")
+	return nil
+}
+
+func (e *Engine) registerKVStoreType() {
+	mt := e.L.NewTypeMetatable("LuaKVStore")
+	methods := map[string]lua.LGFunction{
+		"get":    kvStoreGet,
+		"set":    kvStoreSet,
+		"remove": kvStoreRemove,
+		"scoped": kvStoreScoped,
+	}
+	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
+}
+
+func kvStoreGet(L *lua.LState) int {
+	kv := checkKVStore(L)
+	if kv == nil {
+		return 0
+	}
+	key := L.CheckString(2)
+	fullKey := key
+	if len(kv.Scope) > 0 {
+		fullKey = strings.Join(kv.Scope, ".") + "." + key
+	}
+
+	if kv.Player.KVStore == nil {
+		kv.Player.KVStore = make(map[string]any)
+	}
+
+	val, exists := kv.Player.KVStore[fullKey]
+	if !exists {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	switch v := val.(type) {
+	case string:
+		L.Push(lua.LString(v))
+	case int:
+		L.Push(lua.LNumber(v))
+	case int32:
+		L.Push(lua.LNumber(v))
+	case int64:
+		L.Push(lua.LNumber(v))
+	case uint32:
+		L.Push(lua.LNumber(v))
+	case uint64:
+		L.Push(lua.LNumber(v))
+	case float64:
+		L.Push(lua.LNumber(v))
+	case bool:
+		L.Push(lua.LBool(v))
+	default:
+		L.Push(lua.LNil)
+	}
+	return 1
+}
+
+func kvStoreSet(L *lua.LState) int {
+	kv := checkKVStore(L)
+	if kv == nil {
+		return 0
+	}
+	key := L.CheckString(2)
+	val := L.Get(3)
+	fullKey := key
+	if len(kv.Scope) > 0 {
+		fullKey = strings.Join(kv.Scope, ".") + "." + key
+	}
+
+	if kv.Player.KVStore == nil {
+		kv.Player.KVStore = make(map[string]any)
+	}
+
+	if val == lua.LNil {
+		delete(kv.Player.KVStore, fullKey)
+	} else {
+		switch v := val.(type) {
+		case lua.LString:
+			kv.Player.KVStore[fullKey] = string(v)
+		case lua.LNumber:
+			kv.Player.KVStore[fullKey] = float64(v)
+		case lua.LBool:
+			kv.Player.KVStore[fullKey] = bool(v)
+		default:
+			// ignore unsupported complex types for now
+		}
+	}
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func kvStoreRemove(L *lua.LState) int {
+	kv := checkKVStore(L)
+	if kv == nil {
+		return 0
+	}
+	key := L.CheckString(2)
+	fullKey := key
+	if len(kv.Scope) > 0 {
+		fullKey = strings.Join(kv.Scope, ".") + "." + key
+	}
+
+	if kv.Player.KVStore != nil {
+		delete(kv.Player.KVStore, fullKey)
+	}
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func kvStoreScoped(L *lua.LState) int {
+	kv := checkKVStore(L)
+	if kv == nil {
+		return 0
+	}
+	scopeName := L.CheckString(2)
+	newScope := append([]string{}, kv.Scope...)
+	newScope = append(newScope, scopeName)
+
+	newKv := &LuaKVStore{
+		Player: kv.Player,
+		Scope:  newScope,
+	}
+	ud := L.NewUserData()
+	ud.Value = newKv
+	L.SetMetatable(ud, L.GetTypeMetatable("LuaKVStore"))
+	L.Push(ud)
 	return 1
 }
 

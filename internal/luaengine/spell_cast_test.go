@@ -317,4 +317,39 @@ func TestOfflineTrainingWithRevscriptsys(t *testing.T) {
 	}
 }
 
+func TestPlayerKVStore(t *testing.T) {
+	e := newTestEngine()
+	p := &game.Player{}
+
+	pUd := e.L.NewUserData()
+	pUd.Value = p
+	e.L.SetMetatable(pUd, e.L.GetTypeMetatable("Player"))
+	e.L.SetGlobal("player", pUd)
+
+	// test getting, setting, and scoped namespaces
+	err := e.DoString(`
+		local kv = player:kv()
+		assert(kv:get("foo") == nil, "expected nil")
+		kv:set("foo", "bar")
+		assert(kv:get("foo") == "bar", "expected bar")
+
+		local scope = kv:scoped("test")
+		assert(scope:get("foo") == nil, "expected scope foo to be nil")
+		scope:set("foo", 123)
+		assert(scope:get("foo") == 123, "expected scope foo to be 123")
+		assert(kv:get("foo") == "bar", "expected root foo to remain bar")
+
+		local nested = scope:scoped("nested")
+		nested:set("hello", true)
+		assert(nested:get("hello") == true, "expected nested hello to be true")
+
+		nested:remove("hello")
+		assert(nested:get("hello") == nil, "expected hello to be removed")
+	`)
+	if err != nil {
+		t.Fatalf("KVStore Lua verification failed: %v", err)
+	}
+}
+
+
 

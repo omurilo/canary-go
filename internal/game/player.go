@@ -184,6 +184,7 @@ type Player struct {
 
 	World   *World
 	Session Session
+	KVStore map[string]any
 }
 
 // Cooldowns returns the player's spell cooldown manager, creating it on first
