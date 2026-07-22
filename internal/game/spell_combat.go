@@ -88,7 +88,7 @@ func (e *CombatEngine) rollSpellDamage(c *combat.Combat, caster Creature) combat
 	level, magic := 0, 0
 	if p, ok := caster.(*Player); ok {
 		level = int(p.Level)
-		magic = int(p.MagLevel)
+		magic = int(p.GetEffectiveMagLevel())
 	}
 	raw := c.RollValue(level, magic)
 	if raw < 0 {

@@ -279,7 +279,7 @@ func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 }
 
 func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item) {
-	skill := int(p.Skills[SkillDistance])
+	skill := int(p.GetEffectiveSkill(SkillDistance))
 	voc := vocations.GetVocation(uint32(p.Vocation))
 	attackValue := int(ammo.Attack(e.world.Items))
 	if attackValue <= 0 {

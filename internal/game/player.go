@@ -338,7 +338,27 @@ func (p *Player) SetHealth(health uint32) {
 		p.Health = p.MaxHealth
 	}
 }
-func (p *Player) GetMaxHealth() uint32 { return p.MaxHealth }
+func (p *Player) GetMaxHealth() uint32 {
+	val := int32(p.MaxHealth)
+	percent := int32(100)
+
+	for _, cond := range p.Conditions() {
+		if attrCond, ok := cond.(*combat.ConditionAttributesStruct); ok {
+			if bonus, ok := attrCond.Stats[27]; ok { // CONDITION_PARAM_STAT_MAXHITPOINTS
+				val += bonus
+			}
+			if pct, ok := attrCond.StatPercent[31]; ok { // CONDITION_PARAM_STAT_MAXHITPOINTSPERCENT
+				percent += pct - 100
+			}
+		}
+	}
+
+	total := (val * percent) / 100
+	if total < 0 {
+		return 0
+	}
+	return uint32(total)
+}
 func (p *Player) AddHealth(amount int32) {
 	if amount > 0 {
 		p.Health += uint32(amount)
@@ -458,6 +478,94 @@ func (p *Player) ChangeSpeed(delta int32) {
 	p.SpeedBonus += delta
 }
 
+// GetEffectiveMagLevel returns the player's MagLevel modified by any active ConditionAttributes
+func (p *Player) GetEffectiveMagLevel() uint16 {
+	val := int32(p.MagLevel)
+	percent := int32(100)
+
+	for _, cond := range p.Conditions() {
+		if attrCond, ok := cond.(*combat.ConditionAttributesStruct); ok {
+			if bonus, ok := attrCond.Stats[30]; ok { // CONDITION_PARAM_STAT_MAGICPOINTS
+				val += bonus
+			}
+			if pct, ok := attrCond.StatPercent[34]; ok { // CONDITION_PARAM_STAT_MAGICPOINTSPERCENT
+				percent += pct - 100
+			}
+		}
+	}
+
+	total := (val * percent) / 100
+	if total < 0 {
+		return 0
+	}
+	return uint16(total)
+}
+
+// GetEffectiveSkill returns the player's skill level modified by active ConditionAttributes
+func (p *Player) GetEffectiveSkill(skill Skill) uint16 {
+	val := int32(p.Skills[skill])
+	percent := int32(100)
+
+	var paramKey int32
+	var paramPctKey int32
+
+	switch skill {
+	case SkillFist:
+		paramKey = 20    // CONDITION_PARAM_SKILL_FIST
+		paramPctKey = 37 // CONDITION_PARAM_SKILL_FISTPERCENT
+	case SkillClub:
+		paramKey = 21    // CONDITION_PARAM_SKILL_CLUB
+		paramPctKey = 38 // CONDITION_PARAM_SKILL_CLUBPERCENT
+	case SkillSword:
+		paramKey = 22    // CONDITION_PARAM_SKILL_SWORD
+		paramPctKey = 39 // CONDITION_PARAM_SKILL_SWORDPERCENT
+	case SkillAxe:
+		paramKey = 23    // CONDITION_PARAM_SKILL_AXE
+		paramPctKey = 40 // CONDITION_PARAM_SKILL_AXEPERCENT
+	case SkillDistance:
+		paramKey = 24    // CONDITION_PARAM_SKILL_DISTANCE
+		paramPctKey = 41 // CONDITION_PARAM_SKILL_DISTANCEPERCENT
+	case SkillShielding:
+		paramKey = 25    // CONDITION_PARAM_SKILL_SHIELD
+		paramPctKey = 42 // CONDITION_PARAM_SKILL_SHIELDPERCENT
+	case SkillFishing:
+		paramKey = 26    // CONDITION_PARAM_SKILL_FISHING
+		paramPctKey = 43 // CONDITION_PARAM_SKILL_FISHINGPERCENT
+	}
+
+	for _, cond := range p.Conditions() {
+		if attrCond, ok := cond.(*combat.ConditionAttributesStruct); ok {
+			// Check melee-generic bonuses (applies to Club, Sword, and Axe)
+			if skill >= SkillClub && skill <= SkillAxe {
+				if bonus, ok := attrCond.Skills[19]; ok { // CONDITION_PARAM_SKILL_MELEE
+					val += bonus
+				}
+				if pct, ok := attrCond.SkillPercent[36]; ok { // CONDITION_PARAM_SKILL_MELEEPERCENT
+					percent += pct - 100
+				}
+			}
+
+			// Check specific skill bonuses
+			if paramKey != 0 {
+				if bonus, ok := attrCond.Skills[paramKey]; ok {
+					val += bonus
+				}
+			}
+			if paramPctKey != 0 {
+				if pct, ok := attrCond.SkillPercent[paramPctKey]; ok {
+					percent += pct - 100
+				}
+			}
+		}
+	}
+
+	total := (val * percent) / 100
+	if total < 0 {
+		return 0
+	}
+	return uint16(total)
+}
+
 func (p *Player) GetCreatureType() uint8 { return 0 } // CREATURETYPE_PLAYER
 
 func (p *Player) GetIcons() uint64 {
@@ -515,7 +623,27 @@ func (p *Player) AttackSpeed() time.Duration {
 // GetMana/GetMaxMana/AddMana expose the player's mana pool for the combat
 // adapter. AddMana clamps like Creature::changeMana (src/creatures/creature.cpp).
 func (p *Player) GetMana() uint32    { return p.Mana }
-func (p *Player) GetMaxMana() uint32 { return p.MaxMana }
+func (p *Player) GetMaxMana() uint32 {
+	val := int32(p.MaxMana)
+	percent := int32(100)
+
+	for _, cond := range p.Conditions() {
+		if attrCond, ok := cond.(*combat.ConditionAttributesStruct); ok {
+			if bonus, ok := attrCond.Stats[28]; ok { // CONDITION_PARAM_STAT_MAXMANAPOINTS
+				val += bonus
+			}
+			if pct, ok := attrCond.StatPercent[32]; ok { // CONDITION_PARAM_STAT_MAXMANAPOINTSPERCENT
+				percent += pct - 100
+			}
+		}
+	}
+
+	total := (val * percent) / 100
+	if total < 0 {
+		return 0
+	}
+	return uint32(total)
+}
 func (p *Player) AddMana(amount int32) {
 	if amount > 0 {
 		p.Mana += uint32(amount)
@@ -620,20 +748,20 @@ func (p *Player) GetShieldAndWeapon(catalog *items.Catalog) (*Item, *Item) {
 // GetWeaponSkill returns the skill value corresponding to the item's weapon type.
 func (p *Player) GetWeaponSkill(catalog *items.Catalog, item *Item) uint16 {
 	if item == nil {
-		return p.Skills[SkillFist]
+		return p.GetEffectiveSkill(SkillFist)
 	}
 	wType := item.WeaponType(catalog)
 	switch wType {
 	case "sword":
-		return p.Skills[SkillSword]
+		return p.GetEffectiveSkill(SkillSword)
 	case "club":
-		return p.Skills[SkillClub]
+		return p.GetEffectiveSkill(SkillClub)
 	case "axe":
-		return p.Skills[SkillAxe]
+		return p.GetEffectiveSkill(SkillAxe)
 	case "distance", "missile":
-		return p.Skills[SkillDistance]
+		return p.GetEffectiveSkill(SkillDistance)
 	default:
-		return p.Skills[SkillFist]
+		return p.GetEffectiveSkill(SkillFist)
 	}
 }
 
@@ -675,7 +803,7 @@ func (p *Player) GetDefense() int32 {
 	if p.World != nil {
 		catalog = p.World.Items
 	}
-	defenseSkill := int32(p.Skills[SkillFist])
+	defenseSkill := int32(p.GetEffectiveSkill(SkillFist))
 	defenseValue := int32(7)
 
 	shield, weapon := p.GetShieldAndWeapon(catalog)
@@ -690,7 +818,7 @@ func (p *Player) GetDefense() int32 {
 		} else {
 			defenseValue = shield.Defense(catalog)
 		}
-		defenseSkill = int32(p.Skills[SkillShielding])
+		defenseSkill = int32(p.GetEffectiveSkill(SkillShielding))
 	}
 
 	if defenseSkill == 0 {

@@ -41,6 +41,14 @@ func CreateCondition(id ConditionId, condType ConditionType, ticks int32, subId 
 		return &ConditionRegenerationStruct{
 			ConditionGeneric: generic,
 		}
+	case ConditionAttributes:
+		return &ConditionAttributesStruct{
+			ConditionGeneric: generic,
+			Skills:           make(map[int32]int32),
+			Stats:            make(map[int32]int32),
+			SkillPercent:     make(map[int32]int32),
+			StatPercent:      make(map[int32]int32),
+		}
 	default:
 		return &ConditionGeneric{
 			Id:           id,
@@ -335,4 +343,93 @@ func (c *ConditionSpeedStruct) Clone() Condition {
 		Maxa:             c.Maxa,
 		Maxb:             c.Maxb,
 	}
+}
+
+// ConditionAttributesStruct handles skill and stat modifications
+type ConditionAttributesStruct struct {
+	ConditionGeneric
+	Skills       map[int32]int32
+	Stats        map[int32]int32
+	SkillPercent map[int32]int32
+	StatPercent  map[int32]int32
+}
+
+func (c *ConditionAttributesStruct) SetParam(key int32, value int32) {
+	c.ConditionGeneric.SetParam(key, value)
+	switch key {
+	case 19, 20, 21, 22, 23, 24, 25, 26: // Skill modifiers
+		c.Skills[key] = value
+	case 27, 28, 30: // Stat modifiers (health, mana, magic level)
+		c.Stats[key] = value
+	case 31, 32, 34: // Stat percentages (health, mana, magic level)
+		c.StatPercent[key] = value
+	case 36, 37, 38, 39, 40, 41, 42, 43: // Skill percentages
+		c.SkillPercent[key] = value
+	}
+}
+
+func (c *ConditionAttributesStruct) StartCondition(creature Creature) bool {
+	if !c.ConditionGeneric.StartCondition(creature) {
+		return false
+	}
+	if player, ok := creature.(interface{ NotifyStatsChange() }); ok {
+		player.NotifyStatsChange()
+	}
+	return true
+}
+
+func (c *ConditionAttributesStruct) EndCondition(creature Creature) {
+	if player, ok := creature.(interface{ NotifyStatsChange() }); ok {
+		player.NotifyStatsChange()
+	}
+}
+
+func (c *ConditionAttributesStruct) AddCondition(creature Creature, condition Condition) {
+	if c.Type != condition.GetType() {
+		return
+	}
+	if c.Ticks < condition.GetTicks() {
+		c.Ticks = condition.GetTicks()
+		c.EndTime = time.Now().UnixMilli() + int64(c.Ticks)
+	}
+	if attrCond, ok := condition.(*ConditionAttributesStruct); ok {
+		for k, v := range attrCond.Skills {
+			c.Skills[k] = v
+		}
+		for k, v := range attrCond.Stats {
+			c.Stats[k] = v
+		}
+		for k, v := range attrCond.SkillPercent {
+			c.SkillPercent[k] = v
+		}
+		for k, v := range attrCond.StatPercent {
+			c.StatPercent[k] = v
+		}
+	}
+	if player, ok := creature.(interface{ NotifyStatsChange() }); ok {
+		player.NotifyStatsChange()
+	}
+}
+
+func (c *ConditionAttributesStruct) Clone() Condition {
+	clone := &ConditionAttributesStruct{
+		ConditionGeneric: *c.ConditionGeneric.Clone().(*ConditionGeneric),
+		Skills:           make(map[int32]int32, len(c.Skills)),
+		Stats:            make(map[int32]int32, len(c.Stats)),
+		SkillPercent:     make(map[int32]int32, len(c.SkillPercent)),
+		StatPercent:      make(map[int32]int32, len(c.StatPercent)),
+	}
+	for k, v := range c.Skills {
+		clone.Skills[k] = v
+	}
+	for k, v := range c.Stats {
+		clone.Stats[k] = v
+	}
+	for k, v := range c.SkillPercent {
+		clone.SkillPercent[k] = v
+	}
+	for k, v := range c.StatPercent {
+		clone.StatPercent[k] = v
+	}
+	return clone
 }

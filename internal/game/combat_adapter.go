@@ -81,6 +81,14 @@ func (a combatAdapter) NotifyIconsChange() {
 	}
 }
 
+func (a combatAdapter) NotifyStatsChange() {
+	if p, ok := a.c.(*Player); ok {
+		if p.World != nil && p.World.OnPlayerStatsChange != nil {
+			p.World.OnPlayerStatsChange(p)
+		}
+	}
+}
+
 func (a combatAdapter) ChangeMana(amount int32) {
 	if m, ok := a.c.(manaHolder); ok {
 		m.AddMana(amount)

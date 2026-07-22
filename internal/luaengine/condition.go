@@ -209,8 +209,36 @@ func luaToConditionType(v int) combat.ConditionType {
 		return combat.ConditionEnergy
 	case 4:
 		return combat.ConditionBleeding
+	case 5:
+		return combat.ConditionHaste
 	case 6:
 		return combat.ConditionParalyze
+	case 7:
+		return combat.ConditionOutfit
+	case 8:
+		return combat.ConditionInvisible
+	case 9:
+		return combat.ConditionLight
+	case 10:
+		return combat.ConditionManaShield
+	case 11:
+		return combat.ConditionInFight
+	case 12:
+		return combat.ConditionDrunk
+	case 13:
+		return combat.ConditionExhaust
+	case 14:
+		return combat.ConditionRegeneration
+	case 15:
+		return combat.ConditionSoul
+	case 17:
+		return combat.ConditionMuted
+	case 18:
+		return combat.ConditionChannelMutedCondition
+	case 19:
+		return combat.ConditionYellTicks
+	case 20:
+		return combat.ConditionAttributes
 	case 21:
 		return combat.ConditionFreezing
 	case 22:
