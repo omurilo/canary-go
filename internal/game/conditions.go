@@ -87,7 +87,6 @@ func (s *conditionStore) Conditions() []combat.Condition {
 // ExecuteConditions ticks and executes all active conditions on a creature.
 func (s *conditionStore) ExecuteConditions(creature combat.Creature, interval int32) {
 	s.condMu.Lock()
-	defer s.condMu.Unlock()
 
 	out := s.conditions[:0]
 	speedChanged := false
@@ -114,6 +113,7 @@ func (s *conditionStore) ExecuteConditions(creature combat.Creature, interval in
 		}
 	}
 	s.conditions = out
+	s.condMu.Unlock()
 
 	if iconsChanged || speedChanged {
 		if notifier, ok := creature.(interface{ NotifyIconsChange() }); ok {

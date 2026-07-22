@@ -2,6 +2,7 @@ package game
 
 import (
 	"testing"
+	"time"
 
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
@@ -143,6 +144,28 @@ func TestCombat_SelfDamageAndSecureMode(t *testing.T) {
 	// 3. p2 (secure mode OFF) CAN aggressively hit p1
 	if !combat.CanDoCombat(c2, c1) {
 		t.Error("expected aggressive combat from player in aggressive mode to be ALLOWED")
+	}
+}
+
+func TestCondition_TickSelfDeadlock(t *testing.T) {
+	p := &Player{}
+	// Create speed/haste condition with 100ms duration
+	cond := combat.CreateCondition(0, combat.ConditionHaste, 100, 0, false)
+	p.AddCondition(cond)
+
+	// Since ExecuteConditions will call EndCondition and NotifyIconsChange,
+	// if we did not unlock before notifying, this would self-deadlock.
+	done := make(chan struct{})
+	go func() {
+		p.TickConditions(200) // tick 200ms, which will expire the 100ms condition
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Passed! No deadlock occurred.
+	case <-time.After(1 * time.Second):
+		t.Fatal("DEADLOCK: TickConditions failed to complete because of self-deadlock on condMu")
 	}
 }
 
