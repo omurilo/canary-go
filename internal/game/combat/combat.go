@@ -208,6 +208,22 @@ func CanDoCombat(caster Creature, target Creature) bool {
 	if caster.IsInProtectionZone() || target.IsInProtectionZone() {
 		return false
 	}
+
+	// Caster can never aggressively hit themselves
+	if caster.GetId() != 0 && caster.GetId() == target.GetId() {
+		return false
+	}
+
+	// Player-vs-Player specific checks
+	casterPlayer, casterIsPlayer := caster.(Player)
+	_, targetIsPlayer := target.(Player)
+	if casterIsPlayer && targetIsPlayer {
+		// If the caster has Secure Mode active (safe/tank mode), they cannot damage other players
+		if casterPlayer.IsSecureMode() {
+			return false
+		}
+	}
+
 	return true
 }
 

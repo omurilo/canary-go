@@ -148,3 +148,24 @@ func (a combatAdapter) IsInProtectionZone() bool {
 	return tile.IsProtectionZone()
 }
 
+func (a combatAdapter) GetLevel() uint32 {
+	if p, ok := a.c.(*Player); ok {
+		return uint32(p.Level)
+	}
+	return 0
+}
+
+func (a combatAdapter) GetMagicLevel() uint32 {
+	if p, ok := a.c.(*Player); ok {
+		return uint32(p.MagLevel)
+	}
+	return 0
+}
+
+func (a combatAdapter) IsSecureMode() bool {
+	if p, ok := a.c.(*Player); ok {
+		return p.SecureMode
+	}
+	return false
+}
+

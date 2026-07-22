@@ -124,6 +124,7 @@ type Player interface {
 	Creature
 	GetLevel() uint32
 	GetMagicLevel() uint32
+	IsSecureMode() bool
 }
 
 type Tile interface {

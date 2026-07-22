@@ -273,7 +273,7 @@ func run(o runOpts, log *slog.Logger) error {
 		protocol.SendCancelTarget(p)
 	}
 	world.OnChangeSpeed = func(c game.Creature) {
-		protocol.BroadcastChangeSpeed(world, c)
+		go protocol.BroadcastChangeSpeed(world, c)
 	}
 	world.OnIconsUpdate = func(p *game.Player) {
 		if p.Session != nil {
