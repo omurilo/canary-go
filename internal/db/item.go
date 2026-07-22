@@ -65,6 +65,7 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 			}
 		} else {
 			if parent, ok := itemsBySID[row.pid]; ok {
+				row.item.Parent = parent
 				parent.Contents = append(parent.Contents, row.item)
 			}
 		}
