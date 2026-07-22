@@ -162,10 +162,12 @@ type Outfit struct {
 // Weight is in hundredths of an ounce (like capacity).
 func (i *Item) GetWeight(catalog *items.Catalog) uint32 {
 	weight := uint32(0)
+	stackable := false
 	
 	if catalog != nil {
 		if t := catalog.Get(i.ID); t != nil {
 			weight = t.Weight
+			stackable = t.Stackable
 		}
 	}
 	
@@ -173,14 +175,14 @@ func (i *Item) GetWeight(catalog *items.Catalog) uint32 {
 		weight = *i.Attr.Weight
 	}
 	
-	// Stackable items multiply weight by count
-	count := uint32(i.Count)
-	if count == 0 {
-		count = 1
+	total := weight
+	if stackable {
+		count := uint32(i.Count)
+		if count == 0 {
+			count = 1
+		}
+		total = weight * count
 	}
-	// Note: We only multiply if it's stackable? Usually weight in XML is per-item.
-	// Actually, in Tibia, weight is always per-item. So weight * count.
-	total := weight * count
 
 	for _, child := range i.Contents {
 		total += child.GetWeight(catalog)

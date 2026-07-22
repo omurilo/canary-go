@@ -113,6 +113,7 @@ func (w *World) TownTemple(name string) (Position, bool) {
 // correctly updating the tile creature tracking.
 func (w *World) SetPosition(p *Player, pos Position) {
 	w.mu.Lock()
+	p.IsTraining = false
 	w.removeCreatureFromTile(p)
 	p.Pos = pos
 	w.addCreatureToTile(p)

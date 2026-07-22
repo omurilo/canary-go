@@ -237,7 +237,11 @@ func (e *Engine) registerAPI() {
 				}
 			}
 		}
-		L.Push(lua.LNumber(0))
+		if key == "maxallowedonadummy" {
+			L.Push(lua.LNumber(1))
+		} else {
+			L.Push(lua.LNumber(0))
+		}
 		return 1
 	}))
 	L.SetField(configManagerTbl, "getFloat", L.NewFunction(func(L *lua.LState) int {
@@ -257,7 +261,11 @@ func (e *Engine) registerAPI() {
 				}
 			}
 		}
-		L.Push(lua.LNumber(0))
+		if strings.HasPrefix(key, "rate") || strings.Contains(key, "speed") || strings.Contains(key, "multiplier") {
+			L.Push(lua.LNumber(1.0))
+		} else {
+			L.Push(lua.LNumber(0))
+		}
 		return 1
 	}))
 	L.SetField(configManagerTbl, "getString", L.NewFunction(func(L *lua.LState) int {
