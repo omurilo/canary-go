@@ -114,6 +114,8 @@ type Creature interface {
 	ChangeMana(amount int32)
 	GetBaseSpeed() uint16
 	ChangeSpeed(delta int32)
+	GetArmor() int32
+	GetDefense() int32
 }
 
 type Player interface {

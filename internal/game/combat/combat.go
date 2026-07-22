@@ -99,6 +99,31 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 	}
 
 	// Calculate and apply armor/shield blocking here if needed
+	if damage.PrimaryType != CombatHealing && damage.PrimaryValue > 0 {
+		if c.Params.BlockedByShield {
+			defense := target.GetDefense()
+			if defense > 0 {
+				reduction := randomRange(int(defense/2), int(defense))
+				damage.PrimaryValue -= reduction
+				if damage.PrimaryValue <= 0 {
+					damage.PrimaryValue = 0
+				}
+			}
+		}
+
+		if c.Params.BlockedByArmor && damage.PrimaryValue > 0 {
+			armor := target.GetArmor()
+			if armor > 3 {
+				reduction := randomRange(int(armor/2), int(armor-(armor%2+1)))
+				damage.PrimaryValue -= reduction
+			} else if armor > 0 {
+				damage.PrimaryValue--
+			}
+			if damage.PrimaryValue <= 0 {
+				damage.PrimaryValue = 0
+			}
+		}
+	}
 
 	finalDamage := damage.PrimaryValue
 

@@ -20,6 +20,8 @@ type Creature interface {
 	GetSpeed() uint16
 	GetBaseSpeed() uint16
 	ChangeSpeed(delta int32)
+	GetArmor() int32
+	GetDefense() int32
 	GetCreatureType() uint8 // 0=Player, 1=Monster, 2=NPC
 }
 
@@ -89,6 +91,9 @@ func (c *BaseCreature) ChangeSpeed(delta int32) {
 	c.Speed = uint16(speed)
 }
 func (c *BaseCreature) GetCreatureType() uint8 { return 0 } // Player by default
+
+func (c *BaseCreature) GetArmor() int32 { return 0 }
+func (c *BaseCreature) GetDefense() int32 { return 0 }
 
 // GetMana/GetMaxMana/AddMana provide the mana accessors the combat adapter
 // needs. Monsters/NPCs default to zero mana; drainMana clamps at 0 like

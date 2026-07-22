@@ -7,6 +7,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 	"github.com/opentibiabr/canary-go/internal/game/vocations"
+	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -170,6 +171,11 @@ type Player struct {
 	// for the session. Absent keys read back as -1 (see GetStorageValue).
 	Storages map[uint32]int32
 
+	FightMode  uint8 // 1 = attack (offensive), 2 = balanced, 3 = defense
+	ChaseMode  bool  // true = follow, false = stand
+	SecureMode bool  // true = secure, false = unmarked attack allowed
+
+	World   *World
 	Session Session
 }
 
@@ -280,6 +286,15 @@ func (p *Player) ensureDefaults() {
 	if p.Capacity == 0 {
 		p.Capacity = 400
 	}
+	if p.FightMode == 0 {
+		p.FightMode = 1 // offensive
+	}
+	// Note: p.ChaseMode defaults to false (stand) which is fine for 0.
+	// p.SecureMode defaults to true (secure) as standard Tibia behavior.
+	// Since we want default to be secure, we can explicitly set it to true if not initialized.
+	// But let's check if bool default of false can mean uninitialized or not. Actually, let's just initialize it to true.
+	p.SecureMode = true
+
 	for i := range p.Skills {
 		if p.Skills[i] == 0 {
 			p.Skills[i] = 10
@@ -509,3 +524,231 @@ func (p *Player) GetTotalWeight(w *World) uint32 {
 	}
 	return total
 }
+
+// GetWeapon returns currently equipped weapon in Left/Right slots, resolving ammunition/quivers.
+func (p *Player) GetWeapon(catalog *items.Catalog, ignoreAmmo bool) *Item {
+	itemLeft := p.getWeaponFromSlot(catalog, ConstSlotLeft, ignoreAmmo)
+	if itemLeft != nil {
+		return itemLeft
+	}
+	itemRight := p.getWeaponFromSlot(catalog, ConstSlotRight, ignoreAmmo)
+	if itemRight != nil {
+		return itemRight
+	}
+	return nil
+}
+
+func (p *Player) getWeaponFromSlot(catalog *items.Catalog, slot uint8, ignoreAmmo bool) *Item {
+	item := p.Inventory[slot]
+	if item == nil {
+		return nil
+	}
+	wType := item.WeaponType(catalog)
+	if wType == "" || wType == "shield" || wType == "ammunition" || wType == "ammo" {
+		return nil
+	}
+	if !ignoreAmmo && (wType == "distance" || wType == "missile") {
+		ammoType := item.AmmoType(catalog)
+		if ammoType != "" && ammoType != "none" {
+			// First, check ammo slot (ConstSlotAmmo) directly
+			ammoSlotItem := p.Inventory[ConstSlotAmmo]
+			if ammoSlotItem != nil && ammoSlotItem.AmmoType(catalog) == ammoType {
+				return ammoSlotItem
+			}
+			// Fallback to quiver
+			return p.GetQuiverAmmoOfType(catalog, ammoType)
+		}
+	}
+	return item
+}
+
+// GetQuiverAmmoOfType searches for ammo matching the ammoType inside the equipped quiver.
+func (p *Player) GetQuiverAmmoOfType(catalog *items.Catalog, ammoType string) *Item {
+	quiver := p.Inventory[ConstSlotRight]
+	if quiver == nil || !quiver.IsQuiver(catalog) {
+		return nil
+	}
+	for _, ammoItem := range quiver.Contents {
+		if ammoItem == nil {
+			continue
+		}
+		if ammoItem.AmmoType(catalog) == ammoType {
+			return ammoItem
+		}
+	}
+	return nil
+}
+
+// GetShieldAndWeapon returns the equipped shield and weapon.
+func (p *Player) GetShieldAndWeapon(catalog *items.Catalog) (*Item, *Item) {
+	var shield, weapon *Item
+	for slot := ConstSlotRight; slot <= ConstSlotLeft; slot++ {
+		item := p.Inventory[slot]
+		if item == nil {
+			continue
+		}
+		wType := item.WeaponType(catalog)
+		if wType == "shield" {
+			if shield == nil || item.Defense(catalog) > shield.Defense(catalog) {
+				shield = item
+			}
+		} else if wType != "" {
+			weapon = item
+		}
+	}
+	return shield, weapon
+}
+
+// GetWeaponSkill returns the skill value corresponding to the item's weapon type.
+func (p *Player) GetWeaponSkill(catalog *items.Catalog, item *Item) uint16 {
+	if item == nil {
+		return p.Skills[SkillFist]
+	}
+	wType := item.WeaponType(catalog)
+	switch wType {
+	case "sword":
+		return p.Skills[SkillSword]
+	case "club":
+		return p.Skills[SkillClub]
+	case "axe":
+		return p.Skills[SkillAxe]
+	case "distance", "missile":
+		return p.Skills[SkillDistance]
+	default:
+		return p.Skills[SkillFist]
+	}
+}
+
+// GetAttackFactor returns the scaling multiplier for damage based on current fight mode.
+func (p *Player) GetAttackFactor() float64 {
+	switch p.FightMode {
+	case 1: // offensive
+		return 1.0
+	case 2: // balanced
+		return 0.75
+	case 3: // defensive
+		return 0.5
+	default:
+		return 1.0
+	}
+}
+
+// GetArmor returns the player's total armor, scaled by vocation multiplier.
+func (p *Player) GetArmor() int32 {
+	var catalog *items.Catalog
+	if p.World != nil {
+		catalog = p.World.Items
+	}
+	armor := int32(0)
+	for _, item := range p.Inventory {
+		if item != nil {
+			armor += item.Armor(catalog)
+		}
+	}
+	if voc := vocations.GetVocation(uint32(p.Vocation)); voc != nil && voc.Formula.Armor > 0 {
+		armor = int32(float64(armor) * voc.Formula.Armor)
+	}
+	return armor
+}
+
+// GetDefense calculates the player's total defense, reflecting skills, shield, extra weapon defense, and vocation multipliers.
+func (p *Player) GetDefense() int32 {
+	var catalog *items.Catalog
+	if p.World != nil {
+		catalog = p.World.Items
+	}
+	defenseSkill := int32(p.Skills[SkillFist])
+	defenseValue := int32(7)
+
+	shield, weapon := p.GetShieldAndWeapon(catalog)
+	if weapon != nil {
+		defenseValue = weapon.Defense(catalog) + weapon.ExtraDefense(catalog)
+		defenseSkill = int32(p.GetWeaponSkill(catalog, weapon))
+	}
+
+	if shield != nil {
+		if weapon != nil {
+			defenseValue = shield.Defense(catalog) + weapon.ExtraDefense(catalog)
+		} else {
+			defenseValue = shield.Defense(catalog)
+		}
+		defenseSkill = int32(p.Skills[SkillShielding])
+	}
+
+	if defenseSkill == 0 {
+		switch p.FightMode {
+		case 1, 2:
+			return 1
+		case 3:
+			return 2
+		}
+	}
+
+	defenseScalingFactor := 0.15
+	if shield != nil {
+		defenseScalingFactor = 0.16
+	} else if weapon != nil && weapon.Defense(catalog) > 0 {
+		defenseScalingFactor = 0.146
+	}
+
+	// defense factor: 1.0 for defensive, 0.75 for balanced, 0.5 for offensive
+	defenseFactor := 1.0
+	switch p.FightMode {
+	case 1:
+		defenseFactor = 0.5
+	case 2:
+		defenseFactor = 0.75
+	case 3:
+		defenseFactor = 1.0
+	}
+
+	def := (float64(defenseSkill)/4.0 + 2.23) * float64(defenseValue) * defenseFactor * defenseScalingFactor
+	if voc := vocations.GetVocation(uint32(p.Vocation)); voc != nil && voc.Formula.Defense > 0 {
+		def *= voc.Formula.Defense
+	}
+	return int32(def)
+}
+
+// ConsumeAmmo reduces the count of the ammunition matching ammoType by 1, searching the ammo slot and quiver.
+func (p *Player) ConsumeAmmo(catalog *items.Catalog, ammoType string) {
+	// 1. Check ammo slot (ConstSlotAmmo)
+	ammoSlotItem := p.Inventory[ConstSlotAmmo]
+	if ammoSlotItem != nil && ammoSlotItem.AmmoType(catalog) == ammoType {
+		if ammoSlotItem.Count > 1 {
+			ammoSlotItem.Count--
+		} else {
+			p.Inventory[ConstSlotAmmo] = nil
+		}
+		return
+	}
+	// 2. Check quiver
+	quiver := p.Inventory[ConstSlotRight]
+	if quiver != nil && quiver.IsQuiver(catalog) {
+		for i, ammoItem := range quiver.Contents {
+			if ammoItem != nil && ammoItem.AmmoType(catalog) == ammoType {
+				if ammoItem.Count > 1 {
+					ammoItem.Count--
+				} else {
+					// Remove item from container contents
+					quiver.Contents = append(quiver.Contents[:i], quiver.Contents[i+1:]...)
+				}
+				return
+			}
+		}
+	}
+}
+
+// ConsumeWeaponInHand reduces the count of the throwable weapon equipped in the specified hand slot.
+func (p *Player) ConsumeWeaponInHand(slot uint8) {
+	item := p.Inventory[slot]
+	if item != nil {
+		if item.Count > 1 {
+			item.Count--
+		} else {
+			p.Inventory[slot] = nil
+		}
+	}
+}
+
+
+

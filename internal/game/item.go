@@ -77,6 +77,17 @@ func (i *Item) IsContainer(catalog *items.Catalog) bool {
 	return false
 }
 
+// IsQuiver reports whether this item is a quiver per the catalog.
+func (i *Item) IsQuiver(catalog *items.Catalog) bool {
+	if catalog == nil {
+		return false
+	}
+	if t := catalog.Get(i.ID); t != nil {
+		return t.IsQuiver
+	}
+	return false
+}
+
 // HoldingCount returns the total number of items held recursively in this
 // container (mirrors Container::getItemHoldingCount). Guards against cycles via
 // a visited set is unnecessary for the acyclic inventory tree.
@@ -185,3 +196,107 @@ func (i *Item) GetWeight(catalog interface{}) uint32 {
 
 	return total
 }
+
+// WeaponType returns the item's weapon type, e.g. "sword", "axe", "club", "distance", "wand", etc.
+func (i *Item) WeaponType(catalog *items.Catalog) string {
+	if catalog == nil {
+		return ""
+	}
+	if t := catalog.Get(i.ID); t != nil {
+		return t.WeaponType
+	}
+	return ""
+}
+
+// Attack returns the item's attack value, prioritizing custom attributes.
+func (i *Item) Attack(catalog *items.Catalog) int32 {
+	if i.Attr != nil && i.Attr.Attack != nil {
+		return *i.Attr.Attack
+	}
+	if catalog == nil {
+		return 0
+	}
+	if t := catalog.Get(i.ID); t != nil {
+		return t.Attack
+	}
+	return 0
+}
+
+// Defense returns the item's defense value, prioritizing custom attributes.
+func (i *Item) Defense(catalog *items.Catalog) int32 {
+	if i.Attr != nil && i.Attr.Defense != nil {
+		return *i.Attr.Defense
+	}
+	if catalog == nil {
+		return 0
+	}
+	if t := catalog.Get(i.ID); t != nil {
+		return t.Defense
+	}
+	return 0
+}
+
+// ExtraDefense returns the item's extra defense value, prioritizing custom attributes.
+func (i *Item) ExtraDefense(catalog *items.Catalog) int32 {
+	if i.Attr != nil && i.Attr.ExtraDefense != nil {
+		return *i.Attr.ExtraDefense
+	}
+	if catalog == nil {
+		return 0
+	}
+	if t := catalog.Get(i.ID); t != nil {
+		return t.ExtraDefense
+	}
+	return 0
+}
+
+// Armor returns the item's armor value, prioritizing custom attributes.
+func (i *Item) Armor(catalog *items.Catalog) int32 {
+	if i.Attr != nil && i.Attr.Armor != nil {
+		return *i.Attr.Armor
+	}
+	if catalog == nil {
+		return 0
+	}
+	if t := catalog.Get(i.ID); t != nil {
+		return t.Armor
+	}
+	return 0
+}
+
+// Range returns the weapon range, prioritizing custom attributes.
+func (i *Item) Range(catalog *items.Catalog) int32 {
+	if i.Attr != nil && i.Attr.ShootRange != nil {
+		return int32(*i.Attr.ShootRange)
+	}
+	if catalog == nil {
+		return 0
+	}
+	if t := catalog.Get(i.ID); t != nil {
+		return t.Range
+	}
+	return 0
+}
+
+// ShootType returns the projectile/missile animation shoot type of this item.
+func (i *Item) ShootType(catalog *items.Catalog) string {
+	if catalog == nil {
+		return ""
+	}
+	if t := catalog.Get(i.ID); t != nil {
+		return t.ShootType
+	}
+	return ""
+}
+
+// AmmoType returns the ammunition type used or provided by this item.
+func (i *Item) AmmoType(catalog *items.Catalog) string {
+	if catalog == nil {
+		return ""
+	}
+	if t := catalog.Get(i.ID); t != nil {
+		return t.AmmoType
+	}
+	return ""
+}
+

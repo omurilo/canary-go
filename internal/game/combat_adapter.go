@@ -88,3 +88,12 @@ func (a combatAdapter) HasCondition(t combat.ConditionType) bool {
 	}
 	return false
 }
+
+func (a combatAdapter) GetArmor() int32 {
+	return a.c.GetArmor()
+}
+
+func (a combatAdapter) GetDefense() int32 {
+	return a.c.GetDefense()
+}
+

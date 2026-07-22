@@ -112,6 +112,10 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 		it.ShootType = attr.Value
 	case "ammotype", "ammoType":
 		it.AmmoType = attr.Value
+	case "primarytype", "primaryType":
+		if attr.Value == "quivers" {
+			it.IsQuiver = true
+		}
 	case "transformequipto", "transformEquipTo":
 		if v, err := strconv.ParseUint(attr.Value, 10, 16); err == nil {
 			it.TransformEquipTo = uint16(v)

@@ -199,6 +199,7 @@ func (w *World) AddPlayer(p *Player, sess Session) bool {
 		return false
 	}
 	p.ID = w.nextCreatureID.Add(1)
+	p.World = w
 	p.Session = sess
 	p.ensureDefaults()
 	w.players[p.ID] = p

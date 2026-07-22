@@ -2,6 +2,7 @@ package game
 
 import (
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -151,16 +152,60 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 			return
 		}
 	}
-	// Melee reach: adjacent on the same floor, matching Position::areInRange<1,1>
-	// used by Weapon::useFist (src/items/weapons/weapons.cpp).
+
+	maxRange := int32(1)
+	var weapon *Item
+	var weaponType string
+
+	if p, ok := attacker.(*Player); ok {
+		weapon = p.GetWeapon(e.world.Items, false)
+		launcher := p.GetWeapon(e.world.Items, true)
+
+		if launcher != nil && weapon == nil {
+			// Equipped a distance launcher (bow/crossbow) but no matching ammunition found!
+			// Player cannot attack.
+			return
+		}
+
+		if weapon != nil {
+			weaponType = weapon.WeaponType(e.world.Items)
+			if weaponType == "distance" || weaponType == "missile" || weaponType == "ammunition" {
+				if launcher != nil {
+					maxRange = launcher.Range(e.world.Items)
+				} else {
+					maxRange = weapon.Range(e.world.Items)
+				}
+				if maxRange <= 0 {
+					maxRange = 1
+				}
+			} else if weaponType == "wand" {
+				maxRange = weapon.Range(e.world.Items)
+				if maxRange <= 0 {
+					maxRange = 5 // Standard default wand range
+				}
+			}
+		}
+	}
+
 	ap, tp := attacker.GetPosition(), target.GetPosition()
-	if ap.Z != tp.Z || chebyshevDistance(ap, tp) > 1 {
+	if ap.Z != tp.Z || chebyshevDistance(ap, tp) > int(maxRange) {
 		return
 	}
 	if !e.ready(attacker.GetID(), interval) {
 		return
 	}
-	e.doMeleeHit(combat.NewCombat(), attacker, target)
+
+	if p, ok := attacker.(*Player); ok {
+		if weaponType == "wand" {
+			e.doWandHit(p, target, weapon)
+		} else if weaponType == "distance" || weaponType == "missile" || weaponType == "ammunition" {
+			e.doDistanceHit(p, target, weapon)
+		} else {
+			e.doMeleeHit(combat.NewCombat(), p, target)
+		}
+	} else {
+		e.doMeleeHit(combat.NewCombat(), attacker, target)
+	}
 }
 
 // ready reports whether the creature's attack cooldown has elapsed, and if so
@@ -180,12 +225,11 @@ func (e *CombatEngine) ready(id uint32, interval time.Duration) bool {
 func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 	dmg := e.meleeDamage(attacker)
 
-	// Apply through the combat engine so the armor/condition/blocking hooks the
-	// spells agent will need are exercised. Combat::doCombatHealth negates the
-	// primary value for non-healing damage and calls target.ChangeHealth,
-	// mirroring Creature::drainHealth -> changeHealth(-damage)
-	// (src/creatures/combat/combat.cpp, src/creatures/creature.cpp).
+	// Apply through the combat engine so the armor/condition/blocking hooks are exercised.
 	c.SetParam(combat.CombatParamType, uint32(combat.CombatPhysical))
+	c.SetParam(combat.CombatParamBlockArmor, 1)
+	c.SetParam(combat.CombatParamBlockShield, 1)
+
 	c.DoCombatHealth(adaptCreature(attacker), adaptCreature(target), combat.CombatDamage{
 		PrimaryType:  combat.CombatPhysical,
 		PrimaryValue: int32(dmg),
@@ -211,33 +255,190 @@ func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 	}
 }
 
-// meleeDamage computes one melee hit's damage using the existing Canary-style
-// formula in combat.CalculateMeleeDamage.
-//
-// NOTE: combat.CalculateMeleeDamage uses the classic (skill+4)*attack*0.0605
-// formula. The modern Canary formula is
-// round(0.085 * attackFactor * attackValue * attackSkill + level/5)
-// (Weapons::getMaxWeaponDamage, src/items/weapons/weapons.cpp:94). The task
-// directs using CalculateMeleeDamage; revisit the formula for full fidelity.
+func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item) {
+	skill := int(p.Skills[SkillDistance])
+	voc := vocations.GetVocation(uint32(p.Vocation))
+	attackValue := int(ammo.Attack(e.world.Items))
+	if attackValue <= 0 {
+		attackValue = 10 // fallback
+	}
+
+	// Calculate maximum distance damage using the modern formula:
+	// Weapons::getMaxWeaponDamage(level, playerSkill, totalAttack, attackFactor, false)
+	maxDmg := float64(0.09*p.GetAttackFactor()*float64(attackValue)*float64(skill) + float64(p.Level/5))
+	if voc != nil && voc.Formula.DistDamage > 0 {
+		maxDmg *= voc.Formula.DistDamage
+	}
+
+	minDmg := float64(p.Level / 5)
+	if minDmg > maxDmg {
+		minDmg = maxDmg
+	}
+
+	dmg := int32(0)
+	if maxDmg > 0 {
+		dmg = randomRange(int(minDmg), int(maxDmg))
+	}
+
+	// Consume ammunition
+	ammoType := ammo.AmmoType(e.world.Items)
+	if ammoType != "" && ammoType != "none" {
+		p.ConsumeAmmo(e.world.Items, ammoType)
+	} else {
+		// It's a throwable weapon (e.g. spear) equipped in Left or Right slot.
+		// Consume the weapon itself!
+		if p.Inventory[ConstSlotLeft] == ammo {
+			p.ConsumeWeaponInHand(ConstSlotLeft)
+		} else if p.Inventory[ConstSlotRight] == ammo {
+			p.ConsumeWeaponInHand(ConstSlotRight)
+		}
+	}
+
+	// Apply combat
+	c := combat.NewCombat()
+	c.SetParam(combat.CombatParamType, uint32(combat.CombatPhysical))
+	c.SetParam(combat.CombatParamBlockArmor, 1)
+	c.SetParam(combat.CombatParamBlockShield, 1)
+
+	c.DoCombatHealth(adaptCreature(p), adaptCreature(target), combat.CombatDamage{
+		PrimaryType:  combat.CombatPhysical,
+		PrimaryValue: dmg,
+		Origin:       combat.OriginRanged,
+	})
+
+	// Dispatch distance shoot effect
+	shootStr := ammo.ShootType(e.world.Items)
+	if shootStr == "" {
+		shootStr = "arrow"
+	}
+	if e.world.OnDistanceEffect != nil {
+		e.world.OnDistanceEffect(p.GetPosition(), target.GetPosition(), mapShootType(shootStr))
+	}
+
+	effect := uint16(effectDrawBlood)
+	if dmg <= 0 {
+		effect = effectPoff
+	}
+
+	if e.world.OnCreatureHealthChange != nil {
+		e.world.OnCreatureHealthChange(target)
+	}
+	if e.world.OnCombatHit != nil {
+		e.world.OnCombatHit(p, target, dmg, effect)
+	}
+
+	if target.GetHealth() == 0 {
+		e.handleDeath(target, p)
+	}
+}
+
+func (e *CombatEngine) doWandHit(p *Player, target Creature, wand *Item) {
+	// Consume wand/rod shoot mana (defaults to 5 mana if config/attributes unavailable)
+	manaCost := int32(5)
+	if p.Mana < uint32(manaCost) {
+		return
+	}
+	p.AddMana(-manaCost)
+
+	attack := wand.Attack(e.world.Items)
+	if attack <= 0 {
+		attack = 10 // safe default
+	}
+	lo := int(float64(attack) * 0.8)
+	hi := int(float64(attack) * 1.2)
+	dmg := randomRange(lo, hi)
+
+	combatType := combat.CombatEnergy
+	shootStr := wand.ShootType(e.world.Items)
+	switch strings.ToLower(shootStr) {
+	case "fire":
+		combatType = combat.CombatFire
+	case "earth", "poison":
+		combatType = combat.CombatEarth
+	case "ice":
+		combatType = combat.CombatIce
+	case "death":
+		combatType = combat.CombatDeath
+	case "holy":
+		combatType = combat.CombatHoly
+	}
+
+	// Apply combat: wand damage is magic, bypassing armor and shield block
+	c := combat.NewCombat()
+	c.SetParam(combat.CombatParamType, uint32(combatType))
+
+	c.DoCombatHealth(adaptCreature(p), adaptCreature(target), combat.CombatDamage{
+		PrimaryType:  combatType,
+		PrimaryValue: dmg,
+		Origin:       combat.OriginRanged,
+	})
+
+	// Dispatch distance projectile effect
+	if e.world.OnDistanceEffect != nil {
+		e.world.OnDistanceEffect(p.GetPosition(), target.GetPosition(), mapShootType(shootStr))
+	}
+
+	impactEffect := uint16(effectDrawBlood)
+	switch combatType {
+	case combat.CombatFire:
+		impactEffect = 15 // CONST_ME_FIREATTACK
+	case combat.CombatEnergy:
+		impactEffect = 11 // CONST_ME_ENERGYHIT
+	case combat.CombatEarth:
+		impactEffect = 20 // CONST_ME_POISON
+	case combat.CombatIce:
+		impactEffect = 41 // CONST_ME_ICEATTACK
+	case combat.CombatDeath:
+		impactEffect = 17 // CONST_ME_MORTAREA
+	}
+
+	if e.world.OnCreatureHealthChange != nil {
+		e.world.OnCreatureHealthChange(target)
+	}
+	if e.world.OnCombatHit != nil {
+		e.world.OnCombatHit(p, target, dmg, impactEffect)
+	}
+
+	if target.GetHealth() == 0 {
+		e.handleDeath(target, p)
+	}
+}
+
 func (e *CombatEngine) meleeDamage(attacker Creature) int {
 	switch a := attacker.(type) {
 	case *Player:
-		skill := int(a.Skills[SkillFist])
-		voc := vocations.GetVocation(uint32(a.Vocation))
-		return CalculateMeleeDamage(fistAttackValue, skill, 0, voc, int(a.Level))
+		var weapon *Item
+		var weaponType string
+		weapon = a.GetWeapon(e.world.Items, false)
+		if weapon != nil {
+			weaponType = weapon.WeaponType(e.world.Items)
+		}
+
+		skill := int(a.GetWeaponSkill(e.world.Items, weapon))
+		attackValue := fistAttackValue
+		if weapon != nil && weaponType != "distance" && weaponType != "missile" && weaponType != "wand" {
+			attackValue = int(weapon.Attack(e.world.Items))
+		}
+
+		maxDmg := float64(0.085*a.GetAttackFactor()*float64(attackValue)*float64(skill) + float64(a.Level/5))
+		if voc := vocations.GetVocation(uint32(a.Vocation)); voc != nil && voc.Formula.MeleeDamage > 0 {
+			maxDmg *= voc.Formula.MeleeDamage
+		}
+
+		minDmg := float64(a.Level / 5)
+		if minDmg > maxDmg {
+			minDmg = maxDmg
+		}
+
+		if maxDmg <= 0 {
+			return 0
+		}
+		return int(randomRange(int(minDmg), int(maxDmg)))
 	case *Monster:
-		// Use the monster's real melee attack block. The Lua attack stores raw
-		// combat values (minDamage..maxDamage, typically <= 0, e.g. rat 0..-8);
-		// the damage dealt is the magnitude. Mirrors Monster::doAttacking picking
-		// the melee spellBlock and rolling minCombatValue..maxCombatValue
-		// (src/creatures/monsters/monster.cpp:1753, monsters.cpp:57-70).
 		atk := a.MeleeAttack()
 		if atk == nil {
-			// Fall back to a small default so monsters without parsed attack
-			// data can still fight back.
 			return rand.Intn(defaultMonsterAttackValue + 1)
 		}
-		// Per-swing chance gate; a miss deals no damage (poff effect).
 		if atk.Chance < 100 && rand.Intn(100) >= atk.Chance {
 			return 0
 		}
@@ -248,6 +449,45 @@ func (e *CombatEngine) meleeDamage(attacker Creature) int {
 		return lo + rand.Intn(hi-lo+1)
 	default:
 		return 0
+	}
+}
+
+func mapShootType(s string) uint16 {
+	switch strings.ToLower(s) {
+	case "spear":
+		return 1
+	case "bolt":
+		return 2
+	case "arrow":
+		return 3
+	case "fire":
+		return 4
+	case "energy":
+		return 5
+	case "poisonarrow":
+		return 6
+	case "burstarrow":
+		return 7
+	case "throwingstar":
+		return 8
+	case "throwingknife":
+		return 9
+	case "smallstone":
+		return 10
+	case "death":
+		return 11
+	case "holy":
+		return 31
+	case "ice":
+		return 29
+	case "earth":
+		return 30
+	case "suddendeath":
+		return 32
+	case "diamondarrow":
+		return 57
+	default:
+		return 3 // default arrow
 	}
 }
 
@@ -380,3 +620,11 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	delete(e.lastAttack, victim.GetID())
 	e.mu.Unlock()
 }
+
+func randomRange(min, max int) int32 {
+	if min >= max {
+		return int32(min)
+	}
+	return int32(min + rand.Intn(max-min+1))
+}
+

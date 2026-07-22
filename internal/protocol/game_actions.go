@@ -987,3 +987,21 @@ func (g *GameProtocol) parseCloseShop(r *netmsg.Reader) {
 		}
 	}
 }
+
+func (g *GameProtocol) parseFightModes(r *netmsg.Reader) {
+	fightMode := r.GetByte()  // 1 = offensive, 2 = balanced, 3 = defensive
+	chaseMode := r.GetByte()  // 0 = stand, 1 = chase
+	secureMode := r.GetByte() // 0 = secure, 1 = insecure
+
+	p := g.player
+	if p == nil {
+		return
+	}
+
+	p.FightMode = fightMode
+	p.ChaseMode = chaseMode != 0
+	p.SecureMode = secureMode != 0
+
+	g.sendStats()
+}
+

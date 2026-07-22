@@ -69,6 +69,7 @@ type ItemType struct {
 	ForceUse     bool
 	IsLadder     bool
 	IsDoor       bool
+	IsQuiver     bool
 
 	Weight       uint32
 	Armor        int32

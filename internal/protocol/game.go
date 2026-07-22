@@ -75,6 +75,7 @@ const (
 	inLookAt         = 0x8C
 	inThrowItem      = 0x78
 	inAttack         = 0xA1
+	inFightModes     = 0xA0
 	inBuyItem        = 0x7A
 	inSellItem       = 0x7B
 	inCloseShop      = 0x7C
@@ -598,6 +599,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseLookAt(r)
 	case inAttack:
 		g.parseAttack(r)
+	case inFightModes:
+		g.parseFightModes(r)
 	case inBuyItem:
 		g.parseBuyItem(r)
 	case inSellItem:
