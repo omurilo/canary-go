@@ -272,6 +272,14 @@ func run(o runOpts, log *slog.Logger) error {
 	world.OnTargetLost = func(p *game.Player) {
 		protocol.SendCancelTarget(p)
 	}
+	world.OnChangeSpeed = func(c game.Creature) {
+		protocol.BroadcastChangeSpeed(world, c)
+	}
+	world.OnIconsUpdate = func(p *game.Player) {
+		if p.Session != nil {
+			p.Session.SendIcons()
+		}
+	}
 	world.OnPlayerStatsChange = func(p *game.Player) {
 		protocol.SendPlayerStats(p)
 	}

@@ -60,6 +60,9 @@ func (a combatAdapter) GetMaxMana() int32 {
 // (src/creatures/creature.cpp): drainHealth calls changeHealth(-damage).
 func (a combatAdapter) ChangeHealth(amount int32) { a.c.AddHealth(amount) }
 
+func (a combatAdapter) GetBaseSpeed() uint16 { return a.c.GetBaseSpeed() }
+func (a combatAdapter) ChangeSpeed(delta int32) { a.c.ChangeSpeed(delta) }
+
 func (a combatAdapter) ChangeMana(amount int32) {
 	if m, ok := a.c.(manaHolder); ok {
 		m.AddMana(amount)

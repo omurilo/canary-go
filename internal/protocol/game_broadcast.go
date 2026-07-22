@@ -92,3 +92,12 @@ func BroadcastCreatureRemove(w *game.World, c game.Creature) {
 		}
 	}
 }
+
+// BroadcastChangeSpeed tells spectators a creature changed speed.
+func BroadcastChangeSpeed(w *game.World, c game.Creature) {
+	for _, s := range w.Spectators(c.GetPosition(), 0) {
+		if s.Session != nil {
+			s.Session.SendChangeSpeed(c)
+		}
+	}
+}

@@ -15,6 +15,7 @@ type Condition interface {
 	EndCondition(creature Creature)
 	AddCondition(creature Creature, condition Condition)
 	Clone() Condition
+	GetIcons() uint64
 }
 
 // ConditionGeneric is a basic condition implementation
@@ -67,6 +68,37 @@ func (c *ConditionGeneric) Clone() Condition {
 		IsBuff:       c.IsBuff,
 		IsPersistent: c.IsPersistent,
 	}
+}
+
+func (c *ConditionGeneric) GetIcons() uint64 {
+	var icons uint64
+	switch c.Type {
+	case ConditionPoison:
+		icons |= 1 << uint64(PlayerIconPoison)
+	case ConditionFire:
+		icons |= 1 << uint64(PlayerIconBurn)
+	case ConditionEnergy:
+		icons |= 1 << uint64(PlayerIconEnergy)
+	case ConditionBleeding:
+		icons |= 1 << uint64(PlayerIconBleeding)
+	case ConditionHaste:
+		icons |= 1 << uint64(PlayerIconHaste)
+	case ConditionParalyze:
+		icons |= 1 << uint64(PlayerIconParalyze)
+	case ConditionManaShield:
+		icons |= 1 << uint64(PlayerIconManaShield)
+	case ConditionDrunk:
+		icons |= 1 << uint64(PlayerIconDrunk)
+	case ConditionFreezing:
+		icons |= 1 << uint64(PlayerIconFreezing)
+	case ConditionDazzled:
+		icons |= 1 << uint64(PlayerIconDazzled)
+	case ConditionCursed:
+		icons |= 1 << uint64(PlayerIconCursed)
+	case ConditionInFight:
+		icons |= 1 << uint64(PlayerIconSwords)
+	}
+	return icons
 }
 
 // ConditionDamageStruct applies damage over time (e.g. poison, fire, energy)
@@ -160,5 +192,94 @@ func (c *ConditionRegenerationStruct) Clone() Condition {
 		ManaTicks:           c.ManaTicks,
 		HealthGain:          c.HealthGain,
 		ManaGain:            c.ManaGain,
+	}
+}
+
+// ConditionSpeedStruct handles haste and paralyze conditions
+type ConditionSpeedStruct struct {
+	ConditionGeneric
+	SpeedDelta int32
+	Mina       float32
+	Minb       float32
+	Maxa       float32
+	Maxb       float32
+}
+
+func (c *ConditionSpeedStruct) getFormulaValues(baseSpeed int32) (int32, int32) {
+	difference := baseSpeed - 40
+	min := int32(c.Mina*float32(difference) + c.Minb)
+	max := int32(c.Maxa*float32(difference) + c.Maxb)
+	return min, max
+}
+
+func (c *ConditionSpeedStruct) uniformRandom(min, max int32) int32 {
+	if min >= max {
+		return min
+	}
+	return max
+}
+
+func (c *ConditionSpeedStruct) StartCondition(creature Creature) bool {
+	if !c.ConditionGeneric.StartCondition(creature) {
+		return false
+	}
+
+	if c.SpeedDelta == 0 {
+		baseSpeed := creature.GetBaseSpeed()
+		min, max := c.getFormulaValues(int32(baseSpeed))
+		c.SpeedDelta = c.uniformRandom(min, max) - int32(baseSpeed)
+		
+		if c.Type == ConditionParalyze && c.SpeedDelta < int32(40-baseSpeed) {
+			c.SpeedDelta = int32(40 - baseSpeed)
+		}
+	}
+
+	creature.ChangeSpeed(c.SpeedDelta)
+	return true
+}
+
+func (c *ConditionSpeedStruct) EndCondition(creature Creature) {
+	creature.ChangeSpeed(-c.SpeedDelta)
+}
+
+func (c *ConditionSpeedStruct) AddCondition(creature Creature, condition Condition) {
+	if c.Type != condition.GetType() {
+		return
+	}
+
+	if c.Ticks < condition.GetTicks() {
+		c.Ticks = condition.GetTicks()
+		c.EndTime = time.Now().UnixMilli() + int64(c.Ticks)
+	}
+
+	if speedCond, ok := condition.(*ConditionSpeedStruct); ok {
+		c.SpeedDelta = speedCond.SpeedDelta
+		c.Mina = speedCond.Mina
+		c.Minb = speedCond.Minb
+		c.Maxa = speedCond.Maxa
+		c.Maxb = speedCond.Maxb
+
+		if c.SpeedDelta == 0 {
+			baseSpeed := creature.GetBaseSpeed()
+			min, max := c.getFormulaValues(int32(baseSpeed))
+			c.SpeedDelta = c.uniformRandom(min, max) - int32(baseSpeed)
+
+			if c.Type == ConditionParalyze && c.SpeedDelta < int32(40-baseSpeed) {
+				c.SpeedDelta = int32(40 - baseSpeed)
+			}
+		}
+	}
+
+	creature.ChangeSpeed(c.SpeedDelta)
+}
+
+func (c *ConditionSpeedStruct) Clone() Condition {
+	return &ConditionSpeedStruct{
+		ConditionGeneric: *c.ConditionGeneric.Clone().(*ConditionGeneric),
+		SpeedDelta:       c.SpeedDelta,
+		Mina:             c.Mina,
+		Minb:             c.Minb,
+		Maxa:             c.Maxa,
+		Maxb:             c.Maxb,
 	}
 }

@@ -18,6 +18,8 @@ type Creature interface {
 	GetLightLevel() uint8
 	GetLightColor() uint8
 	GetSpeed() uint16
+	GetBaseSpeed() uint16
+	ChangeSpeed(delta int32)
 	GetCreatureType() uint8 // 0=Player, 1=Monster, 2=NPC
 }
 
@@ -78,6 +80,14 @@ func (c *BaseCreature) GetOutfit() Outfit { return c.Outfit }
 func (c *BaseCreature) GetLightLevel() uint8 { return c.LightLevel }
 func (c *BaseCreature) GetLightColor() uint8 { return c.LightColor }
 func (c *BaseCreature) GetSpeed() uint16 { return c.Speed }
+func (c *BaseCreature) GetBaseSpeed() uint16 { return c.Speed }
+func (c *BaseCreature) ChangeSpeed(delta int32) {
+	// Base creatures don't have SpeedBonus logic yet, just adjust Speed directly
+	speed := int32(c.Speed) + delta
+	if speed < 0 { speed = 0 }
+	if speed > 0xFFFF { speed = 0xFFFF }
+	c.Speed = uint16(speed)
+}
 func (c *BaseCreature) GetCreatureType() uint8 { return 0 } // Player by default
 
 // GetMana/GetMaxMana/AddMana provide the mana accessors the combat adapter

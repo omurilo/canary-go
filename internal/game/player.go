@@ -31,6 +31,10 @@ type Session interface {
 
 	// Shop (Phase 4).
 	SendCloseShop() // 0x7C
+
+	// Conditions / Icons
+	SendChangeSpeed(c Creature) // 0x8F
+	SendIcons()                 // 0xA2
 }
 
 // Equipment slot indices (CONST_SLOT_*). Slot 0 is "wherever" (auto-place).
@@ -409,7 +413,7 @@ func (p *Player) GetBaseSpeed() uint16 {
 	if lvl < 1 {
 		lvl = 1
 	}
-	speed := base + (lvl - 1) + int(p.SpeedBonus)
+	speed := base + (lvl - 1)
 	if speed < 0 {
 		speed = 0
 	}
@@ -422,9 +426,51 @@ func (p *Player) GetBaseSpeed() uint16 {
 // GetSpeed returns the player's current movement speed: the level-scaled base
 // plus temporary bonuses (haste). This is what the client and the step-duration
 // pacing use.
-func (p *Player) GetSpeed() uint16 { return p.GetBaseSpeed() }
+func (p *Player) GetSpeed() uint16 {
+	speed := int(p.GetBaseSpeed()) + int(p.SpeedBonus)
+	if speed < 0 {
+		speed = 0
+	}
+	if speed > 0xFFFF {
+		speed = 0xFFFF
+	}
+	return uint16(speed)
+}
+
+func (p *Player) ChangeSpeed(delta int32) {
+	p.SpeedBonus += delta
+}
+
 func (p *Player) GetCreatureType() uint8 { return 0 } // CREATURETYPE_PLAYER
 
+func (p *Player) GetIcons() uint64 {
+	var icons uint64
+	for _, cond := range p.Conditions() {
+		icons |= cond.GetIcons()
+	}
+	return icons
+}
+
+func (p *Player) AddCondition(c combat.Condition) {
+	p.conditionStore.AddCondition(c)
+	if p.Session != nil {
+		p.Session.SendIcons()
+	}
+}
+
+func (p *Player) RemoveCondition(t combat.ConditionType) {
+	p.conditionStore.RemoveCondition(t)
+	if p.Session != nil {
+		p.Session.SendIcons()
+	}
+}
+
+func (p *Player) ClearConditions() {
+	p.conditionStore.ClearConditions()
+	if p.Session != nil {
+		p.Session.SendIcons()
+	}
+}
 func (p *Player) AttackSpeed() time.Duration {
 	voc := vocations.GetVocation(uint32(p.Vocation))
 	if voc != nil && voc.AttackSpeed > 0 {

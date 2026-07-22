@@ -112,6 +112,8 @@ type Creature interface {
 	HasCondition(conditionType ConditionType) bool
 	ChangeHealth(amount int32)
 	ChangeMana(amount int32)
+	GetBaseSpeed() uint16
+	ChangeSpeed(delta int32)
 }
 
 type Player interface {
@@ -138,3 +140,40 @@ type IntervalInfo struct {
 	Damage int32
 	Ticks int32
 }
+
+// PlayerIcon represents the status icons shown in the client
+type PlayerIcon uint8
+
+const (
+	PlayerIconPoison        PlayerIcon = 0
+	PlayerIconBurn          PlayerIcon = 1
+	PlayerIconEnergy        PlayerIcon = 2
+	PlayerIconDrunk         PlayerIcon = 3
+	PlayerIconManaShield    PlayerIcon = 4
+	PlayerIconParalyze      PlayerIcon = 5
+	PlayerIconHaste         PlayerIcon = 6
+	PlayerIconSwords        PlayerIcon = 7
+	PlayerIconDrowning      PlayerIcon = 8
+	PlayerIconFreezing      PlayerIcon = 9
+	PlayerIconDazzled       PlayerIcon = 10
+	PlayerIconCursed        PlayerIcon = 11
+	PlayerIconPartyBuff     PlayerIcon = 12
+	PlayerIconRedSwords     PlayerIcon = 13
+	PlayerIconPigeon        PlayerIcon = 14
+	PlayerIconBleeding      PlayerIcon = 15
+	PlayerIconLesserHex     PlayerIcon = 16
+	PlayerIconIntenseHex    PlayerIcon = 17
+	PlayerIconGreaterHex    PlayerIcon = 18
+	PlayerIconRooted        PlayerIcon = 19
+	PlayerIconFeared        PlayerIcon = 20
+	PlayerIconGoshnarTaint1 PlayerIcon = 21
+	PlayerIconGoshnarTaint2 PlayerIcon = 22
+	PlayerIconGoshnarTaint3 PlayerIcon = 23
+	PlayerIconGoshnarTaint4 PlayerIcon = 24
+	PlayerIconGoshnarTaint5 PlayerIcon = 25
+	PlayerIconNewManaShield PlayerIcon = 26
+	PlayerIconAgony         PlayerIcon = 27
+	PlayerIconPowerless     PlayerIcon = 28
+	PlayerIconMentorOther   PlayerIcon = 29
+	PlayerIconCount         PlayerIcon = 30
+)

@@ -188,8 +188,10 @@ func outfitToTable(L *lua.LState, o game.Outfit) *lua.LTable {
 func (e *Engine) registerCreatureType() {
 	mt := e.L.NewTypeMetatable("Creature")
 	e.L.SetFuncs(mt, creatureMethods)
-	// teleportTo needs the world (to broadcast the jump), so it's engine-bound.
+	// teleportTo, changeSpeed, setSpeed need the world to broadcast.
 	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "changeSpeed", e.L.NewFunction(e.creatureChangespeed))
+	e.L.SetField(mt, "setSpeed", e.L.NewFunction(e.creatureSetspeed))
 	e.L.SetField(mt, "__index", mt)
 }
 
@@ -227,9 +229,7 @@ var creatureMethods = map[string]lua.LGFunction{
 	"getLight": creatureGetlight,
 	"setLight": creatureSetlight,
 	"getSpeed": creatureGetspeed,
-	"setSpeed": creatureSetspeed,
 	"getBaseSpeed": creatureGetbasespeed,
-	"changeSpeed": creatureChangespeed,
 	"setDropLoot": creatureSetdroploot,
 	"setSkillLoss": creatureSetskillloss,
 	"getPosition": creatureGetposition,
@@ -342,7 +342,13 @@ func creatureCanseecreature(L *lua.LState) int {
 	return 1
 }
 
-func creatureChangespeed(L *lua.LState) int { return 0 }
+func (e *Engine) creatureChangespeed(L *lua.LState) int {
+	if c := checkCreature(L); c != nil {
+		delta := L.CheckInt(2)
+		e.world.ChangeSpeed(c, int32(delta))
+	}
+	return 0
+}
 
 func creatureClearicons(L *lua.LState) int { return 0 }
 
@@ -741,7 +747,30 @@ func creatureSetskillloss(L *lua.LState) int { return 0 }
 
 func creatureSetskull(L *lua.LState) int { return 0 }
 
-func creatureSetspeed(L *lua.LState) int { return 0 }
+func (e *Engine) creatureSetspeed(L *lua.LState) int {
+	if c := checkCreature(L); c != nil {
+		speed := L.CheckInt(2)
+		// C++ setCreatureSpeed changes base speed, then broadcasts
+		// We'll mimic this by finding the difference from current base speed
+		// Wait, Creature doesn't have SetBaseSpeed. We can just add SetBaseSpeed, 
+		// but since we only use ChangeSpeed, let's just adjust the SpeedBonus
+		// so that GetSpeed() == speed. 
+		// Actually, in Canary setCreatureSpeed does: creature->setBaseSpeed(speed); then broadcasts.
+		// For now we'll just set speed delta to match requested speed.
+		delta := int32(speed) - int32(c.GetBaseSpeed())
+		e.world.ChangeSpeed(c, delta - int32(c.GetSpeed()) + int32(c.GetBaseSpeed())) 
+		// Wait, ChangeSpeed adds to SpeedBonus.
+		// Current Speed = BaseSpeed + SpeedBonus.
+		// We want New Speed = speed.
+		// So New SpeedBonus = speed - BaseSpeed.
+		// Delta to apply = New SpeedBonus - Current SpeedBonus
+		//                = (speed - BaseSpeed) - (Speed - BaseSpeed) // Wait, SpeedBonus = Speed - BaseSpeed
+		//                = speed - Speed
+		deltaToApply := int32(speed) - int32(c.GetSpeed())
+		e.world.ChangeSpeed(c, deltaToApply)
+	}
+	return 0
+}
 
 func creatureSettarget(L *lua.LState) int {
 	c := checkCreature(L)

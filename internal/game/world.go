@@ -58,6 +58,8 @@ type World struct {
 	OnMagicEffect    func(pos Position, effect uint16)
 	OnDistanceEffect func(from, to Position, effect uint16)
 	OnCreatureSay    func(speaker Creature, talkType byte, text string)
+	OnChangeSpeed    func(c Creature)
+	OnIconsUpdate    func(p *Player)
 
 	// Combat is the world's combat engine, used by the spell system to resolve
 	// spell damage/heal through the same hit/death path as melee.
@@ -155,6 +157,14 @@ func (w *World) Players() []*Player {
 		out = append(out, p)
 	}
 	return out
+}
+
+// ChangeSpeed updates a creature's speed and broadcasts the change to spectators.
+func (w *World) ChangeSpeed(c Creature, speedDelta int32) {
+	c.ChangeSpeed(speedDelta)
+	if w.OnChangeSpeed != nil {
+		w.OnChangeSpeed(c)
+	}
 }
 
 // Creatures returns a snapshot of all non-player creatures.

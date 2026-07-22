@@ -64,6 +64,28 @@ func (g *GameProtocol) SendCloseShop() {
 	g.SendToClient(w)
 }
 
+// SendChangeSpeed sends the creature's new speed to the client (0x8F).
+func (g *GameProtocol) SendChangeSpeed(c game.Creature) {
+	w := netmsg.NewWriter()
+	w.AddByte(0x8F)
+	w.AddU32(c.GetID())
+	w.AddU16(c.GetBaseSpeed())
+	w.AddU16(c.GetSpeed())
+	g.SendToClient(w)
+}
+
+// SendIcons sends the player's active condition icons (0xA2).
+func (g *GameProtocol) SendIcons() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xA2)
+	w.AddU64(g.player.GetIcons())
+	w.AddByte(0) // IconBakragore::None
+	g.SendToClient(w)
+}
+
 // SendInventoryIds sends the aggregated inventory id/tier/count list (0xF5),
 // mirroring ProtocolGame::sendInventoryIds. The client's crafting/loot UIs read
 // this. Amounts >= 0x40000000 are skipped (unencodable by writeCount).

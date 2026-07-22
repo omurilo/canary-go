@@ -31,6 +31,8 @@ func (s *recordSession) OpenContainer(*game.Item)            {}
 func (s *recordSession) RefreshContainer(*game.Item)         {}
 func (s *recordSession) CloseClientContainer(uint8)          {}
 func (s *recordSession) SendCloseShop()                      {}
+func (s *recordSession) SendChangeSpeed(game.Creature)       {}
+func (s *recordSession) SendIcons()                          {}
 
 // TestNpcTradeOpensShop drives the full post-greeting interaction: greet the
 // merchant, then say "trade", and assert the shop-open packet (0x7A) is sent.
