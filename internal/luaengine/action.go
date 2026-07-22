@@ -123,6 +123,13 @@ func (e *Engine) CallAction(a *actions.Action, player *game.Player, item *game.I
 		return false
 	}
 
+	if fromPos.X == 0xFFFF {
+		fromPos = player.GetPosition()
+	}
+	if toPos.X == 0xFFFF {
+		toPos = player.GetPosition()
+	}
+
 	// args: (player, item, fromPosition, target, toPosition, isHotkey)
 	playerUd := L.NewUserData()
 	playerUd.Value = player
