@@ -61,8 +61,8 @@ func pushPosition(L *lua.LState, p game.Position) {
 
 func positionIndex(L *lua.LState) int {
 	ud := L.CheckUserData(1)
+	key := L.CheckString(2)
 	if p, ok := ud.Value.(game.Position); ok {
-		key := L.CheckString(2)
 		switch key {
 		case "x":
 			L.Push(lua.LNumber(p.X))
@@ -78,7 +78,15 @@ func positionIndex(L *lua.LState) int {
 	mt := L.GetTypeMetatable(positionTypeName)
 	methods := L.GetField(mt, "methods")
 	if methods.Type() == lua.LTTable {
-		val := L.GetField(methods, L.CheckString(2))
+		val := L.GetField(methods, key)
+		if val.Type() != lua.LTNil {
+			L.Push(val)
+			return 1
+		}
+	}
+	// Fallback to searching the global "Position" table for Lua-defined methods
+	if gPos := L.GetGlobal("Position"); gPos.Type() == lua.LTTable {
+		val := L.GetField(gPos, key)
 		if val.Type() != lua.LTNil {
 			L.Push(val)
 			return 1
