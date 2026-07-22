@@ -35,7 +35,12 @@ func (p *Player) GetFreeCapacity() uint32 {
 func (p *Player) UpdateInventoryWeight(catalog *items.Catalog) {
 	var total uint32
 	p.walkInventory(func(it *Item) {
-		total += itemUnitWeight(catalog, it.ID) * uint32(max16(it.Count, 1))
+		unitWeight := itemUnitWeight(catalog, it.ID)
+		if isStackable(catalog, it.ID) {
+			total += unitWeight * uint32(max16(it.Count, 1))
+		} else {
+			total += unitWeight
+		}
 	})
 	p.InventoryWeight = total
 }
