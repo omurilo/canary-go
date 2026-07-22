@@ -128,7 +128,10 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 
 	// 2. Determine move count
 	moveCount := uint16(count)
-	if moveCount > item.Count {
+	itType := g.deps.Items.Get(item.ID)
+	if itType == nil || !itType.Stackable {
+		moveCount = item.Count
+	} else if moveCount > item.Count {
 		moveCount = item.Count
 	}
 	if moveCount == 0 {
