@@ -37,6 +37,7 @@ type Item struct {
 	Unlocked   bool
 	Pagination bool
 	Parent     *Item
+	Actor      bool
 }
 
 // ContainerCapacity returns the container's slot capacity, preferring the

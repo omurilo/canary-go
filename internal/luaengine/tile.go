@@ -94,6 +94,23 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			L.Push(lua.LNil)
 			return 1
 		},
+		"getItemById": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			itemID := uint16(L.CheckInt(2))
+			
+			if t.tile.Ground != nil && t.tile.Ground.ID == itemID {
+				e.pushItem(L, t.tile.Ground)
+				return 1
+			}
+			for _, it := range t.tile.Items {
+				if it.ID == itemID {
+					e.pushItem(L, it)
+					return 1
+				}
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
 		"getTopCreature": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			if len(t.tile.Creatures) > 0 {

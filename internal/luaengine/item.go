@@ -209,6 +209,16 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		"getDescription": e.itemGetDescription,
 		"isInsideDepot": stubItemMethod,
 		"isContainer": stubItemMethod,
+		"actor": func(L *lua.LState) int {
+			it := checkItem(L)
+			if L.GetTop() == 1 {
+				L.Push(lua.LBool(it.item.Actor))
+			} else {
+				it.item.Actor = L.CheckBool(2)
+				L.Push(lua.LTrue)
+			}
+			return 1
+		},
 	}
 }
 
