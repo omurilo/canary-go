@@ -63,15 +63,27 @@ func Default() *Config {
 // not fatal: defaults + env still apply.
 func Load(path string) (*Config, error) {
 	cfg := Default()
-	if _, err := os.Stat(path); err != nil {
+	
+	// Support sharing the configuration with the C++ server in the root directory.
+	// If the default "config.lua" is used, check if there's a "../config.lua" first.
+	resolvedPath := path
+	if path == "config.lua" {
+		if _, err := os.Stat("../config.lua"); err == nil {
+			resolvedPath = "../config.lua"
+		} else if _, err := os.Stat(path); err != nil {
+			// fallback/error handled below
+		}
+	}
+
+	if _, err := os.Stat(resolvedPath); err != nil {
 		applyEnv(cfg)
 		return cfg, fmt.Errorf("config: %w", err)
 	}
 
 	L := lua.NewState()
 	defer L.Close()
-	if err := L.DoFile(path); err != nil {
-		return nil, fmt.Errorf("config: executing %s: %w", path, err)
+	if err := L.DoFile(resolvedPath); err != nil {
+		return nil, fmt.Errorf("config: executing %s: %w", resolvedPath, err)
 	}
 	g := L.Get(lua.GlobalsIndex).(*lua.LTable)
 
@@ -108,10 +120,17 @@ func Load(path string) (*Config, error) {
 	cfg.DBName = str("mysqlDatabase", cfg.DBName)
 	cfg.DBPort = num("mysqlPort", cfg.DBPort)
 
-	cfg.MOTD = str("motd", cfg.MOTD)
+	// Fallback to serverMotd if motd is not defined (to support config.lua.dist)
+	cfg.MOTD = str("serverMotd", str("motd", cfg.MOTD))
 	cfg.AllowOldProto = boolean("allowOldProtocol", cfg.AllowOldProto)
 	cfg.RSAKeyFile = str("rsaKeyFile", cfg.RSAKeyFile)
-	cfg.WorldFile = str("worldFile", cfg.WorldFile)
+
+	// Fallback to constructing the world path from dataPackDirectory + mapName
+	cfg.WorldFile = str("worldFile", "")
+	if cfg.WorldFile == "" {
+		mapName := str("mapName", "otservbr")
+		cfg.WorldFile = fmt.Sprintf("%s/world/%s.otbm", cfg.DataPack, mapName)
+	}
 
 	applyEnv(cfg)
 	return cfg, nil
