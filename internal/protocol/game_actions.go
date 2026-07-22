@@ -978,6 +978,7 @@ func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 	}
 
 	totalCost := uint64(price) * uint64(amount)
+	g.deps.Log.Debug("parseBuyItem: starting transaction", "player", g.player.Name, "itemID", itemID, "amount", amount, "price", price, "totalCost", totalCost, "playerMoney", g.player.GetMoney(), "bankBalance", g.player.BankBalance)
 	// Funds: inventory coins first, bank as fallback (Game::removeMoney useBalance).
 	if g.player.GetMoney()+g.player.BankBalance < totalCost {
 		g.player.SendTextMessage(0x13, "You do not have enough money.")
@@ -1075,7 +1076,8 @@ func (g *GameProtocol) refreshAfterTrade() {
 			g.sendInventoryEmpty(uint8(slot))
 		}
 	}
-	for _, c := range g.rangeContainers() {
+	for cid, c := range g.rangeContainers() {
+		g.deps.Log.Debug("refreshAfterTrade: refreshing container", "cid", cid, "itemId", c.ID, "contentsCount", len(c.Contents))
 		g.refreshContainerIfOpen(c)
 	}
 	g.sendStats()
