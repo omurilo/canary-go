@@ -11,6 +11,15 @@ type Tile struct {
 	Ground    *Item
 	Items     []*Item // stacked items (top + down), excluding creatures
 	Creatures []Creature
+	Flags     uint32  // tile flags (e.g. Protection Zone, No-PVP, etc.)
+}
+
+// IsProtectionZone reports whether the tile has the protection zone flag.
+func (t *Tile) IsProtectionZone() bool {
+	if t == nil {
+		return false
+	}
+	return (t.Flags & 1) != 0
 }
 
 // Walkable reports whether a creature may stand on the tile.

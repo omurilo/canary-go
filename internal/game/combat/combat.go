@@ -205,7 +205,9 @@ func CanDoCombat(caster Creature, target Creature) bool {
 	if caster == nil || target == nil {
 		return false
 	}
-	// Add protection zone or other checks here
+	if caster.IsInProtectionZone() || target.IsInProtectionZone() {
+		return false
+	}
 	return true
 }
 

@@ -124,3 +124,19 @@ func (a combatAdapter) GetResistance(combatType combat.CombatType) int16 {
 	return 0
 }
 
+func (a combatAdapter) IsInProtectionZone() bool {
+	var world *World
+	if p, ok := a.c.(*Player); ok {
+		world = p.World
+	} else if m, ok := a.c.(*Monster); ok {
+		world = m.World
+	} else if n, ok := a.c.(*Npc); ok {
+		world = n.World
+	}
+	if world == nil || world.Map == nil {
+		return false
+	}
+	tile := world.Map.GetTile(a.c.GetPosition())
+	return tile.IsProtectionZone()
+}
+

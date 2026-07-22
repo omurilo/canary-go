@@ -117,6 +117,7 @@ type Creature interface {
 	GetArmor() int32
 	GetDefense() int32
 	GetResistance(combatType CombatType) int16
+	IsInProtectionZone() bool
 }
 
 type Player interface {

@@ -158,6 +158,14 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 	if target.GetHealth() == 0 {
 		return
 	}
+	if e.world != nil && e.world.Map != nil {
+		if tile := e.world.Map.GetTile(attacker.GetPosition()); tile != nil && tile.IsProtectionZone() {
+			return
+		}
+		if tile := e.world.Map.GetTile(target.GetPosition()); tile != nil && tile.IsProtectionZone() {
+			return
+		}
+	}
 	// Monsters never harm players who cannot be attacked (staff/ghost),
 	// mirroring PlayerFlags_t::CannotBeAttacked.
 	if _, atkIsMonster := attacker.(*Monster); atkIsMonster {

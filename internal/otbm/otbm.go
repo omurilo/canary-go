@@ -293,7 +293,7 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 	for {
 		tag := r.u8()
 		if tag == attrTileFlags {
-			_ = r.u32()
+			tile.Flags = r.u32()
 			continue
 		}
 		if tag == attrItem {
@@ -333,7 +333,7 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 		}
 	}
 
-	if tile.Ground != nil || len(tile.Items) > 0 {
+	if tile.Ground != nil || len(tile.Items) > 0 || tile.Flags != 0 {
 		p.m.SetTile(pos, tile)
 		p.res.TileCount++
 	}

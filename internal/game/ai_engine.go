@@ -26,7 +26,23 @@ func (e *AIEngine) updateAI() {
 	creatures := e.world.Creatures()
 	for _, c := range creatures {
 		// Only monsters have AI for now
-		if _, isMonster := c.(*Monster); !isMonster {
+		monster, isMonster := c.(*Monster)
+		if !isMonster {
+			continue
+		}
+
+		// Passive AI: If the monster is not hostile (e.g. Cat, Rabbit, Deer),
+		// it should never seek targets or keep any existing target.
+		if monster.Type != nil && !monster.Type.Flags.Hostile {
+			if monster.GetTarget() != nil {
+				monster.SetTarget(nil)
+			}
+			// Just wander
+			if rand.Intn(3) == 0 { // 33% chance to move randomly
+				dirs := []Direction{DirNorth, DirEast, DirSouth, DirWest}
+				dir := dirs[rand.Intn(len(dirs))]
+				e.world.TryMoveCreature(monster, dir)
+			}
 			continue
 		}
 

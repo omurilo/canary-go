@@ -426,7 +426,11 @@ func (w *World) TeleportCreature(c Creature, dest Position) {
 // and whether the move succeeded.
 func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 	dest := c.GetPosition().Offset(dir)
-	if !w.Map.GetTile(dest).Walkable(w.Items) {
+	destTile := w.Map.GetTile(dest)
+	if destTile == nil || !destTile.Walkable(w.Items) {
+		return c.GetPosition(), false
+	}
+	if c.GetCreatureType() != 0 && destTile.IsProtectionZone() {
 		return c.GetPosition(), false
 	}
 	w.mu.Lock()
