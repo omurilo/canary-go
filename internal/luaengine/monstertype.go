@@ -95,6 +95,19 @@ func (e *Engine) registerMonsterType() {
 			// No-op since MonsterType doesn't have a Defenses slice yet in Go
 			return 0
 		},
+		"targetDistance": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			if L.GetTop() >= 2 {
+				m.TargetDistance = int32(L.CheckInt(2))
+				return 0
+			}
+			val := m.TargetDistance
+			if val == 0 {
+				val = 1
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
 	}
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), monsterTypeMethods))
 

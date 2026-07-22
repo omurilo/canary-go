@@ -19,10 +19,11 @@ type Outfit struct {
 }
 
 type MonsterType struct {
-	Name       string
-	Speed      uint32
-	MaxHealth  uint32
-	Experience uint64 // exp awarded to the killer (MonsterType::info.experience)
+	Name           string
+	Speed          uint32
+	MaxHealth      uint32
+	TargetDistance int32
+	Experience     uint64 // exp awarded to the killer (MonsterType::info.experience)
 	Corpse     uint16 // corpse item id dropped on death (0 = unknown)
 	RaceID     uint16 // bestiary race id (monster.raceId)
 	Outfit     Outfit
