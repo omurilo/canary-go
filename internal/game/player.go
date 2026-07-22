@@ -133,6 +133,9 @@ type Player struct {
 	QuickLootFallbackToMain bool               // Fallback to main container if specific container full
 	ManagedContainers       map[uint8]Position // Map of ObjectCategory -> Container Position
 
+	// Wheel of Destiny progression tree
+	Wheel *WheelOfDestiny
+
 	// Inventory holds equipment slots 1..10 (CONST_SLOT_HEAD..CONST_SLOT_AMMO);
 	// index 0 is unused. Slot 11 (store inbox, CONST_SLOT_LAST) is intentionally
 	// omitted. Persistence of these is a later milestone.
@@ -389,8 +392,18 @@ func (p *Player) SetHealth(health uint32) {
 		p.Health = p.MaxHealth
 	}
 }
+func (p *Player) GetWheel() *WheelOfDestiny {
+	if p.Wheel == nil {
+		p.Wheel = NewWheelOfDestiny()
+	}
+	return p.Wheel
+}
+
 func (p *Player) GetMaxHealth() uint32 {
 	val := int32(p.MaxHealth)
+	if p.Wheel != nil {
+		val += int32(p.Wheel.GetBonusHealth())
+	}
 	percent := int32(100)
 
 	for _, cond := range p.Conditions() {

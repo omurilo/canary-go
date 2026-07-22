@@ -671,6 +671,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseInspectPlayer(r)
 	case 0xE5:
 		g.parseCyclopediaCharacterInfo(r)
+	case 0xEC:
+		g.parseWheelOfDestiny(r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
 	default:

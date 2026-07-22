@@ -60,6 +60,10 @@ func (e *Engine) registerPlayerType() {
 
 var playerMethods = map[string]lua.LGFunction{
 	"resetCharmsBestiary": playerResetcharmsbestiary,
+	"getWheelPoints": playerGetwheelpoints,
+	"getWheelSpentPoints": playerGetwheelspentpoints,
+	"getWheelSpells": playerGetwheelspells,
+	"addWheelPoints": playerAddwheelpoints,
 	"unlockAllCharmRunes": playerUnlockallcharmrunes,
 	"addCharmPoints": playerAddcharmpoints,
 	"addMinorCharmEchoes": playerAddminorcharmechoes,
@@ -3036,6 +3040,53 @@ func playerRevelationstagewod(L *lua.LState) int {
 		return 1
 	}
 	L.Push(lua.LNumber(p.AccountType))
+	return 1
+}
+
+func playerGetwheelpoints(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	wheel := p.GetWheel()
+	isPromoted := p.Vocation > 0 && (p.Vocation > 4)
+	L.Push(lua.LNumber(wheel.GetTotalPoints(p.Level, isPromoted)))
+	return 1
+}
+
+func playerGetwheelspentpoints(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	wheel := p.GetWheel()
+	L.Push(lua.LNumber(wheel.GetSpentPoints()))
+	return 1
+}
+
+func playerGetwheelspells(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(L.NewTable())
+		return 1
+	}
+	tbl := L.NewTable()
+	L.Push(tbl)
+	return 1
+}
+
+func playerAddwheelpoints(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	amount := uint16(L.CheckNumber(2))
+	wheel := p.GetWheel()
+	wheel.BonusPoints += amount
+	L.Push(lua.LTrue)
 	return 1
 }
 
