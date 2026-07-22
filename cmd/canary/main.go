@@ -451,7 +451,8 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 
 	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return err
+			log.Warn("walking script directory entry failed; skipping", "path", path, "err", err)
+			return nil
 		}
 		if d.IsDir() && d.Name() == "lib" && path == libDir {
 			return filepath.SkipDir
