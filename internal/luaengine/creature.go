@@ -1,6 +1,8 @@
 package luaengine
 
 import (
+	"reflect"
+
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 	lua "github.com/yuin/gopher-lua"
@@ -53,18 +55,29 @@ func checkCreature(L *lua.LState) game.Creature {
 // a numeric creature id (looked up in the world). Pushes nil on miss/mismatch.
 func (e *Engine) creatureConstructorCall(L *lua.LState, kind string) int {
 	var c game.Creature
-	switch arg := L.Get(2); arg.Type() {
+	arg := L.Get(2)
+	// fmt.Printf("ctor %s: arg1=%v (%s) arg2=%v (%s)\n", kind, L.Get(1), L.Get(1).Type(), arg, arg.Type())
+	switch arg.Type() {
 	case lua.LTUserData:
 		if v, ok := arg.(*lua.LUserData).Value.(game.Creature); ok {
 			c = v
 		}
 	case lua.LTNumber:
 		if e.world != nil {
-			c = e.world.CreatureByID(uint32(lua.LVAsNumber(arg)))
+			if cr := e.world.CreatureByID(uint32(lua.LVAsNumber(arg))); cr != nil {
+				c = cr
+			}
+		}
+	case lua.LTString:
+		if e.world != nil {
+			if cr := e.world.CreatureByName(lua.LVAsString(arg)); cr != nil {
+				c = cr
+			}
 		}
 	}
 	if !e.pushCreatureAs(L, c, kind) {
 		L.Push(lua.LNil)
+		return 1
 	}
 	return 1
 }
@@ -122,7 +135,7 @@ func metatableForCreature(c game.Creature) string {
 }
 
 func (e *Engine) pushCreatureAs(L *lua.LState, c game.Creature, kind string) bool {
-	if c == nil {
+	if c == nil || (reflect.ValueOf(c).Kind() == reflect.Ptr && reflect.ValueOf(c).IsNil()) {
 		return false
 	}
 	metatable := kind

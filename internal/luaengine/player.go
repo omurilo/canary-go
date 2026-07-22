@@ -119,6 +119,7 @@ var playerMethods = map[string]lua.LGFunction{
 	"sendSpellCooldown": playerSendspellcooldown,
 	"sendSpellGroupCooldown": playerSendspellgroupcooldown,
 	"getMagicLevel": playerGetmagiclevel,
+	"getMagicLevelPercent": playerGetmagiclevelpercent,
 	"getBaseMagicLevel": playerGetbasemagiclevel,
 	"getMana": playerGetmana,
 	"addMana": playerAddmana,
@@ -1806,7 +1807,24 @@ func playerGetskillpercent(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	skill := luaOptInt(L, 2)
+	if skill < 0 || skill >= int(game.SkillCount) {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	pct := float64(p.GetSkillPercent(game.Skill(skill))) / 100.0
+	L.Push(lua.LNumber(pct))
+	return 1
+}
+
+func playerGetmagiclevelpercent(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pct := float64(p.GetMagLevelPercent()) / 100.0
+	L.Push(lua.LNumber(pct))
 	return 1
 }
 

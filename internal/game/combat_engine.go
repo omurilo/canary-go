@@ -179,11 +179,12 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 
 	maxRange := int32(1)
 	var weapon *Item
+	var launcher *Item
 	var weaponType string
 
 	if p, ok := attacker.(*Player); ok {
 		weapon = p.GetWeapon(e.world.Items, false)
-		launcher := p.GetWeapon(e.world.Items, true)
+		launcher = p.GetWeapon(e.world.Items, true)
 
 		if launcher != nil && weapon == nil {
 			// Equipped a distance launcher (bow/crossbow) but no matching ammunition found!
@@ -223,7 +224,7 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 		if weaponType == "wand" {
 			e.doWandHit(p, target, weapon)
 		} else if weaponType == "distance" || weaponType == "missile" || weaponType == "ammunition" || weaponType == "ammo" {
-			e.doDistanceHit(p, target, weapon)
+			e.doDistanceHit(p, target, weapon, launcher)
 		} else {
 			e.doMeleeHit(combat.NewCombat(), p, target)
 		}
@@ -256,6 +257,25 @@ func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 	c.SetParam(combat.CombatParamBlockArmor, 1)
 	c.SetParam(combat.CombatParamBlockShield, 1)
 
+	if p, ok := attacker.(*Player); ok {
+		weapon := p.GetWeapon(e.world.Items, false)
+		skill := SkillFist
+		if weapon != nil {
+			switch weapon.WeaponType(e.world.Items) {
+			case "sword":
+				skill = SkillSword
+			case "axe":
+				skill = SkillAxe
+			case "club":
+				skill = SkillClub
+			}
+		}
+		p.AddSkillTries(skill, 1)
+	}
+	if tp, ok := target.(*Player); ok {
+		tp.AddSkillTries(SkillShielding, 1)
+	}
+
 	if !c.DoCombatHealth(adaptCreature(attacker), adaptCreature(target), combat.CombatDamage{
 		PrimaryType:  combat.CombatPhysical,
 		PrimaryValue: int32(dmg),
@@ -283,10 +303,13 @@ func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 	}
 }
 
-func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item) {
+func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item, launcher *Item) {
 	skill := int(p.GetEffectiveSkill(SkillDistance))
 	voc := vocations.GetVocation(uint32(p.Vocation))
 	attackValue := int(ammo.Attack(e.world.Items))
+	if launcher != nil {
+		attackValue += int(launcher.Attack(e.world.Items))
+	}
 	if attackValue <= 0 {
 		attackValue = 10 // fallback
 	}
@@ -321,6 +344,8 @@ func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item) {
 			p.ConsumeWeaponInHand(ConstSlotRight)
 		}
 	}
+
+	p.AddSkillTries(SkillDistance, 1)
 
 	// Apply combat
 	c := combat.NewCombat()

@@ -75,6 +75,22 @@ func (w *World) PlayerByName(name string) *Player {
 	return w.byName[strings.ToLower(strings.TrimSpace(name))]
 }
 
+// CreatureByName returns an online creature (player, monster, npc) by (case-insensitive) name, or nil.
+func (w *World) CreatureByName(name string) Creature {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	target := strings.ToLower(strings.TrimSpace(name))
+	if p, ok := w.byName[target]; ok {
+		return p
+	}
+	for _, c := range w.creatures {
+		if c != nil && strings.EqualFold(strings.TrimSpace(c.GetName()), target) {
+			return c
+		}
+	}
+	return nil
+}
+
 // NewWorld creates an empty world with a fresh map.
 func NewWorld() *World {
 	w := &World{

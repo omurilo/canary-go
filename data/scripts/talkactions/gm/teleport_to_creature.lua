@@ -51,7 +51,7 @@ end
 local function getOrderedCreaturesByName(player, creatureName)
 	local ordered = {}
 	local loweredName = creatureName:lower()
-	local spectators = Game.getSpectators(player:getPosition(), true, false, GLOBAL_GOTO_SCAN_RANGE, GLOBAL_GOTO_SCAN_RANGE, GLOBAL_GOTO_SCAN_RANGE, GLOBAL_GOTO_SCAN_RANGE)
+	local spectators = Game.getSpectators(player:getPosition(), true, false, GLOBAL_GOTO_SCAN_RANGE, GLOBAL_GOTO_SCAN_RANGE, GLOBAL_GOTO_SCAN_RANGE, GLOBAL_GOTO_SCAN_RANGE) or {}
 	for _, creature in pairs(spectators) do
 		if creature and creature:getName():lower() == loweredName then
 			table.insert(ordered, creature)
@@ -101,6 +101,18 @@ function teleportToCreature.onSay(player, words, param)
 	if param == "" then
 		player:sendCancelMessage("Command param required.")
 		return true
+	end
+
+	local posParam = param:toPosition()
+	if posParam then
+		local tile = Tile(posParam)
+		if tile then
+			player:teleportTo(posParam)
+			if not player:isInGhostMode() then
+				posParam:sendMagicEffect(CONST_ME_TELEPORT)
+			end
+			return true
+		end
 	end
 
 	local loweredParam = param:lower()

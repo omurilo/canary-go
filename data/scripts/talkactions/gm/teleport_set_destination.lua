@@ -15,7 +15,8 @@ function teleportSetDestination.onSay(player, words, param)
 	if params[3] then
 		local position = player:getPosition()
 		position:getNextPosition(player:getDirection(), 1)
-		local destination = Position(params[1], params[2], params[3])
+		local x, y, z = tonumber(params[1]), tonumber(params[2]), tonumber(params[3])
+		local destination = (x and y and z) and Position(x, y, z) or nil
 		if destination and destination:getTile() then
 			local tp = Game.createItem(35502, 1, position)
 			if tp then
