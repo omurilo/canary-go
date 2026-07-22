@@ -168,12 +168,6 @@ func (g *GameProtocol) canWalkthroughEx(observer *game.Player, target game.Creat
 		if observer.GroupID >= 3 {
 			return true
 		}
-		if g.deps != nil && g.deps.World != nil {
-			tile := g.deps.World.Map.GetTile(targetP.GetPosition())
-			if tile != nil && (tile.IsProtectionZone() || g.deps.World.WorldType == 1 || g.deps.World.WorldType == 0) {
-				return true
-			}
-		}
 	}
 	return false
 }

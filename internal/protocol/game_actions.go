@@ -82,14 +82,6 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 	g.SendCreatureMove(oldPos, oldStack, newPos)
 	g.sendMapShift(dir, newPos)
 
-	if destTile := g.deps.World.Map.GetTile(newPos); destTile != nil {
-		for _, c := range destTile.Creatures {
-			if c.GetID() != p.ID {
-				g.SendCreatureWalkthrough(c, g.canWalkthroughEx(p, c))
-			}
-		}
-	}
-
 	// Trigger StepIn events
 	if tile := g.deps.World.Map.GetTile(newPos); tile != nil {
 		var stepInEvents []*moveevents.MoveEvent
