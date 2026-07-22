@@ -169,3 +169,8 @@ func (a combatAdapter) IsSecureMode() bool {
 	return false
 }
 
+func (a combatAdapter) IsPlayer() bool {
+	_, ok := a.c.(*Player)
+	return ok
+}
+

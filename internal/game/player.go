@@ -302,6 +302,10 @@ func (p *Player) ensureDefaults() {
 	// But let's check if bool default of false can mean uninitialized or not. Actually, let's just initialize it to true.
 	p.SecureMode = true
 
+	if p.LastLogin == 0 && p.OfflineTrainingTime == 0 {
+		p.OfflineTrainingTime = 43200 * 1000 // default to full 12-hour training pool
+	}
+
 	for i := range p.Skills {
 		if p.Skills[i] == 0 {
 			p.Skills[i] = 10

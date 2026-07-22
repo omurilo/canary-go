@@ -89,7 +89,8 @@ func NewCombat() *Combat {
 
 // DoCombatHealth applies combat damage or healing to health
 func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatDamage) bool {
-	if c.Params.Aggressive && !CanDoCombat(caster, target) {
+	isAggressive := c.Params.Aggressive && damage.PrimaryType != CombatHealing
+	if isAggressive && !CanDoCombat(caster, target) {
 		return false
 	}
 
@@ -99,9 +100,7 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 	}
 
 	// Apply PvP reduction
-	_, casterIsPlayer := caster.(Player)
-	_, targetIsPlayer := target.(Player)
-	if casterIsPlayer && targetIsPlayer && damage.PrimaryType != CombatHealing {
+	if caster.IsPlayer() && target.IsPlayer() && damage.PrimaryType != CombatHealing {
 		damage.PrimaryValue = damage.PrimaryValue / 2
 	}
 
@@ -215,12 +214,13 @@ func CanDoCombat(caster Creature, target Creature) bool {
 	}
 
 	// Player-vs-Player specific checks
-	casterPlayer, casterIsPlayer := caster.(Player)
-	_, targetIsPlayer := target.(Player)
-	if casterIsPlayer && targetIsPlayer {
-		// If the caster has Secure Mode active (safe/tank mode), they cannot damage other players
-		if casterPlayer.IsSecureMode() {
-			return false
+	if caster.IsPlayer() && target.IsPlayer() {
+		casterPlayer, ok := caster.(Player)
+		if ok {
+			// If the caster has Secure Mode active (safe/tank mode), they cannot damage other players
+			if casterPlayer.IsSecureMode() {
+				return false
+			}
 		}
 	}
 

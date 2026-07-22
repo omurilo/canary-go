@@ -222,6 +222,7 @@ func (e *Engine) registerAPI() {
 	configManagerTbl := L.NewTable()
 	L.SetField(configManagerTbl, "getNumber", L.NewFunction(func(L *lua.LState) int {
 		key := strings.ToLower(L.OptString(1, ""))
+		key = strings.ReplaceAll(key, "_", "")
 		if config.Active != nil && config.Active.Custom != nil {
 			if val, exists := config.Active.Custom[key]; exists {
 				if num, ok := val.(lua.LNumber); ok {
@@ -241,6 +242,7 @@ func (e *Engine) registerAPI() {
 	}))
 	L.SetField(configManagerTbl, "getFloat", L.NewFunction(func(L *lua.LState) int {
 		key := strings.ToLower(L.OptString(1, ""))
+		key = strings.ReplaceAll(key, "_", "")
 		if config.Active != nil && config.Active.Custom != nil {
 			if val, exists := config.Active.Custom[key]; exists {
 				if num, ok := val.(lua.LNumber); ok {
@@ -260,6 +262,7 @@ func (e *Engine) registerAPI() {
 	}))
 	L.SetField(configManagerTbl, "getString", L.NewFunction(func(L *lua.LState) int {
 		key := strings.ToLower(L.OptString(1, ""))
+		key = strings.ReplaceAll(key, "_", "")
 		if config.Active != nil && config.Active.Custom != nil {
 			if val, exists := config.Active.Custom[key]; exists {
 				L.Push(lua.LString(val.String()))
@@ -275,6 +278,7 @@ func (e *Engine) registerAPI() {
 	}))
 	L.SetField(configManagerTbl, "getBoolean", L.NewFunction(func(L *lua.LState) int {
 		key := strings.ToLower(L.OptString(1, ""))
+		key = strings.ReplaceAll(key, "_", "")
 		if config.Active != nil && config.Active.Custom != nil {
 			if val, exists := config.Active.Custom[key]; exists {
 				if b, ok := val.(lua.LBool); ok {

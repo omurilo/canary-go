@@ -114,3 +114,35 @@ func TestPassiveMonster_AIIgnoresTargets(t *testing.T) {
 		t.Error("expected passive monster target to be cleared during AI update")
 	}
 }
+
+func TestCombat_SelfDamageAndSecureMode(t *testing.T) {
+	w := NewWorld()
+	p1 := &Player{}
+	p1.ID = 100
+	p1.World = w
+	p1.SecureMode = true // Secure mode is ON (Dove)
+
+	p2 := &Player{}
+	p2.ID = 101
+	p2.World = w
+	p2.SecureMode = false // Secure mode is OFF (Aggressive)
+
+	c1 := combatAdapter{c: p1}
+	c2 := combatAdapter{c: p2}
+
+	// 1. Caster should never aggressively hit themselves
+	if combat.CanDoCombat(c1, c1) {
+		t.Error("expected aggressive combat to be BLOCKED on self")
+	}
+
+	// 2. p1 (secure mode ON) cannot aggressively hit p2
+	if combat.CanDoCombat(c1, c2) {
+		t.Error("expected aggressive combat from player in secure mode to be BLOCKED")
+	}
+
+	// 3. p2 (secure mode OFF) CAN aggressively hit p1
+	if !combat.CanDoCombat(c2, c1) {
+		t.Error("expected aggressive combat from player in aggressive mode to be ALLOWED")
+	}
+}
+

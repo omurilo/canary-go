@@ -143,7 +143,9 @@ func Load(path string) (*Config, error) {
 
 	cfg.Custom = make(map[string]lua.LValue)
 	g.ForEach(func(k, v lua.LValue) {
-		cfg.Custom[strings.ToLower(k.String())] = v
+		key := strings.ToLower(k.String())
+		key = strings.ReplaceAll(key, "_", "")
+		cfg.Custom[key] = v
 	})
 	Active = cfg
 
