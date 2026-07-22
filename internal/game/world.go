@@ -391,6 +391,7 @@ func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 		return p.Pos, false
 	}
 	w.mu.Lock()
+	p.IsTraining = false
 	oldPos := p.Pos
 	oldTileIndex := w.removeCreatureFromTile(p)
 	p.Pos = dest
@@ -411,6 +412,9 @@ func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 // not require the destination to be adjacent. Used by scripted travel/teleport.
 func (w *World) TeleportCreature(c Creature, dest Position) {
 	w.mu.Lock()
+	if player, ok := c.(*Player); ok {
+		player.IsTraining = false
+	}
 	oldPos := c.GetPosition()
 	oldTileIndex := w.removeCreatureFromTile(c)
 	c.SetPosition(dest)
@@ -434,6 +438,9 @@ func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 		return c.GetPosition(), false
 	}
 	w.mu.Lock()
+	if player, ok := c.(*Player); ok {
+		player.IsTraining = false
+	}
 	oldPos := c.GetPosition()
 	oldTileIndex := w.removeCreatureFromTile(c)
 	c.SetPosition(dest)

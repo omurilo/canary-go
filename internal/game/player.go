@@ -144,6 +144,7 @@ type Player struct {
 	TownID          uint16
 	LoginPosition   Position
 	Dead            bool
+	IsTraining      bool
 	SkillLoss       bool
 	Skull           uint8
 	Blessings       [8]uint8

@@ -9,6 +9,53 @@ const positionTypeName = "Position"
 
 func (e *Engine) registerPosition() {
 	mt := e.L.NewTypeMetatable(positionTypeName)
+
+	positionMethods := map[string]lua.LGFunction{
+		"isPosition": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
+		"sendSingleSoundEffect": func(L *lua.LState) int {
+			return 0
+		},
+		"sendMagicEffect": func(L *lua.LState) int {
+			p := checkPosition(L, 1)
+			effect := uint16(L.CheckInt(2))
+			if e.world.OnMagicEffect != nil {
+				e.world.OnMagicEffect(p, effect)
+			}
+			return 0
+		},
+		"sendDistanceEffect": func(L *lua.LState) int {
+			from := checkPosition(L, 1)
+			to := checkPosition(L, 2)
+			effect := uint16(L.CheckInt(3))
+			if e.world.OnDistanceEffect != nil {
+				e.world.OnDistanceEffect(from, to, effect)
+			}
+			return 0
+		},
+		"getDistance": func(L *lua.LState) int {
+			p1 := checkPosition(L, 1)
+			p2 := checkPosition(L, 2)
+			if p1.Z != p2.Z {
+				L.Push(lua.LNumber(0xFFFF))
+				return 1
+			}
+			dx := int(p1.X) - int(p2.X)
+			if dx < 0 {
+				dx = -dx
+			}
+			dy := int(p1.Y) - int(p2.Y)
+			if dy < 0 {
+				dy = -dy
+			}
+			dist := dx
+			if dy > dx {
+				dist = dy
+			}
+			L.Push(lua.LNumber(dist))
+			return 1
+		},
+	}
+
 	methods := e.L.SetFuncs(e.L.NewTable(), positionMethods)
 	e.L.SetField(mt, "methods", methods)
 
@@ -123,35 +170,4 @@ func positionEq(L *lua.LState) int {
 	return 1
 }
 
-var positionMethods = map[string]lua.LGFunction{
-	"isPosition": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
-	"sendSingleSoundEffect": func(L *lua.LState) int {
-		// Stub for sound effect
-		return 0
-	},
-	"sendMagicEffect": func(L *lua.LState) int {
-		return 0
-	},
-	"getDistance": func(L *lua.LState) int {
-		p1 := checkPosition(L, 1)
-		p2 := checkPosition(L, 2)
-		if p1.Z != p2.Z {
-			L.Push(lua.LNumber(0xFFFF))
-			return 1
-		}
-		dx := int(p1.X) - int(p2.X)
-		if dx < 0 {
-			dx = -dx
-		}
-		dy := int(p1.Y) - int(p2.Y)
-		if dy < 0 {
-			dy = -dy
-		}
-		dist := dx
-		if dy > dx {
-			dist = dy
-		}
-		L.Push(lua.LNumber(dist))
-		return 1
-	},
-}
+

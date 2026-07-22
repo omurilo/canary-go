@@ -34,7 +34,7 @@ func (p *Player) GetFreeCapacity() uint32 {
 // Player::updateInventoryWeight.
 func (p *Player) UpdateInventoryWeight(catalog *items.Catalog) {
 	var total uint32
-	p.walkInventory(func(it *Item) {
+	p.WalkInventory(func(it *Item) {
 		unitWeight := itemUnitWeight(catalog, it.ID)
 		if isStackable(catalog, it.ID) {
 			total += unitWeight * uint32(max16(it.Count, 1))
@@ -56,10 +56,10 @@ func itemUnitWeight(catalog *items.Catalog, id uint16) uint32 {
 	return 0
 }
 
-// walkInventory invokes fn for every item the player carries: equipped items
+// WalkInventory invokes fn for every item the player carries: equipped items
 // and the recursive contents of any containers. Order is slot 1..10 then
 // depth-first container contents.
-func (p *Player) walkInventory(fn func(it *Item)) {
+func (p *Player) WalkInventory(fn func(it *Item)) {
 	var walk func(items []*Item)
 	walk = func(items []*Item) {
 		for _, it := range items {
@@ -119,7 +119,7 @@ func stackSizeOf(catalog *items.Catalog, id uint16) uint16 {
 // across the whole inventory tree. Mirrors Player::getItemTypeCount.
 func (p *Player) GetItemTypeCount(catalog *items.Catalog, itemId uint16, subType int) uint32 {
 	var total uint32
-	p.walkInventory(func(it *Item) {
+	p.WalkInventory(func(it *Item) {
 		total += countMatch(catalog, it, itemId, subType)
 	})
 	return total
@@ -401,7 +401,7 @@ func itemIsSellable(it *Item) bool {
 // Npc::getInventoryItemsFromId.
 func (p *Player) CountSellable(catalog *items.Catalog, itemId uint16, subType int) uint32 {
 	var total uint32
-	p.walkInventory(func(it *Item) {
+	p.WalkInventory(func(it *Item) {
 		if itemIsSellable(it) {
 			total += countMatch(catalog, it, itemId, subType)
 		}

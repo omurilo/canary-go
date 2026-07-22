@@ -178,6 +178,20 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		},
 		"getPosition": func(L *lua.LState) int {
 			it := checkItem(L)
+			if it.item != nil {
+				for _, p := range e.world.Players() {
+					found := false
+					p.WalkInventory(func(inventoryItem *game.Item) {
+						if inventoryItem == it.item {
+							found = true
+						}
+					})
+					if found {
+						pushPosition(L, p.GetPosition())
+						return 1
+					}
+				}
+			}
 			pushPosition(L, it.pos)
 			return 1
 		},

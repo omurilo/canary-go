@@ -2292,7 +2292,11 @@ func playerIstraining(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	if p.IsTraining {
+		L.Push(lua.LNumber(1))
+	} else {
+		L.Push(lua.LNumber(0))
+	}
 	return 1
 }
 
@@ -3421,7 +3425,8 @@ func playerSettraining(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	p.IsTraining = L.CheckBool(2)
+	L.Push(lua.LTrue)
 	return 1
 }
 
