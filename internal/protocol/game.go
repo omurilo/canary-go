@@ -653,6 +653,12 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.deps.World.PlayerLeaveParty(g.player.ID)
 	case inEnableSharedPartyExp:
 		g.deps.World.PlayerEnableSharedPartyExperience(g.player.ID, r.GetByte() == 1)
+	case 0xCD:
+		g.parseInspectionObject(r)
+	case 0xCE:
+		g.parseInspectPlayer(r)
+	case 0xE5:
+		g.parseCyclopediaCharacterInfo(r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
 	default:
