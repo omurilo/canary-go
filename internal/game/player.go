@@ -254,13 +254,11 @@ func (p *Player) SendTextWindow(windowTextID uint32, itemID uint16, text string)
 		w.AddByte(0x96) // Text Window opcode
 		w.AddU32(windowTextID)
 		w.AddU16(itemID)
-		w.AddByte(1) // count
-		w.AddByte(0) // subType
-		w.AddU16(uint16(len(text)))
-		w.AddString(text)
-		w.AddU16(0)
-		w.AddByte(0)
-		w.AddU16(0)
+		w.AddByte(1)      // count
+		w.AddString(text) // AddString writes uint16(len) + string bytes
+		w.AddU16(0)       // writer name (empty)
+		w.AddByte(0)       // show traded
+		w.AddU16(0)       // date (empty)
 		p.Session.SendToClient(w)
 	}
 }
