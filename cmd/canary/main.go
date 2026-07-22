@@ -441,14 +441,19 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 		return nil
 	})
 
-	// Special case for npclib to ensure npc_handler is loaded before modules
+	// Special case for npclib to ensure npc_handler and modules are loaded in order before custom_modules
 	if filepath.Base(dir) == "npclib" {
-		npcHandler := filepath.Join(dir, "npc_system", "npc_handler.lua")
-		if _, err := os.Stat(npcHandler); err == nil {
-			if err := e.DoFile(npcHandler); err != nil {
-				log.Warn("script error", "file", npcHandler, "err", err)
-			} else {
-				log.Debug("loaded script", "file", npcHandler)
+		for _, primary := range []string{
+			filepath.Join(dir, "npc_system", "npc_handler.lua"),
+			filepath.Join(dir, "npc_system", "modules.lua"),
+			filepath.Join(dir, "npc_system", "custom_modules.lua"),
+		} {
+			if _, err := os.Stat(primary); err == nil {
+				if err := e.DoFile(primary); err != nil {
+					log.Warn("script error", "file", primary, "err", err)
+				} else {
+					log.Debug("loaded script", "file", primary)
+				}
 			}
 		}
 	}
@@ -464,8 +469,8 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 		if !d.IsDir() {
 			log.Debug("visiting file during walkthrough", "path", path, "ext", filepath.Ext(path))
 			if filepath.Ext(path) == ".lua" {
-				// Skip npc_handler since we already loaded it
-				if filepath.Base(dir) == "npclib" && strings.HasSuffix(path, "npc_handler.lua") {
+				// Skip pre-loaded core npclib files
+				if filepath.Base(dir) == "npclib" && (strings.HasSuffix(path, "npc_handler.lua") || strings.HasSuffix(path, "modules.lua") || strings.HasSuffix(path, "custom_modules.lua")) {
 					return nil
 				}
 				log.Info("loading script file", "path", path)
