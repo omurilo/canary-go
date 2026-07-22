@@ -951,12 +951,13 @@ func (p *Player) AddSkillTries(skill Skill, tries uint64) {
 			p.SkillTries[skill] -= req
 			p.Skills[skill]++
 			p.SendTextMessage(0x13, "You advanced to skill level "+fmt.Sprintf("%d", p.Skills[skill])+" in "+skillNameOf(skill)+".")
-			if p.Session != nil {
-				p.Session.SendSkills()
-			}
 		} else {
 			break
 		}
+	}
+
+	if p.Session != nil {
+		p.Session.SendSkills()
 	}
 }
 
@@ -991,13 +992,91 @@ func (p *Player) AddManaSpent(amount uint64) {
 			p.ManaSpent -= req
 			p.MagLevel++
 			p.SendTextMessage(0x13, "You advanced to magic level "+fmt.Sprintf("%d", p.MagLevel)+".")
-			if p.Session != nil {
-				p.Session.SendSkills()
-			}
 		} else {
 			break
 		}
 	}
+
+	if p.Session != nil {
+		p.Session.SendSkills()
+	}
+}
+
+// GetSkillPercent returns the percentage progress to the next skill level (0 to 10000).
+func (p *Player) GetSkillPercent(skill Skill) uint16 {
+	if skill < 0 || skill >= SkillCount {
+		return 0
+	}
+	currentLevel := p.Skills[skill]
+	if currentLevel >= 150 {
+		return 0
+	}
+
+	base := uint64(50)
+	multiplier := 1.1
+	switch skill {
+	case SkillDistance:
+		multiplier = 1.2
+	case SkillShielding:
+		multiplier = 1.1
+	default:
+		multiplier = 1.1
+	}
+
+	var req uint64
+	if currentLevel < 10 {
+		req = base
+	} else {
+		factor := 1.0
+		for i := uint16(10); i < currentLevel; i++ {
+			factor *= multiplier
+		}
+		req = uint64(float64(base) * factor)
+	}
+
+	if req == 0 {
+		req = 50
+	}
+
+	tries := p.SkillTries[skill]
+	if tries >= req {
+		return 10000
+	}
+
+	return uint16((float64(tries) / float64(req)) * 10000)
+}
+
+// GetMagLevelPercent returns the percentage progress to the next magic level (0 to 10000).
+func (p *Player) GetMagLevelPercent() uint16 {
+	currentLevel := p.MagLevel
+	if currentLevel >= 150 {
+		return 0
+	}
+
+	base := uint64(1600)
+	multiplier := 1.1
+
+	var req uint64
+	if currentLevel < 1 {
+		req = base
+	} else {
+		factor := 1.0
+		for i := uint16(1); i < currentLevel; i++ {
+			factor *= multiplier
+		}
+		req = uint64(float64(base) * factor)
+	}
+
+	if req == 0 {
+		req = 1600
+	}
+
+	spent := p.ManaSpent
+	if spent >= req {
+		return 10000
+	}
+
+	return uint16((float64(spent) / float64(req)) * 10000)
 }
 
 func skillNameOf(skill Skill) string {

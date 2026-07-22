@@ -510,13 +510,13 @@ func (g *GameProtocol) addSkills(w *netmsg.Writer) {
 	w.AddU16(p.MagLevel) // magic level
 	w.AddU16(p.MagLevel) // base magic level
 	w.AddU16(0)          // loyalty magic level
-	w.AddU16(0)          // magic level percent * 100
+	w.AddU16(p.GetMagLevelPercent()) // magic level percent * 100
 	// combat skills fist..fishing.
 	for i := game.SkillFist; i < game.SkillCount; i++ {
 		w.AddU16(p.Skills[i]) // level
 		w.AddU16(p.Skills[i]) // base
 		w.AddU16(0)           // loyalty
-		w.AddU16(0)           // percent * 100
+		w.AddU16(p.GetSkillPercent(i)) // percent * 100
 	}
 
 	// The rest mirrors AddPlayerSkills for the modern (1525) profile. Our
