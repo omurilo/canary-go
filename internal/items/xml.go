@@ -73,7 +73,7 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {
 			it.ExtraDefense = int32(v)
 		}
-	case "decayTo":
+	case "decayto", "decayTo":
 		if v, err := strconv.ParseUint(attr.Value, 10, 16); err == nil {
 			it.DecayTo = uint16(v)
 		}
@@ -81,13 +81,13 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 		if v, err := strconv.ParseUint(attr.Value, 10, 32); err == nil {
 			it.Duration = uint32(v)
 		}
-	case "showduration":
+	case "showduration", "showDuration":
 		it.ShowDuration = (attr.Value == "1")
 	case "charges":
 		if v, err := strconv.ParseUint(attr.Value, 10, 32); err == nil {
 			it.Charges = uint32(v)
 		}
-	case "showcharges":
+	case "showcharges", "showCharges":
 		it.ShowCharges = (attr.Value == "1")
 	case "capacity", "containersize", "containerSize":
 		// Container slot count. Canary's items.xml uses `containersize`; the
