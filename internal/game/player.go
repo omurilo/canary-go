@@ -83,7 +83,10 @@ type Player struct {
 	AccountType uint8
 	GroupID   uint16 // players.group_id — staff groups 4/5/6 cannot be attacked
 	Ghost     bool   // ghost mode (invisible; not targetable by monsters)
-	Name      string
+	Name          string
+	GuildName     string
+	GuildRankName string
+	GuildNick     string
 
 	Pos       Position
 	Direction Direction

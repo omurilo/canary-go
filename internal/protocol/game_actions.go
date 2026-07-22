@@ -7,6 +7,7 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/game/vocations"
 	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/moveevents"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
@@ -706,6 +707,10 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 		}
 		
 		desc := fmt.Sprintf("You see %s.", targetCreature.GetName())
+		if targetPlayer, ok := targetCreature.(*game.Player); ok {
+			desc = BuildPlayerDescription(g.player, targetPlayer)
+		}
+
 		w := netmsg.NewWriter()
 		w.AddByte(opTextMessage)
 		w.AddByte(0x15) // MESSAGE_EVENT_ADVANCE (white text center)
@@ -721,11 +726,7 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 			}
 		}
 		
-		name := "an item of type " + fmt.Sprint(spriteID)
-		if t := g.deps.Items.Get(spriteID); t != nil && t.Name != "" {
-			name = t.Name
-		}
-		desc := fmt.Sprintf("You see %s.", name)
+		desc := BuildItemDescription(g.player, item, g.deps.Items)
 
 		w := netmsg.NewWriter()
 		w.AddByte(opTextMessage)
@@ -734,6 +735,168 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 		g.SendToClient(w)
 		return
 	}
+}
+
+// BuildPlayerDescription formats a player description with level, vocation, guild, and party details, mirroring Player::getDescription.
+func BuildPlayerDescription(viewer *game.Player, target *game.Player) string {
+	isSelf := viewer.ID == target.ID
+	var s strings.Builder
+
+	// Line 1: Name and Level
+	if isSelf {
+		s.WriteString("You see yourself.")
+	} else {
+		s.WriteString(fmt.Sprintf("You see %s (Level %d).", target.Name, target.Level))
+	}
+
+	// Determine pronoun and verb matching character sex
+	var subject string
+	if isSelf {
+		subject = "You"
+	} else if target.Sex == 0 {
+		subject = "She"
+	} else {
+		subject = "He"
+	}
+
+	var verb string
+	if isSelf {
+		verb = "are"
+	} else {
+		verb = "is"
+	}
+
+	// Vocation description
+	var vocStr string
+	if voc := vocations.GetVocation(uint32(target.Vocation)); voc != nil && voc.ID != 0 {
+		name := voc.Name
+		article := "a"
+		if len(name) > 0 && (name[0] == 'A' || name[0] == 'E' || name[0] == 'I' || name[0] == 'O' || name[0] == 'U' || name[0] == 'a' || name[0] == 'e' || name[0] == 'i' || name[0] == 'o' || name[0] == 'u') {
+			article = "an"
+		}
+		vocStr = fmt.Sprintf(" %s %s %s %s.", subject, verb, article, name)
+	} else {
+		if isSelf {
+			vocStr = " You have no vocation."
+		} else {
+			vocStr = fmt.Sprintf(" %s has no vocation.", subject)
+		}
+	}
+	s.WriteString(vocStr)
+
+	// Party status description
+	if target.Party != nil {
+		memberCount := target.Party.MemberCount() + 1
+		invitationCount := len(target.Party.Invitees())
+		
+		var part1, part2 string
+		if memberCount == 1 {
+			part1 = "1 member"
+		} else {
+			part1 = fmt.Sprintf("%d members", memberCount)
+		}
+		if invitationCount == 1 {
+			part2 = "1 pending invitation"
+		} else {
+			part2 = fmt.Sprintf("%d pending invitations", invitationCount)
+		}
+
+		if isSelf {
+			s.WriteString(fmt.Sprintf(" Your party has %s and %s.", part1, part2))
+		} else {
+			s.WriteString(fmt.Sprintf(" %s %s in a party with %s and %s.", subject, verb, part1, part2))
+		}
+	}
+
+	// Guild status description
+	if target.GuildName != "" && target.GuildRankName != "" {
+		var gPart string
+		nickStr := ""
+		if target.GuildNick != "" {
+			nickStr = fmt.Sprintf(" (%s)", target.GuildNick)
+		}
+		if isSelf {
+			gPart = fmt.Sprintf(" You are %s of the %s%s.", target.GuildRankName, target.GuildName, nickStr)
+		} else {
+			gPart = fmt.Sprintf(" %s %s %s of the %s%s.", subject, verb, target.GuildRankName, target.GuildName, nickStr)
+		}
+		s.WriteString(gPart)
+	}
+
+	return s.String()
+}
+
+// BuildItemDescription constructs a detailed item description including weight and remaining charges, mirroring Item::getDescription.
+func BuildItemDescription(viewer *game.Player, item *game.Item, catalog *items.Catalog) string {
+	spriteID := item.ID
+	itemType := catalog.Get(spriteID)
+	if itemType == nil {
+		return fmt.Sprintf("You see an item of type %d.", spriteID)
+	}
+
+	var s strings.Builder
+
+	// Build the item's name prefix and article
+	article := itemType.Article
+	if article == "" {
+		article = "a"
+		if len(itemType.Name) > 0 {
+			c := itemType.Name[0]
+			if c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u' ||
+			   c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U' {
+				article = "an"
+			}
+		}
+	}
+
+	name := itemType.Name
+	if name == "" {
+		name = fmt.Sprintf("item of type %d", spriteID)
+	}
+
+	s.WriteString(fmt.Sprintf("You see %s %s", article, name))
+
+	// Display charges when requested
+	if itemType.ShowCharges {
+		charges := uint32(0)
+		if item.Attr != nil && item.Attr.Charges != nil {
+			charges = uint32(*item.Attr.Charges)
+		} else if item.Count > 0 {
+			charges = uint32(item.Count)
+		} else {
+			charges = itemType.Charges
+		}
+
+		if charges > 0 {
+			pluralSuffix := "s"
+			if charges == 1 {
+				pluralSuffix = ""
+			}
+			s.WriteString(fmt.Sprintf(" that has %d charge%s left", charges, pluralSuffix))
+		}
+	}
+
+	s.WriteString(".")
+
+	// Include custom description attributes if populated
+	if itemType.Description != "" {
+		s.WriteString(" " + itemType.Description)
+		if !strings.HasSuffix(itemType.Description, ".") {
+			s.WriteString(".")
+		}
+	}
+
+	// Weight statistics
+	weight := itemType.Weight
+	if item.Attr != nil && item.Attr.Weight != nil {
+		weight = *item.Attr.Weight
+	}
+	if weight > 0 {
+		weightFloat := float64(weight) / 100.0
+		s.WriteString(fmt.Sprintf(" It weighs %.2f oz.", weightFloat))
+	}
+
+	return s.String()
 }
 
 func (g *GameProtocol) parseAttack(r *netmsg.Reader) {

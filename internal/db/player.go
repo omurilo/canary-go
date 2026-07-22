@@ -102,6 +102,13 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 			}
 		}
 	}
+	// Load player guild membership
+	gQuery := `SELECT g.name, r.name, m.nick
+	           FROM guild_membership m
+	           JOIN guilds g ON m.guild_id = g.id
+	           JOIN guild_ranks r ON m.rank_id = r.id
+	           WHERE m.player_id = ? LIMIT 1`
+	_ = d.SQL.QueryRowContext(ctx, gQuery, p.DBID).Scan(&p.GuildName, &p.GuildRankName, &p.GuildNick)
 
 	return p, nil
 }
