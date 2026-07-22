@@ -109,7 +109,23 @@ func (e *Engine) registerMonsterType() {
 			return 1
 		},
 	}
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), monsterTypeMethods))
+	
+	// Resilient __index fallback: if a method on MonsterType doesn't exist,
+	// return a safe no-op function that returns 'self' to support method chaining.
+	mtIndex := e.L.NewFunction(func(L *lua.LState) int {
+		key := L.CheckString(2)
+		if fn, ok := monsterTypeMethods[key]; ok {
+			L.Push(L.NewFunction(fn))
+			return 1
+		}
+		noOpFn := L.NewFunction(func(L *lua.LState) int {
+			L.Push(L.Get(1)) // Return self to allow method chaining (e.g. mtype:foo():bar())
+			return 1
+		})
+		L.Push(noOpFn)
+		return 1
+	})
+	e.L.SetField(mt, "__index", mtIndex)
 
 	// Game.createMonsterType
 	gameTable := e.L.GetGlobal("Game")
