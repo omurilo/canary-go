@@ -254,7 +254,9 @@ func (p *Player) SendTextWindow(windowTextID uint32, itemID uint16, text string)
 		w.AddByte(0x96) // Text Window opcode
 		w.AddU32(windowTextID)
 		w.AddU16(itemID)
-		w.AddByte(1)      // count
+		if itemID == 2160 {
+			w.AddByte(1) // count for stackable item
+		}
 		w.AddString(text) // AddString writes uint16(len) + string bytes
 		w.AddU16(0)       // writer name (empty)
 		w.AddByte(0)       // show traded

@@ -188,3 +188,24 @@ func TestProtectionZone_PlayerIcons(t *testing.T) {
 	}
 }
 
+func TestWalkthrough_TryMove(t *testing.T) {
+	w := NewWorld()
+	p1 := &Player{GroupID: 1}
+	p1.SetPosition(Position{X: 100, Y: 100, Z: 7})
+	tile1 := &Tile{Ground: &Item{ID: 1}, Flags: 1} // Protection Zone
+	tile1.Creatures = append(tile1.Creatures, p1)
+	w.Map.SetTile(Position{X: 100, Y: 100, Z: 7}, tile1)
+
+	p2 := &Player{GroupID: 1}
+	p2.SetPosition(Position{X: 100, Y: 101, Z: 7})
+	tile2 := &Tile{Ground: &Item{ID: 1}, Flags: 1} // Protection Zone
+	tile2.Creatures = append(tile2.Creatures, p2)
+	w.Map.SetTile(Position{X: 100, Y: 101, Z: 7}, tile2)
+
+	// In Protection Zone, p2 should be able to walk into tile1 (DirNorth)
+	pos, ok := w.TryMove(p2, DirNorth)
+	if !ok || pos != (Position{X: 100, Y: 100, Z: 7}) {
+		t.Fatalf("expected p2 to walk into tile containing p1 in Protection Zone, got ok=%v, pos=%v", ok, pos)
+	}
+}
+

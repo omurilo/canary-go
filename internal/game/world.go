@@ -418,7 +418,8 @@ func (w *World) CreaturesInView(pos Position) []Creature {
 // and whether the move succeeded.
 func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 	dest := p.Pos.Offset(dir)
-	if !w.Map.GetTile(dest).Walkable(w.Items) {
+	destTile := w.Map.GetTile(dest)
+	if destTile == nil || !destTile.WalkableFor(p, w.Items, w.WorldType) {
 		return p.Pos, false
 	}
 	w.mu.Lock()
