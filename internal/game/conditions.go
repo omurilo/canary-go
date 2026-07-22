@@ -22,7 +22,7 @@ type conditionStore struct {
 // AddCondition stores (or refreshes) a condition on the creature. If a
 // condition of the same type already exists its duration is extended, matching
 // Creature::addCondition's merge behaviour.
-func (s *conditionStore) AddCondition(c combat.Condition) {
+func (s *conditionStore) AddCondition(creature combat.Creature, c combat.Condition) {
 	if c == nil {
 		return
 	}
@@ -30,20 +30,22 @@ func (s *conditionStore) AddCondition(c combat.Condition) {
 	defer s.condMu.Unlock()
 	for _, existing := range s.conditions {
 		if existing.GetType() == c.GetType() {
-			existing.AddCondition(nil, c)
+			existing.AddCondition(creature, c)
 			return
 		}
 	}
 	s.conditions = append(s.conditions, c)
+	c.StartCondition(creature)
 }
 
-// RemoveCondition removes every condition of the given type.
-func (s *conditionStore) RemoveCondition(t combat.ConditionType) {
+// RemoveCondition removes every condition of the given type, calling EndCondition first to revert bonuses.
+func (s *conditionStore) RemoveCondition(creature combat.Creature, t combat.ConditionType) {
 	s.condMu.Lock()
 	defer s.condMu.Unlock()
 	out := s.conditions[:0]
 	for _, existing := range s.conditions {
 		if existing.GetType() == t {
+			existing.EndCondition(creature)
 			continue
 		}
 		out = append(out, existing)
@@ -63,10 +65,13 @@ func (s *conditionStore) HasCondition(t combat.ConditionType) bool {
 	return false
 }
 
-// ClearConditions removes every active condition (used on death).
-func (s *conditionStore) ClearConditions() {
+// ClearConditions removes every active condition (used on death), calling EndCondition on all of them first.
+func (s *conditionStore) ClearConditions(creature combat.Creature) {
 	s.condMu.Lock()
 	defer s.condMu.Unlock()
+	for _, existing := range s.conditions {
+		existing.EndCondition(creature)
+	}
 	s.conditions = nil
 }
 

@@ -308,6 +308,10 @@ func (c *ConditionSpeedStruct) AddCondition(creature Creature, condition Conditi
 		return
 	}
 
+	if creature != nil {
+		creature.ChangeSpeed(-c.SpeedDelta)
+	}
+
 	if c.Ticks < condition.GetTicks() {
 		c.Ticks = condition.GetTicks()
 		c.EndTime = time.Now().UnixMilli() + int64(c.Ticks)
@@ -320,7 +324,7 @@ func (c *ConditionSpeedStruct) AddCondition(creature Creature, condition Conditi
 		c.Maxa = speedCond.Maxa
 		c.Maxb = speedCond.Maxb
 
-		if c.SpeedDelta == 0 {
+		if c.SpeedDelta == 0 && creature != nil {
 			baseSpeed := creature.GetBaseSpeed()
 			min, max := c.getFormulaValues(int32(baseSpeed))
 			c.SpeedDelta = c.uniformRandom(min, max) - int32(baseSpeed)
@@ -331,7 +335,9 @@ func (c *ConditionSpeedStruct) AddCondition(creature Creature, condition Conditi
 		}
 	}
 
-	creature.ChangeSpeed(c.SpeedDelta)
+	if creature != nil {
+		creature.ChangeSpeed(c.SpeedDelta)
+	}
 }
 
 func (c *ConditionSpeedStruct) Clone() Condition {

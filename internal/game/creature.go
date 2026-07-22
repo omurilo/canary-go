@@ -121,8 +121,7 @@ func (c *BaseCreature) AddMana(amount int32) {
 func (c *BaseCreature) GetWorld() *World { return c.World }
 
 func (c *BaseCreature) AddCondition(cond combat.Condition) {
-	cond.StartCondition(adaptCreature(c))
-	c.conditionStore.AddCondition(cond)
+	c.conditionStore.AddCondition(adaptCreature(c), cond)
 }
 
 func (c *BaseCreature) TickConditions(interval int32) {

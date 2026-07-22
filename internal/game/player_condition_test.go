@@ -70,3 +70,55 @@ func TestPlayerConditionAttributes(t *testing.T) {
 		t.Errorf("expected reverted effective sword skill 80, got %d", p.GetEffectiveSkill(game.SkillSword))
 	}
 }
+
+func TestPlayerConditionSpeed(t *testing.T) {
+	p := &game.Player{
+		Name:      "SpeedTester",
+		Level:     100,
+		MaxHealth: 1000,
+		MaxMana:   1000,
+	}
+
+	// Base speed of a level 100 character in Canary-Go:
+	// BaseSpeed = 110 + (Level - 1) = 110 + 99 = 209
+	if p.GetBaseSpeed() != 209 {
+		t.Errorf("expected base speed 209, got %d", p.GetBaseSpeed())
+	}
+	if p.GetSpeed() != 209 {
+		t.Errorf("expected initial current speed 209, got %d", p.GetSpeed())
+	}
+
+	// Create and apply a Haste Speed condition using standard haste formula: (1.3, 40, 1.3, 40)
+	cond1 := combat.CreateCondition(1, combat.ConditionHaste, 10000, 0, false)
+	if speedCond, ok := cond1.(*combat.ConditionSpeedStruct); ok {
+		speedCond.SetFormulaVars(1.3, 40, 1.3, 40)
+	}
+
+	// Apply condition first time
+	p.AddCondition(cond1)
+
+	speedAfterFirst := p.GetSpeed()
+	if speedAfterFirst <= 209 {
+		t.Errorf("expected speed to increase after applying haste, got %d", speedAfterFirst)
+	}
+
+	// Create and apply a second Haste Speed condition (refreshing)
+	cond2 := combat.CreateCondition(2, combat.ConditionHaste, 10000, 0, false)
+	if speedCond, ok := cond2.(*combat.ConditionSpeedStruct); ok {
+		speedCond.SetFormulaVars(1.3, 40, 1.3, 40)
+	}
+
+	// Apply condition second time (should merge, refresh, and NOT stack)
+	p.AddCondition(cond2)
+
+	speedAfterSecond := p.GetSpeed()
+	if speedAfterSecond != speedAfterFirst {
+		t.Errorf("expected speed to remain %d on refresh, but it changed/stacked to %d", speedAfterFirst, speedAfterSecond)
+	}
+
+	// Remove condition and ensure speed reverts to base speed
+	p.RemoveCondition(combat.ConditionHaste)
+	if p.GetSpeed() != 209 {
+		t.Errorf("expected reverted current speed 209, got %d", p.GetSpeed())
+	}
+}

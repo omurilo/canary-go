@@ -577,8 +577,7 @@ func (p *Player) GetIcons() uint64 {
 }
 
 func (p *Player) AddCondition(c combat.Condition) {
-	c.StartCondition(adaptCreature(p))
-	p.conditionStore.AddCondition(c)
+	p.conditionStore.AddCondition(adaptCreature(p), c)
 	if p.Session != nil {
 		p.Session.SendIcons()
 	}
@@ -600,14 +599,14 @@ func (p *Player) TickConditions(interval int32) {
 }
 
 func (p *Player) RemoveCondition(t combat.ConditionType) {
-	p.conditionStore.RemoveCondition(t)
+	p.conditionStore.RemoveCondition(adaptCreature(p), t)
 	if p.Session != nil {
 		p.Session.SendIcons()
 	}
 }
 
 func (p *Player) ClearConditions() {
-	p.conditionStore.ClearConditions()
+	p.conditionStore.ClearConditions(adaptCreature(p))
 	if p.Session != nil {
 		p.Session.SendIcons()
 	}
