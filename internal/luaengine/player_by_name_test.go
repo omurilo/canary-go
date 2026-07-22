@@ -32,3 +32,20 @@ func TestPlayerConstructorByName(t *testing.T) {
 		t.Fatalf("Lua execution error: %v", err)
 	}
 }
+
+func TestPositionConstructorUserdata(t *testing.T) {
+	w := game.NewWorld()
+	e := New(w, nil)
+
+	L := e.L
+	err := L.DoString(`
+		local p1 = Position(100, 200, 7)
+		local p2 = Position(p1)
+		if p2.x ~= 100 or p2.y ~= 200 or p2.z ~= 7 then
+			error("expected Position(Position) to copy coordinates (100, 200, 7), got " .. tostring(p2.x) .. ", " .. tostring(p2.y) .. ", " .. tostring(p2.z))
+		end
+	`)
+	if err != nil {
+		t.Fatalf("Lua execution error: %v", err)
+	}
+}

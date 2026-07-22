@@ -68,13 +68,20 @@ func (e *Engine) registerPosition() {
 
 func positionCreate(L *lua.LState) int {
 	var x, y, z int
-	// Support Position(x, y, z) and Position(table)
-	if L.GetTop() == 2 && L.Get(2).Type() == lua.LTTable {
+	arg2 := L.Get(2)
+	switch arg2.Type() {
+	case lua.LTTable:
 		t := L.ToTable(2)
 		x = int(lua.LVAsNumber(L.GetField(t, "x")))
 		y = int(lua.LVAsNumber(L.GetField(t, "y")))
 		z = int(lua.LVAsNumber(L.GetField(t, "z")))
-	} else {
+	case lua.LTUserData:
+		if pos, ok := arg2.(*lua.LUserData).Value.(game.Position); ok {
+			x, y, z = int(pos.X), int(pos.Y), int(pos.Z)
+		} else if posPtr, ok := arg2.(*lua.LUserData).Value.(*game.Position); ok && posPtr != nil {
+			x, y, z = int(posPtr.X), int(posPtr.Y), int(posPtr.Z)
+		}
+	default:
 		x = L.OptInt(2, 0)
 		y = L.OptInt(3, 0)
 		z = L.OptInt(4, 7)
