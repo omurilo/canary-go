@@ -421,13 +421,17 @@ func run(o runOpts, log *slog.Logger) error {
 
 // loadScripts runs every .lua file in dir (recursive) through the engine.
 func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
+	absDir, _ := filepath.Abs(dir)
+	log.Info("loadScripts starting walkthrough", "dir", dir, "absDir", absDir)
+
 	libDir := filepath.Join(dir, "lib")
 	// load lib first
-	filepath.WalkDir(libDir, func(path string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(libDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil // ignore if lib doesn't exist
 		}
 		if !d.IsDir() && filepath.Ext(path) == ".lua" {
+			log.Debug("loading lib script", "file", path)
 			if err := e.DoFile(path); err != nil {
 				log.Warn("script error", "file", path, "err", err)
 			} else {
@@ -449,7 +453,7 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 		}
 	}
 
-	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+	walkErr := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			log.Warn("walking script directory entry failed; skipping", "path", path, "err", err)
 			return nil
@@ -457,19 +461,30 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 		if d.IsDir() && d.Name() == "lib" && path == libDir {
 			return filepath.SkipDir
 		}
-		if !d.IsDir() && filepath.Ext(path) == ".lua" {
-			// Skip npc_handler since we already loaded it
-			if filepath.Base(dir) == "npclib" && strings.HasSuffix(path, "npc_handler.lua") {
-				return nil
-			}
-			if err := e.DoFile(path); err != nil {
-				log.Warn("script error", "file", path, "err", err)
-			} else {
-				log.Debug("loaded script", "file", path)
+		if !d.IsDir() {
+			log.Debug("visiting file during walkthrough", "path", path, "ext", filepath.Ext(path))
+			if filepath.Ext(path) == ".lua" {
+				// Skip npc_handler since we already loaded it
+				if filepath.Base(dir) == "npclib" && strings.HasSuffix(path, "npc_handler.lua") {
+					return nil
+				}
+				log.Info("loading script file", "path", path)
+				if err := e.DoFile(path); err != nil {
+					log.Warn("script error", "file", path, "err", err)
+				} else {
+					log.Debug("loaded script", "file", path)
+				}
 			}
 		}
 		return nil
 	})
+
+	if walkErr != nil {
+		log.Warn("loadScripts WalkDir finished with error", "dir", dir, "err", walkErr)
+	} else {
+		log.Info("loadScripts WalkDir finished successfully", "dir", dir)
+	}
+	return walkErr
 }
 
 // resolveMonsterLoot resolves loot entries declared by name (e.g. "gold coin")
