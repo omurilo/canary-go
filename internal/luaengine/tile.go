@@ -107,5 +107,9 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR
 			return 1
 		},
+		"getHouse": func(L *lua.LState) int {
+			L.Push(lua.LNil) // not modelled yet; safe default
+			return 1
+		},
 	}
 }
