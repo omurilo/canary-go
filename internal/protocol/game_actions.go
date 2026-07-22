@@ -713,7 +713,7 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 
 		w := netmsg.NewWriter()
 		w.AddByte(opTextMessage)
-		w.AddByte(0x19) // MESSAGE_LOOK (green description center screen + console)
+		w.AddByte(22) // MESSAGE_LOOK (green description center screen + console)
 		w.AddString(desc)
 		g.SendToClient(w)
 		return
@@ -730,7 +730,7 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 
 		w := netmsg.NewWriter()
 		w.AddByte(opTextMessage)
-		w.AddByte(0x19) // MESSAGE_LOOK (green description center screen + console)
+		w.AddByte(22) // MESSAGE_LOOK (green description center screen + console)
 		w.AddString(desc)
 		g.SendToClient(w)
 		return
@@ -979,23 +979,56 @@ func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 
 	totalCost := uint64(price) * uint64(amount)
 	g.deps.Log.Debug("parseBuyItem: starting transaction", "player", g.player.Name, "itemID", itemID, "amount", amount, "price", price, "totalCost", totalCost, "playerMoney", g.player.GetMoney(), "bankBalance", g.player.BankBalance)
-	// Funds: inventory coins first, bank as fallback (Game::removeMoney useBalance).
-	if g.player.GetMoney()+g.player.BankBalance < totalCost {
+	
+	invMoney := g.player.GetMoney()
+	if invMoney+g.player.BankBalance < totalCost {
 		g.player.SendTextMessage(0x13, "You do not have enough money.")
 		return
 	}
 
-	// Deliver first so we only charge for what actually fit.
+	// Safely deduct the funds first. Keep track of how much bank balance is utilized.
+	bankDebited := uint64(0)
+	if invMoney < totalCost {
+		bankDebited = totalCost - invMoney
+	}
+	if !g.player.RemoveMoney(totalCost, true) {
+		g.player.SendTextMessage(0x13, "You do not have enough money.")
+		return
+	}
+
+	// Deliver the items
 	placed, _ := g.player.InternalAddItem(g.deps.Items, itemID, uint32(amount), int(subType), game.ConstSlotWhereever)
 	deliveredCount := deliveredUnits(placed)
 	if deliveredCount == 0 {
+		// Full refund
+		if bankDebited > 0 {
+			g.player.BankBalance += bankDebited
+			g.player.AddMoney(invMoney)
+		} else {
+			g.player.AddMoney(totalCost)
+		}
 		g.player.SendTextMessage(0x13, "You do not have enough room to carry this item.")
+		g.refreshAfterTrade()
 		return
 	}
+
 	charge := uint64(price) * uint64(deliveredCount)
-	if !g.player.RemoveMoney(charge, true) {
-		g.player.SendTextMessage(0x13, "You do not have enough money.")
-		return
+	if deliveredCount < uint32(amount) {
+		// Partial refund
+		refund := totalCost - charge
+		if bankDebited > 0 {
+			toBank := refund
+			if toBank > bankDebited {
+				toBank = bankDebited
+			}
+			g.player.BankBalance += toBank
+			toInv := refund - toBank
+			if toInv > 0 {
+				g.player.AddMoney(toInv)
+			}
+		} else {
+			g.player.AddMoney(refund)
+		}
 	}
 
 	g.player.SendTextMessage(0x14, fmt.Sprintf("Bought %dx %s for %d gold.", deliveredCount, itemName(it, itemID), charge))

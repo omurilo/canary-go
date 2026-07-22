@@ -120,7 +120,8 @@ func (p *Player) AddItem(id uint16, count uint64) {
 		added := false
 		// Try to put it in an existing container first
 		for i := 1; i < len(p.Inventory); i++ {
-			if p.Inventory[i] != nil && p.Inventory[i].Contents != nil {
+			if p.Inventory[i] != nil && (p.Inventory[i].Contents != nil || i == ConstSlotBackpack) {
+				item.Parent = p.Inventory[i]
 				p.Inventory[i].Contents = append(p.Inventory[i].Contents, item)
 				added = true
 				break
