@@ -653,6 +653,12 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.deps.World.PlayerLeaveParty(g.player.ID)
 	case inEnableSharedPartyExp:
 		g.deps.World.PlayerEnableSharedPartyExperience(g.player.ID, r.GetByte() == 1)
+	case 0x0F: // Ping back
+		w := netmsg.NewWriter()
+		w.AddByte(0x1D)
+		g.SendToClient(w)
+	case 0x91, 0xB3, 0xD0: // Telemetry / client checks (quest log / bestiary / resource balance)
+		// Handled gracefully without error
 	case 0xCD:
 		g.parseInspectionObject(r)
 	case 0xCE:
