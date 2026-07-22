@@ -26,6 +26,10 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetFuncs(mt, creatureMethods)
 	e.L.SetFuncs(mt, playerMethods)
 	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "changeSpeed", e.L.NewFunction(e.creatureChangespeed))
+	e.L.SetField(mt, "setSpeed", e.L.NewFunction(e.creatureSetspeed))
+	e.L.SetField(mt, "getParent", e.L.NewFunction(e.creatureGetparent))
+	e.L.SetField(mt, "getTile", e.L.NewFunction(e.creatureGettile))
 	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
 	// Inventory bindings that need the item catalog (name->id, stack size,
 	// container capacity) override the package-level stubs. Same pattern as
