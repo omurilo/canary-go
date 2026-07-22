@@ -560,13 +560,30 @@ func (g *GameProtocol) addSkills(w *netmsg.Writer) {
 	w.AddDouble(0, 4) // amplification
 }
 
+func getVocationClientID(vocation uint16) byte {
+	switch vocation {
+	case 1, 5: // Sorcerer / Master Sorcerer
+		return 13
+	case 2, 6: // Druid / Elder Druid
+		return 14
+	case 3, 7: // Paladin / Royal Paladin
+		return 12
+	case 4, 8: // Knight / Elite Knight
+		return 11
+	case 9, 10: // Monk / Exalted Monk
+		return 15
+	default:
+		return 0
+	}
+}
+
 func (g *GameProtocol) addBasicData(w *netmsg.Writer) {
 	p := g.player
 	w.AddByte(opBasicData)
 	w.AddByte(1) // is premium
-	w.AddU32(0)  // premium expire ts
-	w.AddByte(uint8(p.Vocation))
-	w.AddByte(0) // has reached main
+	w.AddU32(uint32(time.Now().Unix() + 86400*365)) // premium expire timestamp
+	w.AddByte(getVocationClientID(p.Vocation))
+	w.AddByte(1) // has reached main (1 = allow main features like Wheel & Prey)
 	w.AddU16(0)  // spell count
 	w.AddByte(0) // magic shield active
 }
