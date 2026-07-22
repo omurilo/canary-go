@@ -404,7 +404,17 @@ func playerAddblessing(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	blessing := luaOptInt(L, 2)
+	count := luaOptInt(L, 3)
+	if count <= 0 {
+		count = 1
+	}
+	if blessing >= 1 && blessing <= 8 {
+		p.Blessings[blessing-1] = uint8(count)
+		L.Push(lua.LTrue)
+		return 1
+	}
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -540,7 +550,9 @@ func playerAddmanaspent(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	amount := uint64(luaOptInt(L, 2))
+	p.ManaSpent += amount
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -597,7 +609,12 @@ func playerAddofflinetrainingtime(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	timeVal := int32(luaOptInt(L, 2))
+	p.OfflineTrainingTime += timeVal
+	if p.OfflineTrainingTime > 43200000 {
+		p.OfflineTrainingTime = 43200000
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -1025,7 +1042,13 @@ func playerGetblessingcount(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	var total int
+	for _, b := range p.Blessings {
+		if b > 0 {
+			total++
+		}
+	}
+	L.Push(lua.LNumber(total))
 	return 1
 }
 
@@ -1540,7 +1563,7 @@ func playerGetmanaspent(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	L.Push(lua.LNumber(p.ManaSpent))
 	return 1
 }
 
@@ -1600,7 +1623,7 @@ func playerGetofflinetrainingskill(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	L.Push(lua.LNumber(p.OfflineTrainingSkill))
 	return 1
 }
 
@@ -1610,7 +1633,7 @@ func playerGetofflinetrainingtime(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	L.Push(lua.LNumber(p.OfflineTrainingTime))
 	return 1
 }
 
@@ -1730,7 +1753,12 @@ func playerGetskilltries(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	skill := luaOptInt(L, 2)
+	if skill < 0 || skill >= int(game.SkillCount) {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	L.Push(lua.LNumber(p.SkillTries[skill]))
 	return 1
 }
 
@@ -2051,7 +2079,12 @@ func playerHasblessing(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	blessing := luaOptInt(L, 2)
+	if blessing >= 1 && blessing <= 8 {
+		L.Push(lua.LBool(p.Blessings[blessing-1] > 0))
+		return 1
+	}
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2360,7 +2393,13 @@ func playerRemoveblessing(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	blessing := luaOptInt(L, 2)
+	if blessing >= 1 && blessing <= 8 {
+		p.Blessings[blessing-1] = 0
+		L.Push(lua.LTrue)
+		return 1
+	}
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2473,7 +2512,12 @@ func playerRemoveofflinetrainingtime(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	timeVal := int32(luaOptInt(L, 2))
+	p.OfflineTrainingTime -= timeVal
+	if p.OfflineTrainingTime < 0 {
+		p.OfflineTrainingTime = 0
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3053,7 +3097,9 @@ func playerSetofflinetrainingskill(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	skillVal := int8(luaOptInt(L, 2))
+	p.OfflineTrainingSkill = skillVal
+	L.Push(lua.LTrue)
 	return 1
 }
 

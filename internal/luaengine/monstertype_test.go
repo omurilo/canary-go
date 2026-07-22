@@ -1,6 +1,7 @@
 package luaengine
 
 import (
+	"encoding/xml"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/game/spawns"
 )
 
 // monsterDataDir locates the otservbr monster data relative to the repo, or ""
@@ -116,17 +118,31 @@ func TestLoadAllMonsters(t *testing.T) {
 	e := newTestEngine()
 	defer e.Close()
 
+	// Load lib first, mimicking main.go loadScripts
+	libDir := filepath.Join(dir, "lib")
+	_ = filepath.WalkDir(libDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(path) != ".lua" {
+			return nil
+		}
+		if err := e.DoFile(path); err != nil {
+			t.Logf("lib script error: %s: %v", path, err)
+		}
+		return nil
+	})
+
 	var files, errs int
 	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || filepath.Ext(path) != ".lua" {
 			return nil
 		}
+		// Skip lib since we loaded it first
 		if strings.Contains(path, string(filepath.Separator)+"lib"+string(filepath.Separator)) {
 			return nil
 		}
 		files++
 		if err := e.DoFile(path); err != nil {
 			errs++
+			t.Logf("script error: %s: %v", path, err)
 		}
 		return nil
 	})
@@ -137,3 +153,95 @@ func TestLoadAllMonsters(t *testing.T) {
 		t.Fatal("no monster types registered from Lua")
 	}
 }
+
+// TestDiagnosticRealSpawnsMatching loads the real monsters and the real monster spawns,
+// checking if all spawned monster names exist in the registry.
+func TestDiagnosticRealSpawnsMatching(t *testing.T) {
+	monsterDir := "../../../data-otservbr-global/monster"
+	spawnsFile := "../../../data-otservbr-global/world/otservbr-monster.xml"
+
+	if _, err := os.Stat(monsterDir); err != nil {
+		t.Skip("otservbr monster data not available")
+	}
+	if _, err := os.Stat(spawnsFile); err != nil {
+		t.Skip("otservbr spawns file not available")
+	}
+
+	// Create real Lua engine and register types
+	w := game.NewWorld()
+	reg := creatures.NewTypeRegistry()
+	w.TypeRegistry = reg
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	e := New(w, logger)
+	defer e.Close()
+
+	// Load lib first, mimicking main.go loadScripts
+	libDir := filepath.Join(monsterDir, "lib")
+	_ = filepath.WalkDir(libDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(path) != ".lua" {
+			return nil
+		}
+		_ = e.DoFile(path)
+		return nil
+	})
+
+	// Load monster files
+	_ = filepath.WalkDir(monsterDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(path) != ".lua" {
+			return nil
+		}
+		if strings.Contains(path, string(filepath.Separator)+"lib"+string(filepath.Separator)) {
+			return nil
+		}
+		_ = e.DoFile(path)
+		return nil
+	})
+
+	t.Logf("Total monster types loaded: %d", len(reg.Monsters))
+
+	// Load spawns
+	data, err := os.ReadFile(spawnsFile)
+	if err != nil {
+		t.Fatalf("failed to read spawns file: %v", err)
+	}
+
+	var spawnsData spawns.SpawnsData
+	if err := xml.Unmarshal(data, &spawnsData); err != nil {
+		t.Fatalf("failed to parse spawns XML: %v", err)
+	}
+
+	matched := 0
+	mismatched := 0
+	mismatchedNames := make(map[string]int)
+
+	allNodes := append(spawnsData.Spawns, spawnsData.Monsters...)
+	allNodes = append(allNodes, spawnsData.NPCs...)
+	for _, sn := range allNodes {
+		for _, mn := range sn.Monsters {
+			key := strings.ToLower(mn.Name)
+			if _, ok := reg.Monsters[key]; ok {
+				matched++
+			} else {
+				mismatched++
+				mismatchedNames[mn.Name]++
+			}
+		}
+	}
+
+	t.Logf("Matched spawns: %d, Mismatched spawns: %d", matched, mismatched)
+	t.Logf("Distinct mismatched names: %d", len(mismatchedNames))
+
+	if mismatched > 0 {
+		t.Logf("Top mismatched monster names:")
+		count := 0
+		for name, occurrences := range mismatchedNames {
+			t.Logf("  - %q (%d occurrences)", name, occurrences)
+			count++
+			if count >= 30 {
+				break
+			}
+		}
+	}
+}
+
+

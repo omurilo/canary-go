@@ -9,8 +9,6 @@ import (
 // registerGame registers the global Game table and its methods.
 func (e *Engine) registerGame() {
 	gameMethods := map[string]lua.LGFunction{
-		"createNpcType":            e.gameCreateNpcType,
-		"createMonsterType":        e.gameCreateMonsterType,
 		"getMonsterTypeByName":     e.gameGetMonsterTypeByName,
 		"getSpectators":            e.gameGetSpectators,
 		"getBoostedCreature":       e.gameGetBoostedCreature,
@@ -99,8 +97,7 @@ func (e *Engine) registerGame() {
 	}))
 }
 
-func (e *Engine) gameCreateNpcType(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateMonsterType(L *lua.LState) int { return 0 }
+
 func (e *Engine) gameGetMonsterTypeByName(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetSpectators(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetBoostedCreature(L *lua.LState) int { return 0 }

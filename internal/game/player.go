@@ -141,6 +141,8 @@ type Player struct {
 	SkillLoss       bool
 	Skull           uint8
 	Blessings       [8]uint8
+	OfflineTrainingTime  int32
+	OfflineTrainingSkill int8
 	SkillTries      [SkillCount]uint64
 	ManaSpent       uint64
 	MagLevelPercent uint8

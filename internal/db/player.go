@@ -23,7 +23,10 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	                  p.skill_axe, p.skill_axe_tries,
 	                  p.skill_dist, p.skill_dist_tries,
 	                  p.skill_shielding, p.skill_shielding_tries,
-	                  p.skill_fishing, p.skill_fishing_tries
+	                  p.skill_fishing, p.skill_fishing_tries,
+	                  p.offlinetraining_time, p.offlinetraining_skill,
+	                  p.blessings1, p.blessings2, p.blessings3, p.blessings4,
+	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8
 	           FROM players p JOIN accounts a ON a.id = p.account_id WHERE p.name = ? LIMIT 1`
 
 	p := &game.Player{}
@@ -32,6 +35,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	var lookType, lookHead, lookBody, lookLegs, lookFeet, lookAddons uint16
 	var posx, posy uint16
 	var posz uint8
+	var offlineTimeSeconds int32
 	err := d.SQL.QueryRowContext(ctx, q, name).Scan(
 		&p.DBID, &p.AccountID, &p.AccountType, &p.GroupID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
 		&p.Health, &p.MaxHealth, &p.Mana, &p.MaxMana, &p.Experience,
@@ -45,7 +49,11 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		&p.Skills[game.SkillDistance], &p.SkillTries[game.SkillDistance],
 		&p.Skills[game.SkillShielding], &p.SkillTries[game.SkillShielding],
 		&p.Skills[game.SkillFishing], &p.SkillTries[game.SkillFishing],
+		&offlineTimeSeconds, &p.OfflineTrainingSkill,
+		&p.Blessings[0], &p.Blessings[1], &p.Blessings[2], &p.Blessings[3],
+		&p.Blessings[4], &p.Blessings[5], &p.Blessings[6], &p.Blessings[7],
 	)
+	p.OfflineTrainingTime = offlineTimeSeconds * 1000
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -111,7 +119,10 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	              skill_axe=?, skill_axe_tries=?,
 	              skill_dist=?, skill_dist_tries=?,
 	              skill_shielding=?, skill_shielding_tries=?,
-	              skill_fishing=?, skill_fishing_tries=?
+	              skill_fishing=?, skill_fishing_tries=?,
+	              offlinetraining_time=?, offlinetraining_skill=?,
+	              blessings1=?, blessings2=?, blessings3=?, blessings4=?,
+	              blessings5=?, blessings6=?, blessings7=?, blessings8=?
 	           WHERE id=?`
 	_, err := d.SQL.ExecContext(ctx, q,
 		p.Level, p.Experience, p.Health, p.MaxHealth,
@@ -127,6 +138,9 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		p.Skills[game.SkillDistance], p.SkillTries[game.SkillDistance],
 		p.Skills[game.SkillShielding], p.SkillTries[game.SkillShielding],
 		p.Skills[game.SkillFishing], p.SkillTries[game.SkillFishing],
+		p.OfflineTrainingTime / 1000, p.OfflineTrainingSkill,
+		p.Blessings[0], p.Blessings[1], p.Blessings[2], p.Blessings[3],
+		p.Blessings[4], p.Blessings[5], p.Blessings[6], p.Blessings[7],
 		p.DBID,
 	)
 	if err != nil {
