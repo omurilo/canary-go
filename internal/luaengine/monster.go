@@ -23,6 +23,7 @@ func (e *Engine) registerMonster() {
 	e.L.SetFuncs(mt, creatureMethods)
 	e.L.SetFuncs(mt, monsterMethods)
 	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
 	e.L.SetField(mt, "__index", mt)
 }
 

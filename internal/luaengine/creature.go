@@ -194,6 +194,7 @@ func (e *Engine) registerCreatureType() {
 	e.L.SetField(mt, "setSpeed", e.L.NewFunction(e.creatureSetspeed))
 	e.L.SetField(mt, "getParent", e.L.NewFunction(e.creatureGetparent))
 	e.L.SetField(mt, "getTile", e.L.NewFunction(e.creatureGettile))
+	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
 	e.L.SetField(mt, "__index", mt)
 }
 
@@ -254,7 +255,6 @@ var creatureMethods = map[string]lua.LGFunction{
 	"addCondition": creatureAddcondition,
 	"removeCondition": creatureRemovecondition,
 	"hasCondition": creatureHascondition,
-	"remove": creatureRemove,
 	"say": creatureSay,
 	"getDamageMap": creatureGetdamagemap,
 	"getSummons": creatureGetsummons,
@@ -691,12 +691,19 @@ func creatureRegisterevent(L *lua.LState) int {
 
 func creatureReload(L *lua.LState) int { return 0 }
 
-func creatureRemove(L *lua.LState) int {
+func (e *Engine) creatureRemove(L *lua.LState) int {
 	c := checkCreature(L)
 	if c != nil {
 		if p, ok := c.(*game.Player); ok {
 			if p.Session != nil {
-				p.Session.Disconnect()
+				go p.Session.Disconnect()
+			}
+		} else {
+			if e.world != nil {
+				id := c.GetID()
+				game.GlobalDispatcher.AddEvent(0, func() {
+					e.world.RemoveCreature(id)
+				})
 			}
 		}
 	}

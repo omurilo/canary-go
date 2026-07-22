@@ -29,6 +29,7 @@ func (e *Engine) registerNpc() {
 	e.L.SetField(mt, "openShopWindow", e.L.NewFunction(e.npcOpenshopwindow))
 	e.L.SetField(mt, "isMerchant", e.L.NewFunction(e.npcIsmerchant))
 	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
 	e.L.SetField(mt, "__index", mt)
 }
 

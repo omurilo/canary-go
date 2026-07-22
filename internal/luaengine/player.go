@@ -26,6 +26,7 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetFuncs(mt, creatureMethods)
 	e.L.SetFuncs(mt, playerMethods)
 	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
 	// Inventory bindings that need the item catalog (name->id, stack size,
 	// container capacity) override the package-level stubs. Same pattern as
 	// teleportTo: SetField wins over the SetFuncs map because __index == mt.

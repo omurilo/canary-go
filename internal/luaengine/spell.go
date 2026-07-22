@@ -67,12 +67,13 @@ var spellMethods = map[string]lua.LGFunction{
 	// calls them, so accept-and-ignore keeps them loading. setPzLocked is an
 	// alias for pzLock and maps to the real field.
 	"runeId":      spellNoop,
-	"charges":     spellNoop,
-	"allowFarUse": spellNoop,
-	"setPzLocked": spellPzLock,
-	"monkSpellType": spellNoop,
-	"hasPlayerNameParam": spellNoop,
-	"register":    spellRegister,
+	"onCastSpell":                 spellOnCastSpell,
+	"charges":                     spellNoop,
+	"allowFarUse":                 spellNoop,
+	"setPzLocked":                 spellPzLock,
+	"monkSpellType":               spellNoop,
+	"hasPlayerNameParam":          spellNoop,
+	"register":                    spellRegister,
 }
 
 func checkSpell(L *lua.LState) *spells.Spell {
@@ -88,6 +89,13 @@ func checkSpell(L *lua.LState) *spells.Spell {
 func spellSelf(L *lua.LState) int {
 	L.Push(L.Get(1))
 	return 1
+}
+
+func spellOnCastSpell(L *lua.LState) int {
+	s := checkSpell(L)
+	val := L.CheckAny(2)
+	s.OnCastSpell = val
+	return spellSelf(L)
 }
 
 func spellNewIndex(L *lua.LState) int {

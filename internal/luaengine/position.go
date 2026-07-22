@@ -124,4 +124,26 @@ var positionMethods = map[string]lua.LGFunction{
 	"sendMagicEffect": func(L *lua.LState) int {
 		return 0
 	},
+	"getDistance": func(L *lua.LState) int {
+		p1 := checkPosition(L, 1)
+		p2 := checkPosition(L, 2)
+		if p1.Z != p2.Z {
+			L.Push(lua.LNumber(0xFFFF))
+			return 1
+		}
+		dx := int(p1.X) - int(p2.X)
+		if dx < 0 {
+			dx = -dx
+		}
+		dy := int(p1.Y) - int(p2.Y)
+		if dy < 0 {
+			dy = -dy
+		}
+		dist := dx
+		if dy > dx {
+			dist = dy
+		}
+		L.Push(lua.LNumber(dist))
+		return 1
+	},
 }
