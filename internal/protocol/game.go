@@ -657,6 +657,10 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		w := netmsg.NewWriter()
 		w.AddByte(0x1D)
 		g.SendToClient(w)
+	case 0x61:
+		g.parseOpenWheel(r)
+	case 0x62:
+		g.parseSaveWheel(r)
 	case 0x8F:
 		g.parseQuickLoot(r)
 	case 0x90:
