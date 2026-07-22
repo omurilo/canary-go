@@ -85,7 +85,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 				if it.SlotPosition == "necklace" && toSlot == 2 { valid = true }
 				if it.SlotPosition == "backpack" && toSlot == 3 { valid = true }
 				if it.SlotPosition == "body" && toSlot == 4 { valid = true }
-				if (toSlot == 5 || toSlot == 6) && (it.SlotPosition == "two-handed" || it.SlotPosition == "right-hand" || it.SlotPosition == "left-hand" || it.WeaponType != "") { valid = true }
+				if (toSlot == 5 || toSlot == 6) && (it.SlotPosition == "two-handed" || it.SlotPosition == "right-hand" || it.SlotPosition == "left-hand" || it.WeaponType != "" || it.IsQuiver) { valid = true }
 				if it.SlotPosition == "legs" && toSlot == 7 { valid = true }
 				if it.SlotPosition == "feet" && toSlot == 8 { valid = true }
 				if it.SlotPosition == "ring" && toSlot == 9 { valid = true }

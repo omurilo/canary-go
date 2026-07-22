@@ -723,8 +723,13 @@ func (p *Player) getWeaponFromSlot(catalog *items.Catalog, slot uint8, ignoreAmm
 
 // GetQuiverAmmoOfType searches for ammo matching the ammoType inside the equipped quiver.
 func (p *Player) GetQuiverAmmoOfType(catalog *items.Catalog, ammoType string) *Item {
-	quiver := p.Inventory[ConstSlotRight]
-	if quiver == nil || !quiver.IsQuiver(catalog) {
+	var quiver *Item
+	if q := p.Inventory[ConstSlotRight]; q != nil && q.IsQuiver(catalog) {
+		quiver = q
+	} else if q := p.Inventory[ConstSlotLeft]; q != nil && q.IsQuiver(catalog) {
+		quiver = q
+	}
+	if quiver == nil {
 		return nil
 	}
 	for _, ammoItem := range quiver.Contents {
@@ -877,12 +882,21 @@ func (p *Player) ConsumeAmmo(catalog *items.Catalog, ammoType string) {
 			ammoSlotItem.Count--
 		} else {
 			p.Inventory[ConstSlotAmmo] = nil
+			ammoSlotItem = nil
+		}
+		if p.Session != nil {
+			p.Session.SendInventoryItem(ConstSlotAmmo, ammoSlotItem)
 		}
 		return
 	}
 	// 2. Check quiver
-	quiver := p.Inventory[ConstSlotRight]
-	if quiver != nil && quiver.IsQuiver(catalog) {
+	var quiver *Item
+	if q := p.Inventory[ConstSlotRight]; q != nil && q.IsQuiver(catalog) {
+		quiver = q
+	} else if q := p.Inventory[ConstSlotLeft]; q != nil && q.IsQuiver(catalog) {
+		quiver = q
+	}
+	if quiver != nil {
 		for i, ammoItem := range quiver.Contents {
 			if ammoItem != nil && ammoItem.AmmoType(catalog) == ammoType {
 				if ammoItem.Count > 1 {
@@ -890,6 +904,9 @@ func (p *Player) ConsumeAmmo(catalog *items.Catalog, ammoType string) {
 				} else {
 					// Remove item from container contents
 					quiver.Contents = append(quiver.Contents[:i], quiver.Contents[i+1:]...)
+				}
+				if p.Session != nil {
+					p.Session.RefreshContainer(quiver)
 				}
 				return
 			}
@@ -905,6 +922,10 @@ func (p *Player) ConsumeWeaponInHand(slot uint8) {
 			item.Count--
 		} else {
 			p.Inventory[slot] = nil
+			item = nil
+		}
+		if p.Session != nil {
+			p.Session.SendInventoryItem(slot, item)
 		}
 	}
 }
