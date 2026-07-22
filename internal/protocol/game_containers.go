@@ -118,6 +118,15 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	}
 
 	if t.IsContainer() {
+		if cid := g.player.GetContainerID(item); cid != -1 {
+			g.player.CloseContainer(uint8(cid))
+			w := netmsg.NewWriter()
+			w.AddByte(opContainerClose)
+			w.AddByte(uint8(cid))
+			g.SendToClient(w)
+			return
+		}
+
 		if pos.X == 0xFFFF {
 			g.player.OpenContainerAt(index, item)
 			g.sendContainer(index, item, item.Parent != nil)
@@ -323,6 +332,19 @@ func (g *GameProtocol) parseCloseContainer(r *netmsg.Reader) {
 	w.AddByte(opContainerClose)
 	w.AddByte(cid)
 	g.SendToClient(w)
+}
+
+// parseContainerUp handles a container up navigation request (0x88).
+func (g *GameProtocol) parseContainerUp(r *netmsg.Reader) {
+	cid := r.GetByte()
+	if g.player == nil {
+		return
+	}
+	c := g.player.GetContainerByID(cid)
+	if c != nil && c.Parent != nil {
+		g.player.OpenContainerAt(cid, c.Parent)
+		g.sendContainer(cid, c.Parent, c.Parent.Parent != nil)
+	}
 }
 
 func boolByte(b bool) byte {

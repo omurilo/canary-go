@@ -211,6 +211,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	// 4. Add to destination
 	if toPos.X != 0xFFFF {
 		pos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
+		moveItem.Parent = nil
 		
 		// Map merging logic
 		tile := g.deps.World.Map.GetTile(pos)
@@ -263,6 +264,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 				}
 
 				if !merged {
+					moveItem.Parent = toContainer
 					// Insert at the beginning of the container (index 0)
 					toContainer.Contents = append([]*game.Item{moveItem}, toContainer.Contents...)
 					if len(toContainer.Contents) > 0xFF {
@@ -274,6 +276,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		} else {
 			toSlot := uint8(toPos.Y)
 			if toSlot > 0 && toSlot <= 10 {
+				moveItem.Parent = nil
 				var merged bool
 				if it != nil && it.Stackable {
 					if targetItem := g.player.Inventory[toSlot]; targetItem != nil {
@@ -304,6 +307,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	// 5. Handle swapItem placement back to fromPos
 	if swapItem != nil {
 		if fromPos.X != 0xFFFF {
+			swapItem.Parent = nil
 			pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
 			if !g.deps.World.AddItem(pos, swapItem) {
 				g.deps.World.Map.SetTile(pos, &game.Tile{Items: []*game.Item{swapItem}})
@@ -313,12 +317,14 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			if fromPos.Y >= 0x40 {
 				cid := uint8(fromPos.Y - 0x40)
 				if fromContainer != nil {
+					swapItem.Parent = fromContainer
 					fromContainer.Contents = append([]*game.Item{swapItem}, fromContainer.Contents...)
 					g.sendAddContainerItem(cid, 0, swapItem)
 				}
 			} else {
 				fSlot := uint8(fromPos.Y)
 				if fSlot > 0 && fSlot <= 10 {
+					swapItem.Parent = nil
 					g.player.Inventory[fSlot] = swapItem
 					g.sendInventoryItem(fSlot, swapItem)
 				}

@@ -72,6 +72,7 @@ const (
 	inExtendedOpcode = 0x32
 	inUseItem        = 0x82
 	inCloseContainer = 0x87
+	inContainerUp    = 0x88
 	inLookAt         = 0x8C
 	inThrowItem      = 0x78
 	inAttack         = 0xA1
@@ -591,6 +592,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseUseItem(r)
 	case inCloseContainer:
 		g.parseCloseContainer(r)
+	case inContainerUp:
+		g.parseContainerUp(r)
 	case inSay:
 		g.handleSay(r)
 	case inThrowItem:
