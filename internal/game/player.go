@@ -127,6 +127,12 @@ type Player struct {
 	LightLevel uint8
 	LightColor uint8
 
+	// Quick Loot settings
+	QuickLootFilter         uint8              // 0 = Accepted/Whitelist, 1 = Skipped/Blacklist
+	QuickLootList           []uint16           // List of item IDs
+	QuickLootFallbackToMain bool               // Fallback to main container if specific container full
+	ManagedContainers       map[uint8]Position // Map of ObjectCategory -> Container Position
+
 	// Inventory holds equipment slots 1..10 (CONST_SLOT_HEAD..CONST_SLOT_AMMO);
 	// index 0 is unused. Slot 11 (store inbox, CONST_SLOT_LAST) is intentionally
 	// omitted. Persistence of these is a later milestone.

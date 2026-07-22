@@ -657,7 +657,13 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		w := netmsg.NewWriter()
 		w.AddByte(0x1D)
 		g.SendToClient(w)
-	case 0x91, 0xB3, 0xD0: // Telemetry / client checks (quest log / bestiary / resource balance)
+	case 0x8F:
+		g.parseQuickLoot(r)
+	case 0x90:
+		g.parseLootContainer(r)
+	case 0x91:
+		g.parseQuickLootBlackWhitelist(r)
+	case 0xB3, 0xD0: // Telemetry / client checks (quest log / bestiary / resource balance)
 		// Handled gracefully without error
 	case 0xCD:
 		g.parseInspectionObject(r)

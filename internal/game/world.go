@@ -38,6 +38,7 @@ type World struct {
 	OnCreatureHealthChange func(c Creature)
 	OnCombatHit            func(attacker, victim Creature, damage int32, effect uint16)
 	OnItemAppear           func(pos Position, item *Item)
+	OnContainerAddItem     func(p *Player, container *Item, item *Item)
 	OnTargetLost           func(p *Player)
 	// OnPlayerStatsChange pushes a refreshed stats packet (0xA0) after
 	// experience/level changes, e.g. on a monster kill.
