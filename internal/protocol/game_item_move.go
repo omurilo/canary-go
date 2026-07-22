@@ -244,21 +244,23 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		if toPos.Y >= 0x40 {
 			cid := uint8(toPos.Y - 0x40)
 			if toContainer, ok := g.openContainerByCID(cid); ok {
-				toSlot := int(toPos.Z)
 				var merged bool
-				if toSlot < len(toContainer.Contents) && it != nil && it.Stackable {
-					targetItem := toContainer.Contents[toSlot]
-					if targetItem.ID == moveItem.ID && targetItem.Count < 100 {
-						room := 100 - targetItem.Count
-						take := moveItem.Count
-						if take > room {
-							take = room
-						}
-						targetItem.Count += take
-						moveItem.Count -= take
-						g.sendUpdateContainerItem(cid, uint8(toSlot), targetItem)
-						if moveItem.Count == 0 {
-							merged = true
+				if it != nil && it.Stackable {
+					// Search container for any non-full matching stacks first
+					for idx, targetItem := range toContainer.Contents {
+						if targetItem != nil && targetItem.ID == moveItem.ID && targetItem.Count < 100 {
+							room := 100 - targetItem.Count
+							take := moveItem.Count
+							if take > room {
+								take = room
+							}
+							targetItem.Count += take
+							moveItem.Count -= take
+							g.sendUpdateContainerItem(cid, uint8(idx), targetItem)
+							if moveItem.Count == 0 {
+								merged = true
+								break
+							}
 						}
 					}
 				}

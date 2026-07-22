@@ -70,7 +70,9 @@ const (
 	inTurnWest       = 0x72
 	inSay            = 0x96
 	inExtendedOpcode = 0x32
-	inUseItem        = 0x82
+	inUseItem          = 0x82
+	inUseItemWith      = 0x83
+	inUseWithCreature  = 0x84
 	inCloseContainer = 0x87
 	inContainerUp    = 0x88
 	inLookAt         = 0x8C
@@ -183,6 +185,13 @@ func (g *GameProtocol) Player() *game.Player { return g.player }
 func (g *GameProtocol) SendToClient(w *netmsg.Writer) {
 	if g.conn != nil {
 		_ = g.conn.Send(w)
+	}
+}
+
+// Disconnect implements game.Session.
+func (g *GameProtocol) Disconnect() {
+	if g.conn != nil {
+		g.conn.Close()
 	}
 }
 
@@ -590,6 +599,10 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.autoWalk(r)
 	case inUseItem:
 		g.parseUseItem(r)
+	case inUseItemWith:
+		g.parseUseItemWith(r)
+	case inUseWithCreature:
+		g.parseUseWithCreature(r)
 	case inCloseContainer:
 		g.parseCloseContainer(r)
 	case inContainerUp:

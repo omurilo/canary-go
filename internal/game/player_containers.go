@@ -5,6 +5,8 @@ package game
 type OpenContainer struct {
 	Container *Item
 	Index     uint16
+	Position  Position
+	IsOnMap   bool
 }
 
 // maxOpenContainers is the client cap on simultaneously open container windows
@@ -54,6 +56,11 @@ func (p *Player) SetContainerIndex(cid uint8, index uint16) {
 // is already open, else allocating the lowest free cid (0..15). Returns the cid,
 // or -1 when all slots are taken. Mirrors Player::addContainer.
 func (p *Player) AddContainer(c *Item) int {
+	return p.AddContainerWithPos(c, Position{}, false)
+}
+
+// AddContainerWithPos registers a container as open, with explicit position / IsOnMap metadata.
+func (p *Player) AddContainerWithPos(c *Item, pos Position, isOnMap bool) int {
 	if c == nil {
 		return -1
 	}
@@ -61,12 +68,12 @@ func (p *Player) AddContainer(c *Item) int {
 		p.openContainers = make(map[uint8]OpenContainer)
 	}
 	if cid := p.GetContainerID(c); cid != -1 {
-		p.openContainers[uint8(cid)] = OpenContainer{Container: c}
+		p.openContainers[uint8(cid)] = OpenContainer{Container: c, Position: pos, IsOnMap: isOnMap}
 		return cid
 	}
 	for cid := 0; cid < maxOpenContainers; cid++ {
 		if _, taken := p.openContainers[uint8(cid)]; !taken {
-			p.openContainers[uint8(cid)] = OpenContainer{Container: c}
+			p.openContainers[uint8(cid)] = OpenContainer{Container: c, Position: pos, IsOnMap: isOnMap}
 			return cid
 		}
 	}
@@ -77,11 +84,18 @@ func (p *Player) AddContainer(c *Item) int {
 // any existing pagination index. Used when the client requests a container be
 // (re)opened in a specific window.
 func (p *Player) OpenContainerAt(cid uint8, c *Item) {
+	p.OpenContainerAtWithPos(cid, c, Position{}, false)
+}
+
+// OpenContainerAtWithPos registers c as open under an explicit client cid, with explicit position / IsOnMap metadata.
+func (p *Player) OpenContainerAtWithPos(cid uint8, c *Item, pos Position, isOnMap bool) {
 	if p.openContainers == nil {
 		p.openContainers = make(map[uint8]OpenContainer)
 	}
 	oc := p.openContainers[cid]
 	oc.Container = c
+	oc.Position = pos
+	oc.IsOnMap = isOnMap
 	p.openContainers[cid] = oc
 }
 

@@ -21,13 +21,17 @@ const (
 // Mirrors Spells::playerSaySpell -> InstantSpell::playerCastInstant ->
 // Spell::playerSpellCheck (src/creatures/combat/spells.cpp).
 func (g *GameProtocol) tryCastSpell(talkType byte, text string) bool {
+	g.deps.Log.Debug("tryCastSpell checking words", "text", text)
 	sp := spells.FindByWords(text)
 	if sp == nil {
+		g.deps.Log.Debug("tryCastSpell words did not match any registered spells", "text", text)
 		return false
 	}
+	g.deps.Log.Debug("tryCastSpell matched spell words", "spell", sp.Name, "words", sp.Words)
 	p := g.player
 
 	if !g.spellCastCheck(sp) {
+		g.deps.Log.Debug("tryCastSpell failed spellCastCheck", "spell", sp.Name)
 		return true // matched a spell but failed a precondition
 	}
 
@@ -35,11 +39,14 @@ func (g *GameProtocol) tryCastSpell(talkType byte, text string) bool {
 	// (InstantSpell::playerCastInstant, spells.cpp:1144).
 	vtype, targetID, pos, ok := g.buildSpellVariant(sp)
 	if !ok {
+		g.deps.Log.Debug("tryCastSpell failed to build spell variant", "spell", sp.Name)
 		return true
 	}
 
 	// Execute the Lua onCastSpell, which runs the real combat.
-	g.deps.Lua.RunSpell(sp, p, vtype, targetID, pos)
+	g.deps.Log.Debug("tryCastSpell executing onCastSpell", "spell", sp.Name, "vtype", vtype, "targetID", targetID, "pos", pos)
+	success := g.deps.Lua.RunSpell(sp, p, vtype, targetID, pos)
+	g.deps.Log.Debug("tryCastSpell onCastSpell returned", "spell", sp.Name, "success", success)
 
 	// postCastSpell: spend mana, apply cooldowns (spells.cpp:876,795).
 	if cost := spellManaCost(sp, p); cost > 0 {

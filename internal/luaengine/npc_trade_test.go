@@ -20,6 +20,7 @@ type recordSession struct {
 
 func (s *recordSession) SendToClient(w *netmsg.Writer) { s.sent = append(s.sent, append([]byte(nil), w.Bytes()...)) }
 func (s *recordSession) Player() *game.Player          { return s.p }
+func (s *recordSession) Disconnect()                  {}
 
 // The remaining game.Session methods are no-ops for the trade test; it only
 // asserts on raw packets captured via SendToClient.

@@ -120,6 +120,7 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 		}
 	}
 
+	g.CheckMapContainersDistance()
 	return true
 }
 
@@ -155,6 +156,7 @@ func (g *GameProtocol) floorChangeMove(dest game.Position, dir game.Direction) {
 	g.deps.World.SetPosition(p, dest)
 	g.sendFullMapAt(dest)
 	g.broadcastAppear(p)
+	g.CheckMapContainersDistance()
 }
 
 // fcFlags is the set of directional floor-change flags aggregated over a tile's
@@ -482,19 +484,28 @@ func (g *GameProtocol) turn(dir game.Direction) {
 	}
 }
 
+// SpeakClasses enum values matching Tibia/Canary definitions
+const (
+	talkTypePrivateTo    = 5
+	talkTypeChannelY     = 7
+	talkTypeChannelR1    = 14
+	talkTypePrivateRedTo = 16
+)
+
 // handleSay parses a chat message and broadcasts it.
 func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 	talkType := r.GetByte()
 	switch talkType {
-	case 0x05, 0x06, 0x07: // channel variants carry a channel id
-		_ = r.GetU16()
-	case 0x04, 0x0A: // private message carries a receiver
-		_ = r.GetString()
+	case talkTypePrivateTo, talkTypePrivateRedTo:
+		_ = r.GetString() // receiver name
+	case talkTypeChannelY, talkTypeChannelR1:
+		_ = r.GetU16()    // channel ID
 	}
 	text := r.GetString()
 	if text == "" {
 		return
 	}
+	g.deps.Log.Debug("handleSay parsed chat message", "player", g.player.Name, "talkType", talkType, "text", text)
 	if g.handleCommand(text) {
 		return // GM command — handled, not broadcast as chat
 	}

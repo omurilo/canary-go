@@ -17,6 +17,7 @@ import (
 type Session interface {
 	SendToClient(w *netmsg.Writer)
 	Player() *Player
+	Disconnect()
 
 	// Inventory / stats refresh (Phase 1).
 	SendInventoryItem(slot uint8, it *Item) // 0x78

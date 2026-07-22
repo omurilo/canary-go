@@ -692,8 +692,14 @@ func creatureRegisterevent(L *lua.LState) int {
 func creatureReload(L *lua.LState) int { return 0 }
 
 func creatureRemove(L *lua.LState) int {
-	// Removal lifecycle isn't exposed through the Creature interface; accept the
-	// call (scripts use it to despawn temporary creatures) without erroring.
+	c := checkCreature(L)
+	if c != nil {
+		if p, ok := c.(*game.Player); ok {
+			if p.Session != nil {
+				p.Session.Disconnect()
+			}
+		}
+	}
 	L.Push(lua.LTrue)
 	return 1
 }

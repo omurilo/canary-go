@@ -314,7 +314,12 @@ func (e *Engine) RunSpell(sp *spells.Spell, caster *game.Player, vtype LuaVarian
 	defer e.mu.Unlock()
 
 	L := e.L
-	if sp.OnCastSpell == nil || sp.OnCastSpell.Type() != lua.LTFunction {
+	if sp.OnCastSpell == nil {
+		e.log.Warn("spell OnCastSpell is nil (spell registered but callback function not found)", "spell", sp.Name)
+		return false
+	}
+	if sp.OnCastSpell.Type() != lua.LTFunction {
+		e.log.Warn("spell OnCastSpell is not a function", "spell", sp.Name, "type", sp.OnCastSpell.Type().String())
 		return false
 	}
 

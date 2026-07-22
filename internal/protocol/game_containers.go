@@ -21,29 +21,7 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	stackpos := r.GetByte() // stackpos
 	index := r.GetByte()    // index
 
-	var item *game.Item
-	if pos.X == 0xFFFF {
-		if pos.Y >= 0x40 {
-			cid := uint8(pos.Y - 0x40)
-			if cont, ok := g.openContainerByCID(cid); ok {
-				fromSlot := int(pos.Z)
-				if fromSlot < len(cont.Contents) {
-					item = cont.Contents[fromSlot]
-				}
-			}
-		} else {
-			slot := uint8(pos.Y)
-			if slot > 0 && slot <= 10 {
-				item = g.player.Inventory[slot]
-			}
-		}
-	} else {
-		tile := g.deps.World.Map.GetTile(game.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
-		if tile != nil {
-			item = g.findTileItemByStackPos(tile, itemID, stackpos)
-		}
-	}
-
+	item := g.getItemAt(pos, itemID, stackpos)
 	if item == nil {
 		return
 	}
@@ -128,10 +106,21 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		}
 
 		if pos.X == 0xFFFF {
-			g.player.OpenContainerAt(index, item)
+			var isOnMap bool
+			var containerPos game.Position
+			if pos.Y >= 0x40 {
+				parentCid := uint8(pos.Y - 0x40)
+				if parentOc, ok := g.player.OpenContainersSnapshot()[parentCid]; ok {
+					if parentOc.IsOnMap {
+						isOnMap = true
+						containerPos = parentOc.Position
+					}
+				}
+			}
+			g.player.OpenContainerAtWithPos(index, item, containerPos, isOnMap)
 			g.sendContainer(index, item, item.Parent != nil)
 		} else {
-			g.openContainer(item)
+			g.openContainerWithPos(item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, true)
 		}
 	} else if t.FloorChange != "" {
 		teleportPos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
@@ -250,10 +239,15 @@ func findTileItem(tile *game.Tile, id uint16) *game.Item {
 
 // openContainer assigns a client container id and sends the container window.
 func (g *GameProtocol) openContainer(item *game.Item) {
+	g.openContainerWithPos(item, game.Position{}, false)
+}
+
+// openContainerWithPos assigns a client container id, setting explicit Position / IsOnMap metadata.
+func (g *GameProtocol) openContainerWithPos(item *game.Item, pos game.Position, isOnMap bool) {
 	if g.player == nil {
 		return
 	}
-	cid := g.player.AddContainer(item) // reuses an existing cid or allocates one
+	cid := g.player.AddContainerWithPos(item, pos, isOnMap)
 	if cid < 0 {
 		return // all 16 container slots in use
 	}
@@ -399,3 +393,137 @@ func (g *GameProtocol) sendInventoryEmpty(slot uint8) {
 	w.AddByte(slot)
 	g.SendToClient(w)
 }
+
+// CheckMapContainersDistance automatically closes any open map/ground containers
+// that have exceeded a distance of 2 steps (or any floor change) from the player.
+func (g *GameProtocol) CheckMapContainersDistance() {
+	if g.player == nil {
+		return
+	}
+	for cid, oc := range g.player.OpenContainersSnapshot() {
+		if oc.IsOnMap {
+			dx := absDiff(g.player.Pos.X, oc.Position.X)
+			dy := absDiff(g.player.Pos.Y, oc.Position.Y)
+			dz := absDiffByte(g.player.Pos.Z, oc.Position.Z)
+			if dx > 2 || dy > 2 || dz != 0 {
+				g.player.CloseContainer(cid)
+				w := netmsg.NewWriter()
+				w.AddByte(opContainerClose)
+				w.AddByte(cid)
+				g.SendToClient(w)
+			}
+		}
+	}
+}
+
+func absDiff(a, b uint16) uint16 {
+	if a > b {
+		return a - b
+	}
+	return b - a
+}
+
+func absDiffByte(a, b uint8) uint8 {
+	if a > b {
+		return a - b
+	}
+	return b - a
+}
+
+// parseUseItemWith handles a use-item-with request (0x83).
+func (g *GameProtocol) parseUseItemWith(r *netmsg.Reader) {
+	fromPos := r.GetPosition()
+	fromItemID := r.GetU16()
+	fromStackPos := r.GetByte()
+	toPos := r.GetPosition()
+	toItemID := r.GetU16()
+	toStackPos := r.GetByte()
+
+	g.deps.Log.Debug("parseUseItemWith", "player", g.player.Name, "fromPos", fromPos, "fromItemID", fromItemID, "toPos", toPos, "toItemID", toItemID)
+
+	fromItem := g.getItemAt(fromPos, fromItemID, fromStackPos)
+	if fromItem == nil {
+		g.deps.Log.Debug("parseUseItemWith: fromItem is nil")
+		return
+	}
+
+	toItem := g.getItemAt(toPos, toItemID, toStackPos)
+
+	// Execute Lua action
+	action := actions.FindAction(fromItem)
+	if action != nil {
+		fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+		toGamePos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
+		beforeCount := fromItem.Count
+		if g.deps.Lua.CallAction(action, g.player, fromItem, fromGamePos, toItem, toGamePos, false) {
+			if fromItem.Count != beforeCount {
+				g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
+			}
+			return
+		}
+	}
+}
+
+// parseUseWithCreature handles a use-item-with-creature request (0x84).
+func (g *GameProtocol) parseUseWithCreature(r *netmsg.Reader) {
+	fromPos := r.GetPosition()
+	fromItemID := r.GetU16()
+	fromStackPos := r.GetByte()
+	creatureID := r.GetU32()
+
+	g.deps.Log.Debug("parseUseWithCreature", "player", g.player.Name, "fromPos", fromPos, "fromItemID", fromItemID, "creatureID", creatureID)
+
+	fromItem := g.getItemAt(fromPos, fromItemID, fromStackPos)
+	if fromItem == nil {
+		g.deps.Log.Debug("parseUseWithCreature: fromItem is nil")
+		return
+	}
+
+	targetCreature := g.deps.World.CreatureByID(creatureID)
+	if targetCreature == nil {
+		g.deps.Log.Debug("parseUseWithCreature: targetCreature is nil", "creatureID", creatureID)
+		return
+	}
+
+	// Execute Lua action
+	action := actions.FindAction(fromItem)
+	if action != nil {
+		fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+		toGamePos := targetCreature.GetPosition()
+		beforeCount := fromItem.Count
+		if g.deps.Lua.CallAction(action, g.player, fromItem, fromGamePos, targetCreature, toGamePos, false) {
+			if fromItem.Count != beforeCount {
+				g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
+			}
+			return
+		}
+	}
+}
+
+// getItemAt returns an item from the given client netmsg.Position and stackpos.
+func (g *GameProtocol) getItemAt(pos netmsg.Position, itemID uint16, stackpos uint8) *game.Item {
+	var item *game.Item
+	if pos.X == 0xFFFF {
+		if pos.Y >= 0x40 {
+			cid := uint8(pos.Y - 0x40)
+			if cont, ok := g.openContainerByCID(cid); ok {
+				fromSlot := int(pos.Z)
+				if fromSlot < len(cont.Contents) {
+					item = cont.Contents[fromSlot]
+				}
+			}
+		} else {
+			slot := uint8(pos.Y)
+			if slot > 0 && slot <= 10 {
+				item = g.player.Inventory[slot]
+			}
+		}
+	} else {
+		tile := g.deps.World.Map.GetTile(game.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
+		if tile != nil {
+			item = g.findTileItemByStackPos(tile, itemID, stackpos)
+		}
+	}
+	return item
+}
+

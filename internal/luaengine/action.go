@@ -114,7 +114,7 @@ func actionOnUse(L *lua.LState) int {
 }
 
 // CallAction executes the action's OnUseFunc.
-func (e *Engine) CallAction(a *actions.Action, player *game.Player, item *game.Item, fromPos game.Position, targetItem *game.Item, toPos game.Position, isHotkey bool) bool {
+func (e *Engine) CallAction(a *actions.Action, player *game.Player, item *game.Item, fromPos game.Position, target any, toPos game.Position, isHotkey bool) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -137,11 +137,19 @@ func (e *Engine) CallAction(a *actions.Action, player *game.Player, item *game.I
 	L.SetMetatable(fromPosUd, L.GetTypeMetatable("Position"))
 
 	var targetUd lua.LValue = lua.LNil
-	if targetItem != nil {
-		ud := L.NewUserData()
-		ud.Value = luaItem{item: targetItem, pos: toPos}
-		L.SetMetatable(ud, L.GetTypeMetatable("Item"))
-		targetUd = ud
+	if target != nil {
+		switch t := target.(type) {
+		case *game.Item:
+			ud := L.NewUserData()
+			ud.Value = luaItem{item: t, pos: toPos}
+			L.SetMetatable(ud, L.GetTypeMetatable("Item"))
+			targetUd = ud
+		case game.Creature:
+			ud := L.NewUserData()
+			ud.Value = t
+			L.SetMetatable(ud, L.GetTypeMetatable(metatableForCreature(t)))
+			targetUd = ud
+		}
 	}
 
 	toPosUd := L.NewUserData()
