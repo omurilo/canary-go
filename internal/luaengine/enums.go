@@ -227,6 +227,20 @@ func RegisterEnums(L *lua.LState) {
 		"TILESTATE_PVPZONE":        8,
 		"TILESTATE_REFRESH":        16,
 
+		// Item / Tile Properties (CONST_PROP_*)
+		"CONST_PROP_BLOCKSOLID":                0,
+		"CONST_PROP_HASHEIGHT":                 1,
+		"CONST_PROP_BLOCKPROJECTILE":           2,
+		"CONST_PROP_BLOCKPATH":                 3,
+		"CONST_PROP_ISVERTICAL":                4,
+		"CONST_PROP_ISHORIZONTAL":              5,
+		"CONST_PROP_MOVABLE":                   6,
+		"CONST_PROP_IMMOVABLEBLOCKSOLID":       7,
+		"CONST_PROP_IMMOVABLEBLOCKPATH":        8,
+		"CONST_PROP_IMMOVABLENOFIELDBLOCKPATH": 9,
+		"CONST_PROP_NOFIELDBLOCKPATH":          10,
+		"CONST_PROP_SUPPORTHANGABLE":           11,
+
 		// Zones
 		"ZONE_PROTECTION": 0,
 		"ZONE_NOPVP":      1,

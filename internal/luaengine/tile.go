@@ -139,7 +139,7 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		},
 		"hasProperty": func(L *lua.LState) int {
 			t := checkTile(L, 1)
-			_ = L.CheckInt(2)
+			_ = L.OptInt(2, 0)
 			has := t.tile.BlocksSolid(e.itemCatalog())
 			L.Push(lua.LBool(has))
 			return 1

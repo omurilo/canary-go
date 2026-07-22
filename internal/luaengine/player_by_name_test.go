@@ -72,6 +72,9 @@ func TestTileMethods(t *testing.T) {
 		if tile:hasProperty(3) ~= false then
 			error("expected hasProperty(3) to be false")
 		end
+		if tile:hasProperty(CONST_PROP_IMMOVABLEBLOCKSOLID) ~= false then
+			error("expected hasProperty(CONST_PROP_IMMOVABLEBLOCKSOLID) to be false")
+		end
 	`)
 	if err != nil {
 		t.Fatalf("Lua execution error: %v", err)
