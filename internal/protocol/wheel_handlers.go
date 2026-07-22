@@ -4,6 +4,24 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
+// getCIPVocation maps server OT vocation ID to CIP client vocation ID used in Wheel UI packets.
+// Server OT Vocations: 1=Sorcerer, 2=Druid, 3=Paladin, 4=Knight (and 5..8 for promoted).
+// CIP Client Vocations: 1=Knight, 2=Paladin, 3=Sorcerer, 4=Druid.
+func getCIPVocation(vocation uint16) byte {
+	switch vocation {
+	case 1, 5: // Sorcerer / Master Sorcerer
+		return 3
+	case 2, 6: // Druid / Elder Druid
+		return 4
+	case 3, 7: // Paladin / Royal Paladin
+		return 2
+	case 4, 8: // Knight / Elite Knight
+		return 1
+	default:
+		return 1 // Fallback
+	}
+}
+
 // parseOpenWheel handles opcode 0x61 (Open Wheel of Destiny window).
 func (g *GameProtocol) parseOpenWheel(r *netmsg.Reader) {
 	_ = r.GetU32() // ownerID
@@ -11,21 +29,17 @@ func (g *GameProtocol) parseOpenWheel(r *netmsg.Reader) {
 }
 
 // parseSaveWheel handles opcode 0x62 (Save Wheel of Destiny allocations).
+// In Tibia 13.x protocol, the client sends 36 uint16 values representing allocated points for slots 1..36.
 func (g *GameProtocol) parseSaveWheel(r *netmsg.Reader) {
-	if r.Remaining() >= 4 {
-		_ = r.GetU32() // ownerID
-	}
-	if r.Remaining() >= 2 {
-		slotCount := int(r.GetU16())
-		pointsMap := make(map[uint16]uint16)
-		for i := 0; i < slotCount && r.Remaining() >= 4; i++ {
-			slotID := r.GetU16()
-			pts := r.GetU16()
+	pointsMap := make(map[uint16]uint16)
+	for slotID := uint16(1); slotID <= 36 && r.Remaining() >= 2; slotID++ {
+		pts := r.GetU16()
+		if pts > 0 {
 			pointsMap[slotID] = pts
 		}
-		wheel := g.player.GetWheel()
-		wheel.SaveSlotPoints(pointsMap)
 	}
+	wheel := g.player.GetWheel()
+	wheel.SaveSlotPoints(pointsMap)
 	g.SendWheelOfDestiny()
 }
 
@@ -36,14 +50,13 @@ func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
 	case 0: // Request / Open Wheel Data
 		g.SendWheelOfDestiny()
 	case 1: // Save Wheel Allocation / Preset
-		preset := r.GetByte()
-		_ = preset
-		slotCount := int(r.GetU16())
+		_ = r.GetByte() // preset
 		pointsMap := make(map[uint16]uint16)
-		for i := 0; i < slotCount && r.Remaining() >= 4; i++ {
-			slotID := r.GetU16()
+		for slotID := uint16(1); slotID <= 36 && r.Remaining() >= 2; slotID++ {
 			pts := r.GetU16()
-			pointsMap[slotID] = pts
+			if pts > 0 {
+				pointsMap[slotID] = pts
+			}
 		}
 		wheel := g.player.GetWheel()
 		wheel.SaveSlotPoints(pointsMap)
@@ -71,13 +84,8 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	w.AddByte(1) // canUse = true
 	w.AddByte(1) // options = 1 (1 = can increase and decrease points)
 
-	// Map vocation (1..4 base vocation)
-	vocationByte := byte(g.player.Vocation)
-	if vocationByte == 0 {
-		vocationByte = 1
-	} else if vocationByte > 4 {
-		vocationByte = ((vocationByte - 1) % 4) + 1
-	}
+	// Map OT vocation ID to CIP client vocation ID
+	vocationByte := getCIPVocation(g.player.Vocation)
 	w.AddByte(vocationByte)
 
 	totalPoints := wheel.GetTotalPoints(g.player.Level)
