@@ -27,6 +27,7 @@ func (s *recordSession) SendInventoryItem(uint8, *game.Item) {}
 func (s *recordSession) SendInventoryEmpty(uint8)            {}
 func (s *recordSession) SendInventoryIds()                   {}
 func (s *recordSession) SendStats()                          {}
+func (s *recordSession) SendSkills()                         {}
 func (s *recordSession) OpenContainer(*game.Item)            {}
 func (s *recordSession) RefreshContainer(*game.Item)         {}
 func (s *recordSession) CloseClientContainer(uint8)          {}

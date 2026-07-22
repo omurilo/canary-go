@@ -25,6 +25,13 @@ func (g *GameProtocol) SendInventoryEmpty(slot uint8) { g.sendInventoryEmpty(slo
 // SendStats pushes the player stats block (0xA0).
 func (g *GameProtocol) SendStats() { g.sendStats() }
 
+// SendSkills pushes the player skills block (0xA1).
+func (g *GameProtocol) SendSkills() {
+	w := netmsg.NewWriter()
+	g.addSkills(w)
+	g.conn.Send(w)
+}
+
 // OpenContainer allocates/reuses a client container id and sends the window.
 func (g *GameProtocol) OpenContainer(c *game.Item) {
 	if c != nil {

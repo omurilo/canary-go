@@ -551,7 +551,9 @@ func playerAddmanaspent(L *lua.LState) int {
 		return 0
 	}
 	amount := uint64(luaOptInt(L, 2))
-	p.ManaSpent += amount
+	game.GlobalDispatcher.AddEvent(0, func() {
+		p.AddManaSpent(amount)
+	})
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -623,7 +625,21 @@ func playerAddofflinetrainingtries(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	luaSkill := luaOptInt(L, 2)
+	triesVal := uint64(luaOptInt(L, 3))
+
+	skillVal, isMagic, ok := mapLuaSkillToGo(luaSkill)
+	if ok {
+		game.GlobalDispatcher.AddEvent(0, func() {
+			if isMagic {
+				p.AddManaSpent(triesVal)
+			} else {
+				p.AddSkillTries(skillVal, triesVal)
+			}
+		})
+	}
+
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -668,7 +684,21 @@ func playerAddskilltries(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	luaSkill := luaOptInt(L, 2)
+	triesVal := uint64(luaOptInt(L, 3))
+
+	skillVal, isMagic, ok := mapLuaSkillToGo(luaSkill)
+	if ok {
+		game.GlobalDispatcher.AddEvent(0, func() {
+			if isMagic {
+				p.AddManaSpent(triesVal)
+			} else {
+				p.AddSkillTries(skillVal, triesVal)
+			}
+		})
+	}
+
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3379,5 +3409,15 @@ func playerWheelunlockscroll(L *lua.LState) int {
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
 	return 1
+}
+
+func mapLuaSkillToGo(luaSkill int) (game.Skill, bool, bool) {
+	if luaSkill == 14 { // SKILL_MAGLEVEL
+		return 0, true, true
+	}
+	if luaSkill >= 1 && luaSkill <= 7 {
+		return game.Skill(luaSkill - 1), false, true
+	}
+	return 0, false, false
 }
 

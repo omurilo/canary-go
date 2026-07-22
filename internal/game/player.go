@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -22,6 +23,7 @@ type Session interface {
 	SendInventoryEmpty(slot uint8)          // 0x79
 	SendInventoryIds()                      // 0xF5 aggregated id/tier/count list
 	SendStats()                             // 0xA0 player stats
+	SendSkills()                            // 0xA1 player skills
 
 	// Container windows (Phase 2). OpenContainer allocates/reuses a client cid
 	// and pushes 0x6E; RefreshContainer re-sends 0x6E for every open window
@@ -893,6 +895,117 @@ func (p *Player) ConsumeWeaponInHand(slot uint8) {
 			p.Inventory[slot] = nil
 		}
 	}
+}
+
+func (p *Player) AddSkillTries(skill Skill, tries uint64) {
+	if skill < 0 || skill >= SkillCount {
+		return
+	}
+	p.SkillTries[skill] += tries
+
+	for {
+		currentLevel := p.Skills[skill]
+		if currentLevel >= 150 {
+			break
+		}
+
+		base := uint64(50)
+		multiplier := 1.1
+		switch skill {
+		case SkillDistance:
+			multiplier = 1.2
+		case SkillShielding:
+			multiplier = 1.1
+		default:
+			multiplier = 1.1
+		}
+
+		var req uint64
+		if currentLevel < 10 {
+			req = base
+		} else {
+			factor := 1.0
+			for i := uint16(10); i < currentLevel; i++ {
+				factor *= multiplier
+			}
+			req = uint64(float64(base) * factor)
+		}
+
+		if req == 0 {
+			req = 50
+		}
+
+		if p.SkillTries[skill] >= req {
+			p.SkillTries[skill] -= req
+			p.Skills[skill]++
+			p.SendTextMessage(0x13, "You advanced to skill level "+fmt.Sprintf("%d", p.Skills[skill])+" in "+skillNameOf(skill)+".")
+			if p.Session != nil {
+				p.Session.SendSkills()
+			}
+		} else {
+			break
+		}
+	}
+}
+
+func (p *Player) AddManaSpent(amount uint64) {
+	p.ManaSpent += amount
+
+	for {
+		currentLevel := p.MagLevel
+		if currentLevel >= 150 {
+			break
+		}
+
+		base := uint64(1600)
+		multiplier := 1.1
+
+		var req uint64
+		if currentLevel < 1 {
+			req = base
+		} else {
+			factor := 1.0
+			for i := uint16(1); i < currentLevel; i++ {
+				factor *= multiplier
+			}
+			req = uint64(float64(base) * factor)
+		}
+
+		if req == 0 {
+			req = 1600
+		}
+
+		if p.ManaSpent >= req {
+			p.ManaSpent -= req
+			p.MagLevel++
+			p.SendTextMessage(0x13, "You advanced to magic level "+fmt.Sprintf("%d", p.MagLevel)+".")
+			if p.Session != nil {
+				p.Session.SendSkills()
+			}
+		} else {
+			break
+		}
+	}
+}
+
+func skillNameOf(skill Skill) string {
+	switch skill {
+	case SkillFist:
+		return "fist fighting"
+	case SkillClub:
+		return "club fighting"
+	case SkillSword:
+		return "sword fighting"
+	case SkillAxe:
+		return "axe fighting"
+	case SkillDistance:
+		return "distance fighting"
+	case SkillShielding:
+		return "shielding"
+	case SkillFishing:
+		return "fishing"
+	}
+	return "skill"
 }
 
 

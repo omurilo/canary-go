@@ -173,7 +173,24 @@ func (e *Engine) gameRemoveFiendishMonster(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetFiendishMonsters(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetBoostedBoss(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetLadderIds(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetDummies(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetDummies(L *lua.LState) int {
+	dummies := map[uint16]uint16{
+		28558: 100,
+		28559: 110,
+		28560: 110,
+		28561: 110,
+		28562: 110,
+		28563: 110,
+		28564: 110,
+		28565: 100,
+	}
+	tbl := L.NewTable()
+	for k, v := range dummies {
+		tbl.RawSetInt(int(k), lua.LNumber(v))
+	}
+	L.Push(tbl)
+	return 1
+}
 func (e *Engine) gameGetTalkActions(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetEventCallbacks(L *lua.LState) int { return 0 }
 func (e *Engine) gameRegisterAchievement(L *lua.LState) int { return 0 }
