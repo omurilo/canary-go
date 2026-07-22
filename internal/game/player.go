@@ -237,6 +237,34 @@ func (p *Player) SendTextMessage(msgType uint8, text string) {
 	}
 }
 
+// SendFYIBox sends an FYI popup box (opcode 0x15) to the player's client.
+func (p *Player) SendFYIBox(text string) {
+	if p.Session != nil {
+		w := netmsg.NewWriter()
+		w.AddByte(0x15) // FYI Box opcode
+		w.AddString(text)
+		p.Session.SendToClient(w)
+	}
+}
+
+// SendTextWindow sends a text dialog window (opcode 0x96) to the player's client.
+func (p *Player) SendTextWindow(windowTextID uint32, itemID uint16, text string) {
+	if p.Session != nil {
+		w := netmsg.NewWriter()
+		w.AddByte(0x96) // Text Window opcode
+		w.AddU32(windowTextID)
+		w.AddU16(itemID)
+		w.AddByte(1) // count
+		w.AddByte(0) // subType
+		w.AddU16(uint16(len(text)))
+		w.AddString(text)
+		w.AddU16(0)
+		w.AddByte(0)
+		w.AddU16(0)
+		p.Session.SendToClient(w)
+	}
+}
+
 // SendOpenShop sends the shop window (opcode 0x7A) to the player's client.
 func (p *Player) SendOpenShop(npc Creature, items []creatures.ShopItem) {
 	if p.Session != nil {

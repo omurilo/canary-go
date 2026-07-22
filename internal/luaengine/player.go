@@ -2740,7 +2740,9 @@ func playerPopupfyi(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	text := L.CheckString(2)
+	p.SendFYIBox(text)
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3675,7 +3677,20 @@ func playerShowtextdialog(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	var itemID uint16 = 2160
+	var text string
+	if L.GetTop() >= 3 {
+		itemID = uint16(L.OptInt(2, 2160))
+		text = L.CheckString(3)
+	} else if L.GetTop() >= 2 {
+		if L.Get(2).Type() == lua.LTNumber {
+			itemID = uint16(L.CheckInt(2))
+		} else {
+			text = L.CheckString(2)
+		}
+	}
+	p.SendTextWindow(100, itemID, text)
+	L.Push(lua.LTrue)
 	return 1
 }
 

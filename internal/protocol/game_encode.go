@@ -153,6 +153,25 @@ func (g *GameProtocol) isTopItem(it *game.Item) bool {
 	return t != nil && t.AlwaysOnTop()
 }
 
+func (g *GameProtocol) canSeeCreature(c game.Creature) bool {
+	if c == nil {
+		return false
+	}
+	if p, ok := c.(*game.Player); ok && p.Ghost {
+		if g.player == nil {
+			return false
+		}
+		if g.player == p {
+			return true
+		}
+		if g.player.GroupID >= 3 && g.player.GroupID >= p.GroupID {
+			return true
+		}
+		return false
+	}
+	return true
+}
+
 // addTileDescription writes a tile's things in the client's stack order, mirroring
 // GetTileDescription: ground, always-on-top items, creatures, then normal items.
 // Placing creatures between the two item groups is what keeps creature stackpos in
@@ -173,12 +192,17 @@ func (g *GameProtocol) addTileDescription(w *netmsg.Writer, t *game.Tile, pos ga
 			count++
 		}
 	}
+
 	// Creatures.
 	for i := len(t.Creatures) - 1; i >= 0; i-- {
 		if count >= 10 {
 			return
 		}
-		g.addCreature(w, t.Creatures[i])
+		c := t.Creatures[i]
+		if !g.canSeeCreature(c) {
+			continue
+		}
+		g.addCreature(w, c)
 		count++
 	}
 	// Down items (no always-on-top order): render above creatures.
