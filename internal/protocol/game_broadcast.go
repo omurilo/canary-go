@@ -62,6 +62,7 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 			// Stack position in the old tile
 			oldStack := gp.StackPosWithIndex(oldPos, oldTileIndex)
 			gp.SendCreatureMove(oldPos, oldStack, newPos)
+			gp.SendCreatureWalkthrough(c, gp.canWalkthroughEx(gp.player, c))
 		} else {
 			oldStack := gp.StackPosWithIndex(oldPos, oldTileIndex)
 			gp.SendRemoveCreatureAt(oldPos, oldStack)
@@ -74,6 +75,7 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 		}
 		visited[s.ID] = true
 		gp.SendAppendCreature(c, newPos)
+		gp.SendCreatureWalkthrough(c, gp.canWalkthroughEx(gp.player, c))
 	}
 }
 
@@ -82,6 +84,7 @@ func BroadcastCreatureAppear(w *game.World, c game.Creature) {
 	for _, s := range w.Spectators(c.GetPosition(), c.GetID()) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
 			gp.SendAppendCreature(c, c.GetPosition())
+			gp.SendCreatureWalkthrough(c, gp.canWalkthroughEx(gp.player, c))
 		}
 	}
 }

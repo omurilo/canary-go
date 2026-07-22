@@ -343,3 +343,19 @@ func (g *GameProtocol) StackPosWithIndex(pos game.Position, tileIndex int) uint8
 	}
 	return uint8(stack)
 }
+
+// SendCreatureWalkthrough sends opcode 0x92 to update a creature's walkthrough state on client.
+func (g *GameProtocol) SendCreatureWalkthrough(c game.Creature, walkthrough bool) {
+	if c == nil || !g.canSeeCreature(c) {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0x92)
+	w.AddU32(c.GetID())
+	if walkthrough {
+		w.AddByte(0x00) // 0 = can walk through
+	} else {
+		w.AddByte(0x01) // 1 = solid
+	}
+	g.SendToClient(w)
+}
