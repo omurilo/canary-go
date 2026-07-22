@@ -1,6 +1,8 @@
 package luaengine
 
 import (
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -13,6 +15,51 @@ import (
 // that the remaining Canary API surface will follow.
 func (e *Engine) registerAPI() {
 	L := e.L
+
+	// Set global directory paths required by Lua scripts
+	cfg := config.Active
+	dataDir := "data-otservbr-global"
+	coreDir := "data"
+	if cfg != nil {
+		if cfg.DataPack != "" {
+			dataDir = cfg.DataPack
+		}
+		if cfg.Core != "" {
+			coreDir = cfg.Core
+		}
+	}
+
+	// Resolve directories relative to current working directory if needed (e.g. running from package subdirs in tests)
+	resolveDir := func(dir string) string {
+		if _, err := os.Stat(dir); err == nil {
+			return dir
+		}
+		for _, up := range []string{"..", filepath.Join("..", ".."), filepath.Join("..", "..", "..")} {
+			if _, err := os.Stat(filepath.Join(up, dir)); err == nil {
+				return filepath.Join(up, dir)
+			}
+		}
+		return dir
+	}
+
+	dataDirResolved := resolveDir(dataDir)
+	coreDirResolved := resolveDir(coreDir)
+
+	L.SetGlobal("DATA_DIRECTORY", lua.LString(dataDirResolved))
+	L.SetGlobal("CORE_DIRECTORY", lua.LString(coreDirResolved))
+
+	// Set package.path so require(...) can find scripts across the datapack and core libs
+	pkgPath := strings.Join([]string{
+		coreDirResolved + "/libs/?.lua",
+		coreDirResolved + "/libs/?/init.lua",
+		dataDirResolved + "/?.lua",
+		dataDirResolved + "/?/init.lua",
+		"?.lua",
+		"?/init.lua",
+	}, ";")
+	if pkg, ok := L.GetGlobal("package").(*lua.LTable); ok {
+		L.SetField(pkg, "path", lua.LString(pkgPath))
+	}
 
 	// Global Tibia enums (COMBAT_*, BESTY_RACE_*, CONST_SLOT_*, ...) must exist
 	// before content scripts (monsters, spells) reference them.

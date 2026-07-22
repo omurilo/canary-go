@@ -31,7 +31,15 @@ func talkActionConstructor(L *lua.LState) int {
 var talkActionMethods = map[string]lua.LGFunction{
 	"separator": talkActionSeparator,
 	"groupType": talkActionGroupType,
+	"onSay":     talkActionOnSay,
 	"register":  talkActionRegister,
+}
+
+func talkActionOnSay(L *lua.LState) int {
+	t := checkTalkAction(L)
+	t.OnSayFunc = L.CheckAny(2)
+	L.Push(L.Get(1))
+	return 1
 }
 
 func checkTalkAction(L *lua.LState) *talkactions.TalkAction {

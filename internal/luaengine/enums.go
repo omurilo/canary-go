@@ -175,6 +175,36 @@ func RegisterEnums(L *lua.LState) {
 		"SKILL_MAGLEVEL":            14,
 		"SKILL_LEVEL":               15,
 
+		// Player Pronouns
+		"PLAYERPRONOUN_UNSET": 0,
+		"PLAYERPRONOUN_THEY":  1,
+		"PLAYERPRONOUN_SHE":   2,
+		"PLAYERPRONOUN_HE":    3,
+		"PLAYERPRONOUN_ZE":    4,
+		"PLAYERPRONOUN_NAME":  5,
+
+		// Concoction IDs
+		"Concoction_KooldownAid":           1,
+		"Concoction_StaminaExtension":      2,
+		"Concoction_StrikeEnhancement":     3,
+		"Concoction_CharmUpgrade":          4,
+		"Concoction_WealthDuplex":          5,
+		"Concoction_BestiaryBetterment":     6,
+		"Concoction_FireResilience":        7,
+		"Concoction_IceResilience":         8,
+		"Concoction_EarthResilience":       9,
+		"Concoction_EnergyResilience":      10,
+		"Concoction_HolyResilience":        11,
+		"Concoction_DeathResilience":       12,
+		"Concoction_PhysicalResilience":    13,
+		"Concoction_FireAmplification":     14,
+		"Concoction_IceAmplification":      15,
+		"Concoction_EarthAmplification":    16,
+		"Concoction_EnergyAmplification":   17,
+		"Concoction_HolyAmplification":     18,
+		"Concoction_DeathAmplification":    19,
+		"Concoction_PhysicalAmplification": 20,
+
 		// World Types
 		"WORLD_TYPE_NO_PVP":       0,
 		"WORLD_TYPE_PVP":          1,

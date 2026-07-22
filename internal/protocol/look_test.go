@@ -56,6 +56,7 @@ func TestBuildItemDescription(t *testing.T) {
 		Article:     "a",
 		Description: "It's a valuable currency.",
 		Weight:      10, // 0.10 oz
+		Stackable:   true,
 		ShowCharges: false,
 	}
 

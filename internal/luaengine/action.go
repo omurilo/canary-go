@@ -29,9 +29,27 @@ var actionMethods = map[string]lua.LGFunction{
 	"id":          actionId,
 	"aid":         actionAid,
 	"uid":         actionUid,
+	"position":    actionPosition,
 	"allowFarUse": actionAllowFarUse,
+	"blockWalls":  actionBlockWalls,
+	"checkFloor":  actionCheckFloor,
 	"onUse":       actionOnUse,
 	"register":    actionRegister,
+}
+
+func actionPosition(L *lua.LState) int {
+	L.Push(L.Get(1))
+	return 1
+}
+
+func actionBlockWalls(L *lua.LState) int {
+	L.Push(L.Get(1))
+	return 1
+}
+
+func actionCheckFloor(L *lua.LState) int {
+	L.Push(L.Get(1))
+	return 1
 }
 
 func checkAction(L *lua.LState) *actions.Action {
