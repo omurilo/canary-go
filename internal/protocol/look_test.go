@@ -68,8 +68,18 @@ func TestBuildItemDescription(t *testing.T) {
 		Charges:     500,
 	}
 
-	cat := items.NewCatalog(itemType, wandType)
+	backpackType := &items.ItemType{
+		ID:          1988,
+		Name:        "backpack",
+		Article:     "a",
+		Description: "An adventurer's backpack.",
+		Weight:      1800, // 18.00 oz
+		Group:       items.GroupContainer,
+	}
 
+	cat := items.NewCatalog(itemType, wandType, backpackType)
+
+	// Test crystal coin (count: 5, weight should be 5 * 0.10 oz = 0.50 oz)
 	item := &game.Item{
 		ID:    2160,
 		Count: 5,
@@ -77,7 +87,7 @@ func TestBuildItemDescription(t *testing.T) {
 
 	desc := BuildItemDescription(nil, item, cat)
 	expectedName := "You see a crystal coin."
-	expectedWeight := "It weighs 0.10 oz."
+	expectedWeight := "It weighs 0.50 oz."
 	if !contains(desc, expectedName) {
 		t.Errorf("BuildItemDescription = %q, want to contain %q", desc, expectedName)
 	}
@@ -85,6 +95,7 @@ func TestBuildItemDescription(t *testing.T) {
 		t.Errorf("BuildItemDescription = %q, want to contain %q", desc, expectedWeight)
 	}
 
+	// Test training wand (charges)
 	wand := &game.Item{
 		ID: 2184,
 	}
@@ -93,6 +104,18 @@ func TestBuildItemDescription(t *testing.T) {
 	expectedWandCharges := "that has 500 charges left"
 	if !contains(descWand, expectedWandCharges) {
 		t.Errorf("BuildItemDescription(wand) = %q, want to contain %q", descWand, expectedWandCharges)
+	}
+
+	// Test backpack container weight (18.00 oz) + 5 crystal coins (0.50 oz) = 18.50 oz
+	backpack := &game.Item{
+		ID:       1988,
+		Contents: []*game.Item{item},
+	}
+
+	descBackpack := BuildItemDescription(nil, backpack, cat)
+	expectedBackpackWeight := "It weighs 18.50 oz."
+	if !contains(descBackpack, expectedBackpackWeight) {
+		t.Errorf("BuildItemDescription(backpack with coins) = %q, want to contain %q", descBackpack, expectedBackpackWeight)
 	}
 }
 

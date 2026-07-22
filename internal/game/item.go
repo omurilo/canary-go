@@ -160,21 +160,12 @@ type Outfit struct {
 
 // GetWeight returns the total weight of the item (and its contents if it's a container).
 // Weight is in hundredths of an ounce (like capacity).
-func (i *Item) GetWeight(catalog interface{}) uint32 {
+func (i *Item) GetWeight(catalog *items.Catalog) uint32 {
 	weight := uint32(0)
 	
-	// Fallback interface to avoid cyclic dependency
-	type Catalog interface {
-		Get(id uint16) interface{}
-	}
-	
-	type ItemType interface {
-		GetWeight() uint32
-	}
-
-	if cat, ok := catalog.(Catalog); ok {
-		if t, ok := cat.Get(i.ID).(ItemType); ok {
-			weight = t.GetWeight()
+	if catalog != nil {
+		if t := catalog.Get(i.ID); t != nil {
+			weight = t.Weight
 		}
 	}
 	

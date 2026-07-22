@@ -104,6 +104,13 @@ func (t *ItemType) IsGround() bool         { return t.Group == GroupGround }
 func (t *ItemType) IsFluidContainer() bool { return t.Group == GroupFluid }
 func (t *ItemType) IsSplash() bool         { return t.Group == GroupSplash }
 
+func (t *ItemType) GetWeight() uint32 {
+	if t == nil {
+		return 0
+	}
+	return t.Weight
+}
+
 // Catalog maps client item ids to their metadata.
 type Catalog struct {
 	byID   map[uint16]*ItemType

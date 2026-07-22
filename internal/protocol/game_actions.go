@@ -887,10 +887,7 @@ func BuildItemDescription(viewer *game.Player, item *game.Item, catalog *items.C
 	}
 
 	// Weight statistics
-	weight := itemType.Weight
-	if item.Attr != nil && item.Attr.Weight != nil {
-		weight = *item.Attr.Weight
-	}
+	weight := item.GetWeight(catalog)
 	if weight > 0 {
 		weightFloat := float64(weight) / 100.0
 		s.WriteString(fmt.Sprintf(" It weighs %.2f oz.", weightFloat))
