@@ -224,6 +224,8 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 		} else {
 			e.doMeleeHit(combat.NewCombat(), p, target)
 		}
+	} else if m, ok := attacker.(*Monster); ok {
+		e.doMonsterAttack(m, target)
 	} else {
 		e.doMeleeHit(combat.NewCombat(), attacker, target)
 	}
@@ -647,5 +649,112 @@ func randomRange(min, max int) int32 {
 		return int32(min)
 	}
 	return int32(min + rand.Intn(max-min+1))
+}
+
+func (e *CombatEngine) doMonsterAttack(m *Monster, target Creature) {
+	if m.Type == nil || len(m.Type.Attacks) == 0 {
+		e.doMeleeHit(combat.NewCombat(), m, target)
+		return
+	}
+
+	var spells []creatures.MonsterAttack
+
+	for i := range m.Type.Attacks {
+		atk := &m.Type.Attacks[i]
+		if !atk.IsMelee() {
+			spells = append(spells, *atk)
+		}
+	}
+
+	ap, tp := m.GetPosition(), target.GetPosition()
+	dist := chebyshevDistance(ap, tp)
+
+	for _, s := range spells {
+		chanceRoll := rand.Intn(100)
+		if chanceRoll < s.Chance {
+			maxRange := s.Range
+			if maxRange <= 0 {
+				maxRange = 1
+			}
+			if dist <= maxRange {
+				e.executeMonsterSpell(m, target, s)
+				return
+			}
+		}
+	}
+
+	if dist <= 1 {
+		e.doMeleeHit(combat.NewCombat(), m, target)
+	}
+}
+
+func (e *CombatEngine) executeMonsterSpell(m *Monster, target Creature, s creatures.MonsterAttack) {
+	if s.ShootEffect != 0 && e.world.OnDistanceEffect != nil {
+		e.world.OnDistanceEffect(m.GetPosition(), target.GetPosition(), s.ShootEffect)
+	}
+
+	minDmg := s.MinDamage
+	maxDmg := s.MaxDamage
+	if minDmg < 0 {
+		minDmg = -minDmg
+	}
+	if maxDmg < 0 {
+		maxDmg = -maxDmg
+	}
+	if minDmg > maxDmg {
+		minDmg, maxDmg = maxDmg, minDmg
+	}
+
+	dmg := minDmg
+	if maxDmg > minDmg {
+		dmg = minDmg + rand.Intn(maxDmg-minDmg+1)
+	}
+
+	effect := s.Effect
+	if effect == 0 {
+		effect = uint16(effectDrawBlood)
+	}
+
+	c := combat.NewCombat()
+	cType := combat.CombatPhysical
+	sNameLower := strings.ToLower(s.Name)
+	sTypeLower := strings.ToLower(s.CombatType)
+	if strings.Contains(sTypeLower, "fire") || strings.Contains(sNameLower, "fire") {
+		cType = combat.CombatFire
+	} else if strings.Contains(sTypeLower, "ice") || strings.Contains(sNameLower, "ice") {
+		cType = combat.CombatIce
+	} else if strings.Contains(sTypeLower, "energy") || strings.Contains(sNameLower, "energy") {
+		cType = combat.CombatEnergy
+	} else if strings.Contains(sTypeLower, "poison") || strings.Contains(sNameLower, "poison") || strings.Contains(sNameLower, "earth") {
+		cType = combat.CombatEarth
+	} else if strings.Contains(sTypeLower, "death") || strings.Contains(sNameLower, "death") {
+		cType = combat.CombatDeath
+	} else if strings.Contains(sTypeLower, "holy") || strings.Contains(sNameLower, "holy") {
+		cType = combat.CombatHoly
+	}
+
+	c.SetParam(combat.CombatParamType, uint32(cType))
+
+	c.DoCombatHealth(adaptCreature(m), adaptCreature(target), combat.CombatDamage{
+		PrimaryType:  cType,
+		PrimaryValue: int32(dmg),
+		Origin:       combat.OriginSpell,
+	})
+
+	if e.world.OnCreatureHealthChange != nil {
+		e.world.OnCreatureHealthChange(target)
+	}
+
+	if e.world.OnMagicEffect != nil && effect != 0 {
+		e.world.OnMagicEffect(target.GetPosition(), effect)
+	}
+
+	if e.world.OnCombatHit != nil {
+		e.world.OnCombatHit(m, target, int32(dmg), effect)
+	}
+
+	if target.GetHealth() == 0 {
+		e.handleDeath(target, m)
+	}
 }
 

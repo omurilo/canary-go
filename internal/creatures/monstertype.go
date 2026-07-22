@@ -41,17 +41,30 @@ type MonsterType struct {
 	Elements map[uint32]int16
 }
 
-// MonsterAttack mirrors one entry of monster.attacks. For "melee" the damage is
-// MinDamage..MaxDamage (raw combat values, typically <= 0). Non-melee attacks
-// keep Name (spell name / combat type) plus Range for the spells agent.
-// See spellBlock_t / Monsters::deserializeSpell (src/creatures/monsters/monsters.cpp).
 type MonsterAttack struct {
-	Name      string // "melee" or a spell/combat-type name
-	Interval  int    // ms between attempts (default 2000)
-	Chance    int    // 0..100 chance per attempt
-	MinDamage int    // raw min combat value (melee: usually 0)
-	MaxDamage int    // raw max combat value (melee: usually negative)
-	Range     int    // shoot range for distance/spell attacks; 0 = melee/adjacent
+	Name            string // "melee" or a spell/combat-type name
+	Interval        int    // ms between attempts (default 2000)
+	Chance          int    // 0..100 chance per attempt
+	MinDamage       int    // raw min combat value (melee: usually 0)
+	MaxDamage       int    // raw max combat value (melee: usually negative)
+	Range           int    // shoot range for distance/spell attacks; 0 = melee/adjacent
+	Effect          uint16 // visual magic effect on target (CONST_ME_*)
+	ShootEffect     uint16 // distance missile effect (CONST_ANI_*)
+	CastSound       string // audio cast identifier
+	ImpactSound     string // audio impact identifier
+	CombatType      string // damage type (physical, fire, ice, energy, etc.)
+	ConditionType   string // condition type (poison, speed, paralyze)
+	Duration        int    // condition duration in ms
+	SpeedChange     int    // speed change for conditions
+	NeedTarget      bool   // if true, requires target to cast
+	Length          int    // wave length
+	Spread          int    // wave spread
+	Radius          int    // area radius
+	OutfitMonster   string // monster name for transform
+	OutfitItem      int    // item ID for transform
+	ConditionDamage int    // damage over time
+	TickInterval    int    // speed of ticks
+	ScriptName      string // Lua file script name
 }
 
 // IsMelee reports whether this is the basic adjacent melee attack.
