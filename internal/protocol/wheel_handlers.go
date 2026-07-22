@@ -22,6 +22,18 @@ func getCIPVocation(vocation uint16) byte {
 	}
 }
 
+// sendGiftOfLifeCooldown sends opcode 0x5E (Wheel of Destiny Gift of Life cooldown status).
+func (g *GameProtocol) sendGiftOfLifeCooldown() {
+	w := netmsg.NewWriter()
+	w.AddByte(0x5E)
+	w.AddByte(0x01) // Gift of life ID
+	w.AddByte(0x00) // Cooldown ENUM
+	w.AddU32(0)     // Remaining cooldown seconds
+	w.AddU32(0)     // Total cooldown seconds
+	w.AddByte(0x00) // Infight / cooldown paused flag
+	g.SendToClient(w)
+}
+
 // parseOpenWheel handles opcode 0x61 (Open Wheel of Destiny window).
 func (g *GameProtocol) parseOpenWheel(r *netmsg.Reader) {
 	_ = r.GetU32() // ownerID
@@ -100,12 +112,11 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	}
 
 	w.AddU16(0)  // promotion scrolls count (u16 = 2 bytes)
-	w.AddByte(0) // monk quest bonus flag (u8 = 1 byte)
-	w.AddU16(0)  // monk quest bonus amount (u16 = 2 bytes)
+	w.AddByte(0) // monk quest bonus (u8 = 1 byte for 13.x client protocol)
 
 	// Gems section
-	w.AddByte(0) // active gems count (u8)
-	w.AddU16(0)  // revealed gems count (u16)
+	w.AddByte(0) // active gems count (u8 = 1 byte)
+	w.AddU16(0)  // revealed gems count (u16 = 2 bytes)
 
 	// Grade modifiers section
 	// Basic grade modifiers (46 entries)
@@ -123,6 +134,9 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	}
 
 	g.SendToClient(w)
+
+	// Send Gift of Life cooldown state (opcode 0x5E)
+	g.sendGiftOfLifeCooldown()
 
 	// Send resource balance updates expected by Wheel UI
 	g.sendResourceBalance(0, g.player.BankBalance)
