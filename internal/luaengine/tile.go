@@ -120,6 +120,48 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			L.Push(lua.LNil)
 			return 1
 		},
+		"getCreatureCount": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			L.Push(lua.LNumber(len(t.tile.Creatures)))
+			return 1
+		},
+		"getCreatures": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			tbl := L.NewTable()
+			for i, cr := range t.tile.Creatures {
+				ud := L.NewUserData()
+				ud.Value = cr
+				L.SetMetatable(ud, L.GetTypeMetatable(metatableForCreature(cr)))
+				tbl.RawSetInt(i+1, ud)
+			}
+			L.Push(tbl)
+			return 1
+		},
+		"hasProperty": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			_ = L.CheckInt(2)
+			has := t.tile.BlocksSolid(e.itemCatalog())
+			L.Push(lua.LBool(has))
+			return 1
+		},
+		"getItemCount": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			count := len(t.tile.Items)
+			if t.tile.Ground != nil {
+				count++
+			}
+			L.Push(lua.LNumber(count))
+			return 1
+		},
+		"getThingCount": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			count := len(t.tile.Items) + len(t.tile.Creatures)
+			if t.tile.Ground != nil {
+				count++
+			}
+			L.Push(lua.LNumber(count))
+			return 1
+		},
 		"queryAdd": func(L *lua.LState) int {
 			L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR
 			return 1

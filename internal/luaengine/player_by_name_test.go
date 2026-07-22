@@ -49,3 +49,31 @@ func TestPositionConstructorUserdata(t *testing.T) {
 		t.Fatalf("Lua execution error: %v", err)
 	}
 }
+
+func TestTileMethods(t *testing.T) {
+	w := game.NewWorld()
+	e := New(w, nil)
+
+	pos := game.Position{X: 100, Y: 100, Z: 7}
+	tile := &game.Tile{
+		Creatures: []game.Creature{&game.Player{ID: 1, Name: "Test"}},
+	}
+	w.Map.SetTile(pos, tile)
+
+	L := e.L
+	err := L.DoString(`
+		local tile = Tile(100, 100, 7)
+		if not tile then
+			error("expected Tile(100, 100, 7) to return tile object")
+		end
+		if tile:getCreatureCount() ~= 1 then
+			error("expected creature count 1, got " .. tostring(tile:getCreatureCount()))
+		end
+		if tile:hasProperty(3) ~= false then
+			error("expected hasProperty(3) to be false")
+		end
+	`)
+	if err != nil {
+		t.Fatalf("Lua execution error: %v", err)
+	}
+}
