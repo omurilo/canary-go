@@ -146,6 +146,8 @@ type Player struct {
 	Blessings       [8]uint8
 	OfflineTrainingTime  int32
 	OfflineTrainingSkill int8
+	LastLogin            uint64
+	LastLogout           uint64
 	SkillTries      [SkillCount]uint64
 	ManaSpent       uint64
 	MagLevelPercent uint8

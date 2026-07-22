@@ -1469,7 +1469,7 @@ func playerGetlastloginsaved(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	L.Push(lua.LNumber(p.LastLogin))
 	return 1
 }
 
@@ -1479,7 +1479,7 @@ func playerGetlastlogout(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	L.Push(lua.LNumber(p.LastLogout))
 	return 1
 }
 
@@ -2012,12 +2012,22 @@ func playerGetvocation(L *lua.LState) int {
 		return 1
 	}))
 	num("getAttackSpeed", voc.AttackSpeed)
+	num("getBaseAttackSpeed", voc.AttackSpeed)
 	num("getBaseSpeed", voc.BaseSpeed)
 	// Health/mana regeneration rates consumed by Player.feed.
 	num("getHealthGainAmount", voc.GainHPAmount)
 	num("getHealthGainTicks", voc.GainHPTicks)
 	num("getManaGainAmount", voc.GainManaAmount)
 	num("getManaGainTicks", voc.GainManaTicks)
+
+	L.SetField(ud, "getPromotion", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNil)
+		return 1
+	}))
+	L.SetField(ud, "getDemotion", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNil)
+		return 1
+	}))
 
 	L.SetMetatable(ud, mt)
 	L.Push(ud)

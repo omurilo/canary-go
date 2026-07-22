@@ -233,6 +233,11 @@ func (g *GameProtocol) OnDisconnect(c *network.Connection) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// Update last logout timestamp and execute creature event logout callbacks
+	g.player.LastLogout = uint64(time.Now().Unix())
+	g.deps.Lua.ExecuteCreatureOnLogout(g.player)
+
 	if err := g.deps.DB.SavePlayer(ctx, g.player); err != nil {
 		c.Logger().Warn("save on disconnect failed", "err", err)
 	}
@@ -335,6 +340,11 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	}
 	g.player = player
 	g.enterWorld()
+
+	// Run creature event login callbacks (offline training, stamina, first items, daily rewards, etc.)
+	g.deps.Lua.ExecuteCreatureOnLogin(player)
+	player.LastLogin = uint64(time.Now().Unix())
+
 	g.deps.Lua.Call("onPlayerLogin", player.Name)
 	c.Logger().Info("player entered world", "name", player.Name,
 		"pos", player.Pos, "online", g.deps.World.OnlineCount())

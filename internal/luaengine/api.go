@@ -68,6 +68,7 @@ func (e *Engine) registerAPI() {
 	e.registerBank()
 	e.registerParty()
 	e.registerTown()
+	e.registerCreatureEvent()
 
 	linkClasses := func(child, parent string) {
 		childMt, _ := L.GetTypeMetatable(child).(*lua.LTable)
@@ -118,7 +119,6 @@ func (e *Engine) registerAPI() {
 		L.SetMetatable(classTable, mt)
 		L.SetGlobal(name, classTable)
 	}
-	mockClass("CreatureEvent")
 	mockClass("GlobalEvent")
 	mockClass("Weapon")
 	mockClass("Result")

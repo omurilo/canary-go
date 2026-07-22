@@ -40,6 +40,9 @@ type Engine struct {
 	eventMu  sync.Mutex
 	eventSeq int
 	events   map[int]*time.Timer
+
+	creatureEventsOnLogin  []*lua.LFunction
+	creatureEventsOnLogout []*lua.LFunction
 }
 
 // New creates an engine with the base libraries loaded.
