@@ -713,7 +713,7 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 
 		w := netmsg.NewWriter()
 		w.AddByte(opTextMessage)
-		w.AddByte(0x15) // MESSAGE_EVENT_ADVANCE (white text center)
+		w.AddByte(0x19) // MESSAGE_LOOK (green description center screen + console)
 		w.AddString(desc)
 		g.SendToClient(w)
 		return
@@ -730,7 +730,7 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 
 		w := netmsg.NewWriter()
 		w.AddByte(opTextMessage)
-		w.AddByte(0x15) // MESSAGE_EVENT_ADVANCE (white text center)
+		w.AddByte(0x19) // MESSAGE_LOOK (green description center screen + console)
 		w.AddString(desc)
 		g.SendToClient(w)
 		return
