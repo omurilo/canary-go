@@ -1,6 +1,12 @@
 package luaengine
 
 import (
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/opentibiabr/canary-go/internal/config"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -9,6 +15,55 @@ import (
 // that the remaining Canary API surface will follow.
 func (e *Engine) registerAPI() {
 	L := e.L
+
+	// Set global directory paths required by Lua scripts
+	cfg := config.Active
+	dataDir := "data-otservbr-global"
+	coreDir := "data"
+	if cfg != nil {
+		if cfg.DataPack != "" {
+			dataDir = cfg.DataPack
+		}
+		if cfg.Core != "" {
+			coreDir = cfg.Core
+		}
+	}
+
+	// Resolve directories relative to current working directory if needed (e.g. running from package subdirs in tests)
+	resolveDir := func(dir string) string {
+		if _, err := os.Stat(dir); err == nil {
+			return dir
+		}
+		for _, up := range []string{"..", filepath.Join("..", ".."), filepath.Join("..", "..", "..")} {
+			if _, err := os.Stat(filepath.Join(up, dir)); err == nil {
+				return filepath.Join(up, dir)
+			}
+		}
+		return dir
+	}
+
+	dataDirResolved := resolveDir(dataDir)
+	coreDirResolved := resolveDir(coreDir)
+
+	L.SetGlobal("DATA_DIRECTORY", lua.LString(dataDirResolved))
+	L.SetGlobal("CORE_DIRECTORY", lua.LString(coreDirResolved))
+
+	// Set package.path so require(...) can find scripts across the datapack and core libs
+	pkgPath := strings.Join([]string{
+		coreDirResolved + "/libs/?.lua",
+		coreDirResolved + "/libs/?/init.lua",
+		dataDirResolved + "/?.lua",
+		dataDirResolved + "/?/init.lua",
+		"?.lua",
+		"?/init.lua",
+	}, ";")
+	if pkg, ok := L.GetGlobal("package").(*lua.LTable); ok {
+		L.SetField(pkg, "path", lua.LString(pkgPath))
+	}
+
+	// Global Tibia enums (COMBAT_*, BESTY_RACE_*, CONST_SLOT_*, ...) must exist
+	// before content scripts (monsters, spells) reference them.
+	RegisterEnums(L)
 
 	// print -> structured logger, so script output shows up in server logs.
 	L.SetGlobal("print", L.NewFunction(func(L *lua.LState) int {
@@ -41,15 +96,356 @@ func (e *Engine) registerAPI() {
 	}))
 	L.SetGlobal("logger", logger)
 
-	e.registerPosition()
-	e.registerTile()
-	e.registerItem()
-	e.registerContainer()
+	e.registerGame()
 	e.registerCreatureType()
 	e.registerPlayerType()
+	e.registerMonster()
+	e.registerNpc()
+	e.registerPosition()
+	e.registerItem()
+	e.registerItemType()
+	e.registerContainer()
+	e.registerTile()
+	e.registerAction()
+	e.registerMoveEvent()
 	e.registerMonsterType()
+	e.registerMonsterSpellClass()
+	e.registerLootClass()
 	e.registerNpcType()
-	e.registerGame()
+	e.registerNetworkMessage()
+	e.registerBank()
+	e.registerParty()
+	e.registerTown()
+	e.registerCreatureEvent()
+
+	linkClasses := func(child, parent string) {
+		childMt, _ := L.GetTypeMetatable(child).(*lua.LTable)
+		parentMt, _ := L.GetTypeMetatable(parent).(*lua.LTable)
+		if childMt == nil || parentMt == nil {
+			return
+		}
+		
+		childIdx, _ := L.RawGet(childMt, lua.LString("__index")).(*lua.LTable)
+		parentIdx, _ := L.RawGet(parentMt, lua.LString("__index")).(*lua.LTable)
+		
+		if childIdx != nil && parentIdx != nil {
+			idxMt := L.NewTable()
+			L.SetField(idxMt, "__index", parentIdx)
+			L.SetMetatable(childIdx, idxMt)
+		}
+	}
+
+	linkClasses("Player", "Creature")
+	linkClasses("Monster", "Creature")
+	linkClasses("Npc", "Creature")
+
+	// Mock constructors for unused revscriptsys classes so scripts don't crash
+	mockClass := func(name string) {
+		mt := L.NewTypeMetatable(name)
+		
+		idxTable := L.NewTable()
+		idxMt := L.NewTable()
+		L.SetField(idxMt, "__index", L.NewFunction(func(L *lua.LState) int {
+			L.Push(L.NewFunction(func(L *lua.LState) int { return 0 }))
+			return 1
+		}))
+		L.SetMetatable(idxTable, idxMt)
+		
+		L.SetField(mt, "__index", idxTable)
+		L.SetField(mt, "__newindex", L.NewFunction(func(L *lua.LState) int { return 0 }))
+		
+		// The constructor (__call) returns a new userdata
+		L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int {
+			ud := L.NewUserData()
+			ud.Value = name
+			L.SetMetatable(ud, mt)
+			L.Push(ud)
+			return 1
+		}))
+
+		classTable := L.NewTable()
+		L.SetMetatable(classTable, mt)
+		L.SetGlobal(name, classTable)
+	}
+	mockClass("GlobalEvent")
+	mockClass("Weapon")
+	mockClass("Result")
+	mockClass("Achievement")
+	mockClass("BestiaryCharm")
+	mockClass("ItemTier")
+	mockClass("Spawns")
+	mockClass("BedItem")
+	mockClass("DropLoot")
+	mockClass("Charm")
+	mockClass("ItemClassification")
+	mockClass("Teleport")
+	mockClass("EventCallback")
+	mockClass("Vocation")
+	mockClass("GemAtelier")
+	mockClass("Guild")
+	mockClass("Group")
+	mockClass("House")
+	mockClass("Zone")
+
+	// rawgetmetatable allows scripts (like revscriptsys) to retrieve the type metatable
+	L.SetGlobal("rawgetmetatable", L.NewFunction(func(L *lua.LState) int {
+		name := L.CheckString(1)
+		mt := L.GetTypeMetatable(name)
+		if mt != lua.LNil {
+			L.Push(mt)
+		} else {
+			L.Push(lua.LNil)
+		}
+		return 1
+	}))
+	
+	// Ensure these class tables exist so scripts can inject methods into them (e.g. Player.feed = ...)
+	ensureClassTable := func(name string) {
+		if L.GetGlobal(name) == lua.LNil {
+			var classTable *lua.LTable
+			if typeMt, ok := L.GetTypeMetatable(name).(*lua.LTable); ok {
+				if idx := L.RawGet(typeMt, lua.LString("__index")); idx.Type() == lua.LTTable {
+					classTable = idx.(*lua.LTable)
+				}
+			}
+			if classTable == nil {
+				classTable = L.NewTable()
+			}
+			mt := L.NewTypeMetatable(name + "_ClassDummy")
+			// Dummy __call returning nil so scripts don't crash when calling Player(cid)
+			L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int { return 0 }))
+			
+			// Dummy __index returning a dummy function so arbitrary method calls don't crash
+			L.SetField(mt, "__index", L.NewFunction(func(L *lua.LState) int {
+				L.Push(L.NewFunction(func(L *lua.LState) int { return 0 }))
+				return 1
+			}))
+
+			L.SetMetatable(classTable, mt)
+			L.SetGlobal(name, classTable)
+		}
+	}
+	// Player/Creature/Npc/Monster are also callable constructors: Player(x)
+	// resolves x (a creature userdata, or a numeric creature id) to the matching
+	// userdata, mirroring the C++ Player(cid)/Creature(cid) lookups. NPC dialog
+	// scripts rely on Player(creature):getPosition() etc. A dummy __call here
+	// would return nil and crash those scripts.
+	setCreatureConstructor := func(name string) {
+		var classTable *lua.LTable
+		if typeMt, ok := L.GetTypeMetatable(name).(*lua.LTable); ok {
+			if idx := L.RawGet(typeMt, lua.LString("__index")); idx.Type() == lua.LTTable {
+				classTable = idx.(*lua.LTable)
+			}
+		}
+		if classTable == nil {
+			classTable = L.NewTable()
+		}
+
+		mt := L.NewTypeMetatable(name + "_ClassCtor")
+		L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int {
+			return e.creatureConstructorCall(L, name)
+		}))
+		// Keep field injection working (e.g. Player.feed = ...) on the table.
+		L.SetMetatable(classTable, mt)
+		L.SetGlobal(name, classTable)
+	}
+	setCreatureConstructor("Player")
+	setCreatureConstructor("Monster")
+	setCreatureConstructor("Npc")
+	setCreatureConstructor("Creature")
+	ensureClassTable("MonsterType")
+	ensureClassTable("NpcType")
+	ensureClassTable("Spell")
+	ensureClassTable("Party")
+	ensureClassTable("Town")
+	ensureClassTable("Variant")
+	ensureClassTable("Condition")
+	ensureClassTable("Combat")
+
+	// configManager / configKeys mirror the C++ globals that expose config.lua.
+	// The full server reads real config values here; this slice provides safe
+	// defaults so datapack scripts that read config (e.g. boss cooldowns via
+	// configKeys.*) degrade gracefully instead of erroring on a nil table.
+	configManagerTbl := L.NewTable()
+	L.SetField(configManagerTbl, "getNumber", L.NewFunction(func(L *lua.LState) int {
+		key := strings.ToLower(L.OptString(1, ""))
+		key = strings.ReplaceAll(key, "_", "")
+		if config.Active != nil && config.Active.Custom != nil {
+			if val, exists := config.Active.Custom[key]; exists {
+				if num, ok := val.(lua.LNumber); ok {
+					L.Push(num)
+					return 1
+				}
+				if str, ok := val.(lua.LString); ok {
+					if f, err := strconv.ParseFloat(string(str), 64); err == nil {
+						L.Push(lua.LNumber(f))
+						return 1
+					}
+				}
+			}
+		}
+		if key == "maxallowedonadummy" {
+			L.Push(lua.LNumber(1))
+		} else {
+			L.Push(lua.LNumber(0))
+		}
+		return 1
+	}))
+	L.SetField(configManagerTbl, "getFloat", L.NewFunction(func(L *lua.LState) int {
+		key := strings.ToLower(L.OptString(1, ""))
+		key = strings.ReplaceAll(key, "_", "")
+		if config.Active != nil && config.Active.Custom != nil {
+			if val, exists := config.Active.Custom[key]; exists {
+				if num, ok := val.(lua.LNumber); ok {
+					L.Push(num)
+					return 1
+				}
+				if str, ok := val.(lua.LString); ok {
+					if f, err := strconv.ParseFloat(string(str), 64); err == nil {
+						L.Push(lua.LNumber(f))
+						return 1
+					}
+				}
+			}
+		}
+		if strings.HasPrefix(key, "rate") || strings.Contains(key, "speed") || strings.Contains(key, "multiplier") {
+			L.Push(lua.LNumber(1.0))
+		} else {
+			L.Push(lua.LNumber(0))
+		}
+		return 1
+	}))
+	L.SetField(configManagerTbl, "getString", L.NewFunction(func(L *lua.LState) int {
+		key := strings.ToLower(L.OptString(1, ""))
+		key = strings.ReplaceAll(key, "_", "")
+		if config.Active != nil && config.Active.Custom != nil {
+			if val, exists := config.Active.Custom[key]; exists {
+				L.Push(lua.LString(val.String()))
+				return 1
+			}
+		}
+		if strings.Contains(key, "save_time") || strings.Contains(key, "savetime") {
+			L.Push(lua.LString("03:00:00"))
+			return 1
+		}
+		L.Push(lua.LString(""))
+		return 1
+	}))
+	L.SetField(configManagerTbl, "getBoolean", L.NewFunction(func(L *lua.LState) int {
+		key := strings.ToLower(L.OptString(1, ""))
+		key = strings.ReplaceAll(key, "_", "")
+		if config.Active != nil && config.Active.Custom != nil {
+			if val, exists := config.Active.Custom[key]; exists {
+				if b, ok := val.(lua.LBool); ok {
+					L.Push(b)
+					return 1
+				}
+				if str, ok := val.(lua.LString); ok {
+					s := strings.ToLower(string(str))
+					if s == "true" || s == "yes" || s == "1" {
+						L.Push(lua.LTrue)
+						return 1
+					} else if s == "false" || s == "no" || s == "0" {
+						L.Push(lua.LFalse)
+						return 1
+					}
+				}
+			}
+		}
+		L.Push(lua.LFalse)
+		return 1
+	}))
+	L.SetGlobal("configManager", configManagerTbl)
+
+	// configKeys.X resolves to the key name itself (never nil), so callers can
+	// pass it straight to configManager.get*.
+	configKeysTbl := L.NewTable()
+	configKeysMeta := L.NewTable()
+	L.SetField(configKeysMeta, "__index", L.NewFunction(func(L *lua.LState) int {
+		L.Push(L.Get(2))
+		return 1
+	}))
+	L.SetMetatable(configKeysTbl, configKeysMeta)
+	L.SetGlobal("configKeys", configKeysTbl)
+
+	e.registerShop()
+	e.registerEventCallback()
+	e.registerTalkAction()
+	e.registerSpell()
+	e.registerCombat()
+	e.registerVariant()
+	e.registerCondition()
+	e.registerDB()
+
+	// addPlayerEvent global fallback function if modules.lua isn't loaded yet
+	L.SetGlobal("addPlayerEvent", L.NewFunction(func(L *lua.LState) int {
+		fn := L.Get(1)
+		delay := L.CheckInt(2)
+		target := L.Get(3)
+		n := L.GetTop()
+		args := make([]lua.LValue, 0, n-3)
+		for i := 4; i <= n; i++ {
+			args = append(args, L.Get(i))
+		}
+		addEv := L.GetGlobal("addEvent")
+		if addEvFn, ok := addEv.(*lua.LFunction); ok {
+			wrapper := L.NewFunction(func(L *lua.LState) int {
+				pVal := L.Get(2)
+				callArgs := []lua.LValue{pVal}
+				top := L.GetTop()
+				for i := 3; i <= top; i++ {
+					callArgs = append(callArgs, L.Get(i))
+				}
+				L.Push(fn)
+				for _, arg := range callArgs {
+					L.Push(arg)
+				}
+				L.Call(len(callArgs), 0)
+				return 0
+			})
+			L.Push(addEvFn)
+			L.Push(wrapper)
+			L.Push(lua.LNumber(delay))
+			L.Push(target)
+			for _, arg := range args {
+				L.Push(arg)
+			}
+			L.Call(3+len(args), 0)
+		}
+		return 0
+	}))
+
+	// DailyReward table fallback
+	dailyRewardTbl := L.NewTable()
+	L.SetField(dailyRewardTbl, "init", L.NewFunction(func(L *lua.LState) int { return 0 }))
+	storagesTbl := L.NewTable()
+	L.SetField(storagesTbl, "lastServerSave", lua.LNumber(1001))
+	L.SetField(dailyRewardTbl, "storages", storagesTbl)
+	L.SetGlobal("DailyReward", dailyRewardTbl)
+
+	// QuestTrackerServerConfig fallback
+	qtConfigTbl := L.NewTable()
+	L.SetField(qtConfigTbl, "kvScope", lua.LString("quest-tracker"))
+	L.SetField(qtConfigTbl, "trackedMissionsKey", lua.LString("tracked-missions"))
+	L.SetField(qtConfigTbl, "knownQuestsKey", lua.LString("known-quests"))
+	L.SetField(qtConfigTbl, "autoTrackNewQuestsKey", lua.LString("auto-track-new-quests"))
+	L.SetField(qtConfigTbl, "autoUntrackCompletedQuestsKey", lua.LString("auto-untrack-completed-quests"))
+	L.SetField(qtConfigTbl, "completedMissionRemovalDelay", lua.LNumber(5000))
+	L.SetField(qtConfigTbl, "loginLoadDelay", lua.LNumber(1000))
+	L.SetField(qtConfigTbl, "initialSyncWindow", lua.LNumber(5000))
+	L.SetGlobal("QuestTrackerServerConfig", qtConfigTbl)
+
+	// VOCATION table
+	vocTbl := L.NewTable()
+	baseIdTbl := L.NewTable()
+	L.SetField(baseIdTbl, "NONE", lua.LNumber(0))
+	L.SetField(baseIdTbl, "SORCERER", lua.LNumber(1))
+	L.SetField(baseIdTbl, "DRUID", lua.LNumber(2))
+	L.SetField(baseIdTbl, "PALADIN", lua.LNumber(3))
+	L.SetField(baseIdTbl, "KNIGHT", lua.LNumber(4))
+	L.SetField(baseIdTbl, "MONK", lua.LNumber(5))
+	L.SetField(vocTbl, "BASE_ID", baseIdTbl)
+	L.SetGlobal("VOCATION", vocTbl)
 }
 
 // SetGameFunc registers a Go function as a field on the global Game table.
@@ -62,4 +458,33 @@ func (e *Engine) SetGameFunc(name string, fn lua.LGFunction) {
 		e.L.SetGlobal("Game", game)
 	}
 	e.L.SetField(game, name, e.L.NewFunction(fn))
+}
+
+// setClassConstructor registers a global table with a __call metamethod so that
+// scripts can use `Class(args)` to construct new instances. This matches how Canary C++
+// exports constructors like Action, MoveEvent, Spell, etc.
+func (e *Engine) setClassConstructor(name string, constructor lua.LGFunction, methods map[string]lua.LGFunction) *lua.LTable {
+	L := e.L
+	var classTable *lua.LTable
+	if typeMt, ok := L.GetTypeMetatable(name).(*lua.LTable); ok {
+		if idx := L.RawGet(typeMt, lua.LString("__index")); idx.Type() == lua.LTTable {
+			classTable = idx.(*lua.LTable)
+		}
+	}
+	if classTable == nil {
+		classTable = L.NewTable()
+	}
+
+	mt := L.NewTypeMetatable(name + "_ClassCtor")
+	call := func(L *lua.LState) int {
+		return constructor(L)
+	}
+	L.SetField(mt, "__call", L.NewFunction(call))
+
+	if methods != nil {
+		L.SetFuncs(classTable, methods)
+	}
+	L.SetMetatable(classTable, mt)
+	L.SetGlobal(name, classTable)
+	return classTable
 }

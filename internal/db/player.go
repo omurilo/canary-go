@@ -11,15 +11,24 @@ import (
 // LoadPlayer loads a character by name into a game.Player. The town temple is
 // used when the stored position is (0,0,0).
 func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) {
-	const q = `SELECT p.id, p.account_id, p.name, p.level, p.vocation, p.sex,
+	const q = `SELECT p.id, p.account_id, a.type as account_type, p.group_id, p.name, p.level, p.vocation, p.sex,
 	                  p.health, p.healthmax, p.mana, p.manamax, p.experience,
-	                  p.maglevel, p.soul, p.cap,
+	                  p.maglevel, p.manaspent, p.soul, p.cap, p.balance,
 	                  p.looktype, p.lookhead, p.lookbody, p.looklegs, p.lookfeet,
 	                  p.lookaddons,
 	                  p.posx, p.posy, p.posz, p.town_id,
-	                  p.skill_fist, p.skill_club, p.skill_sword, p.skill_axe,
-	                  p.skill_dist, p.skill_shielding, p.skill_fishing
-	           FROM players p WHERE p.name = ? LIMIT 1`
+	                  p.skill_fist, p.skill_fist_tries,
+	                  p.skill_club, p.skill_club_tries,
+	                  p.skill_sword, p.skill_sword_tries,
+	                  p.skill_axe, p.skill_axe_tries,
+	                  p.skill_dist, p.skill_dist_tries,
+	                  p.skill_shielding, p.skill_shielding_tries,
+	                  p.skill_fishing, p.skill_fishing_tries,
+	                  p.offlinetraining_time, p.offlinetraining_skill,
+	                  p.lastlogin, p.lastlogout,
+	                  p.blessings1, p.blessings2, p.blessings3, p.blessings4,
+	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8
+	           FROM players p JOIN accounts a ON a.id = p.account_id WHERE p.name = ? LIMIT 1`
 
 	p := &game.Player{}
 	var townID int
@@ -27,16 +36,26 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	var lookType, lookHead, lookBody, lookLegs, lookFeet, lookAddons uint16
 	var posx, posy uint16
 	var posz uint8
+	var offlineTimeSeconds int32
 	err := d.SQL.QueryRowContext(ctx, q, name).Scan(
-		&p.DBID, &p.AccountID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
+		&p.DBID, &p.AccountID, &p.AccountType, &p.GroupID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
 		&p.Health, &p.MaxHealth, &p.Mana, &p.MaxMana, &p.Experience,
-		&p.MagLevel, &p.Soul, &capValue,
+		&p.MagLevel, &p.ManaSpent, &p.Soul, &capValue, &p.BankBalance,
 		&lookType, &lookHead, &lookBody, &lookLegs, &lookFeet, &lookAddons,
 		&posx, &posy, &posz, &townID,
-		&p.Skills[game.SkillFist], &p.Skills[game.SkillClub], &p.Skills[game.SkillSword],
-		&p.Skills[game.SkillAxe], &p.Skills[game.SkillDistance], &p.Skills[game.SkillShielding],
-		&p.Skills[game.SkillFishing],
+		&p.Skills[game.SkillFist], &p.SkillTries[game.SkillFist],
+		&p.Skills[game.SkillClub], &p.SkillTries[game.SkillClub],
+		&p.Skills[game.SkillSword], &p.SkillTries[game.SkillSword],
+		&p.Skills[game.SkillAxe], &p.SkillTries[game.SkillAxe],
+		&p.Skills[game.SkillDistance], &p.SkillTries[game.SkillDistance],
+		&p.Skills[game.SkillShielding], &p.SkillTries[game.SkillShielding],
+		&p.Skills[game.SkillFishing], &p.SkillTries[game.SkillFishing],
+		&offlineTimeSeconds, &p.OfflineTrainingSkill,
+		&p.LastLogin, &p.LastLogout,
+		&p.Blessings[0], &p.Blessings[1], &p.Blessings[2], &p.Blessings[3],
+		&p.Blessings[4], &p.Blessings[5], &p.Blessings[6], &p.Blessings[7],
 	)
+	p.OfflineTrainingTime = offlineTimeSeconds * 1000
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -52,43 +71,102 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		Legs:      uint8(lookLegs),
 		Feet:      uint8(lookFeet),
 		Addons:    uint8(lookAddons),
-		// The canonical Canary schema does not persist the mount creature id in
-		// a single column (only mount outfit colors), so it defaults to 0.
 	}
 	p.Pos = game.Position{X: posx, Y: posy, Z: posz}
+	p.TownID = uint16(townID)
 
-	if p.Pos.X == 0 && p.Pos.Y == 0 {
-		if temple, err := d.TownTemple(ctx, townID); err == nil {
+	// Resolve the town temple: it seeds the position when unset and is always
+	// stored as LoginPosition so death can respawn the player there.
+	if temple, err := d.TownTemple(ctx, townID); err == nil {
+		p.LoginPosition = temple
+		if p.Pos.X == 0 && p.Pos.Y == 0 {
 			p.Pos = temple
 		}
 	}
+	p.SkillLoss = true
 
 	if err := d.LoadPlayerItems(ctx, p); err != nil {
 		return nil, err
 	}
 
+	// Load player storages
+	p.Storages = make(map[uint32]int32)
+	sRows, err := d.SQL.QueryContext(ctx, "SELECT `key`, `value` FROM player_storage WHERE player_id = ?", p.DBID)
+	if err == nil {
+		defer sRows.Close()
+		for sRows.Next() {
+			var k uint32
+			var v int32
+			if err := sRows.Scan(&k, &v); err == nil {
+				p.Storages[k] = v
+			}
+		}
+	}
+	// Load player guild membership
+	gQuery := `SELECT g.name, r.name, m.nick
+	           FROM guild_membership m
+	           JOIN guilds g ON m.guild_id = g.id
+	           JOIN guild_ranks r ON m.rank_id = r.id
+	           WHERE m.player_id = ? LIMIT 1`
+	_ = d.SQL.QueryRowContext(ctx, gQuery, p.DBID).Scan(&p.GuildName, &p.GuildRankName, &p.GuildNick)
+
 	return p, nil
 }
 
-// SavePlayer persists mutable player state (position, vitals, experience).
+// SavePlayer persists mutable player state (position, vitals, experience, skills, and storages).
 func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	const q = `UPDATE players SET
 	              level=?, experience=?, health=?, healthmax=?,
-	              mana=?, manamax=?, soul=?, cap=?,
+	              mana=?, manamax=?, soul=?, cap=?, balance=?,
 	              posx=?, posy=?, posz=?,
 	              looktype=?, lookhead=?, lookbody=?, looklegs=?,
-	              lookfeet=?, lookaddons=?
+	              lookfeet=?, lookaddons=?,
+	              maglevel=?, manaspent=?,
+	              skill_fist=?, skill_fist_tries=?,
+	              skill_club=?, skill_club_tries=?,
+	              skill_sword=?, skill_sword_tries=?,
+	              skill_axe=?, skill_axe_tries=?,
+	              skill_dist=?, skill_dist_tries=?,
+	              skill_shielding=?, skill_shielding_tries=?,
+	              skill_fishing=?, skill_fishing_tries=?,
+	              offlinetraining_time=?, offlinetraining_skill=?,
+	              lastlogin=?, lastlogout=?,
+	              blessings1=?, blessings2=?, blessings3=?, blessings4=?,
+	              blessings5=?, blessings6=?, blessings7=?, blessings8=?
 	           WHERE id=?`
 	_, err := d.SQL.ExecContext(ctx, q,
 		p.Level, p.Experience, p.Health, p.MaxHealth,
-		p.Mana, p.MaxMana, p.Soul, p.Capacity,
+		p.Mana, p.MaxMana, p.Soul, p.Capacity, p.BankBalance,
 		p.Pos.X, p.Pos.Y, p.Pos.Z,
 		p.Outfit.LookType, p.Outfit.Head, p.Outfit.Body, p.Outfit.Legs,
 		p.Outfit.Feet, p.Outfit.Addons,
+		p.MagLevel, p.ManaSpent,
+		p.Skills[game.SkillFist], p.SkillTries[game.SkillFist],
+		p.Skills[game.SkillClub], p.SkillTries[game.SkillClub],
+		p.Skills[game.SkillSword], p.SkillTries[game.SkillSword],
+		p.Skills[game.SkillAxe], p.SkillTries[game.SkillAxe],
+		p.Skills[game.SkillDistance], p.SkillTries[game.SkillDistance],
+		p.Skills[game.SkillShielding], p.SkillTries[game.SkillShielding],
+		p.Skills[game.SkillFishing], p.SkillTries[game.SkillFishing],
+		p.OfflineTrainingTime / 1000, p.OfflineTrainingSkill,
+		p.LastLogin, p.LastLogout,
+		p.Blessings[0], p.Blessings[1], p.Blessings[2], p.Blessings[3],
+		p.Blessings[4], p.Blessings[5], p.Blessings[6], p.Blessings[7],
 		p.DBID,
 	)
 	if err != nil {
 		return err
+	}
+
+	// Save player storages
+	if p.Storages != nil {
+		// First delete existing storages for the player
+		_, _ = d.SQL.ExecContext(ctx, "DELETE FROM player_storage WHERE player_id = ?", p.DBID)
+		
+		// Then insert current storages
+		for k, v := range p.Storages {
+			_, _ = d.SQL.ExecContext(ctx, "INSERT INTO player_storage (player_id, `key`, `value`) VALUES (?, ?, ?)", p.DBID, k, v)
+		}
 	}
 
 	return d.SavePlayerItems(ctx, p)

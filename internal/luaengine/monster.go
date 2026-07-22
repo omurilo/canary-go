@@ -14,10 +14,21 @@ func checkMonster(L *lua.LState) *game.Monster {
 	return nil
 }
 
-// registerMonsterType registers the Monster userdata type.
-func (e *Engine) registerMonsterType() {
+// registerMonster registers the Monster userdata type.
+func (e *Engine) registerMonster() {
 	mt := e.L.NewTypeMetatable("Monster")
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), monsterMethods))
+	// Monster IS-A Creature: expose all creature methods, monster-specific win.
+	// Methods directly on the metatable (see registerCreatureType) for
+	// revscriptsys CreatureIndex compatibility.
+	e.L.SetFuncs(mt, creatureMethods)
+	e.L.SetFuncs(mt, monsterMethods)
+	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "changeSpeed", e.L.NewFunction(e.creatureChangespeed))
+	e.L.SetField(mt, "setSpeed", e.L.NewFunction(e.creatureSetspeed))
+	e.L.SetField(mt, "getParent", e.L.NewFunction(e.creatureGetparent))
+	e.L.SetField(mt, "getTile", e.L.NewFunction(e.creatureGettile))
+	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
+	e.L.SetField(mt, "__index", mt)
 }
 
 var monsterMethods = map[string]lua.LGFunction{

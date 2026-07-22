@@ -1,0 +1,8 @@
+**/*:Zone.Identifier
+**/*.Identifier
+bin/
+build/
+canary
+canary-go-bin
+canary_test
+canary.log

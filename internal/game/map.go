@@ -1,16 +1,117 @@
 package game
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/opentibiabr/canary-go/internal/items"
+)
 
 // Tile holds the contents of a single map cell.
 type Tile struct {
-	Ground *Item
-	Items  []*Item // stacked items (top + down), excluding creatures
+	Ground    *Item
+	Items     []*Item // stacked items (top + down), excluding creatures
+	Creatures []Creature
+	Flags     uint32  // tile flags (e.g. Protection Zone, No-PVP, etc.)
+}
+
+// IsProtectionZone reports whether the tile has the protection zone flag.
+func (t *Tile) IsProtectionZone() bool {
+	if t == nil {
+		return false
+	}
+	return (t.Flags & 1) != 0
+}
+
+// WalkableFor reports whether mover may stand on or walk through the tile.
+func (t *Tile) WalkableFor(mover Creature, catalog *items.Catalog, worldType uint8) bool {
+	if t == nil || t.Ground == nil {
+		return false
+	}
+	if catalog != nil {
+		if ct := catalog.Get(t.Ground.ID); ct != nil && ct.BlockSolid {
+			return false
+		}
+		for _, it := range t.Items {
+			if ct := catalog.Get(it.ID); ct != nil && ct.BlockSolid {
+				return false
+			}
+		}
+	}
+
+	if len(t.Creatures) > 0 {
+		moverPlayer, isMoverPlayer := mover.(*Player)
+		for _, other := range t.Creatures {
+			if other == mover {
+				continue
+			}
+			otherPlayer, isOtherPlayer := other.(*Player)
+			if isOtherPlayer {
+				if otherPlayer.Ghost {
+					continue
+				}
+				if isMoverPlayer {
+					// Both are players! Check if walkthrough is allowed:
+					if t.IsProtectionZone() {
+						continue
+					}
+					if worldType == 1 || worldType == 0 { // WORLD_TYPE_NO_PVP or Optional-PVP
+						continue
+					}
+					if moverPlayer.GroupID >= 3 {
+						continue
+					}
+				}
+				return false
+			} else {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // Walkable reports whether a creature may stand on the tile.
-func (t *Tile) Walkable() bool {
-	return t != nil && t.Ground != nil
+func (t *Tile) Walkable(catalog *items.Catalog) bool {
+	return t.WalkableFor(nil, catalog, 1)
+}
+
+// HeightCount returns how many items on the tile (ground + stack) carry the
+// height/elevation flag, mirroring Tile::hasHeight's accumulation. Stairs/ramps
+// are tiles with 3+ such items.
+func (t *Tile) HeightCount(catalog *items.Catalog) int {
+	if t == nil || catalog == nil {
+		return 0
+	}
+	n := 0
+	if t.Ground != nil {
+		if ct := catalog.Get(t.Ground.ID); ct != nil && ct.HasHeight {
+			n++
+		}
+	}
+	for _, it := range t.Items {
+		if ct := catalog.Get(it.ID); ct != nil && ct.HasHeight {
+			n++
+		}
+	}
+	return n
+}
+
+// BlocksSolid reports whether the tile's ground or items block movement.
+func (t *Tile) BlocksSolid(catalog *items.Catalog) bool {
+	if t == nil || catalog == nil {
+		return false
+	}
+	if t.Ground != nil {
+		if ct := catalog.Get(t.Ground.ID); ct != nil && ct.BlockSolid {
+			return true
+		}
+	}
+	for _, it := range t.Items {
+		if ct := catalog.Get(it.ID); ct != nil && ct.BlockSolid {
+			return true
+		}
+	}
+	return false
 }
 
 // Map is a sparse tile store keyed by position.
@@ -29,6 +130,17 @@ func (m *Map) GetTile(pos Position) *Tile {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.tiles[pos]
+}
+
+// Range invokes fn for every loaded tile. fn returns false to stop early.
+func (m *Map) Range(fn func(pos Position, t *Tile) bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for pos, t := range m.tiles {
+		if !fn(pos, t) {
+			return
+		}
+	}
 }
 
 // SetTile stores a tile.

@@ -14,17 +14,24 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	lua "github.com/yuin/gopher-lua"
 
+	"github.com/opentibiabr/canary-go/internal/actions"
 	"github.com/opentibiabr/canary-go/internal/config"
+	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/db"
+	"github.com/opentibiabr/canary-go/internal/events"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/game/spawns"
+	"github.com/opentibiabr/canary-go/internal/game/vocations"
 	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/luaengine"
 	"github.com/opentibiabr/canary-go/internal/network"
 	"github.com/opentibiabr/canary-go/internal/otbm"
 	"github.com/opentibiabr/canary-go/internal/protocol"
+	"github.com/opentibiabr/canary-go/internal/spells"
 	"github.com/opentibiabr/canary-go/internal/tibcrypto"
 )
 
@@ -73,6 +80,10 @@ func run(o runOpts, log *slog.Logger) error {
 	if err != nil {
 		log.Warn("using default config", "err", err)
 	}
+	
+	if scriptsDir == "scripts" && cfg.DataPack != "" {
+		scriptsDir = filepath.Join(cfg.DataPack, "scripts")
+	}
 	log.Info("configuration loaded", "server", cfg.ServerName, "loginPort", cfg.LoginPort,
 		"gamePort", cfg.GamePort, "db", cfg.DBName)
 
@@ -106,40 +117,191 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Warn("item catalog not loaded (AddItem will send bare ids)", "path", o.appearances, "err", err)
 	} else {
 		catalog = cat
+		xmlPath := filepath.Join(filepath.Dir(o.appearances), "items.xml")
+		if err := catalog.LoadXML(xmlPath); err != nil {
+			log.Warn("items.xml not loaded (missing xml attributes)", "path", xmlPath, "err", err)
+		}
 		log.Info("item catalog loaded", "types", cat.Len())
 	}
 
 	// World: real OTBM map if provided, else a synthetic spawn field.
 	world := game.NewWorld()
-	var spawn game.Position
-	if o.mapFile != "" {
-		if catalog == nil {
-			return fmt.Errorf("map loading requires a valid appearances.dat (item metadata)")
+	world.Items = catalog
+
+	creatureTypes := creatures.NewTypeRegistry()
+	world.TypeRegistry = creatureTypes
+	if cfg.DataPack != "" {
+		// XML fallback loader (legacy format). The otservbr data pack is Lua, so
+		// this typically loads nothing; the real load happens later via the Lua
+		// engine (Game.createMonsterType/register) in loadScripts.
+		if err := creatureTypes.LoadMonsters(filepath.Join(cfg.DataPack, "monster")); err != nil {
+			log.Warn("loading monster types (xml fallback)", "err", err)
+		} else if n := len(creatureTypes.Monsters); n > 0 {
+			log.Info("loaded monster types (xml fallback)", "count", n)
 		}
-		res, err := otbm.Load(o.mapFile, catalog, world.Map)
-		if err != nil {
-			return fmt.Errorf("load map: %w", err)
-		}
-		log.Info("loaded OTBM map", "file", o.mapFile, "tiles", res.TileCount,
-			"items", res.ItemCount, "towns", len(res.Towns))
-		for _, t := range res.Towns {
-			world.Towns[strings.ToLower(t.Name)] = t.Pos
-		}
-		if len(res.Towns) > 0 {
-			spawn = res.Towns[0].Pos
-			log.Info("spawn set to town temple", "town", res.Towns[0].Name, "pos", spawn)
+		if err := creatureTypes.LoadNpcs(filepath.Join(cfg.DataPack, "npc")); err != nil {
+			log.Warn("loading npc types", "err", err)
 		} else {
-			spawn = game.Position{X: res.Width / 2, Y: res.Height / 2, Z: 7}
+			log.Info("loaded npc types", "count", len(creatureTypes.Npcs))
 		}
-	} else {
-		spawn = game.Position{X: 1000, Y: 1000, Z: 7}
+	}
+
+	// Load vocations (base speed, attack speed, HP/mana/cap gains). Without this
+	// the registry is empty and players fall back to defaults (base speed 110).
+	if cfg.Core != "" {
+		vocFile := filepath.Join(cfg.Core, "XML", "vocations.xml")
+		if err := vocations.LoadVocations(vocFile); err != nil {
+			log.Warn("vocations not loaded", "path", vocFile, "err", err)
+		} else {
+			log.Info("loaded vocations", "path", vocFile)
+		}
+	}
+
+	spawnEngine := game.NewSpawnEngine(world, creatureTypes)
+	aiEngine := game.NewAIEngine(world)
+	combatEngine := game.NewCombatEngine(world)
+
+	mapFilePath := o.mapFile
+	if mapFilePath == "" && cfg.WorldFile != "" {
+		mapFilePath = cfg.WorldFile
+	}
+
+	// generateSyntheticField is the playable fallback used when no OTBM map is
+	// configured, or when the configured map can't be loaded (e.g. the datapack
+	// ships without the main otservbr.otbm). It mirrors the C++ "spawn field".
+	generateSyntheticField := func() game.Position {
+		spawn := game.Position{X: 1000, Y: 1000, Z: 7}
 		if temple, err := database.TownTemple(ctx, 1); err == nil && (temple.X != 0 || temple.Y != 0) {
 			spawn = temple
 		}
 		world.Map.GenerateFlatField(spawn, 40, 4526) // grass field
 		log.Info("generated synthetic spawn field", "center", spawn, "radius", 40)
+		return spawn
+	}
+
+	var spawn game.Position
+	var loadedMap bool
+	if mapFilePath != "" {
+		if catalog == nil {
+			return fmt.Errorf("map loading requires a valid appearances.dat (item metadata)")
+		}
+		// Retry the load a few times: on Docker Desktop (macOS) a large
+		// bind-mounted OTBM can be briefly unavailable right after container
+		// start, which would otherwise silently drop the server onto the
+		// synthetic field (sending every player/temple to 1000,1000).
+		var res *otbm.Result
+		var err error
+		for attempt := 1; attempt <= 5; attempt++ {
+			res, err = otbm.Load(mapFilePath, catalog, world.Map)
+			if err == nil {
+				break
+			}
+			log.Warn("OTBM load attempt failed; retrying", "file", mapFilePath, "attempt", attempt, "err", err)
+			time.Sleep(1 * time.Second)
+		}
+		if err != nil {
+			// A missing or unreadable map must not crash the server: the working
+			// vertical slice falls back to the synthetic spawn field so login and
+			// gameplay still work without the (large, unshipped) OTBM map.
+			log.Warn("OTBM map not loaded; falling back to synthetic spawn field",
+				"file", mapFilePath, "err", err)
+			spawn = generateSyntheticField()
+		} else {
+			loadedMap = true
+			log.Info("loaded OTBM map", "file", mapFilePath, "tiles", res.TileCount,
+				"items", res.ItemCount, "towns", len(res.Towns))
+
+			// Parse spawn files
+			mapBase := strings.TrimSuffix(mapFilePath, filepath.Ext(mapFilePath))
+
+			monsterFile := mapBase + "-monster.xml"
+			if spawnsData, err := spawns.LoadSpawnFile(monsterFile); err == nil {
+				spawnEngine.LoadSpawns(spawnsData)
+				log.Info("loaded monster spawns", "file", monsterFile)
+			} else {
+				log.Warn("monster spawn file not loaded", "file", monsterFile, "err", err)
+			}
+
+			npcFile := mapBase + "-npc.xml"
+			if spawnsData, err := spawns.LoadSpawnFile(npcFile); err == nil {
+				spawnEngine.LoadSpawns(spawnsData)
+				log.Info("loaded npc spawns", "file", npcFile)
+			} else {
+				log.Warn("npc spawn file not loaded", "file", npcFile, "err", err)
+			}
+
+			for _, t := range res.Towns {
+				world.Towns[strings.ToLower(t.Name)] = t.Pos
+				world.TownsByID[uint16(t.ID)] = t.Pos
+				world.TownNames[uint16(t.ID)] = t.Name
+			}
+			if len(res.Towns) > 0 {
+				spawn = res.Towns[0].Pos
+				log.Info("spawn set to town temple", "town", res.Towns[0].Name, "pos", spawn)
+			} else {
+				spawn = game.Position{X: res.Width / 2, Y: res.Height / 2, Z: 7}
+			}
+		}
+	}
+	if !loadedMap && mapFilePath == "" {
+		spawn = generateSyntheticField()
 	}
 	world.DefaultSpawn = spawn
+	world.StartDecayingMap()
+	world.OnCreatureMove = func(c game.Creature, oldPos game.Position, newPos game.Position, oldTileIndex int) {
+		protocol.BroadcastCreatureMove(world, c, oldPos, newPos, oldTileIndex)
+	}
+	world.OnCreatureAppear = func(c game.Creature) {
+		protocol.BroadcastCreatureAppear(world, c)
+	}
+	world.OnCreatureRemove = func(c game.Creature) {
+		protocol.BroadcastCreatureRemove(world, c)
+	}
+	world.OnCreatureHealthChange = func(c game.Creature) {
+		protocol.BroadcastCreatureHealth(world, c)
+	}
+	world.OnCombatHit = func(attacker, victim game.Creature, damage int32, effect uint16) {
+		protocol.BroadcastCombatHit(world, attacker, victim, damage, effect)
+	}
+	world.OnItemAppear = func(pos game.Position, item *game.Item) {
+		protocol.BroadcastAddItem(world, pos, item)
+	}
+	world.OnItemDecay = func(pos game.Position, stackPos uint8, oldItem, newItem *game.Item) {
+		protocol.BroadcastItemDecay(world, pos, stackPos, oldItem, newItem)
+	}
+	world.OnTargetLost = func(p *game.Player) {
+		protocol.SendCancelTarget(p)
+	}
+	world.OnChangeSpeed = func(c game.Creature) {
+		go protocol.BroadcastChangeSpeed(world, c)
+	}
+	world.OnIconsUpdate = func(p *game.Player) {
+		if p.Session != nil {
+			p.Session.SendIcons()
+		}
+	}
+	world.OnPlayerStatsChange = func(p *game.Player) {
+		protocol.SendPlayerStats(p)
+	}
+	world.OnPlayerDeath = func(p *game.Player, killer game.Creature) {
+		protocol.HandlePlayerDeath(world, p, killer)
+		// Persist the penalty immediately so a crash/relog can't revert it.
+		if err := database.SavePlayer(context.Background(), p); err != nil {
+			log.Warn("save on death failed", "player", p.Name, "err", err)
+		}
+	}
+	world.OnShieldUpdate = func(viewer, target *game.Player) {
+		protocol.SendPartyShield(viewer, target)
+	}
+	world.OnMagicEffect = func(pos game.Position, effect uint16) {
+		protocol.BroadcastMagicEffect(world, pos, effect)
+	}
+	world.OnDistanceEffect = func(from, to game.Position, effect uint16) {
+		protocol.BroadcastDistanceEffect(world, from, to, effect)
+	}
+	// The spell system resolves spell damage/heal through the combat engine.
+	world.Combat = combatEngine
+
 
 	// Lua engine.
 	lengine := luaengine.New(world, log)
@@ -148,12 +310,85 @@ func run(o runOpts, log *slog.Logger) error {
 		L.Push(lua.LNumber(world.OnlineCount()))
 		return 1
 	})
+	// Core engine data lives in the base `data/` tree (not the world datapack):
+	// data/lib + data/npclib define framework classes (e.g. KeywordHandler) that
+	
+	world.OnCreatureSay = func(speaker game.Creature, talkType byte, text string) {
+		protocol.BroadcastCreatureSay(world, speaker, talkType, text)
+		
+		if player, ok := speaker.(*game.Player); ok {
+			spectators := world.SpectatorCreatures(speaker.GetPosition())
+			for _, spec := range spectators {
+				if npc, ok := spec.(*game.Npc); ok {
+					lengine.CallNpcOnCreatureSay(npc, player, talkType, text)
+				}
+			}
+		}
+	}
+	// The datapack ships its own lib/ (data-otservbr-global/lib) that defines
+	// Storage, Storage.Quest and the quest/boss constants that the core npclib
+	// (e.g. data/npclib/npc_system/custom_modules.lua) AND the datapack scripts
+	// reference. In the C++ flow data/global.lua dofiles it via DATA_DIRECTORY
+	// before the rest; the Go loader bypasses that bootstrap, so load it FIRST
+	// (with DATA_DIRECTORY set for the scripts' own dofile chains) — before the
+	// core npclib and the datapack scripts/monsters/npcs that depend on Storage.
+	if cfg.DataPack != "" {
+		lengine.L.SetGlobal("DATA_DIRECTORY", lua.LString(cfg.DataPack))
+		if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "lib"), log); err != nil {
+			log.Warn("loading datapack lib", "err", err)
+		}
+	}
+	// datapack npc scripts require, and data/scripts/spells holds the player
+	// vocation spells. Load these (libs first) BEFORE the datapack scripts/npcs.
+	coreData := filepath.Dir(filepath.Dir(o.appearances)) // e.g. ../data
+	if coreData != "" && coreData != cfg.DataPack {
+		lengine.L.SetGlobal("CORE_DIRECTORY", lua.LString(coreData))
+		// data/global.lua + stages.lua are the C++ bootstrap (dofiled by
+		// data/core.lua). They define base helpers/constants — IsTravelFree,
+		// IsRetroPVP, NORTH/EAST direction aliases, rate globals — that the
+		// npclib modules rely on (e.g. StdModule.say calls IsTravelFree()).
+		// Without them those globals are nil and every keyword reply errors.
+		for _, f := range []string{"global.lua", "stages.lua"} {
+			p := filepath.Join(coreData, f)
+			if _, err := os.Stat(p); err == nil {
+				if err := lengine.DoFile(p); err != nil {
+					log.Warn("loading core bootstrap", "file", p, "err", err)
+				}
+			}
+		}
+		for _, sub := range []string{"lib", "libs", "npclib", "scripts"} {
+			d := filepath.Join(coreData, sub)
+			if err := loadScripts(lengine, d, log); err != nil {
+				log.Warn("loading core data", "dir", d, "err", err)
+			}
+		}
+	}
 	if err := loadScripts(lengine, scriptsDir, log); err != nil {
 		log.Warn("loading scripts", "err", err)
 	}
+	log.Info("registered actions (lua)", "count", actions.Count())
+	log.Info("registered instant spells (lua)", "count", spells.Count())
+	if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "monster"), log); err != nil {
+		log.Warn("loading monsters", "err", err)
+	}
+	// The real monster data is Lua (executed above via createMonsterType/register),
+	// not the XML the earlier LoadMonsters call scans. Resolve loot entries given
+	// by name to item ids now that both the catalog and the registry are loaded,
+	// then log the real count.
+	resolveMonsterLoot(creatureTypes, catalog, log)
+	log.Info("loaded monster types (lua)", "count", len(creatureTypes.Monsters))
+	if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "npc"), log); err != nil {
+		log.Warn("loading npcs", "err", err)
+	}
+
+	eventsEngine := events.NewEngine(lengine.L)
+
+	spawnEngine.Start()
+	aiEngine.Start()
+	combatEngine.Start()
 
 	deps := &protocol.Deps{
-		Cfg: cfg, DB: database, RSA: rsa, World: world, Items: catalog, Lua: lengine, Log: log,
+		Cfg: cfg, DB: database, RSA: rsa, World: world, Items: catalog, Lua: lengine, Events: eventsEngine, Log: log,
 	}
 
 	// Async job worker (PostgreSQL LISTEN/NOTIFY queue).
@@ -184,24 +419,109 @@ func run(o runOpts, log *slog.Logger) error {
 	}
 }
 
-// loadScripts runs every .lua file in dir (non-recursive) through the engine.
+// loadScripts runs every .lua file in dir (recursive) through the engine.
 func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".lua" {
-			continue
+	absDir, _ := filepath.Abs(dir)
+	log.Info("loadScripts starting walkthrough", "dir", dir, "absDir", absDir)
+
+	libDir := filepath.Join(dir, "lib")
+	// load lib first
+	_ = filepath.WalkDir(libDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil // ignore if lib doesn't exist
 		}
-		path := filepath.Join(dir, entry.Name())
-		if err := e.DoFile(path); err != nil {
-			log.Warn("script error", "file", path, "err", err)
-			continue
+		if !d.IsDir() && filepath.Ext(path) == ".lua" {
+			log.Debug("loading lib script", "file", path)
+			if err := e.DoFile(path); err != nil {
+				log.Warn("script error", "file", path, "err", err)
+			} else {
+				log.Debug("loaded script", "file", path)
+			}
 		}
-		log.Info("loaded script", "file", path)
+		return nil
+	})
+
+	// Special case for npclib to ensure npc_handler and modules are loaded in order before custom_modules
+	if filepath.Base(dir) == "npclib" {
+		for _, primary := range []string{
+			filepath.Join(dir, "npc_system", "npc_handler.lua"),
+			filepath.Join(dir, "npc_system", "modules.lua"),
+			filepath.Join(dir, "npc_system", "custom_modules.lua"),
+		} {
+			if _, err := os.Stat(primary); err == nil {
+				if err := e.DoFile(primary); err != nil {
+					log.Warn("script error", "file", primary, "err", err)
+				} else {
+					log.Debug("loaded script", "file", primary)
+				}
+			}
+		}
 	}
-	return nil
+
+	walkErr := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			log.Warn("walking script directory entry failed; skipping", "path", path, "err", err)
+			return nil
+		}
+		if d.IsDir() && d.Name() == "lib" && path == libDir {
+			return filepath.SkipDir
+		}
+		if !d.IsDir() {
+			log.Debug("visiting file during walkthrough", "path", path, "ext", filepath.Ext(path))
+			if filepath.Ext(path) == ".lua" {
+				// Skip pre-loaded core npclib files
+				if filepath.Base(dir) == "npclib" && (strings.HasSuffix(path, "npc_handler.lua") || strings.HasSuffix(path, "modules.lua") || strings.HasSuffix(path, "custom_modules.lua")) {
+					return nil
+				}
+				log.Info("loading script file", "path", path)
+				if err := e.DoFile(path); err != nil {
+					log.Warn("script error", "file", path, "err", err)
+				} else {
+					log.Debug("loaded script", "file", path)
+				}
+			}
+		}
+		return nil
+	})
+
+	if walkErr != nil {
+		log.Warn("loadScripts WalkDir finished with error", "dir", dir, "err", walkErr)
+	} else {
+		log.Info("loadScripts WalkDir finished successfully", "dir", dir)
+	}
+	return walkErr
+}
+
+// resolveMonsterLoot resolves loot entries declared by name (e.g. "gold coin")
+// to item ids using the item catalog, mirroring the name lookup the C++ loot
+// loader performs. Entries with an explicit id are left as-is.
+func resolveMonsterLoot(reg *creatures.TypeRegistry, catalog *items.Catalog, log *slog.Logger) {
+	if reg == nil || catalog == nil {
+		return
+	}
+	var unresolved int
+	var walk func(loot []creatures.LootBlock)
+	walk = func(loot []creatures.LootBlock) {
+		for i := range loot {
+			lb := &loot[i]
+			if lb.ID == 0 && lb.Name != "" {
+				if id, ok := catalog.IDByName(lb.Name); ok {
+					lb.ID = id
+				} else {
+					unresolved++
+				}
+			}
+			if len(lb.ChildLoot) > 0 {
+				walk(lb.ChildLoot)
+			}
+		}
+	}
+	for _, mt := range reg.Monsters {
+		walk(mt.Loot)
+	}
+	if unresolved > 0 {
+		log.Warn("some monster loot names could not be resolved to item ids", "count", unresolved)
+	}
 }
 
 // jobHandler processes async jobs pulled from the PostgreSQL queue.

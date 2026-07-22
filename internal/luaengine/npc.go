@@ -1,8 +1,11 @@
 package luaengine
 
 import (
+	"strings"
+	
 	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/creatures"
 )
 
 func checkNpc(L *lua.LState) *game.Npc {
@@ -14,10 +17,43 @@ func checkNpc(L *lua.LState) *game.Npc {
 	return nil
 }
 
-// registerNpcType registers the Npc userdata type.
-func (e *Engine) registerNpcType() {
+// registerNpc registers the Npc userdata type.
+func (e *Engine) registerNpc() {
 	mt := e.L.NewTypeMetatable("Npc")
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), npcMethods))
+	// Npc IS-A Creature; methods live directly on the metatable (see
+	// registerCreatureType) so revscriptsys CreatureIndex finds them.
+	e.L.SetFuncs(mt, creatureMethods)
+	e.L.SetFuncs(mt, npcMethods)
+	// Engine/world-bound overrides.
+	e.L.SetField(mt, "say", e.L.NewFunction(e.npcSay))
+	e.L.SetField(mt, "openShopWindow", e.L.NewFunction(e.npcOpenshopwindow))
+	e.L.SetField(mt, "isMerchant", e.L.NewFunction(e.npcIsmerchant))
+	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
+	e.L.SetField(mt, "changeSpeed", e.L.NewFunction(e.creatureChangespeed))
+	e.L.SetField(mt, "setSpeed", e.L.NewFunction(e.creatureSetspeed))
+	e.L.SetField(mt, "getParent", e.L.NewFunction(e.creatureGetparent))
+	e.L.SetField(mt, "getTile", e.L.NewFunction(e.creatureGettile))
+	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
+	e.L.SetField(mt, "__index", mt)
+}
+
+// npcIsmerchant reports whether the NPC's type defines shop items. NpcHandler:
+// tradeRequest only calls openShopWindow when this is true, so a merchant must
+// answer true here for "trade" to open the shop.
+func (e *Engine) npcIsmerchant(L *lua.LState) int {
+	n := checkNpc(L)
+	if n == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	merchant := false
+	if e.world != nil && e.world.TypeRegistry != nil {
+		if nt := e.world.TypeRegistry.Npcs[strings.ToLower(n.Name)]; nt != nil && len(nt.ShopItems) > 0 {
+			merchant = true
+		}
+	}
+	L.Push(lua.LBool(merchant))
+	return 1
 }
 
 var npcMethods = map[string]lua.LGFunction{
@@ -27,8 +63,8 @@ var npcMethods = map[string]lua.LGFunction{
 	"setCurrency": npcSetcurrency,
 	"getSpeechBubble": npcGetspeechbubble,
 	"setSpeechBubble": npcSetspeechbubble,
-	"getId": npcGetid,
-	"getName": npcGetname,
+	// getId/getName/move are inherited from creatureMethods (which are now
+	// implemented); don't shadow them with stubs here.
 	"setName": npcSetname,
 	"place": npcPlace,
 	"say": npcSay,
@@ -42,150 +78,258 @@ var npcMethods = map[string]lua.LGFunction{
 	"openShopWindowTable": npcOpenshopwindowtable,
 	"closeShopWindow": npcCloseshopwindow,
 	"getShopItem": npcGetshopitem,
-	"isMerchant": npcIsmerchant,
-	"move": npcMove,
 	"turn": npcTurn,
 	"follow": npcFollow,
 	"sellItem": npcSellitem,
 	"getDistanceTo": npcGetdistanceto,
 }
 
-func npcCloseshopwindow(L *lua.LState) int {
-	// TODO: implement closeShopWindow
-	return 0
-}
+func npcCloseshopwindow(L *lua.LState) int { return 0 }
 
 func npcFollow(L *lua.LState) int {
-	// TODO: implement follow
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func npcGetcurrency(L *lua.LState) int {
-	// TODO: implement getCurrency
-	return 0
+	// Default shop currency: gold coin (client id 3031).
+	L.Push(lua.LNumber(3031))
+	return 1
 }
 
 func npcGetdistanceto(L *lua.LState) int {
-	// TODO: implement getDistanceTo
-	return 0
-}
-
-func npcGetid(L *lua.LState) int {
-	// TODO: implement getId
-	return 0
-}
-
-func npcGetname(L *lua.LState) int {
-	// TODO: implement getName
-	return 0
+	n := checkNpc(L)
+	if n == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	ud, ok := L.Get(2).(*lua.LUserData)
+	if !ok {
+		L.Push(lua.LNil)
+		return 1
+	}
+	other, ok := ud.Value.(game.Creature)
+	if !ok {
+		L.Push(lua.LNil)
+		return 1
+	}
+	a, b := n.GetPosition(), other.GetPosition()
+	dx := int(a.X) - int(b.X)
+	dy := int(a.Y) - int(b.Y)
+	if dx < 0 {
+		dx = -dx
+	}
+	if dy < 0 {
+		dy = -dy
+	}
+	dist := dx
+	if dy > dist {
+		dist = dy
+	}
+	L.Push(lua.LNumber(dist))
+	return 1
 }
 
 func npcGetshopitem(L *lua.LState) int {
-	// TODO: implement getShopItem
-	return 0
+	L.Push(lua.LNil)
+	return 1
 }
 
 func npcGetspeechbubble(L *lua.LState) int {
-	// TODO: implement getSpeechBubble
-	return 0
+	// SPEECHBUBBLE_NORMAL (1).
+	L.Push(lua.LNumber(1))
+	return 1
 }
 
 func npcIsintalkrange(L *lua.LState) int {
-	// TODO: implement isInTalkRange
-	return 0
+	// No range check modelled; assume in range so dialogue proceeds.
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func npcIsinteractingwithplayer(L *lua.LState) int {
-	// TODO: implement isInteractingWithPlayer
+	n := checkNpc(L)
+	if n == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	L.Push(lua.LBool(n.IsInteractingWithPlayer(interactionPlayerID(L, 2))))
+	return 1
+}
+
+// interactionPlayerID extracts a player creature id from arg n, which may be a
+// creature userdata or a numeric id.
+func interactionPlayerID(L *lua.LState, n int) uint32 {
+	switch v := L.Get(n); v.Type() {
+	case lua.LTUserData:
+		if c, ok := v.(*lua.LUserData).Value.(game.Creature); ok {
+			return c.GetID()
+		}
+	case lua.LTNumber:
+		return uint32(lua.LVAsNumber(v))
+	}
 	return 0
 }
 
-func npcIsmerchant(L *lua.LState) int {
-	// TODO: implement isMerchant
-	return 0
-}
 
 func npcIsnpc(L *lua.LState) int {
-	// TODO: implement isNpc
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func npcIsplayerinteractingontopic(L *lua.LState) int {
-	// TODO: implement isPlayerInteractingOnTopic
-	return 0
-}
-
-func npcMove(L *lua.LState) int {
-	// TODO: implement move
-	return 0
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func npcOpenshopwindow(L *lua.LState) int {
-	// TODO: implement openShopWindow
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func (e *Engine) npcOpenshopwindow(L *lua.LState) int {
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	p, _ := L.CheckUserData(2).Value.(*game.Player)
+	if p == nil {
+		return 0
+	}
+	
+	if e.world != nil {
+		nType := e.world.TypeRegistry.Npcs[strings.ToLower(n.Name)]
+		if nType != nil && len(nType.ShopItems) > 0 {
+			p.ShopOwnerID = n.ID
+			p.SendOpenShop(n, nType.ShopItems)
+		}
+	}
 	return 0
 }
 
 func npcOpenshopwindowtable(L *lua.LState) int {
-	// TODO: implement openShopWindowTable
-	return 0
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	p, _ := L.CheckUserData(2).Value.(*game.Player)
+	if p == nil {
+		return 0
+	}
+	
+	tbl := L.CheckTable(3)
+	var shopItems []creatures.ShopItem
+	
+	tbl.ForEach(func(key lua.LValue, val lua.LValue) {
+		if innerTbl, ok := val.(*lua.LTable); ok {
+			var si creatures.ShopItem
+			
+			if idVal := innerTbl.RawGetString("id"); idVal.Type() == lua.LTNumber {
+				si.ID = uint16(lua.LVAsNumber(idVal))
+			} else if idVal := innerTbl.RawGetString("itemId"); idVal.Type() == lua.LTNumber {
+				si.ID = uint16(lua.LVAsNumber(idVal))
+			}
+			
+			if buyVal := innerTbl.RawGetString("buy"); buyVal.Type() == lua.LTNumber {
+				si.BuyPrice = uint32(lua.LVAsNumber(buyVal))
+			}
+			
+			if sellVal := innerTbl.RawGetString("sell"); sellVal.Type() == lua.LTNumber {
+				si.SellPrice = uint32(lua.LVAsNumber(sellVal))
+			}
+			
+			if nameVal := innerTbl.RawGetString("name"); nameVal.Type() == lua.LTString {
+				si.Name = lua.LVAsString(nameVal)
+			}
+			
+			// SubType check if we support it
+			if subTypeVal := innerTbl.RawGetString("subType"); subTypeVal.Type() == lua.LTNumber {
+				si.SubType = uint8(lua.LVAsNumber(subTypeVal))
+			}
+			
+			if si.ID != 0 {
+				shopItems = append(shopItems, si)
+			}
+		}
+	})
+	
+	p.ShopOwnerID = n.ID
+	p.SendOpenShop(n, shopItems)
+	
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func npcPlace(L *lua.LState) int {
-	// TODO: implement place
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func npcRemoveplayerinteraction(L *lua.LState) int {
-	// TODO: implement removePlayerInteraction
+	if n := checkNpc(L); n != nil {
+		n.RemovePlayerInteraction(interactionPlayerID(L, 2))
+	}
 	return 0
 }
 
 func npcSay(L *lua.LState) int {
+	return 0
+}
+
+func (e *Engine) npcSay(L *lua.LState) int {
 	n := checkNpc(L)
 	if n == nil {
 		return 0
 	}
 	text := L.CheckString(2)
+	talkType := byte(1) // SAY
+	if L.GetTop() >= 3 && L.Get(3).Type() == lua.LTNumber {
+		talkType = byte(L.ToNumber(3))
+	}
+	
 	game.GlobalDispatcher.AddEvent(0, func() {
-		n.Say(text)
+		if e.world != nil && e.world.OnCreatureSay != nil {
+			e.world.OnCreatureSay(n, talkType, text)
+		}
 	})
 	return 0
 }
 
 func npcSellitem(L *lua.LState) int {
-	// TODO: implement sellItem
+	// The concrete buy/sell flow is handled by the onBuyItem/onSellItem NPC
+	// callbacks; this helper is a no-op in this slice.
 	return 0
 }
 
-func npcSetcurrency(L *lua.LState) int {
-	// TODO: implement setCurrency
-	return 0
-}
+func npcSetcurrency(L *lua.LState) int { return 0 }
 
-func npcSetmasterpos(L *lua.LState) int {
-	// TODO: implement setMasterPos
-	return 0
-}
+func npcSetmasterpos(L *lua.LState) int { return 0 }
 
 func npcSetname(L *lua.LState) int {
-	// TODO: implement setName
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	n.Name = L.CheckString(2)
 	return 0
 }
 
 func npcSetplayerinteraction(L *lua.LState) int {
-	// TODO: implement setPlayerInteraction
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	topic := 0
+	if L.GetTop() >= 3 {
+		topic = luaOptInt(L, 3)
+	}
+	n.SetPlayerInteraction(interactionPlayerID(L, 2), topic)
 	return 0
 }
 
-func npcSetspeechbubble(L *lua.LState) int {
-	// TODO: implement setSpeechBubble
-	return 0
-}
+func npcSetspeechbubble(L *lua.LState) int { return 0 }
 
-func npcTurn(L *lua.LState) int {
-	// TODO: implement turn
-	return 0
-}
+func npcTurn(L *lua.LState) int { return 0 }
 
 func npcTurntocreature(L *lua.LState) int {
 	n := checkNpc(L)
@@ -201,3 +345,82 @@ func npcTurntocreature(L *lua.LState) int {
 	return 0
 }
 
+
+// CallNpcCloseChannel fires the NPC's onCloseChannel callback (if defined) when
+// a player closes the shop/trade window, mirroring Npc::onPlayerCloseChannel so
+// the dialogue module can reset its per-player topic state.
+func (e *Engine) CallNpcCloseChannel(npc *game.Npc, player *game.Player) {
+	if npc == nil || player == nil {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.npcCallbacksMu.Lock()
+	if e.npcCallbacks == nil {
+		e.npcCallbacksMu.Unlock()
+		return
+	}
+	callbacks, ok := e.npcCallbacks[strings.ToLower(npc.Name)]
+	if !ok || callbacks["onCloseChannel"] == nil {
+		e.npcCallbacksMu.Unlock()
+		return
+	}
+	fn := callbacks["onCloseChannel"]
+	e.npcCallbacksMu.Unlock()
+
+	L := e.L
+	L.Push(fn)
+
+	udNpc := L.NewUserData()
+	udNpc.Value = npc
+	L.SetMetatable(udNpc, L.GetTypeMetatable("Npc"))
+	L.Push(udNpc)
+
+	udPlayer := L.NewUserData()
+	udPlayer.Value = player
+	L.SetMetatable(udPlayer, L.GetTypeMetatable("Player"))
+	L.Push(udPlayer)
+
+	if err := L.PCall(2, 0, nil); err != nil {
+		e.log.Error("lua npc onCloseChannel", "npc", npc.Name, "err", err)
+	}
+}
+
+func (e *Engine) CallNpcOnCreatureSay(npc *game.Npc, player *game.Player, talkType byte, text string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.npcCallbacksMu.Lock()
+	if e.npcCallbacks == nil {
+		e.npcCallbacksMu.Unlock()
+		return
+	}
+	callbacks, ok := e.npcCallbacks[strings.ToLower(npc.Name)]
+	if !ok || callbacks["onSay"] == nil {
+		e.npcCallbacksMu.Unlock()
+		return
+	}
+	fn := callbacks["onSay"]
+	e.npcCallbacksMu.Unlock()
+
+	L := e.L
+	L.Push(fn)
+
+	udNpc := L.NewUserData()
+	udNpc.Value = npc
+	L.SetMetatable(udNpc, L.GetTypeMetatable("Npc"))
+	L.Push(udNpc)
+
+	udPlayer := L.NewUserData()
+	udPlayer.Value = player
+	L.SetMetatable(udPlayer, L.GetTypeMetatable("Player"))
+	L.Push(udPlayer)
+
+	L.Push(lua.LNumber(talkType))
+	L.Push(lua.LString(text))
+
+	if err := L.PCall(4, 0, nil); err != nil {
+		e.log.Error("lua npc onCreatureSay", "npc", npc.Name, "err", err)
+	}
+}

@@ -29,12 +29,14 @@ const (
 	opMapEast        = 0x66
 	opMapSouth       = 0x67
 	opMapWest        = 0x68
+	opUpdateTile     = 0x69
 	opTileTransform  = 0x6B
 	opCreatureMove   = 0x6D
 	opInventoryItem  = 0x78
 	opInventoryEmpty = 0x79
 	opMagicEffect    = 0x83
 	opWorldLight     = 0x82
+	opCreatureHealth = 0x8C
 	opCreatureLight  = 0x8D
 	opBasicData      = 0x9F
 	opPlayerStats    = 0xA0
@@ -43,6 +45,7 @@ const (
 	opCreatureSay    = 0xAA
 	opPing           = 0x1D // server→client keep-alive ping (client replies 0x1E)
 	opPingBack       = 0x1E // server→client reply to a client ping
+	opCancelTarget   = 0xA3
 	creatureTurnMark = 0x0063
 )
 
@@ -67,8 +70,26 @@ const (
 	inTurnWest       = 0x72
 	inSay            = 0x96
 	inExtendedOpcode = 0x32
-	inUseItem        = 0x82
+	inUseItem          = 0x82
+	inUseItemWith      = 0x83
+	inUseWithCreature  = 0x84
 	inCloseContainer = 0x87
+	inContainerUp    = 0x88
+	inLookAt         = 0x8C
+	inThrowItem      = 0x78
+	inAttack         = 0xA1
+	inFightModes     = 0xA0
+	inBuyItem        = 0x7A
+	inSellItem       = 0x7B
+	inCloseShop      = 0x7C
+	// Inbound party opcodes (0xA3..0xA8). NOTE: 0xA3 collides with the OUTBOUND
+	// opCancelTarget const — these are a separate inbound namespace.
+	inInviteToParty        = 0xA3
+	inJoinParty            = 0xA4
+	inRevokePartyInvite    = 0xA5
+	inPassPartyLeadership  = 0xA6
+	inLeaveParty           = 0xA7
+	inEnableSharedPartyExp = 0xA8
 )
 
 // GameProtocol is one game-server session.
@@ -90,8 +111,32 @@ type GameProtocol struct {
 
 	actionMu sync.Mutex    // serializes player movement (walk/turn/auto-walk step)
 	walkGen  atomic.Uint64 // bumping cancels the in-flight auto-walk path
+}
 
-	containers map[uint8]*game.Item // open containers by client container id (0-15)
+// openContainerByCID returns the container open under a client cid, preserving
+// the (item, ok) shape callers expect. The open-container state is the single
+// source of truth on game.Player (see Player.openContainers).
+func (g *GameProtocol) openContainerByCID(cid uint8) (*game.Item, bool) {
+	if g.player == nil {
+		return nil, false
+	}
+	c := g.player.GetContainerByID(cid)
+	return c, c != nil
+}
+
+// rangeContainers returns a snapshot of the open containers as cid->item for
+// iteration.
+func (g *GameProtocol) rangeContainers() map[uint8]*game.Item {
+	out := map[uint8]*game.Item{}
+	if g.player == nil {
+		return out
+	}
+	for cid, oc := range g.player.OpenContainersSnapshot() {
+		if oc.Container != nil {
+			out[cid] = oc.Container
+		}
+	}
+	return out
 }
 
 // NewGameFactory returns a factory building GameProtocol instances.
@@ -101,7 +146,6 @@ func NewGameFactory(deps *Deps) network.ProtocolFactory {
 			deps:       deps,
 			known:      make(map[uint32]bool),
 			pingStop:   make(chan struct{}),
-			containers: make(map[uint8]*game.Item),
 		}
 	}
 }
@@ -144,6 +188,13 @@ func (g *GameProtocol) SendToClient(w *netmsg.Writer) {
 	}
 }
 
+// Disconnect implements game.Session.
+func (g *GameProtocol) Disconnect() {
+	if g.conn != nil {
+		g.conn.Close()
+	}
+}
+
 // OnConnect sends the login challenge immediately.
 func (g *GameProtocol) OnConnect(c *network.Connection) {
 	g.conn = c
@@ -182,6 +233,11 @@ func (g *GameProtocol) OnDisconnect(c *network.Connection) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// Update last logout timestamp and execute creature event logout callbacks
+	g.player.LastLogout = uint64(time.Now().Unix())
+	g.deps.Lua.ExecuteCreatureOnLogout(g.player)
+
 	if err := g.deps.DB.SavePlayer(ctx, g.player); err != nil {
 		c.Logger().Warn("save on disconnect failed", "err", err)
 	}
@@ -261,10 +317,21 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 		return
 	}
 
-	// Relocate to the default spawn if the stored tile has no ground (e.g. a
-	// fresh character, or a stored position outside the loaded map).
-	if !g.deps.World.Map.GetTile(player.Pos).Walkable() {
-		player.Pos = g.deps.World.DefaultSpawn
+	// Resolve the player's temple (respawn point) from the OTBM towns. The SQL
+	// `towns` table only holds placeholder data, so trusting it sends dead
+	// players to a void tile ("limbo"); the OTBM town data has the real temple
+	// positions. Fall back to the default spawn when the town id is unknown or
+	// its tile is not walkable.
+	temple := g.deps.World.DefaultSpawn
+	if t, ok := g.deps.World.TempleByTownID(player.TownID); ok && g.deps.World.Map.GetTile(t).Walkable(g.deps.Items) {
+		temple = t
+	}
+	player.LoginPosition = temple
+
+	// Relocate to the temple if the stored tile has no ground (e.g. a fresh
+	// character, or a stored position outside the loaded map).
+	if !g.deps.World.Map.GetTile(player.Pos).Walkable(g.deps.Items) {
+		player.Pos = temple
 	}
 
 	if !g.deps.World.AddPlayer(player, g) {
@@ -273,6 +340,11 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	}
 	g.player = player
 	g.enterWorld()
+
+	// Run creature event login callbacks (offline training, stamina, first items, daily rewards, etc.)
+	g.deps.Lua.ExecuteCreatureOnLogin(player)
+	player.LastLogin = uint64(time.Now().Unix())
+
 	g.deps.Lua.Call("onPlayerLogin", player.Name)
 	c.Logger().Info("player entered world", "name", player.Name,
 		"pos", player.Pos, "online", g.deps.World.OnlineCount())
@@ -296,7 +368,7 @@ func (g *GameProtocol) disconnect(msg string) {
 // enterWorld sends the full login sequence as a single message.
 func (g *GameProtocol) enterWorld() {
 	p := g.player
-	idx := g.buildCreatureIndex(p.Pos)
+	
 	w := netmsg.NewWriter()
 
 	// 0x17 self appear.
@@ -329,7 +401,7 @@ func (g *GameProtocol) enterWorld() {
 	// 0x64 full map description.
 	w.AddByte(opFullMap)
 	w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
-	g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight, idx)
+	g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight)
 
 	// 0x83 magic effect (login teleport), modern layout: create-effect (3),
 	// u16 type, source byte, end-loop (0).
@@ -340,10 +412,16 @@ func (g *GameProtocol) enterWorld() {
 	w.AddByte(sourceEffectOwn)
 	w.AddByte(magicEffectsEndLoop)
 
-	// Inventory: all slots empty (slots 1..10).
+	// Inventory: send items or empty.
 	for slot := byte(1); slot <= 10; slot++ {
-		w.AddByte(opInventoryEmpty)
-		w.AddByte(slot)
+		if item := p.Inventory[slot]; item != nil {
+			w.AddByte(opInventoryItem)
+			w.AddByte(slot)
+			g.addItem(w, item)
+		} else {
+			w.AddByte(opInventoryEmpty)
+			w.AddByte(slot)
+		}
 	}
 
 	g.addStats(w)
@@ -364,6 +442,9 @@ func (g *GameProtocol) enterWorld() {
 
 	g.SendToClient(w)
 
+	// Send initial condition/protection zone icons
+	g.SendIcons()
+
 	// Keep-alive pings start once the player is in the world.
 	g.startPingLoop()
 
@@ -371,12 +452,26 @@ func (g *GameProtocol) enterWorld() {
 	g.broadcastAppear(p)
 }
 
+func (g *GameProtocol) sendStats() {
+	w := netmsg.NewWriter()
+	g.addStats(w)
+	g.conn.Send(w)
+}
+
 func (g *GameProtocol) addStats(w *netmsg.Writer) {
 	p := g.player
 	w.AddByte(opPlayerStats)
 	w.AddU32(p.Health)
 	w.AddU32(p.MaxHealth)
-	w.AddU32(p.Capacity * 100)
+
+	totalCap := p.Capacity * 100
+	usedCap := g.getPlayerTotalWeight()
+	freeCap := uint32(0)
+	if totalCap > usedCap {
+		freeCap = totalCap - usedCap
+	}
+	w.AddU32(freeCap)
+	
 	w.AddU64(p.Experience)
 	w.AddU16(p.Level)
 	w.AddU16(0)   // level percent (0-10000)
@@ -389,9 +484,23 @@ func (g *GameProtocol) addStats(w *netmsg.Writer) {
 	w.AddByte(p.Soul)
 	w.AddU16(2520) // stamina minutes
 	w.AddU16(p.Speed)
-	w.AddU16(0)  // regeneration seconds
-	w.AddU16(0)  // offline training minutes
-	w.AddU16(0)  // xp boost time
+	// Food/regeneration time in seconds (RegenTicks is milliseconds). Shown as
+	// the "food" timer in the client's character status.
+	regenSecs := uint32(0)
+	if p.RegenTicks > 0 {
+		regenSecs = uint32(p.RegenTicks) / 1000
+	}
+	if regenSecs > 0xFFFF {
+		regenSecs = 0xFFFF
+	}
+	w.AddU16(uint16(regenSecs)) // regeneration seconds
+
+	offlineTrainingMinutes := uint16(0)
+	if p.OfflineTrainingTime > 0 {
+		offlineTrainingMinutes = uint16(p.OfflineTrainingTime / 60000)
+	}
+	w.AddU16(offlineTrainingMinutes) // offline training minutes
+	w.AddU16(0)                      // xp boost time
 	w.AddByte(1) // can buy xp boost
 	w.AddU32(0)  // mana shield
 	w.AddU32(0)  // max mana shield
@@ -404,13 +513,13 @@ func (g *GameProtocol) addSkills(w *netmsg.Writer) {
 	w.AddU16(p.MagLevel) // magic level
 	w.AddU16(p.MagLevel) // base magic level
 	w.AddU16(0)          // loyalty magic level
-	w.AddU16(0)          // magic level percent * 100
+	w.AddU16(p.GetMagLevelPercent()) // magic level percent * 100
 	// combat skills fist..fishing.
 	for i := game.SkillFist; i < game.SkillCount; i++ {
 		w.AddU16(p.Skills[i]) // level
 		w.AddU16(p.Skills[i]) // base
 		w.AddU16(0)           // loyalty
-		w.AddU16(0)           // percent * 100
+		w.AddU16(p.GetSkillPercent(i)) // percent * 100
 	}
 
 	// The rest mirrors AddPlayerSkills for the modern (1525) profile. Our
@@ -471,13 +580,13 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	switch op {
 	case inLogout:
 		c.Close()
-	case inPing:
+	case inPing, 0x1C:
 		// Client keep-alive ping — answer with a ping-back (0x1E).
 		w := netmsg.NewWriter()
 		w.AddByte(opPingBack)
 		g.SendToClient(w)
-	case inPong:
-		// Reply to our own keep-alive ping; nothing to do.
+	case inPong, 0x60, 0xBE:
+		// Reply to our own keep-alive ping, or safely ignored opcodes (imbuements/cancel attack).
 	case inWalkNorth:
 		g.manualWalk(game.DirNorth)
 	case inWalkEast:
@@ -508,10 +617,54 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.autoWalk(r)
 	case inUseItem:
 		g.parseUseItem(r)
+	case inUseItemWith:
+		g.parseUseItemWith(r)
+	case inUseWithCreature:
+		g.parseUseWithCreature(r)
 	case inCloseContainer:
 		g.parseCloseContainer(r)
+	case inContainerUp:
+		g.parseContainerUp(r)
 	case inSay:
 		g.handleSay(r)
+	case inThrowItem:
+		g.parseItemMove(r)
+	case inLookAt:
+		g.parseLookAt(r)
+	case inAttack:
+		g.parseAttack(r)
+	case inFightModes:
+		g.parseFightModes(r)
+	case inBuyItem:
+		g.parseBuyItem(r)
+	case inSellItem:
+		g.parseSellItem(r)
+	case inCloseShop:
+		g.parseCloseShop(r)
+	case inInviteToParty:
+		g.deps.World.PlayerInviteToParty(g.player.ID, r.GetU32())
+	case inJoinParty:
+		g.deps.World.PlayerJoinParty(g.player.ID, r.GetU32())
+	case inRevokePartyInvite:
+		g.deps.World.PlayerRevokePartyInvitation(g.player.ID, r.GetU32())
+	case inPassPartyLeadership:
+		g.deps.World.PlayerPassPartyLeadership(g.player.ID, r.GetU32())
+	case inLeaveParty:
+		g.deps.World.PlayerLeaveParty(g.player.ID)
+	case inEnableSharedPartyExp:
+		g.deps.World.PlayerEnableSharedPartyExperience(g.player.ID, r.GetByte() == 1)
+	case 0x0F: // Ping back
+		w := netmsg.NewWriter()
+		w.AddByte(0x1D)
+		g.SendToClient(w)
+	case 0x91, 0xB3, 0xD0: // Telemetry / client checks (quest log / bestiary / resource balance)
+		// Handled gracefully without error
+	case 0xCD:
+		g.parseInspectionObject(r)
+	case 0xCE:
+		g.parseInspectPlayer(r)
+	case 0xE5:
+		g.parseCyclopediaCharacterInfo(r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
 	default:

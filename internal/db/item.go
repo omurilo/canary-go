@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 )
@@ -10,7 +11,7 @@ import (
 func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 	const q = `SELECT pid, sid, itemtype, count, attributes 
 	           FROM player_items WHERE player_id = ? ORDER BY sid ASC`
-	
+
 	rows, err := d.SQL.QueryContext(ctx, q, p.DBID)
 	if err != nil {
 		return err
@@ -37,6 +38,18 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 			Count:      count,
 			Attributes: attrs,
 		}
+		// Decode the OTBR attribute blob. Mirrors C++ IOLoginDataLoad::loadItems:
+		// Item::CreateItem(type, count) seeds the subtype from the count column,
+		// then Item::unserializeAttr overrides it via ATTR_COUNT if present
+		// (src/io/functions/iologindata_load_player.cpp:47-49). On a decode error
+		// we keep the raw blob so it round-trips verbatim on save.
+		if attr, subType, err := game.DecodeItemAttributes(attrs, count); err != nil {
+			slog.Default().Warn("failed to decode item attributes; preserving raw blob",
+				"player_id", p.DBID, "itemtype", itemtype, "err", err)
+		} else {
+			item.Attr = attr
+			item.Count = subType
+		}
 		itemsBySID[sid] = item
 		loadedRows = append(loadedRows, itemRow{pid: pid, item: item})
 	}
@@ -52,6 +65,7 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 			}
 		} else {
 			if parent, ok := itemsBySID[row.pid]; ok {
+				row.item.Parent = parent
 				parent.Contents = append(parent.Contents, row.item)
 			}
 		}
@@ -88,8 +102,18 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 		sid := sidCounter
 		sidCounter++
 
-		var attrs []byte
-		if len(item.Attributes) > 0 {
+		// Re-serialize attributes. When the blob decoded cleanly, Attr is
+		// authoritative and we encode from it (mirroring C++
+		// IOLoginDataSave::saveItems -> Item::serializeAttr,
+		// src/io/functions/iologindata_save_player.cpp:90-91); otherwise we write
+		// back the preserved raw blob verbatim. The count column stores the
+		// subtype (item.Count), matching C++ which writes getSubType().
+		attrs := make([]byte, 0)
+		if item.Attr != nil {
+			if b := item.Attr.Encode(item.Count); len(b) > 0 {
+				attrs = b
+			}
+		} else if len(item.Attributes) > 0 {
 			attrs = item.Attributes
 		}
 

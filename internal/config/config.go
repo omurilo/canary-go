@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	lua "github.com/yuin/gopher-lua"
 )
+
+// Active is a package-level variable holding the currently loaded configuration.
+var Active *Config = Default()
 
 // Config holds the subset of settings the Go server currently uses. Unknown
 // keys in config.lua are simply ignored.
@@ -35,6 +39,8 @@ type Config struct {
 
 	RSAKeyFile string
 	WorldFile  string
+
+	Custom     map[string]lua.LValue
 }
 
 // Default returns a config with sane defaults for local development.
@@ -55,6 +61,7 @@ func Default() *Config {
 		MOTD:          "Welcome to Canary-Go!",
 		AllowOldProto: true,
 		RSAKeyFile:    "key.pem",
+		Custom:        make(map[string]lua.LValue),
 	}
 }
 
@@ -63,15 +70,27 @@ func Default() *Config {
 // not fatal: defaults + env still apply.
 func Load(path string) (*Config, error) {
 	cfg := Default()
-	if _, err := os.Stat(path); err != nil {
+	
+	// Support sharing the configuration with the C++ server in the root directory.
+	// If the default "config.lua" is used, check if there's a "../config.lua" first.
+	resolvedPath := path
+	if path == "config.lua" {
+		if _, err := os.Stat("../config.lua"); err == nil {
+			resolvedPath = "../config.lua"
+		} else if _, err := os.Stat(path); err != nil {
+			// fallback/error handled below
+		}
+	}
+
+	if _, err := os.Stat(resolvedPath); err != nil {
 		applyEnv(cfg)
 		return cfg, fmt.Errorf("config: %w", err)
 	}
 
 	L := lua.NewState()
 	defer L.Close()
-	if err := L.DoFile(path); err != nil {
-		return nil, fmt.Errorf("config: executing %s: %w", path, err)
+	if err := L.DoFile(resolvedPath); err != nil {
+		return nil, fmt.Errorf("config: executing %s: %w", resolvedPath, err)
 	}
 	g := L.Get(lua.GlobalsIndex).(*lua.LTable)
 
@@ -108,12 +127,28 @@ func Load(path string) (*Config, error) {
 	cfg.DBName = str("mysqlDatabase", cfg.DBName)
 	cfg.DBPort = num("mysqlPort", cfg.DBPort)
 
-	cfg.MOTD = str("motd", cfg.MOTD)
+	// Fallback to serverMotd if motd is not defined (to support config.lua.dist)
+	cfg.MOTD = str("serverMotd", str("motd", cfg.MOTD))
 	cfg.AllowOldProto = boolean("allowOldProtocol", cfg.AllowOldProto)
 	cfg.RSAKeyFile = str("rsaKeyFile", cfg.RSAKeyFile)
-	cfg.WorldFile = str("worldFile", cfg.WorldFile)
+
+	// Fallback to constructing the world path from dataPackDirectory + mapName
+	cfg.WorldFile = str("worldFile", "")
+	if cfg.WorldFile == "" {
+		mapName := str("mapName", "otservbr")
+		cfg.WorldFile = fmt.Sprintf("%s/world/%s.otbm", cfg.DataPack, mapName)
+	}
 
 	applyEnv(cfg)
+
+	cfg.Custom = make(map[string]lua.LValue)
+	g.ForEach(func(k, v lua.LValue) {
+		key := strings.ToLower(k.String())
+		key = strings.ReplaceAll(key, "_", "")
+		cfg.Custom[key] = v
+	})
+	Active = cfg
+
 	return cfg, nil
 }
 

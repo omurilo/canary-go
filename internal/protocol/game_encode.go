@@ -24,33 +24,6 @@ type posKey struct {
 	z uint8
 }
 
-// creatureIndex maps tile positions to the creatures standing on them.
-type creatureIndex map[posKey][]*game.Player
-
-func (g *GameProtocol) buildCreatureIndex(center game.Position) creatureIndex {
-	idx := make(creatureIndex)
-	for _, p := range g.deps.World.Spectators(center, 0) {
-		k := posKey{p.Pos.X, p.Pos.Y, p.Pos.Z}
-		idx[k] = append(idx[k], p)
-	}
-	// Include self (Spectators excludes id 0 only; self is included since we
-	// pass excludeID 0, but ensure presence).
-	if g.player != nil {
-		k := posKey{g.player.Pos.X, g.player.Pos.Y, g.player.Pos.Z}
-		found := false
-		for _, c := range idx[k] {
-			if c.ID == g.player.ID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			idx[k] = append(idx[k], g.player)
-		}
-	}
-	return idx
-}
-
 // addOutfit writes an Outfit.
 func addOutfit(w *netmsg.Writer, o game.Outfit) {
 	w.AddU16(o.LookType)
@@ -122,42 +95,60 @@ func (g *GameProtocol) addItem(w *netmsg.Writer, it *game.Item) {
 
 // addCreature writes a creature description. When known, only the id marker is
 // sent; otherwise the full appearance follows.
-func (g *GameProtocol) addCreature(w *netmsg.Writer, c *game.Player) {
-	known := g.known[c.ID]
+func (g *GameProtocol) addCreature(w *netmsg.Writer, c game.Creature) {
+	known := g.known[c.GetID()]
 	if known {
 		w.AddU16(creatureKnown)
-		w.AddU32(c.ID)
+		w.AddU32(c.GetID())
 	} else {
-		g.known[c.ID] = true
+		g.known[c.GetID()] = true
 		w.AddU16(creatureNew)
 		w.AddU32(0) // removedKnownId (cache not full)
-		w.AddU32(c.ID)
-		w.AddByte(0) // creatureType: PLAYER
-		w.AddString(c.Name)
+		w.AddU32(c.GetID())
+		w.AddByte(c.GetCreatureType()) // creatureType: 0=Player, 1=Monster, 2=NPC
+		w.AddString(c.GetName())
 	}
 
 	healthPct := byte(100)
-	if c.MaxHealth > 0 {
-		healthPct = byte(c.Health * 100 / c.MaxHealth)
+	if c.GetMaxHealth() > 0 {
+		healthPct = byte(c.GetHealth() * 100 / c.GetMaxHealth())
 	}
 	w.AddByte(healthPct)
-	w.AddByte(byte(c.Direction))
-	addOutfit(w, c.Outfit)
-	w.AddByte(c.LightLevel)
-	w.AddByte(c.LightColor)
-	w.AddU16(c.Speed)
+	w.AddByte(byte(c.GetDirection()))
+	addOutfit(w, c.GetOutfit())
+	w.AddByte(c.GetLightLevel())
+	w.AddByte(c.GetLightColor())
+	w.AddU16(c.GetSpeed())
+
 	w.AddByte(0) // creature icons count
 	w.AddByte(0) // skull
-	w.AddByte(0) // party shield
+	// Party shield: computed from the viewer's relationship to the target when
+	// both are players, else none.
+	shield := byte(game.ShieldNone)
+	if g.player != nil {
+		if target, ok := c.(*game.Player); ok {
+			shield = g.player.PartyShield(target)
+		}
+	}
+	w.AddByte(shield) // party shield
 	if !known {
 		w.AddByte(0) // guild emblem
 	}
-	w.AddByte(0)    // creature type (again)
-	w.AddByte(0)    // vocation client id (PLAYER)
+	w.AddByte(c.GetCreatureType()) // creature type (again)
+	// Vocation client id is sent ONLY for players (CREATURETYPE_PLAYER == 0).
+	// Sending it for NPCs/monsters adds a spurious byte that desyncs the whole
+	// tile/map stream — see ProtocolGame::AddCreature (protocolgame.cpp:9641).
+	if c.GetCreatureType() == 0 {
+		w.AddByte(0) // vocation client id
+	}
 	w.AddByte(0)    // speech bubble
 	w.AddByte(0xFF) // mark (unmarked)
 	w.AddByte(0)    // inspection type
-	w.AddByte(0)    // walkthrough (can walk through: 0)
+	walkthrough := byte(0x01)
+	if g.canWalkthroughEx(g.player, c) {
+		walkthrough = byte(0x00)
+	}
+	w.AddByte(walkthrough) // walkthrough (can walk through: 0, solid: 1)
 }
 
 // isTopItem reports whether an item stacks below creatures (always-on-top).
@@ -166,11 +157,51 @@ func (g *GameProtocol) isTopItem(it *game.Item) bool {
 	return t != nil && t.AlwaysOnTop()
 }
 
+func (g *GameProtocol) canWalkthroughEx(observer *game.Player, target game.Creature) bool {
+	if observer == nil || target == nil {
+		return false
+	}
+	if targetP, ok := target.(*game.Player); ok {
+		if targetP.Ghost {
+			return true
+		}
+		if observer.GroupID >= 3 {
+			return true
+		}
+		if g.deps != nil && g.deps.World != nil {
+			tile := g.deps.World.Map.GetTile(targetP.GetPosition())
+			if tile != nil && (tile.IsProtectionZone() || g.deps.World.WorldType == 1 || g.deps.World.WorldType == 0) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (g *GameProtocol) canSeeCreature(c game.Creature) bool {
+	if c == nil {
+		return false
+	}
+	if p, ok := c.(*game.Player); ok && p.Ghost {
+		if g.player == nil {
+			return false
+		}
+		if g.player == p {
+			return true
+		}
+		if g.player.GroupID >= 3 && g.player.GroupID >= p.GroupID {
+			return true
+		}
+		return false
+	}
+	return true
+}
+
 // addTileDescription writes a tile's things in the client's stack order, mirroring
 // GetTileDescription: ground, always-on-top items, creatures, then normal items.
 // Placing creatures between the two item groups is what keeps creature stackpos in
 // sync with the client (a mismatch makes 0x6D moves reference the wrong thing).
-func (g *GameProtocol) addTileDescription(w *netmsg.Writer, t *game.Tile, idx creatureIndex, pos game.Position) {
+func (g *GameProtocol) addTileDescription(w *netmsg.Writer, t *game.Tile, pos game.Position) {
 	count := 0
 	if t.Ground != nil {
 		g.addItem(w, t.Ground)
@@ -186,13 +217,17 @@ func (g *GameProtocol) addTileDescription(w *netmsg.Writer, t *game.Tile, idx cr
 			count++
 		}
 	}
+
 	// Creatures.
-	creatures := idx[posKey{pos.X, pos.Y, pos.Z}]
-	for i := len(creatures) - 1; i >= 0; i-- {
+	for i := len(t.Creatures) - 1; i >= 0; i-- {
 		if count >= 10 {
 			return
 		}
-		g.addCreature(w, creatures[i])
+		c := t.Creatures[i]
+		if !g.canSeeCreature(c) {
+			continue
+		}
+		g.addCreature(w, c)
 		count++
 	}
 	// Down items (no always-on-top order): render above creatures.
@@ -208,7 +243,7 @@ func (g *GameProtocol) addTileDescription(w *netmsg.Writer, t *game.Tile, idx cr
 }
 
 // addFloorDescription writes a single floor with run-length skips for empties.
-func (g *GameProtocol) addFloorDescription(w *netmsg.Writer, x, y, z, width, height, offset int, idx creatureIndex, skip *int) {
+func (g *GameProtocol) addFloorDescription(w *netmsg.Writer, x, y, z, width, height, offset int, skip *int) {
 	for nx := 0; nx < width; nx++ {
 		for ny := 0; ny < height; ny++ {
 			pos := game.Position{
@@ -223,7 +258,7 @@ func (g *GameProtocol) addFloorDescription(w *netmsg.Writer, x, y, z, width, hei
 					w.AddByte(0xFF)
 				}
 				*skip = 0
-				g.addTileDescription(w, tile, idx, pos)
+				g.addTileDescription(w, tile, pos)
 			} else if *skip == 0xFE {
 				w.AddByte(0xFF)
 				w.AddByte(0xFF)
@@ -236,7 +271,10 @@ func (g *GameProtocol) addFloorDescription(w *netmsg.Writer, x, y, z, width, hei
 }
 
 // addMapDescription writes a rectangular map area (all visible floors).
-func (g *GameProtocol) addMapDescription(w *netmsg.Writer, x, y int, z uint8, width, height int, idx creatureIndex) {
+func (g *GameProtocol) addMapDescription(w *netmsg.Writer, x, y int, z uint8, width, height int) {
+	g.deps.World.RLock()
+	defer g.deps.World.RUnlock()
+
 	skip := -1
 	var startz, endz, zstep int
 	if z > surfaceZ {
@@ -249,7 +287,7 @@ func (g *GameProtocol) addMapDescription(w *netmsg.Writer, x, y int, z uint8, wi
 		zstep = -1
 	}
 	for nz := startz; nz != endz+zstep; nz += zstep {
-		g.addFloorDescription(w, x, y, nz, width, height, int(z)-nz, idx, &skip)
+		g.addFloorDescription(w, x, y, nz, width, height, int(z)-nz, &skip)
 	}
 	if skip >= 0 {
 		w.AddByte(byte(skip))
@@ -257,9 +295,11 @@ func (g *GameProtocol) addMapDescription(w *netmsg.Writer, x, y int, z uint8, wi
 	}
 }
 
-// stackPosOf returns the tile stack position of the given creature, matching the
+// StackPosOf returns the tile stack position of the given creature, matching the
 // order addTileDescription emits: ground, always-on-top items, then creatures.
-func (g *GameProtocol) stackPosOf(pos game.Position, creatureID uint32, idx creatureIndex) uint8 {
+func (g *GameProtocol) StackPosOf(pos game.Position, creatureID uint32) uint8 {
+	g.deps.World.RLock()
+	defer g.deps.World.RUnlock()
 	stack := 0
 	tile := g.deps.World.Map.GetTile(pos)
 	if tile != nil {
@@ -271,13 +311,35 @@ func (g *GameProtocol) stackPosOf(pos game.Position, creatureID uint32, idx crea
 				stack++
 			}
 		}
-	}
-	creatures := idx[posKey{pos.X, pos.Y, pos.Z}]
-	for i := len(creatures) - 1; i >= 0; i-- {
-		if creatures[i].ID == creatureID {
-			return uint8(stack)
+		for i := len(tile.Creatures) - 1; i >= 0; i-- {
+			if tile.Creatures[i].GetID() == creatureID {
+				return uint8(stack)
+			}
+			stack++
 		}
-		stack++
+	}
+	return uint8(stack)
+}
+
+// StackPosWithIndex returns the tile stack position for a creature that was at the
+// specified index in the Tile.Creatures slice before it was removed.
+func (g *GameProtocol) StackPosWithIndex(pos game.Position, tileIndex int) uint8 {
+	g.deps.World.RLock()
+	defer g.deps.World.RUnlock()
+	stack := 0
+	tile := g.deps.World.Map.GetTile(pos)
+	if tile != nil {
+		if tile.Ground != nil {
+			stack++
+		}
+		for _, it := range tile.Items {
+			if g.isTopItem(it) {
+				stack++
+			}
+		}
+		if tileIndex >= 0 {
+			stack += len(tile.Creatures) - tileIndex
+		}
 	}
 	return uint8(stack)
 }

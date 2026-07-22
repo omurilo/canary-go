@@ -117,15 +117,19 @@ func (r *reader) u64() uint64 {
 	return v
 }
 
-// str reads a u16-length string; the body is raw (not un-escaped).
+// str reads a u16-length string. The length prefix is the logical character
+// count; the body is escape-encoded like the rest of a node's properties, so it
+// MUST be read char-by-char through u8() (which un-escapes). Reading the body
+// raw leaves the cursor short by the number of escape bytes, desyncing every
+// subsequent attribute/node in the stream — that corruption is what sent some
+// teleports to a (0,0,0) "limbo" destination.
 func (r *reader) str() string {
 	n := int(r.u16())
-	if r.pos+n > len(r.data) {
-		n = len(r.data) - r.pos
+	b := make([]byte, 0, n)
+	for i := 0; i < n && !r.eof(); i++ {
+		b = append(b, r.u8())
 	}
-	s := string(r.data[r.pos : r.pos+n])
-	r.pos += n
-	return s
+	return string(b)
 }
 
 // peekRaw returns the next raw byte without consuming it.
@@ -283,13 +287,14 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 
 	if house {
 		_ = r.u32() // house id
+		tile.Flags |= 1 // House tiles are protection zones
 	}
 
 	// Inline tile attributes.
 	for {
 		tag := r.u8()
 		if tag == attrTileFlags {
-			_ = r.u32()
+			tile.Flags = r.u32()
 			continue
 		}
 		if tag == attrItem {
@@ -329,7 +334,7 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 		}
 	}
 
-	if tile.Ground != nil || len(tile.Items) > 0 {
+	if tile.Ground != nil || len(tile.Items) > 0 || tile.Flags != 0 {
 		p.m.SetTile(pos, tile)
 		p.res.TileCount++
 	}
@@ -346,6 +351,8 @@ func (p *parser) readItem() *game.Item {
 	r := p.r
 	id := r.u16()
 	count := uint16(0)
+	var teleDest *game.Position
+	var actionID, uniqueID *uint16
 
 	// Item attributes.
 attrLoop:
@@ -356,16 +363,25 @@ attrLoop:
 			count = uint16(r.u8())
 		case attrCharges:
 			count = r.u16()
-		case attrActionID, attrUniqueID, attrDepotID:
+		case attrActionID:
+			v := r.u16()
+			actionID = &v
+		case attrUniqueID:
+			// The unique id keys map-placed movements/actions (e.g. the temple
+			// "citizen" set-town tiles register by uid); it must be stored.
+			v := r.u16()
+			uniqueID = &v
+		case attrDepotID:
 			_ = r.u16()
 		case attrHouseDoorID, attrDecayState, attrShootRange:
 			_ = r.u8()
 		case attrHitChance:
 			_ = r.u8()
 		case attrTeleDest:
-			_ = r.u16()
-			_ = r.u16()
-			_ = r.u8()
+			tx := r.u16()
+			ty := r.u16()
+			tz := r.u8()
+			teleDest = &game.Position{X: tx, Y: ty, Z: tz}
 		case attrText, attrDesc, attrName, attrArticle, attrPluralName, attrSpecial, attrWrittenBy:
 			_ = r.str()
 		case attrWrittenDate:
@@ -383,6 +399,13 @@ attrLoop:
 	}
 
 	it := &game.Item{ID: id, Count: count}
+	if teleDest != nil || actionID != nil || uniqueID != nil {
+		it.Attr = &game.ItemAttributes{
+			TeleDest: teleDest,
+			ActionID: actionID,
+			UniqueID: uniqueID,
+		}
+	}
 
 	// Container children: nested item nodes become this item's contents.
 	for {

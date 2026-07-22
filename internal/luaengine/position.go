@@ -9,6 +9,53 @@ const positionTypeName = "Position"
 
 func (e *Engine) registerPosition() {
 	mt := e.L.NewTypeMetatable(positionTypeName)
+
+	positionMethods := map[string]lua.LGFunction{
+		"isPosition": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
+		"sendSingleSoundEffect": func(L *lua.LState) int {
+			return 0
+		},
+		"sendMagicEffect": func(L *lua.LState) int {
+			p := checkPosition(L, 1)
+			effect := uint16(L.CheckInt(2))
+			if e.world.OnMagicEffect != nil {
+				e.world.OnMagicEffect(p, effect)
+			}
+			return 0
+		},
+		"sendDistanceEffect": func(L *lua.LState) int {
+			from := checkPosition(L, 1)
+			to := checkPosition(L, 2)
+			effect := uint16(L.CheckInt(3))
+			if e.world.OnDistanceEffect != nil {
+				e.world.OnDistanceEffect(from, to, effect)
+			}
+			return 0
+		},
+		"getDistance": func(L *lua.LState) int {
+			p1 := checkPosition(L, 1)
+			p2 := checkPosition(L, 2)
+			if p1.Z != p2.Z {
+				L.Push(lua.LNumber(0xFFFF))
+				return 1
+			}
+			dx := int(p1.X) - int(p2.X)
+			if dx < 0 {
+				dx = -dx
+			}
+			dy := int(p1.Y) - int(p2.Y)
+			if dy < 0 {
+				dy = -dy
+			}
+			dist := dx
+			if dy > dx {
+				dist = dy
+			}
+			L.Push(lua.LNumber(dist))
+			return 1
+		},
+	}
+
 	methods := e.L.SetFuncs(e.L.NewTable(), positionMethods)
 	e.L.SetField(mt, "methods", methods)
 
@@ -16,21 +63,28 @@ func (e *Engine) registerPosition() {
 	e.L.SetField(mt, "__newindex", e.L.NewFunction(positionNewIndex))
 	e.L.SetField(mt, "__eq", e.L.NewFunction(positionEq))
 
-	e.L.SetGlobal("Position", e.L.NewFunction(positionCreate))
+	e.setClassConstructor("Position", positionCreate, positionMethods)
 }
 
 func positionCreate(L *lua.LState) int {
 	var x, y, z int
-	// Support Position(x, y, z) and Position(table)
-	if L.GetTop() == 1 && L.Get(1).Type() == lua.LTTable {
-		t := L.ToTable(1)
+	arg2 := L.Get(2)
+	switch arg2.Type() {
+	case lua.LTTable:
+		t := L.ToTable(2)
 		x = int(lua.LVAsNumber(L.GetField(t, "x")))
 		y = int(lua.LVAsNumber(L.GetField(t, "y")))
 		z = int(lua.LVAsNumber(L.GetField(t, "z")))
-	} else {
-		x = L.OptInt(1, 0)
-		y = L.OptInt(2, 0)
-		z = L.OptInt(3, 7)
+	case lua.LTUserData:
+		if pos, ok := arg2.(*lua.LUserData).Value.(game.Position); ok {
+			x, y, z = int(pos.X), int(pos.Y), int(pos.Z)
+		} else if posPtr, ok := arg2.(*lua.LUserData).Value.(*game.Position); ok && posPtr != nil {
+			x, y, z = int(posPtr.X), int(posPtr.Y), int(posPtr.Z)
+		}
+	default:
+		x = L.OptInt(2, 0)
+		y = L.OptInt(3, 0)
+		z = L.OptInt(4, 7)
 	}
 
 	p := game.Position{
@@ -61,8 +115,8 @@ func pushPosition(L *lua.LState, p game.Position) {
 
 func positionIndex(L *lua.LState) int {
 	ud := L.CheckUserData(1)
+	key := L.CheckString(2)
 	if p, ok := ud.Value.(game.Position); ok {
-		key := L.CheckString(2)
 		switch key {
 		case "x":
 			L.Push(lua.LNumber(p.X))
@@ -78,7 +132,15 @@ func positionIndex(L *lua.LState) int {
 	mt := L.GetTypeMetatable(positionTypeName)
 	methods := L.GetField(mt, "methods")
 	if methods.Type() == lua.LTTable {
-		val := L.GetField(methods, L.CheckString(2))
+		val := L.GetField(methods, key)
+		if val.Type() != lua.LTNil {
+			L.Push(val)
+			return 1
+		}
+	}
+	// Fallback to searching the global "Position" table for Lua-defined methods
+	if gPos := L.GetGlobal("Position"); gPos.Type() == lua.LTTable {
+		val := L.GetField(gPos, key)
 		if val.Type() != lua.LTNil {
 			L.Push(val)
 			return 1
@@ -115,6 +177,4 @@ func positionEq(L *lua.LState) int {
 	return 1
 }
 
-var positionMethods = map[string]lua.LGFunction{
-	"isPosition": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
-}
+

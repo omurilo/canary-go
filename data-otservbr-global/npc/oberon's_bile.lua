@@ -1,0 +1,24 @@
+local internalNpcName = "Oberon's Bile"
+local npcType = Game.createNpcType(internalNpcName)
+local npcConfig = {}
+
+npcConfig.name = internalNpcName
+npcConfig.description = internalNpcName
+
+npcConfig.health = 100
+npcConfig.maxHealth = npcConfig.health
+npcConfig.walkInterval = 0
+npcConfig.walkRadius = 2
+
+npcConfig.outfit = {
+	lookTypeEx = 10980,
+}
+
+npcConfig.flags = {
+	floorchange = false,
+	profession = "normal",
+}
+npcConfig.speechBubble = SPEECHBUBBLE_NORMAL
+
+-- npcType registering the npcConfig table
+npcType:register(npcConfig)

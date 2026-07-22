@@ -1,11 +1,19 @@
-# Build context must be the repository root so the parent data/ directories are
-# available to mount at runtime. Build:
-#   docker build -f canary-go/Dockerfile -t canary-go .
+# Build context must be the canary-go directory. Build:
+#   cd canary-go
+#   docker build -t canary-go .
 FROM golang:1.25-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
+
+# Install protoc and go protobuf compiler
+RUN apk add --no-cache protobuf bash
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+
 COPY / ./
+# Generate protobufs for appearances
+RUN ./scripts/generate_appearances.sh
+
 RUN CGO_ENABLED=0 go build -trimpath -o /out/canary ./cmd/canary
 
 FROM alpine:3.20
@@ -20,4 +28,4 @@ COPY scripts /app/scripts
 USER canary
 EXPOSE 7171 7172
 ENTRYPOINT ["/app/canary"]
-CMD ["-config", "config.lua", "-schema", "schema/mysql.sql", "-scripts", "scripts", "-migrate", "-seed"]
+CMD ["-config", "config.lua", "-schema", "schema/mysql.sql", "-scripts", "scripts", "-appearances", "data/items/appearances.dat", "-migrate", "-seed"]

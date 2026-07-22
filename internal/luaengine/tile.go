@@ -9,21 +9,22 @@ const tileTypeName = "Tile"
 
 func (e *Engine) registerTile() {
 	mt := e.L.NewTypeMetatable(tileTypeName)
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), e.tileMethods()))
-	e.L.SetGlobal("Tile", e.L.NewFunction(e.tileCreate))
+	methods := e.tileMethods()
+	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
+	e.setClassConstructor("Tile", e.tileCreate, methods)
 }
 
 func (e *Engine) tileCreate(L *lua.LState) int {
 	var pos game.Position
-	if L.GetTop() >= 3 {
-		x := L.CheckInt(1)
-		y := L.CheckInt(2)
-		z := L.CheckInt(3)
+	if L.GetTop() >= 4 { // Arg 1 is class
+		x := L.CheckInt(2)
+		y := L.CheckInt(3)
+		z := L.CheckInt(4)
 		pos = game.Position{X: uint16(x), Y: uint16(y), Z: uint8(z)}
-	} else if L.GetTop() == 1 {
-		pos = checkPosition(L, 1)
+	} else if L.GetTop() >= 2 {
+		pos = checkPosition(L, 2)
 	} else {
-		L.ArgError(1, "Position or X, Y, Z expected")
+		L.ArgError(2, "Position or X, Y, Z expected")
 		return 0
 	}
 
@@ -65,6 +66,12 @@ func checkTile(L *lua.LState, n int) luaTile {
 func (e *Engine) tileMethods() map[string]lua.LGFunction {
 	return map[string]lua.LGFunction{
 		"isTile": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
+		"hasFlag": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			flag := uint32(L.CheckInt(2))
+			L.Push(lua.LBool((uint32(t.tile.Flags) & flag) != 0))
+			return 1
+		},
 		"getPosition": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			pushPosition(L, t.pos)
@@ -85,6 +92,82 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 				}
 			}
 			L.Push(lua.LNil)
+			return 1
+		},
+		"getItemById": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			itemID := uint16(L.CheckInt(2))
+			
+			if t.tile.Ground != nil && t.tile.Ground.ID == itemID {
+				e.pushItem(L, t.tile.Ground)
+				return 1
+			}
+			for _, it := range t.tile.Items {
+				if it.ID == itemID {
+					e.pushItem(L, it)
+					return 1
+				}
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getTopCreature": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if len(t.tile.Creatures) > 0 {
+				e.pushCreature(L, t.tile.Creatures[0])
+				return 1
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getCreatureCount": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			L.Push(lua.LNumber(len(t.tile.Creatures)))
+			return 1
+		},
+		"getCreatures": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			tbl := L.NewTable()
+			for i, cr := range t.tile.Creatures {
+				ud := L.NewUserData()
+				ud.Value = cr
+				L.SetMetatable(ud, L.GetTypeMetatable(metatableForCreature(cr)))
+				tbl.RawSetInt(i+1, ud)
+			}
+			L.Push(tbl)
+			return 1
+		},
+		"hasProperty": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			_ = L.OptInt(2, 0)
+			has := t.tile.BlocksSolid(e.itemCatalog())
+			L.Push(lua.LBool(has))
+			return 1
+		},
+		"getItemCount": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			count := len(t.tile.Items)
+			if t.tile.Ground != nil {
+				count++
+			}
+			L.Push(lua.LNumber(count))
+			return 1
+		},
+		"getThingCount": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			count := len(t.tile.Items) + len(t.tile.Creatures)
+			if t.tile.Ground != nil {
+				count++
+			}
+			L.Push(lua.LNumber(count))
+			return 1
+		},
+		"queryAdd": func(L *lua.LState) int {
+			L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR
+			return 1
+		},
+		"getHouse": func(L *lua.LState) int {
+			L.Push(lua.LNil) // not modelled yet; safe default
 			return 1
 		},
 	}

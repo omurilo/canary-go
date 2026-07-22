@@ -9,8 +9,6 @@ import (
 // registerGame registers the global Game table and its methods.
 func (e *Engine) registerGame() {
 	gameMethods := map[string]lua.LGFunction{
-		"createNpcType":            e.gameCreateNpcType,
-		"createMonsterType":        e.gameCreateMonsterType,
 		"getMonsterTypeByName":     e.gameGetMonsterTypeByName,
 		"getSpectators":            e.gameGetSpectators,
 		"getBoostedCreature":       e.gameGetBoostedCreature,
@@ -83,10 +81,23 @@ func (e *Engine) registerGame() {
 	for name, fn := range gameMethods {
 		e.L.SetField(game, name, e.L.NewFunction(fn))
 	}
+
+	// Global world-time helpers used by NPC greetings / day-night scripts
+	// (data/libs/functions/functions.lua getFormattedWorldTime → getWorldTime).
+	// No day/night clock is modelled yet, so report a stable midday: enough for
+	// the "day"/"night" branch and the |TIME| dialog tag to resolve.
+	e.L.SetGlobal("getWorldTime", e.L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(720)) // minutes since midnight → 12:00
+		return 1
+	}))
+	e.L.SetGlobal("getWorldLight", e.L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(250)) // full daylight level
+		L.Push(lua.LNumber(215)) // default light color
+		return 2
+	}))
 }
 
-func (e *Engine) gameCreateNpcType(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateMonsterType(L *lua.LState) int { return 0 }
+
 func (e *Engine) gameGetMonsterTypeByName(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetSpectators(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetBoostedCreature(L *lua.LState) int { return 0 }
@@ -125,6 +136,11 @@ func (e *Engine) gameCreateItem(L *lua.LState) int {
 	id := L.CheckInt(1)
 	count := L.OptInt(2, 1)
 
+	cat := e.itemCatalog()
+	if it := cat.Get(uint16(id)); it != nil && it.Stackable && count > 100 {
+		count = 100
+	}
+
 	item := &game.Item{
 		ID:    uint16(id),
 		Count: uint16(count),
@@ -138,8 +154,22 @@ func (e *Engine) gameCreateSoulPitMonster(L *lua.LState) int { return 0 }
 func (e *Engine) gameCreateNpc(L *lua.LState) int { return 0 }
 func (e *Engine) gameGenerateNpc(L *lua.LState) int { return 0 }
 func (e *Engine) gameCreateTile(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateBestiaryCharm(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateItemClassification(L *lua.LState) int { return 0 }
+func (e *Engine) gameCreateBestiaryCharm(L *lua.LState) int {
+	mt := L.GetTypeMetatable("BestiaryCharm")
+	ud := L.NewUserData()
+	ud.Value = "BestiaryCharm"
+	L.SetMetatable(ud, mt)
+	L.Push(ud)
+	return 1
+}
+func (e *Engine) gameCreateItemClassification(L *lua.LState) int {
+	mt := L.GetTypeMetatable("ItemClassification")
+	ud := L.NewUserData()
+	ud.Value = "ItemClassification"
+	L.SetMetatable(ud, mt)
+	L.Push(ud)
+	return 1
+}
 func (e *Engine) gameGetBestiaryCharm(L *lua.LState) int { return 0 }
 func (e *Engine) gameStartRaid(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetClientVersion(L *lua.LState) int { return 0 }
@@ -157,7 +187,24 @@ func (e *Engine) gameRemoveFiendishMonster(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetFiendishMonsters(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetBoostedBoss(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetLadderIds(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetDummies(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetDummies(L *lua.LState) int {
+	dummies := map[uint16]uint16{
+		28558: 100,
+		28559: 110,
+		28560: 110,
+		28561: 110,
+		28562: 110,
+		28563: 110,
+		28564: 110,
+		28565: 100,
+	}
+	tbl := L.NewTable()
+	for k, v := range dummies {
+		tbl.RawSetInt(int(k), lua.LNumber(v))
+	}
+	L.Push(tbl)
+	return 1
+}
 func (e *Engine) gameGetTalkActions(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetEventCallbacks(L *lua.LState) int { return 0 }
 func (e *Engine) gameRegisterAchievement(L *lua.LState) int { return 0 }

@@ -18,7 +18,7 @@ db-down:
 
 # Run the server (applies schema + seeds the test account).
 run: build
-	./bin/canary -config config.lua -schema schema/postgres.sql -scripts scripts -migrate -seed
+	./bin/canary -config config.lua -schema schema/mysql.sql -scripts scripts -migrate -seed
 
 # Just the login/game client against a running server.
 client: build
