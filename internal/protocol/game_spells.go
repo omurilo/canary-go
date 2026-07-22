@@ -1,7 +1,10 @@
 package protocol
 
 import (
+	"strings"
+
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/game/vocations"
 	"github.com/opentibiabr/canary-go/internal/luaengine"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 	"github.com/opentibiabr/canary-go/internal/spells"
@@ -111,8 +114,25 @@ func (g *GameProtocol) spellCastCheck(sp *spells.Spell) bool {
 			return false
 		}
 	}
-	// TODO(spells): enforce vocation restriction (sp.VocationNames) once a
-	// vocation-id<->name registry is wired; skipped so casting is not blocked.
+	if len(sp.VocationNames) > 0 {
+		voc := vocations.GetVocation(uint32(p.Vocation))
+		if voc == nil {
+			g.failCast("Your vocation cannot cast this spell.")
+			return false
+		}
+		allowed := false
+		playerVocName := strings.ToLower(voc.Name)
+		for _, name := range sp.VocationNames {
+			if name == playerVocName {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			g.failCast("Your vocation cannot cast this spell.")
+			return false
+		}
+	}
 
 	return true
 }
