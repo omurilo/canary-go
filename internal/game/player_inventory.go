@@ -342,10 +342,16 @@ func (p *Player) mergeIntoStack(it *Item, stackSize uint16) bool {
 			}
 			if existing.ID == it.ID && existing.Count < stackSize {
 				room := stackSize - existing.Count
-				if it.Count <= room {
-					existing.Count += it.Count
-					it.Count = 0
-					return true
+				if room > 0 {
+					take := it.Count
+					if take > room {
+						take = room
+					}
+					existing.Count += take
+					it.Count -= take
+					if it.Count == 0 {
+						return true
+					}
 				}
 			}
 			if len(existing.Contents) > 0 && try(existing.Contents) {

@@ -158,6 +158,9 @@ func (e *Engine) containerMethods() map[string]lua.LGFunction {
 				count = 1
 			}
 			cat := e.itemCatalog()
+			if it := cat.Get(itemID); it != nil && it.Stackable && count > 100 {
+				count = 100
+			}
 			// Reject when the container is full.
 			if int(c.item.ContainerCapacity(cat)) <= len(c.item.Contents) {
 				L.Push(lua.LFalse)

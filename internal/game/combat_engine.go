@@ -557,6 +557,9 @@ func rollLoot(loot []creatures.LootBlock) []*Item {
 				hi = lo
 			}
 			count = uint16(lo + uint32(rand.Intn(int(hi-lo+1))))
+			if count > 100 {
+				count = 100
+			}
 		}
 		item := &Item{ID: lb.ID, Count: count}
 		if len(lb.ChildLoot) > 0 {

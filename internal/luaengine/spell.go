@@ -70,6 +70,8 @@ var spellMethods = map[string]lua.LGFunction{
 	"charges":     spellNoop,
 	"allowFarUse": spellNoop,
 	"setPzLocked": spellPzLock,
+	"monkSpellType": spellNoop,
+	"hasPlayerNameParam": spellNoop,
 	"register":    spellRegister,
 }
 

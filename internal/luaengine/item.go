@@ -204,6 +204,8 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		"canBeMoved": stubItemMethod,
 		"transform": e.itemTransform,
 		"decay": stubItemMethod,
+		"setDuration": stubItemMethod,
+		"stopDecay": stubItemMethod,
 		"getDescription": e.itemGetDescription,
 		"isInsideDepot": stubItemMethod,
 		"isContainer": stubItemMethod,

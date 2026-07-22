@@ -136,6 +136,11 @@ func (e *Engine) gameCreateItem(L *lua.LState) int {
 	id := L.CheckInt(1)
 	count := L.OptInt(2, 1)
 
+	cat := e.itemCatalog()
+	if it := cat.Get(uint16(id)); it != nil && it.Stackable && count > 100 {
+		count = 100
+	}
+
 	item := &game.Item{
 		ID:    uint16(id),
 		Count: uint16(count),

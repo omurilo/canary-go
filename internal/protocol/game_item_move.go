@@ -211,27 +211,92 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	// 4. Add to destination
 	if toPos.X != 0xFFFF {
 		pos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
-		if !g.deps.World.AddItem(pos, moveItem) {
-			// Create a new tile if none exists
-			g.deps.World.Map.SetTile(pos, &game.Tile{Items: []*game.Item{moveItem}})
+		
+		// Map merging logic
+		tile := g.deps.World.Map.GetTile(pos)
+		var merged bool
+		if tile != nil && len(tile.Items) > 0 && it != nil && it.Stackable {
+			topItem := tile.Items[len(tile.Items)-1]
+			if topItem.ID == moveItem.ID && topItem.Count < 100 {
+				room := 100 - topItem.Count
+				take := moveItem.Count
+				if take > room {
+					take = room
+				}
+				topItem.Count += take
+				moveItem.Count -= take
+				g.broadcastUpdateTileThing(pos, uint8(len(tile.Items)-1), topItem)
+				if moveItem.Count == 0 {
+					merged = true
+				}
+			}
 		}
-		g.broadcastAddTileItem(pos, moveItem)
+
+		if !merged {
+			if !g.deps.World.AddItem(pos, moveItem) {
+				// Create a new tile if none exists
+				g.deps.World.Map.SetTile(pos, &game.Tile{Items: []*game.Item{moveItem}})
+			}
+			g.broadcastAddTileItem(pos, moveItem)
+		}
 	} else {
 		if toPos.Y >= 0x40 {
 			cid := uint8(toPos.Y - 0x40)
 			if toContainer, ok := g.openContainerByCID(cid); ok {
-				// Insert at the beginning of the container (index 0)
-				toContainer.Contents = append([]*game.Item{moveItem}, toContainer.Contents...)
-				if len(toContainer.Contents) > 0xFF {
-					toContainer.Contents = toContainer.Contents[:0xFF] // simple truncation
+				toSlot := int(toPos.Z)
+				var merged bool
+				if toSlot < len(toContainer.Contents) && it != nil && it.Stackable {
+					targetItem := toContainer.Contents[toSlot]
+					if targetItem.ID == moveItem.ID && targetItem.Count < 100 {
+						room := 100 - targetItem.Count
+						take := moveItem.Count
+						if take > room {
+							take = room
+						}
+						targetItem.Count += take
+						moveItem.Count -= take
+						g.sendUpdateContainerItem(cid, uint8(toSlot), targetItem)
+						if moveItem.Count == 0 {
+							merged = true
+						}
+					}
 				}
-				g.sendAddContainerItem(cid, 0, moveItem)
+
+				if !merged {
+					// Insert at the beginning of the container (index 0)
+					toContainer.Contents = append([]*game.Item{moveItem}, toContainer.Contents...)
+					if len(toContainer.Contents) > 0xFF {
+						toContainer.Contents = toContainer.Contents[:0xFF] // simple truncation
+					}
+					g.sendAddContainerItem(cid, 0, moveItem)
+				}
 			}
 		} else {
 			toSlot := uint8(toPos.Y)
 			if toSlot > 0 && toSlot <= 10 {
-				g.player.Inventory[toSlot] = moveItem
-				g.sendInventoryItem(toSlot, moveItem)
+				var merged bool
+				if it != nil && it.Stackable {
+					if targetItem := g.player.Inventory[toSlot]; targetItem != nil {
+						if targetItem.ID == moveItem.ID && targetItem.Count < 100 {
+							room := 100 - targetItem.Count
+							take := moveItem.Count
+							if take > room {
+								take = room
+							}
+							targetItem.Count += take
+							moveItem.Count -= take
+							g.sendInventoryItem(toSlot, targetItem)
+							if moveItem.Count == 0 {
+								merged = true
+							}
+						}
+					}
+				}
+
+				if !merged {
+					g.player.Inventory[toSlot] = moveItem
+					g.sendInventoryItem(toSlot, moveItem)
+				}
 			}
 		}
 	}
