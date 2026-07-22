@@ -375,6 +375,71 @@ func (e *Engine) registerAPI() {
 	e.registerCombat()
 	e.registerVariant()
 	e.registerCondition()
+	e.registerDB()
+
+	// addPlayerEvent global fallback function if modules.lua isn't loaded yet
+	L.SetGlobal("addPlayerEvent", L.NewFunction(func(L *lua.LState) int {
+		fn := L.Get(1)
+		delay := L.CheckInt(2)
+		target := L.Get(3)
+		n := L.GetTop()
+		args := make([]lua.LValue, 0, n-3)
+		for i := 4; i <= n; i++ {
+			args = append(args, L.Get(i))
+		}
+		addEv := L.GetGlobal("addEvent")
+		if addEvFn, ok := addEv.(*lua.LFunction); ok {
+			wrapper := L.NewFunction(func(L *lua.LState) int {
+				pVal := L.Get(2)
+				callArgs := []lua.LValue{pVal}
+				top := L.GetTop()
+				for i := 3; i <= top; i++ {
+					callArgs = append(callArgs, L.Get(i))
+				}
+				L.Push(fn)
+				for _, arg := range callArgs {
+					L.Push(arg)
+				}
+				L.Call(len(callArgs), 0)
+				return 0
+			})
+			L.Push(addEvFn)
+			L.Push(wrapper)
+			L.Push(lua.LNumber(delay))
+			L.Push(target)
+			for _, arg := range args {
+				L.Push(arg)
+			}
+			L.Call(3+len(args), 0)
+		}
+		return 0
+	}))
+
+	// DailyReward table fallback
+	dailyRewardTbl := L.NewTable()
+	L.SetField(dailyRewardTbl, "init", L.NewFunction(func(L *lua.LState) int { return 0 }))
+	storagesTbl := L.NewTable()
+	L.SetField(storagesTbl, "lastServerSave", lua.LNumber(1001))
+	L.SetField(dailyRewardTbl, "storages", storagesTbl)
+	L.SetGlobal("DailyReward", dailyRewardTbl)
+
+	// QuestTrackerServerConfig fallback
+	qtConfigTbl := L.NewTable()
+	L.SetField(qtConfigTbl, "loginLoadDelay", lua.LNumber(1000))
+	L.SetField(qtConfigTbl, "initialSyncWindow", lua.LNumber(5000))
+	L.SetGlobal("QuestTrackerServerConfig", qtConfigTbl)
+
+	// VOCATION table
+	vocTbl := L.NewTable()
+	baseIdTbl := L.NewTable()
+	L.SetField(baseIdTbl, "NONE", lua.LNumber(0))
+	L.SetField(baseIdTbl, "SORCERER", lua.LNumber(1))
+	L.SetField(baseIdTbl, "DRUID", lua.LNumber(2))
+	L.SetField(baseIdTbl, "PALADIN", lua.LNumber(3))
+	L.SetField(baseIdTbl, "KNIGHT", lua.LNumber(4))
+	L.SetField(baseIdTbl, "MONK", lua.LNumber(5))
+	L.SetField(vocTbl, "BASE_ID", baseIdTbl)
+	L.SetGlobal("VOCATION", vocTbl)
 }
 
 // SetGameFunc registers a Go function as a field on the global Game table.

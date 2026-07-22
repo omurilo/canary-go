@@ -48,6 +48,15 @@ func RegisterEnums(L *lua.LState) {
 		// Messages
 		"MESSAGE_GAMEMASTER_CONSOLE":  13,
 		"MESSAGE_LOGIN":               17,
+
+		// Groups
+		"GROUP_TYPE_NONE":             0,
+		"GROUP_TYPE_NORMAL":           1,
+		"GROUP_TYPE_TUTOR":            2,
+		"GROUP_TYPE_SENIORTUTOR":      3,
+		"GROUP_TYPE_GAMEMASTER":       4,
+		"GROUP_TYPE_COMMUNITYMANAGER": 5,
+		"GROUP_TYPE_GOD":              6,
 		"MESSAGE_ADMINISTRATOR":       18,
 		"MESSAGE_EVENT_ADVANCE":       19,
 		"MESSAGE_GAME_HIGHLIGHT":      20,

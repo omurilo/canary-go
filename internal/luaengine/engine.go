@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opentibiabr/canary-go/internal/db"
 	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -28,10 +29,11 @@ func preprocessLuaSource(src string) string {
 // Engine owns a Lua state guarded by a mutex (gopher-lua states are not
 // goroutine-safe).
 type Engine struct {
-	mu    sync.Mutex
-	L     *lua.LState
-	log   *slog.Logger
-	world *game.World
+	mu       sync.Mutex
+	L        *lua.LState
+	log      *slog.Logger
+	world    *game.World
+	database *db.DB
 
 	npcCallbacksMu sync.Mutex
 	npcCallbacks   map[string]map[string]*lua.LFunction

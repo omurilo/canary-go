@@ -148,6 +148,8 @@ var playerMethods = map[string]lua.LGFunction{
 	"getVocation": playerGetvocation,
 	"setVocation": playerSetvocation,
 	"isPromoted": playerIspromoted,
+	"isPremium": playerIspremium,
+	"getFinalBaseRateExperience": playerGetfinalbaserateexperience,
 	"getSex": playerGetsex,
 	"setSex": playerSetsex,
 	"getPronoun": playerGetpronoun,
@@ -1337,7 +1339,29 @@ func playerGetgrindingxpboost(L *lua.LState) int {
 }
 
 func playerGetgroup(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	groupID := uint32(1)
+	if p != nil && p.GroupID != 0 {
+		groupID = uint32(p.GroupID)
+	}
+	tbl := L.NewTable()
+	L.SetField(tbl, "getId", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(groupID))
+		return 1
+	}))
+	L.SetField(tbl, "getName", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LString("Player"))
+		return 1
+	}))
+	L.SetField(tbl, "getFlags", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(0))
+		return 1
+	}))
+	L.SetField(tbl, "getAccess", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LFalse)
+		return 1
+	}))
+	L.Push(tbl)
 	return 1
 }
 
@@ -1905,7 +1929,29 @@ func playerGetstoragevalue(L *lua.LState) int {
 }
 
 func playerGetstoreinbox(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	tbl := L.NewTable()
+	L.SetField(tbl, "getItems", L.NewFunction(func(L *lua.LState) int {
+		L.Push(L.NewTable())
+		return 1
+	}))
+	L.SetField(tbl, "getEmptySlots", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(30))
+		return 1
+	}))
+	L.SetField(tbl, "getItemCount", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(0))
+		return 1
+	}))
+	L.SetField(tbl, "getCapacity", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(30))
+		return 1
+	}))
+	L.Push(tbl)
 	return 1
 }
 
@@ -2015,6 +2061,18 @@ func playerGetvocation(L *lua.LState) int {
 		L.Push(lua.LNumber(voc.ID))
 		return 1
 	}))
+	L.SetField(ud, "getBaseId", L.NewFunction(func(L *lua.LState) int {
+		baseID := voc.ID
+		if baseID > 4 {
+			baseID = ((baseID - 1) % 4) + 1
+		}
+		L.Push(lua.LNumber(baseID))
+		return 1
+	}))
+	L.SetField(ud, "getClientId", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(voc.ID))
+		return 1
+	}))
 	L.SetField(ud, "getName", L.NewFunction(func(L *lua.LState) int {
 		L.Push(lua.LString(voc.Name))
 		return 1
@@ -2039,6 +2097,21 @@ func playerGetvocation(L *lua.LState) int {
 
 	L.SetMetatable(ud, mt)
 	L.Push(ud)
+	return 1
+}
+
+func playerIspremium(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func playerGetfinalbaserateexperience(L *lua.LState) int {
+	L.Push(lua.LNumber(1.0))
 	return 1
 }
 

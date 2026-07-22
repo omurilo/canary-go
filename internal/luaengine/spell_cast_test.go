@@ -1,11 +1,13 @@
 package luaengine
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
-	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/spells"
+	lua "github.com/yuin/gopher-lua"
 )
 
 // setupSpellWorld wires a combat engine + effect hooks onto the test engine's
@@ -374,6 +376,58 @@ func TestGlobalKVStore(t *testing.T) {
 	`)
 	if err != nil {
 		t.Fatalf("Global KVStore Lua verification failed: %v", err)
+	}
+}
+
+func TestLoginAndSystemScriptsSmoke(t *testing.T) {
+	e := newTestEngine()
+
+	// Verify db and Result tables and addPlayerEvent
+	err := e.DoString(`
+		assert(db ~= nil, "expected db global table")
+		assert(Result ~= nil, "expected Result global table")
+		assert(addPlayerEvent ~= nil, "expected addPlayerEvent global function")
+
+		local res = db.storeQuery("SELECT 1")
+		assert(res == false or type(res) == "number", "expected storeQuery to return false or number")
+	`)
+	if err != nil {
+		t.Fatalf("db/Result/addPlayerEvent verification failed: %v", err)
+	}
+
+	_ = e.DoFile(filepath.Join("..", "..", "..", "data", "global.lua"))
+	_ = e.DoFile(filepath.Join("..", "..", "..", "data", "libs", "libs.lua"))
+
+	// Verify loading the 5 target scripts
+	files := []string{
+		"data/scripts/creaturescripts/familiar/on_login.lua",
+		"data/scripts/creaturescripts/others/remove_empty_parcel.lua",
+		"data/scripts/creaturescripts/player/login.lua",
+		"data/scripts/talkactions/player/livestream_system.lua",
+		"data/scripts/creaturescripts/player/name_lock.lua",
+	}
+
+	for _, rel := range files {
+		abs := filepath.Join("..", "..", "..", rel)
+		if _, err := os.Stat(abs); os.IsNotExist(err) {
+			continue
+		}
+		if err := e.DoFile(abs); err != nil {
+			t.Errorf("Failed to load script %s: %v", rel, err)
+		}
+	}
+
+	p := &game.Player{Name: "SmokeTester", ID: 1, Vocation: 1, Level: 200, TownID: 1}
+	for _, fn := range e.creatureEventsOnLogin {
+		e.mu.Lock()
+		L := e.L
+		L.Push(fn)
+		e.pushCreature(L, p)
+		err := L.PCall(1, 1, nil)
+		e.mu.Unlock()
+		if err != nil {
+			t.Errorf("onLogin event execution error: %v", err)
+		}
 	}
 }
 
