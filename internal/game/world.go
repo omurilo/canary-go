@@ -18,6 +18,7 @@ type World struct {
 	TownsByID      map[uint16]Position // town id -> temple position (from the OTBM)
 	TownNames      map[uint16]string   // town id -> name (from the OTBM)
 	DefaultSpawn   Position
+	WorldType      uint8 // 1 = WORLD_TYPE_NO_PVP, 2 = WORLD_TYPE_PVP, 3 = WORLD_TYPE_PVP_ENFORCED
 	players        map[uint32]*Player
 	byName         map[string]*Player
 	creatures      map[uint32]Creature
@@ -461,7 +462,7 @@ func (w *World) TeleportCreature(c Creature, dest Position) {
 func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 	dest := c.GetPosition().Offset(dir)
 	destTile := w.Map.GetTile(dest)
-	if destTile == nil || !destTile.Walkable(w.Items) {
+	if destTile == nil || !destTile.WalkableFor(c, w.Items, w.WorldType) {
 		return c.GetPosition(), false
 	}
 	if c.GetCreatureType() != 0 && destTile.IsProtectionZone() {

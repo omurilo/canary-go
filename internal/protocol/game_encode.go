@@ -144,13 +144,38 @@ func (g *GameProtocol) addCreature(w *netmsg.Writer, c game.Creature) {
 	w.AddByte(0)    // speech bubble
 	w.AddByte(0xFF) // mark (unmarked)
 	w.AddByte(0)    // inspection type
-	w.AddByte(0)    // walkthrough (can walk through: 0)
+	walkthrough := byte(0x01)
+	if g.canWalkthroughEx(g.player, c) {
+		walkthrough = byte(0x00)
+	}
+	w.AddByte(walkthrough) // walkthrough (can walk through: 0, solid: 1)
 }
 
 // isTopItem reports whether an item stacks below creatures (always-on-top).
 func (g *GameProtocol) isTopItem(it *game.Item) bool {
 	t := g.deps.Items.Get(it.ID)
 	return t != nil && t.AlwaysOnTop()
+}
+
+func (g *GameProtocol) canWalkthroughEx(observer *game.Player, target game.Creature) bool {
+	if observer == nil || target == nil {
+		return false
+	}
+	if targetP, ok := target.(*game.Player); ok {
+		if targetP.Ghost {
+			return true
+		}
+		if observer.GroupID >= 3 {
+			return true
+		}
+		if g.deps != nil && g.deps.World != nil {
+			tile := g.deps.World.Map.GetTile(targetP.GetPosition())
+			if tile != nil && (tile.IsProtectionZone() || g.deps.World.WorldType == 1 || g.deps.World.WorldType == 0) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (g *GameProtocol) canSeeCreature(c game.Creature) bool {

@@ -22,12 +22,9 @@ func (t *Tile) IsProtectionZone() bool {
 	return (t.Flags & 1) != 0
 }
 
-// Walkable reports whether a creature may stand on the tile.
-func (t *Tile) Walkable(catalog *items.Catalog) bool {
+// WalkableFor reports whether mover may stand on or walk through the tile.
+func (t *Tile) WalkableFor(mover Creature, catalog *items.Catalog, worldType uint8) bool {
 	if t == nil || t.Ground == nil {
-		return false
-	}
-	if len(t.Creatures) > 0 {
 		return false
 	}
 	if catalog != nil {
@@ -40,7 +37,42 @@ func (t *Tile) Walkable(catalog *items.Catalog) bool {
 			}
 		}
 	}
+
+	if len(t.Creatures) > 0 {
+		moverPlayer, isMoverPlayer := mover.(*Player)
+		for _, other := range t.Creatures {
+			if other == mover {
+				continue
+			}
+			otherPlayer, isOtherPlayer := other.(*Player)
+			if isOtherPlayer {
+				if otherPlayer.Ghost {
+					continue
+				}
+				if isMoverPlayer {
+					// Both are players! Check if walkthrough is allowed:
+					if t.IsProtectionZone() {
+						continue
+					}
+					if worldType == 1 || worldType == 0 { // WORLD_TYPE_NO_PVP or Optional-PVP
+						continue
+					}
+					if moverPlayer.GroupID >= 3 {
+						continue
+					}
+				}
+				return false
+			} else {
+				return false
+			}
+		}
+	}
 	return true
+}
+
+// Walkable reports whether a creature may stand on the tile.
+func (t *Tile) Walkable(catalog *items.Catalog) bool {
+	return t.WalkableFor(nil, catalog, 1)
 }
 
 // HeightCount returns how many items on the tile (ground + stack) carry the
