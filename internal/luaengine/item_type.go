@@ -71,6 +71,12 @@ func (e *Engine) registerItemType() {
 			L.Push(lua.LNumber(it.id))
 			return 1
 		},
+		"hasProperty": func(L *lua.LState) int {
+			_ = checkItemType(L, 1)
+			_ = L.OptInt(2, 0)
+			L.Push(lua.LFalse)
+			return 1
+		},
 	}
 
 	e.L.SetFuncs(mt, methods)

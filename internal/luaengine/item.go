@@ -132,6 +132,18 @@ func itemRemove(L *lua.LState) int {
 func (e *Engine) itemMethods() map[string]lua.LGFunction {
 	return map[string]lua.LGFunction{
 		"isItem": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
+		"hasProperty": func(L *lua.LState) int {
+			it := checkItem(L)
+			_ = L.OptInt(2, 0)
+			var has bool
+			if cat := e.itemCatalog(); cat != nil {
+				if ct := cat.Get(it.item.ID); ct != nil {
+					has = ct.BlockSolid
+				}
+			}
+			L.Push(lua.LBool(has))
+			return 1
+		},
 		"getId": func(L *lua.LState) int { 
 			it := checkItem(L)
 			L.Push(lua.LNumber(it.item.ID))
