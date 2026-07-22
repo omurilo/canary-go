@@ -1,6 +1,7 @@
 package game
 
 import (
+	"log/slog"
 	"strings"
 	"time"
 
@@ -116,6 +117,9 @@ func (e *SpawnEngine) spawnCreature(s *Spawn) {
 		if e.Types != nil {
 			nType = e.Types.Npcs[strings.ToLower(s.Name)]
 		}
+		if nType == nil {
+			slog.Warn("spawned npc type not found in registry; falling back to default NPC attributes", "name", s.Name)
+		}
 		npc := NewNpc(id, s.Name, nType)
 		npc.SetPosition(s.Pos)
 		c = npc
@@ -123,6 +127,9 @@ func (e *SpawnEngine) spawnCreature(s *Spawn) {
 		var mType *creatures.MonsterType
 		if e.Types != nil {
 			mType = e.Types.Monsters[strings.ToLower(s.Name)]
+		}
+		if mType == nil {
+			slog.Warn("spawned monster type not found in registry; falling back to default Rat attributes", "name", s.Name)
 		}
 		monster := NewMonster(id, s.Name, mType)
 		monster.SetPosition(s.Pos)
