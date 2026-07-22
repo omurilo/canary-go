@@ -491,8 +491,13 @@ func (g *GameProtocol) addStats(w *netmsg.Writer) {
 		regenSecs = 0xFFFF
 	}
 	w.AddU16(uint16(regenSecs)) // regeneration seconds
-	w.AddU16(0)                 // offline training minutes
-	w.AddU16(0)  // xp boost time
+
+	offlineTrainingMinutes := uint16(0)
+	if p.OfflineTrainingTime > 0 {
+		offlineTrainingMinutes = uint16(p.OfflineTrainingTime / 60000)
+	}
+	w.AddU16(offlineTrainingMinutes) // offline training minutes
+	w.AddU16(0)                      // xp boost time
 	w.AddByte(1) // can buy xp boost
 	w.AddU32(0)  // mana shield
 	w.AddU32(0)  // max mana shield
