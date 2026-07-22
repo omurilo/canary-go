@@ -2,6 +2,7 @@ package luaengine
 
 import (
 	"strings"
+	"sync"
 
 	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -2336,6 +2337,11 @@ func playerKv(L *lua.LState) int {
 	return 1
 }
 
+var (
+	globalKVStore   = make(map[string]any)
+	globalKVStoreMu sync.RWMutex
+)
+
 type LuaKVStore struct {
 	Player *game.Player
 	Scope  []string
@@ -2359,24 +2365,56 @@ func (e *Engine) registerKVStoreType() {
 		"scoped": kvStoreScoped,
 	}
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
+
+	// Register global KV variable matching C++ global KV instance
+	gKv := &LuaKVStore{
+		Player: nil,
+		Scope:  nil,
+	}
+	ud := e.L.NewUserData()
+	ud.Value = gKv
+	e.L.SetMetatable(ud, mt)
+	e.L.SetGlobal("KV", ud)
 }
 
 func kvStoreGet(L *lua.LState) int {
-	kv := checkKVStore(L)
-	if kv == nil {
-		return 0
+	var kv *LuaKVStore
+	var key string
+
+	if ud, ok := L.Get(1).(*lua.LUserData); ok {
+		if k, ok := ud.Value.(*LuaKVStore); ok {
+			kv = k
+			key = L.CheckString(2)
+		}
 	}
-	key := L.CheckString(2)
+
+	if kv == nil {
+		kv = &LuaKVStore{
+			Player: nil,
+			Scope:  nil,
+		}
+		key = L.CheckString(1)
+	}
+
 	fullKey := key
 	if len(kv.Scope) > 0 {
 		fullKey = strings.Join(kv.Scope, ".") + "." + key
 	}
 
-	if kv.Player.KVStore == nil {
-		kv.Player.KVStore = make(map[string]any)
+	var val any
+	var exists bool
+
+	if kv.Player != nil {
+		if kv.Player.KVStore == nil {
+			kv.Player.KVStore = make(map[string]any)
+		}
+		val, exists = kv.Player.KVStore[fullKey]
+	} else {
+		globalKVStoreMu.RLock()
+		val, exists = globalKVStore[fullKey]
+		globalKVStoreMu.RUnlock()
 	}
 
-	val, exists := kv.Player.KVStore[fullKey]
 	if !exists {
 		L.Push(lua.LNil)
 		return 1
@@ -2406,63 +2444,128 @@ func kvStoreGet(L *lua.LState) int {
 }
 
 func kvStoreSet(L *lua.LState) int {
-	kv := checkKVStore(L)
-	if kv == nil {
-		return 0
+	var kv *LuaKVStore
+	var key string
+	var val lua.LValue
+
+	if ud, ok := L.Get(1).(*lua.LUserData); ok {
+		if k, ok := ud.Value.(*LuaKVStore); ok {
+			kv = k
+			key = L.CheckString(2)
+			val = L.Get(3)
+		}
 	}
-	key := L.CheckString(2)
-	val := L.Get(3)
+
+	if kv == nil {
+		kv = &LuaKVStore{
+			Player: nil,
+			Scope:  nil,
+		}
+		key = L.CheckString(1)
+		val = L.Get(2)
+	}
+
 	fullKey := key
 	if len(kv.Scope) > 0 {
 		fullKey = strings.Join(kv.Scope, ".") + "." + key
 	}
 
-	if kv.Player.KVStore == nil {
-		kv.Player.KVStore = make(map[string]any)
-	}
-
-	if val == lua.LNil {
-		delete(kv.Player.KVStore, fullKey)
-	} else {
-		switch v := val.(type) {
-		case lua.LString:
-			kv.Player.KVStore[fullKey] = string(v)
-		case lua.LNumber:
-			kv.Player.KVStore[fullKey] = float64(v)
-		case lua.LBool:
-			kv.Player.KVStore[fullKey] = bool(v)
-		default:
-			// ignore unsupported complex types for now
+	if kv.Player != nil {
+		if kv.Player.KVStore == nil {
+			kv.Player.KVStore = make(map[string]any)
 		}
+		if val == lua.LNil {
+			delete(kv.Player.KVStore, fullKey)
+		} else {
+			switch v := val.(type) {
+			case lua.LString:
+				kv.Player.KVStore[fullKey] = string(v)
+			case lua.LNumber:
+				kv.Player.KVStore[fullKey] = float64(v)
+			case lua.LBool:
+				kv.Player.KVStore[fullKey] = bool(v)
+			default:
+				// ignore unsupported complex types for now
+			}
+		}
+	} else {
+		globalKVStoreMu.Lock()
+		if val == lua.LNil {
+			delete(globalKVStore, fullKey)
+		} else {
+			switch v := val.(type) {
+			case lua.LString:
+				globalKVStore[fullKey] = string(v)
+			case lua.LNumber:
+				globalKVStore[fullKey] = float64(v)
+			case lua.LBool:
+				globalKVStore[fullKey] = bool(v)
+			default:
+				// ignore unsupported complex types for now
+			}
+		}
+		globalKVStoreMu.Unlock()
 	}
 	L.Push(lua.LTrue)
 	return 1
 }
 
 func kvStoreRemove(L *lua.LState) int {
-	kv := checkKVStore(L)
-	if kv == nil {
-		return 0
+	var kv *LuaKVStore
+	var key string
+
+	if ud, ok := L.Get(1).(*lua.LUserData); ok {
+		if k, ok := ud.Value.(*LuaKVStore); ok {
+			kv = k
+			key = L.CheckString(2)
+		}
 	}
-	key := L.CheckString(2)
+
+	if kv == nil {
+		kv = &LuaKVStore{
+			Player: nil,
+			Scope:  nil,
+		}
+		key = L.CheckString(1)
+	}
+
 	fullKey := key
 	if len(kv.Scope) > 0 {
 		fullKey = strings.Join(kv.Scope, ".") + "." + key
 	}
 
-	if kv.Player.KVStore != nil {
-		delete(kv.Player.KVStore, fullKey)
+	if kv.Player != nil {
+		if kv.Player.KVStore != nil {
+			delete(kv.Player.KVStore, fullKey)
+		}
+	} else {
+		globalKVStoreMu.Lock()
+		delete(globalKVStore, fullKey)
+		globalKVStoreMu.Unlock()
 	}
 	L.Push(lua.LTrue)
 	return 1
 }
 
 func kvStoreScoped(L *lua.LState) int {
-	kv := checkKVStore(L)
-	if kv == nil {
-		return 0
+	var kv *LuaKVStore
+	var scopeName string
+
+	if ud, ok := L.Get(1).(*lua.LUserData); ok {
+		if k, ok := ud.Value.(*LuaKVStore); ok {
+			kv = k
+			scopeName = L.CheckString(2)
+		}
 	}
-	scopeName := L.CheckString(2)
+
+	if kv == nil {
+		kv = &LuaKVStore{
+			Player: nil,
+			Scope:  nil,
+		}
+		scopeName = L.CheckString(1)
+	}
+
 	newScope := append([]string{}, kv.Scope...)
 	newScope = append(newScope, scopeName)
 

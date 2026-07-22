@@ -351,5 +351,31 @@ func TestPlayerKVStore(t *testing.T) {
 	}
 }
 
+func TestGlobalKVStore(t *testing.T) {
+	e := newTestEngine()
+
+	// test getting, setting, and scoped namespaces for global KV, including dot convention calls
+	err := e.DoString(`
+		assert(KV ~= nil, "expected KV to be registered globally")
+		assert(KV.get("global_foo") == nil, "expected nil global foo")
+		KV.set("global_foo", "global_val")
+		assert(KV.get("global_foo") == "global_val", "expected global_val")
+
+		-- test dot scoped convention used by action scripts
+		local scoped = KV.scoped("eventscheduler")
+		assert(scoped ~= nil, "expected scoped object")
+		assert(scoped:get("fast-exercise") == nil, "expected fast-exercise to be nil")
+		scoped:set("fast-exercise", "yes")
+		assert(scoped:get("fast-exercise") == "yes", "expected fast-exercise to be yes")
+
+		-- verify nested namespaces and generic remove
+		scoped:remove("fast-exercise")
+		assert(scoped:get("fast-exercise") == nil, "expected removed fast-exercise")
+	`)
+	if err != nil {
+		t.Fatalf("Global KVStore Lua verification failed: %v", err)
+	}
+}
+
 
 
