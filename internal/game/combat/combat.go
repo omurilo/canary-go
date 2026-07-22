@@ -98,6 +98,13 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 		target.RemoveCondition(c.Params.DispelType)
 	}
 
+	// Apply PvP reduction
+	_, casterIsPlayer := caster.(Player)
+	_, targetIsPlayer := target.(Player)
+	if casterIsPlayer && targetIsPlayer && damage.PrimaryType != CombatHealing {
+		damage.PrimaryValue = damage.PrimaryValue / 2
+	}
+
 	// Calculate and apply armor/shield blocking here if needed
 	if damage.PrimaryType != CombatHealing && damage.PrimaryValue > 0 {
 		if c.Params.BlockedByShield {
@@ -119,6 +126,18 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 			} else if armor > 0 {
 				damage.PrimaryValue--
 			}
+			if damage.PrimaryValue <= 0 {
+				damage.PrimaryValue = 0
+			}
+		}
+	}
+
+	// Apply elemental resistance
+	if damage.PrimaryType != CombatHealing && damage.PrimaryValue > 0 {
+		res := target.GetResistance(damage.PrimaryType)
+		if res != 0 {
+			multiplier := 1.0 - (float64(res) / 100.0)
+			damage.PrimaryValue = int32(float64(damage.PrimaryValue) * multiplier)
 			if damage.PrimaryValue <= 0 {
 				damage.PrimaryValue = 0
 			}

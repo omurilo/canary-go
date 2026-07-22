@@ -20,16 +20,10 @@ const conditionRegeneration = 14
 
 const luaConditionTypeName = "Condition"
 
-// luaCondition wraps the combat condition type plus captured parameters.
-// rawType keeps the original Lua CONDITION_* value (needed to recognise
-// CONDITION_REGENERATION, which has no combat.ConditionType mapping). When
-// boundPlayer is set (a regeneration condition returned by getCondition),
-// getTicks/setTicks read and write that player's RegenTicks so the food script's
-// accumulate-and-check logic works against live state.
+// luaCondition wraps a real, concrete combat.Condition and tracks raw Lua type.
 type luaCondition struct {
-	condType    combat.ConditionType
+	cond        combat.Condition
 	rawType     int
-	ticks       int32
 	boundPlayer *game.Player
 }
 
@@ -40,11 +34,30 @@ func (e *Engine) registerCondition() {
 }
 
 func conditionConstructor(L *lua.LState) int {
-	c := &luaCondition{}
+	rawType := 0
 	if L.GetTop() >= 1 && L.Get(2).Type() == lua.LTNumber {
-		c.rawType = luaOptInt(L, 2)
-		c.condType = luaToConditionType(c.rawType)
+		rawType = luaOptInt(L, 2)
 	}
+	condType := luaToConditionType(rawType)
+
+	conditionId := combat.ConditionId(0)
+	if L.GetTop() >= 3 {
+		conditionId = combat.ConditionId(luaOptInt(L, 3))
+	}
+	subId := uint32(0)
+	if L.GetTop() >= 4 {
+		subId = uint32(luaOptInt(L, 4))
+	}
+	isPersistent := false
+	if L.GetTop() >= 5 {
+		isPersistent = L.ToBool(5)
+	}
+
+	c := &luaCondition{
+		rawType: rawType,
+		cond:    combat.CreateCondition(conditionId, condType, 0, subId, isPersistent),
+	}
+
 	ud := L.NewUserData()
 	ud.Value = c
 	L.SetMetatable(ud, L.GetTypeMetatable(luaConditionTypeName))
@@ -52,21 +65,24 @@ func conditionConstructor(L *lua.LState) int {
 	return 1
 }
 
-// getTicks/setTicks read/write the bound player's RegenTicks for a regeneration
-// condition, else the local ticks value.
 func (c *luaCondition) getTicks() int32 {
 	if c.boundPlayer != nil && c.rawType == conditionRegeneration {
 		return c.boundPlayer.RegenTicks
 	}
-	return c.ticks
+	if c.cond != nil {
+		return c.cond.GetTicks()
+	}
+	return 0
 }
 
 func (c *luaCondition) setTicks(t int32) {
-	c.ticks = t
+	if c.cond != nil {
+		c.cond.SetTicks(t)
+	}
 	if c.boundPlayer != nil && c.rawType == conditionRegeneration {
 		c.boundPlayer.RegenTicks = t
 		if c.boundPlayer.Session != nil {
-			c.boundPlayer.Session.SendStats() // refresh the client's food timer
+			c.boundPlayer.Session.SendStats() // refresh client food timer
 		}
 	}
 }
@@ -83,16 +99,32 @@ func checkCondition(L *lua.LState, n int) *luaCondition {
 var conditionMethods = map[string]lua.LGFunction{
 	"setParameter": func(L *lua.LState) int {
 		c := checkCondition(L, 1)
-		// CONDITION_PARAM_TICKS == 2 (creatures_definitions.hpp).
-		if luaOptInt(L, 2) == 2 {
-			c.setTicks(int32(luaOptInt(L, 3)))
+		key := int32(luaOptInt(L, 2))
+		var value int32
+		if L.Get(3).Type() == lua.LTBool {
+			if L.ToBool(3) {
+				value = 1
+			} else {
+				value = 0
+			}
+		} else {
+			value = int32(luaOptInt(L, 3))
 		}
-		return 0
+		if c.cond != nil {
+			c.cond.SetParam(key, value)
+		}
+		// Special case for ticks parameter
+		if key == 2 {
+			c.setTicks(value)
+		}
+		L.Push(lua.LTrue)
+		return 1
 	},
 	"setTicks": func(L *lua.LState) int {
 		c := checkCondition(L, 1)
 		c.setTicks(int32(luaOptInt(L, 2)))
-		return 0
+		L.Push(lua.LTrue)
+		return 1
 	},
 	"getTicks": func(L *lua.LState) int {
 		c := checkCondition(L, 1)
@@ -101,14 +133,66 @@ var conditionMethods = map[string]lua.LGFunction{
 	},
 	"getType": func(L *lua.LState) int {
 		c := checkCondition(L, 1)
-		L.Push(lua.LNumber(c.condType))
+		if c.cond != nil {
+			L.Push(lua.LNumber(c.cond.GetType()))
+		} else {
+			L.Push(lua.LNumber(0))
+		}
 		return 1
 	},
-	"setFormula":      conditionNoop,
-	"setOutfit":       conditionNoop,
-	"addDamage":       conditionNoop,
-	"setTickInterval": conditionNoop,
-	"register":        conditionNoop,
+	"setFormula": func(L *lua.LState) int {
+		c := checkCondition(L, 1)
+		mina := float32(L.CheckNumber(2))
+		minb := float32(L.CheckNumber(3))
+		maxa := float32(L.CheckNumber(4))
+		maxb := float32(L.CheckNumber(5))
+		if c.cond != nil {
+			if speedCond, ok := c.cond.(*combat.ConditionSpeedStruct); ok {
+				speedCond.SetFormulaVars(mina, minb, maxa, maxb)
+				L.Push(lua.LTrue)
+				return 1
+			}
+		}
+		L.Push(lua.LFalse)
+		return 1
+	},
+	"setOutfit": func(L *lua.LState) int {
+		// outfit conditions are currently simplified to return true
+		L.Push(lua.LTrue)
+		return 1
+	},
+	"addDamage": func(L *lua.LState) int {
+		c := checkCondition(L, 1)
+		rounds := int32(L.CheckNumber(2))
+		time := int32(L.CheckNumber(3))
+		value := int32(L.CheckNumber(4))
+		if c.cond != nil {
+			if dmgCond, ok := c.cond.(*combat.ConditionDamageStruct); ok {
+				dmgCond.AddDamage(rounds, time, value)
+				L.Push(lua.LTrue)
+				return 1
+			}
+		}
+		L.Push(lua.LFalse)
+		return 1
+	},
+	"setTickInterval": func(L *lua.LState) int {
+		c := checkCondition(L, 1)
+		value := int32(L.CheckNumber(2))
+		if c.cond != nil {
+			if dmgCond, ok := c.cond.(*combat.ConditionDamageStruct); ok {
+				dmgCond.TickInterval = value
+				L.Push(lua.LTrue)
+				return 1
+			}
+		}
+		L.Push(lua.LFalse)
+		return 1
+	},
+	"register": func(L *lua.LState) int {
+		L.Push(lua.LTrue)
+		return 1
+	},
 }
 
 func conditionNoop(L *lua.LState) int { return 0 }

@@ -1200,7 +1200,7 @@ func playerGetfightmode(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	L.Push(lua.LNumber(p.FightMode))
 	return 1
 }
 
@@ -2061,7 +2061,7 @@ func playerHaschasemode(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LBool(p.ChaseMode))
 	return 1
 }
 
@@ -2121,7 +2121,7 @@ func playerHassecuremode(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LBool(p.SecureMode))
 	return 1
 }
 

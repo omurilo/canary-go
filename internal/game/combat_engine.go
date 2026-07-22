@@ -107,6 +107,19 @@ func (e *CombatEngine) regenTick() {
 
 func (e *CombatEngine) tick() {
 	e.resolveAttacks()
+
+	for _, p := range e.world.Players() {
+		p.TickConditions(100)
+	}
+
+	for _, c := range e.world.Creatures() {
+		if c.GetCreatureType() != 0 {
+			if bc, ok := c.(*BaseCreature); ok {
+				bc.TickConditions(100)
+			}
+		}
+	}
+
 	GlobalDispatcher.AddEvent(combatTickInterval, e.tick)
 }
 

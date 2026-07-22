@@ -78,3 +78,41 @@ func (s *conditionStore) Conditions() []combat.Condition {
 	copy(out, s.conditions)
 	return out
 }
+
+// ExecuteConditions ticks and executes all active conditions on a creature.
+func (s *conditionStore) ExecuteConditions(creature combat.Creature, interval int32) {
+	s.condMu.Lock()
+	defer s.condMu.Unlock()
+
+	out := s.conditions[:0]
+	speedChanged := false
+	iconsChanged := false
+
+	for _, cond := range s.conditions {
+		if cond.GetEndTime() == 0 {
+			cond.StartCondition(creature)
+			if cond.GetType() == combat.ConditionHaste || cond.GetType() == combat.ConditionParalyze {
+				speedChanged = true
+			}
+			iconsChanged = true
+		}
+
+		keep := cond.ExecuteCondition(creature, interval)
+		if keep {
+			out = append(out, cond)
+		} else {
+			cond.EndCondition(creature)
+			if cond.GetType() == combat.ConditionHaste || cond.GetType() == combat.ConditionParalyze {
+				speedChanged = true
+			}
+			iconsChanged = true
+		}
+	}
+	s.conditions = out
+
+	if iconsChanged || speedChanged {
+		if notifier, ok := creature.(interface{ NotifyIconsChange() }); ok {
+			notifier.NotifyIconsChange()
+		}
+	}
+}

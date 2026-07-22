@@ -16,6 +16,40 @@ type Condition interface {
 	AddCondition(creature Creature, condition Condition)
 	Clone() Condition
 	GetIcons() uint64
+	SetTicks(ticks int32)
+	SetParam(key int32, value int32)
+}
+
+func CreateCondition(id ConditionId, condType ConditionType, ticks int32, subId uint32, isPersistent bool) Condition {
+	generic := ConditionGeneric{
+		Id:           id,
+		Type:         condType,
+		Ticks:        ticks,
+		SubId:        subId,
+		IsPersistent: isPersistent,
+	}
+	switch condType {
+	case ConditionHaste, ConditionParalyze:
+		return &ConditionSpeedStruct{
+			ConditionGeneric: generic,
+		}
+	case ConditionPoison, ConditionFire, ConditionEnergy, ConditionBleeding, ConditionFreezing, ConditionDazzled, ConditionCursed:
+		return &ConditionDamageStruct{
+			ConditionGeneric: generic,
+		}
+	case ConditionRegeneration:
+		return &ConditionRegenerationStruct{
+			ConditionGeneric: generic,
+		}
+	default:
+		return &ConditionGeneric{
+			Id:           id,
+			Type:         condType,
+			Ticks:        ticks,
+			SubId:        subId,
+			IsPersistent: isPersistent,
+		}
+	}
 }
 
 // ConditionGeneric is a basic condition implementation
@@ -33,6 +67,18 @@ func (c *ConditionGeneric) GetId() ConditionId { return c.Id }
 func (c *ConditionGeneric) GetType() ConditionType { return c.Type }
 func (c *ConditionGeneric) GetTicks() int32 { return c.Ticks }
 func (c *ConditionGeneric) GetEndTime() int64 { return c.EndTime }
+func (c *ConditionGeneric) SetTicks(ticks int32) { c.Ticks = ticks }
+
+func (c *ConditionGeneric) SetParam(key int32, value int32) {
+	switch key {
+	case 2: // CONDITION_PARAM_TICKS
+		c.Ticks = value
+	case 3: // CONDITION_PARAM_SUBID
+		c.SubId = uint32(value)
+	case 4: // CONDITION_PARAM_BUFF
+		c.IsBuff = value != 0
+	}
+}
 
 func (c *ConditionGeneric) StartCondition(creature Creature) bool {
 	c.EndTime = time.Now().UnixMilli() + int64(c.Ticks)
@@ -203,6 +249,13 @@ type ConditionSpeedStruct struct {
 	Minb       float32
 	Maxa       float32
 	Maxb       float32
+}
+
+func (c *ConditionSpeedStruct) SetFormulaVars(mina, minb, maxa, maxb float32) {
+	c.Mina = mina
+	c.Minb = minb
+	c.Maxa = maxa
+	c.Maxb = maxb
 }
 
 func (c *ConditionSpeedStruct) getFormulaValues(baseSpeed int32) (int32, int32) {

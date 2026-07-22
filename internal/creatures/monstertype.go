@@ -38,6 +38,7 @@ type MonsterType struct {
 	Loot []LootBlock
 
 	Flags MonsterFlags
+	Elements map[uint32]int16
 }
 
 // MonsterAttack mirrors one entry of monster.attacks. For "melee" the damage is
@@ -119,10 +120,28 @@ func NewTypeRegistry() *TypeRegistry {
 }
 
 type xmlMonster struct {
-	Name   string    `xml:"name,attr"`
-	Speed  uint32    `xml:"speed,attr"`
-	Health xmlHealth `xml:"health"`
-	Look   xmlLook   `xml:"look"`
+	Name     string      `xml:"name,attr"`
+	Speed    uint32      `xml:"speed,attr"`
+	Health   xmlHealth   `xml:"health"`
+	Look     xmlLook     `xml:"look"`
+	Elements xmlElements `xml:"elements"`
+}
+
+type xmlElements struct {
+	Element []xmlElement `xml:"element"`
+}
+
+type xmlElement struct {
+	PhysicalPercent  *int16 `xml:"physicalPercent,attr"`
+	FirePercent      *int16 `xml:"firePercent,attr"`
+	IcePercent       *int16 `xml:"icePercent,attr"`
+	EnergyPercent    *int16 `xml:"energyPercent,attr"`
+	EarthPercent     *int16 `xml:"earthPercent,attr"`
+	DeathPercent     *int16 `xml:"deathPercent,attr"`
+	HolyPercent      *int16 `xml:"holyPercent,attr"`
+	DrownPercent     *int16 `xml:"drownPercent,attr"`
+	LifeDrainPercent *int16 `xml:"lifedrainPercent,attr"`
+	ManaDrainPercent *int16 `xml:"manadrainPercent,attr"`
 }
 
 type xmlNpc struct {
@@ -178,6 +197,36 @@ func (r *TypeRegistry) LoadMonsters(dataDir string) error {
 					Addons:    mon.Look.Addons,
 					LookMount: mon.Look.Mount,
 				},
+				Elements: make(map[uint32]int16),
+			}
+			for _, el := range mon.Elements.Element {
+				if el.PhysicalPercent != nil {
+					mType.Elements[1] = *el.PhysicalPercent
+				}
+				if el.EnergyPercent != nil {
+					mType.Elements[2] = *el.EnergyPercent
+				}
+				if el.EarthPercent != nil {
+					mType.Elements[4] = *el.EarthPercent
+				}
+				if el.FirePercent != nil {
+					mType.Elements[8] = *el.FirePercent
+				}
+				if el.DeathPercent != nil {
+					mType.Elements[64] = *el.DeathPercent
+				}
+				if el.IcePercent != nil {
+					mType.Elements[128] = *el.IcePercent
+				}
+				if el.HolyPercent != nil {
+					mType.Elements[256] = *el.HolyPercent
+				}
+				if el.ManaDrainPercent != nil {
+					mType.Elements[512] = *el.ManaDrainPercent
+				}
+				if el.LifeDrainPercent != nil {
+					mType.Elements[1024] = *el.LifeDrainPercent
+				}
 			}
 			if mType.MaxHealth == 0 {
 				mType.MaxHealth = mon.Health.Now

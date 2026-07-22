@@ -152,11 +152,8 @@ func (e *Engine) combatMethods() map[string]lua.LGFunction {
 		"addCondition": func(L *lua.LState) int {
 			c := checkCombat(L, 1)
 			if ud, ok := L.Get(2).(*lua.LUserData); ok {
-				if cond, ok := ud.Value.(*luaCondition); ok && cond.condType != combat.ConditionNone {
-					c.AddCondition(&combat.ConditionGeneric{
-						Type:  cond.condType,
-						Ticks: cond.ticks,
-					})
+				if cond, ok := ud.Value.(*luaCondition); ok && cond.cond != nil {
+					c.AddCondition(cond.cond.Clone())
 				}
 			}
 			return 0

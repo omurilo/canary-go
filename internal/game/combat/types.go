@@ -116,6 +116,7 @@ type Creature interface {
 	ChangeSpeed(delta int32)
 	GetArmor() int32
 	GetDefense() int32
+	GetResistance(combatType CombatType) int16
 }
 
 type Player interface {

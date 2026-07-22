@@ -61,7 +61,25 @@ func (a combatAdapter) GetMaxMana() int32 {
 func (a combatAdapter) ChangeHealth(amount int32) { a.c.AddHealth(amount) }
 
 func (a combatAdapter) GetBaseSpeed() uint16 { return a.c.GetBaseSpeed() }
-func (a combatAdapter) ChangeSpeed(delta int32) { a.c.ChangeSpeed(delta) }
+
+func (a combatAdapter) ChangeSpeed(delta int32) {
+	a.c.ChangeSpeed(delta)
+	if p, ok := a.c.(*Player); ok {
+		if p.World != nil && p.World.OnChangeSpeed != nil {
+			p.World.OnChangeSpeed(p)
+		}
+	} else if bc, ok := a.c.(*BaseCreature); ok {
+		if bc.World != nil && bc.World.OnChangeSpeed != nil {
+			bc.World.OnChangeSpeed(bc)
+		}
+	}
+}
+
+func (a combatAdapter) NotifyIconsChange() {
+	if p, ok := a.c.(*Player); ok {
+		p.NotifyIconsChange()
+	}
+}
 
 func (a combatAdapter) ChangeMana(amount int32) {
 	if m, ok := a.c.(manaHolder); ok {
@@ -95,5 +113,14 @@ func (a combatAdapter) GetArmor() int32 {
 
 func (a combatAdapter) GetDefense() int32 {
 	return a.c.GetDefense()
+}
+
+func (a combatAdapter) GetResistance(combatType combat.CombatType) int16 {
+	if m, ok := a.c.(*Monster); ok {
+		if m.Type != nil && m.Type.Elements != nil {
+			return m.Type.Elements[uint32(combatType)]
+		}
+	}
+	return 0
 }
 

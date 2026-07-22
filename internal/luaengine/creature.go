@@ -188,10 +188,12 @@ func outfitToTable(L *lua.LState, o game.Outfit) *lua.LTable {
 func (e *Engine) registerCreatureType() {
 	mt := e.L.NewTypeMetatable("Creature")
 	e.L.SetFuncs(mt, creatureMethods)
-	// teleportTo, changeSpeed, setSpeed need the world to broadcast.
+	// teleportTo, changeSpeed, setSpeed, getParent, getTile need the world/engine references.
 	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
 	e.L.SetField(mt, "changeSpeed", e.L.NewFunction(e.creatureChangespeed))
 	e.L.SetField(mt, "setSpeed", e.L.NewFunction(e.creatureSetspeed))
+	e.L.SetField(mt, "getParent", e.L.NewFunction(e.creatureGetparent))
+	e.L.SetField(mt, "getTile", e.L.NewFunction(e.creatureGettile))
 	e.L.SetField(mt, "__index", mt)
 }
 
@@ -215,7 +217,6 @@ var creatureMethods = map[string]lua.LGFunction{
 	"isImmune": creatureIsimmune,
 	"canSee": creatureCansee,
 	"canSeeCreature": creatureCanseecreature,
-	"getParent": creatureGetparent,
 	"getId": creatureGetid,
 	"getName": creatureGetname,
 	"getTypeName": creatureGettypename,
@@ -233,7 +234,6 @@ var creatureMethods = map[string]lua.LGFunction{
 	"setDropLoot": creatureSetdroploot,
 	"setSkillLoss": creatureSetskillloss,
 	"getPosition": creatureGetposition,
-	"getTile": creatureGettile,
 	"getDirection": creatureGetdirection,
 	"setDirection": creatureSetdirection,
 	"getHealth": creatureGethealth,
@@ -309,10 +309,10 @@ func creatureAddcondition(L *lua.LState) int {
 		L.Push(lua.LTrue)
 		return 1
 	}
-	if cond.condType == combat.ConditionNone {
+	if cond.cond == nil {
 		return 0
 	}
-	holder.AddCondition(&combat.ConditionGeneric{Type: cond.condType, Ticks: cond.ticks})
+	holder.AddCondition(cond.cond.Clone())
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -496,9 +496,23 @@ func creatureGetoutfit(L *lua.LState) int {
 	return 1
 }
 
-func creatureGetparent(L *lua.LState) int {
-	// Parent is the tile/container holding the creature; not modelled yet.
-	L.Push(lua.LNil)
+func (e *Engine) creatureGetparent(L *lua.LState) int {
+	c := checkCreature(L)
+	if c == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if e.world == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pos := c.GetPosition()
+	tile := e.world.Map.GetTile(pos)
+	if tile == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pushTile(L, tile, pos)
 	return 1
 }
 
@@ -557,15 +571,34 @@ func creatureGettarget(L *lua.LState) int {
 	return 0
 }
 
-func creatureGettile(L *lua.LState) int {
-	// Tile userdata for the creature's position isn't wired yet.
-	L.Push(lua.LNil)
+func (e *Engine) creatureGettile(L *lua.LState) int {
+	c := checkCreature(L)
+	if c == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if e.world == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pos := c.GetPosition()
+	tile := e.world.Map.GetTile(pos)
+	if tile == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pushTile(L, tile, pos)
 	return 1
 }
 
 func creatureGettypename(L *lua.LState) int {
 	if c := checkCreature(L); c != nil {
-		L.Push(lua.LString(c.GetName()))
+		switch c.GetCreatureType() {
+		case 0:
+			L.Push(lua.LString("Player"))
+		default:
+			L.Push(lua.LString(c.GetName()))
+		}
 		return 1
 	}
 	L.Push(lua.LNil)

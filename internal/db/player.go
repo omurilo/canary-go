@@ -13,12 +13,17 @@ import (
 func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) {
 	const q = `SELECT p.id, p.account_id, a.type as account_type, p.group_id, p.name, p.level, p.vocation, p.sex,
 	                  p.health, p.healthmax, p.mana, p.manamax, p.experience,
-	                  p.maglevel, p.soul, p.cap, p.balance,
+	                  p.maglevel, p.manaspent, p.soul, p.cap, p.balance,
 	                  p.looktype, p.lookhead, p.lookbody, p.looklegs, p.lookfeet,
 	                  p.lookaddons,
 	                  p.posx, p.posy, p.posz, p.town_id,
-	                  p.skill_fist, p.skill_club, p.skill_sword, p.skill_axe,
-	                  p.skill_dist, p.skill_shielding, p.skill_fishing
+	                  p.skill_fist, p.skill_fist_tries,
+	                  p.skill_club, p.skill_club_tries,
+	                  p.skill_sword, p.skill_sword_tries,
+	                  p.skill_axe, p.skill_axe_tries,
+	                  p.skill_dist, p.skill_dist_tries,
+	                  p.skill_shielding, p.skill_shielding_tries,
+	                  p.skill_fishing, p.skill_fishing_tries
 	           FROM players p JOIN accounts a ON a.id = p.account_id WHERE p.name = ? LIMIT 1`
 
 	p := &game.Player{}
@@ -30,12 +35,16 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	err := d.SQL.QueryRowContext(ctx, q, name).Scan(
 		&p.DBID, &p.AccountID, &p.AccountType, &p.GroupID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
 		&p.Health, &p.MaxHealth, &p.Mana, &p.MaxMana, &p.Experience,
-		&p.MagLevel, &p.Soul, &capValue, &p.BankBalance,
+		&p.MagLevel, &p.ManaSpent, &p.Soul, &capValue, &p.BankBalance,
 		&lookType, &lookHead, &lookBody, &lookLegs, &lookFeet, &lookAddons,
 		&posx, &posy, &posz, &townID,
-		&p.Skills[game.SkillFist], &p.Skills[game.SkillClub], &p.Skills[game.SkillSword],
-		&p.Skills[game.SkillAxe], &p.Skills[game.SkillDistance], &p.Skills[game.SkillShielding],
-		&p.Skills[game.SkillFishing],
+		&p.Skills[game.SkillFist], &p.SkillTries[game.SkillFist],
+		&p.Skills[game.SkillClub], &p.SkillTries[game.SkillClub],
+		&p.Skills[game.SkillSword], &p.SkillTries[game.SkillSword],
+		&p.Skills[game.SkillAxe], &p.SkillTries[game.SkillAxe],
+		&p.Skills[game.SkillDistance], &p.SkillTries[game.SkillDistance],
+		&p.Skills[game.SkillShielding], &p.SkillTries[game.SkillShielding],
+		&p.Skills[game.SkillFishing], &p.SkillTries[game.SkillFishing],
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -52,8 +61,6 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		Legs:      uint8(lookLegs),
 		Feet:      uint8(lookFeet),
 		Addons:    uint8(lookAddons),
-		// The canonical Canary schema does not persist the mount creature id in
-		// a single column (only mount outfit colors), so it defaults to 0.
 	}
 	p.Pos = game.Position{X: posx, Y: posy, Z: posz}
 	p.TownID = uint16(townID)
@@ -72,17 +79,39 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		return nil, err
 	}
 
+	// Load player storages
+	p.Storages = make(map[uint32]int32)
+	sRows, err := d.SQL.QueryContext(ctx, "SELECT `key`, `value` FROM player_storage WHERE player_id = ?", p.DBID)
+	if err == nil {
+		defer sRows.Close()
+		for sRows.Next() {
+			var k uint32
+			var v int32
+			if err := sRows.Scan(&k, &v); err == nil {
+				p.Storages[k] = v
+			}
+		}
+	}
+
 	return p, nil
 }
 
-// SavePlayer persists mutable player state (position, vitals, experience).
+// SavePlayer persists mutable player state (position, vitals, experience, skills, and storages).
 func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	const q = `UPDATE players SET
 	              level=?, experience=?, health=?, healthmax=?,
 	              mana=?, manamax=?, soul=?, cap=?, balance=?,
 	              posx=?, posy=?, posz=?,
 	              looktype=?, lookhead=?, lookbody=?, looklegs=?,
-	              lookfeet=?, lookaddons=?
+	              lookfeet=?, lookaddons=?,
+	              maglevel=?, manaspent=?,
+	              skill_fist=?, skill_fist_tries=?,
+	              skill_club=?, skill_club_tries=?,
+	              skill_sword=?, skill_sword_tries=?,
+	              skill_axe=?, skill_axe_tries=?,
+	              skill_dist=?, skill_dist_tries=?,
+	              skill_shielding=?, skill_shielding_tries=?,
+	              skill_fishing=?, skill_fishing_tries=?
 	           WHERE id=?`
 	_, err := d.SQL.ExecContext(ctx, q,
 		p.Level, p.Experience, p.Health, p.MaxHealth,
@@ -90,10 +119,29 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		p.Pos.X, p.Pos.Y, p.Pos.Z,
 		p.Outfit.LookType, p.Outfit.Head, p.Outfit.Body, p.Outfit.Legs,
 		p.Outfit.Feet, p.Outfit.Addons,
+		p.MagLevel, p.ManaSpent,
+		p.Skills[game.SkillFist], p.SkillTries[game.SkillFist],
+		p.Skills[game.SkillClub], p.SkillTries[game.SkillClub],
+		p.Skills[game.SkillSword], p.SkillTries[game.SkillSword],
+		p.Skills[game.SkillAxe], p.SkillTries[game.SkillAxe],
+		p.Skills[game.SkillDistance], p.SkillTries[game.SkillDistance],
+		p.Skills[game.SkillShielding], p.SkillTries[game.SkillShielding],
+		p.Skills[game.SkillFishing], p.SkillTries[game.SkillFishing],
 		p.DBID,
 	)
 	if err != nil {
 		return err
+	}
+
+	// Save player storages
+	if p.Storages != nil {
+		// First delete existing storages for the player
+		_, _ = d.SQL.ExecContext(ctx, "DELETE FROM player_storage WHERE player_id = ?", p.DBID)
+		
+		// Then insert current storages
+		for k, v := range p.Storages {
+			_, _ = d.SQL.ExecContext(ctx, "INSERT INTO player_storage (player_id, `key`, `value`) VALUES (?, ?, ?)", p.DBID, k, v)
+		}
 	}
 
 	return d.SavePlayerItems(ctx, p)
