@@ -25,6 +25,7 @@ type World struct {
 	nextCreatureID atomic.Uint32
 
 	Items *items.Catalog
+	Monsters *creatures.TypeRegistry
 	Decay *DecayManager
 
 	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldTileIndex int)
@@ -222,6 +223,11 @@ func (w *World) RUnlock() {
 
 // AddPlayer registers a player, assigns a creature id, applies defaults and
 // places it on the map. Returns false if a character with the same name is
+// GenerateCreatureID allocates a unique creature ID.
+func (w *World) GenerateCreatureID() uint32 {
+	return w.nextCreatureID.Add(1)
+}
+
 // already online.
 func (w *World) AddPlayer(p *Player, sess Session) bool {
 	w.mu.Lock()

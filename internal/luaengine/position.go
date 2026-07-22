@@ -97,10 +97,31 @@ func positionCreate(L *lua.LState) int {
 	return 1
 }
 
+func parsePosition(L *lua.LState, n int) (game.Position, bool) {
+	v := L.Get(n)
+	switch v.Type() {
+	case lua.LTUserData:
+		ud := v.(*lua.LUserData)
+		if p, ok := ud.Value.(game.Position); ok {
+			return p, true
+		}
+		if posPtr, ok := ud.Value.(*game.Position); ok && posPtr != nil {
+			return *posPtr, true
+		}
+	case lua.LTTable:
+		t := v.(*lua.LTable)
+		return game.Position{
+			X: uint16(lua.LVAsNumber(L.GetField(t, "x"))),
+			Y: uint16(lua.LVAsNumber(L.GetField(t, "y"))),
+			Z: uint8(lua.LVAsNumber(L.GetField(t, "z"))),
+		}, true
+	}
+	return game.Position{}, false
+}
+
 func checkPosition(L *lua.LState, n int) game.Position {
-	ud := L.CheckUserData(n)
-	if v, ok := ud.Value.(game.Position); ok {
-		return v
+	if pos, ok := parsePosition(L, n); ok {
+		return pos
 	}
 	L.ArgError(n, "Position expected")
 	return game.Position{}

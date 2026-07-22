@@ -1,6 +1,9 @@
 package luaengine
 
 import (
+	"strings"
+
+	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 	lua "github.com/yuin/gopher-lua"
@@ -149,9 +152,85 @@ func (e *Engine) gameCreateItem(L *lua.LState) int {
 	return 1
 }
 func (e *Engine) gameCreateContainer(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateMonster(L *lua.LState) int { return 0 }
+
+func (e *Engine) gameCreateMonster(L *lua.LState) int {
+	name := L.CheckString(1)
+	pos, ok := parsePosition(L, 2)
+	if !ok {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	if e.world == nil || e.world.Map == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	tile := e.world.Map.GetTile(pos)
+	if tile == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	id := e.world.GenerateCreatureID()
+	var mType *creatures.MonsterType
+	if e.world.Monsters != nil {
+		mType = e.world.Monsters.Monsters[strings.ToLower(name)]
+		if mType == nil {
+			mType = e.world.Monsters.Monsters[name]
+		}
+	}
+
+	m := game.NewMonster(id, name, mType)
+	m.SetPosition(pos)
+	e.world.AddCreature(m)
+
+	if !e.pushCreatureAs(L, m, "Monster") {
+		L.Push(lua.LNil)
+	}
+	return 1
+}
+
 func (e *Engine) gameCreateSoulPitMonster(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateNpc(L *lua.LState) int { return 0 }
+
+func (e *Engine) gameCreateNpc(L *lua.LState) int {
+	name := L.CheckString(1)
+	pos, ok := parsePosition(L, 2)
+	if !ok {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	if e.world == nil || e.world.Map == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	tile := e.world.Map.GetTile(pos)
+	if tile == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	id := e.world.GenerateCreatureID()
+	var nType *creatures.NpcType
+	if e.world.Monsters != nil {
+		nType = e.world.Monsters.Npcs[strings.ToLower(name)]
+		if nType == nil {
+			nType = e.world.Monsters.Npcs[name]
+		}
+	}
+
+	npc := game.NewNpc(id, name, nType)
+	npc.SetPosition(pos)
+	e.world.AddCreature(npc)
+
+	if !e.pushCreatureAs(L, npc, "Npc") {
+		L.Push(lua.LNil)
+	}
+	return 1
+}
+
 func (e *Engine) gameGenerateNpc(L *lua.LState) int { return 0 }
 func (e *Engine) gameCreateTile(L *lua.LState) int { return 0 }
 func (e *Engine) gameCreateBestiaryCharm(L *lua.LState) int {
