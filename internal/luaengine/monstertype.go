@@ -83,6 +83,18 @@ func (e *Engine) registerMonsterType() {
 			}
 			return 0
 		},
+		"addAttack": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			ud := L.CheckUserData(2)
+			if s, ok := ud.Value.(*luaMonsterSpell); ok {
+				m.Attacks = append(m.Attacks, s.Attack)
+			}
+			return 0
+		},
+		"addDefense": func(L *lua.LState) int {
+			// No-op since MonsterType doesn't have a Defenses slice yet in Go
+			return 0
+		},
 	}
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), monsterTypeMethods))
 
