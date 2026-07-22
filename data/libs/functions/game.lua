@@ -42,8 +42,15 @@ function Game.broadcastMessage(message, messageType)
 end
 
 function Game.convertIpToString(ip)
-	local band = bit.band
-	local rshift = bit.rshift
+	if not ip then
+		return "0.0.0.0"
+	end
+	local bitlib = bit or bit32
+	if not bitlib then
+		return "0.0.0.0"
+	end
+	local band = bitlib.band
+	local rshift = bitlib.rshift
 	return string.format("%d.%d.%d.%d", band(ip, 0xFF), band(rshift(ip, 8), 0xFF), band(rshift(ip, 16), 0xFF), rshift(ip, 24))
 end
 

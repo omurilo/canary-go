@@ -48,6 +48,8 @@ func (e *Engine) registerAPI() {
 	L.SetGlobal("DATA_DIRECTORY", lua.LString(dataDirResolved))
 	L.SetGlobal("CORE_DIRECTORY", lua.LString(coreDirResolved))
 
+	registerBitLib(L)
+
 	// Set package.path so require(...) can find scripts across the datapack and core libs
 	pkgPath := strings.Join([]string{
 		coreDirResolved + "/libs/?.lua",
