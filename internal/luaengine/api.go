@@ -57,6 +57,7 @@ func (e *Engine) registerAPI() {
 	e.registerAction()
 	e.registerMoveEvent()
 	e.registerMonsterType()
+	e.registerLootClass()
 	e.registerNpcType()
 	e.registerNetworkMessage()
 	e.registerBank()

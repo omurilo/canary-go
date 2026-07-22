@@ -75,6 +75,14 @@ func (e *Engine) registerMonsterType() {
 			L.Push(lua.LTrue)
 			return 1
 		},
+		"addLoot": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			ud := L.CheckUserData(2)
+			if l, ok := ud.Value.(*luaLoot); ok {
+				m.Loot = append(m.Loot, l.Block)
+			}
+			return 0
+		},
 	}
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), monsterTypeMethods))
 
