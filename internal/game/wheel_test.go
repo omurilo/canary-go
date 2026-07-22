@@ -5,24 +5,24 @@ import "testing"
 func TestWheelOfDestiny_PointsCalculation(t *testing.T) {
 	wheel := NewWheelOfDestiny()
 
-	// Level 50 promoted -> 0 points
-	if pts := wheel.GetTotalPoints(50, true); pts != 0 {
-		t.Errorf("expected 0 points for level 50 promoted, got %d", pts)
+	// Level 50 -> 0 points
+	if pts := wheel.GetTotalPoints(50); pts != 0 {
+		t.Errorf("expected 0 points for level 50, got %d", pts)
 	}
 
-	// Level 100 non-promoted -> 0 points
-	if pts := wheel.GetTotalPoints(100, false); pts != 0 {
-		t.Errorf("expected 0 points for level 100 non-promoted, got %d", pts)
+	// Level 100 -> 50 points
+	if pts := wheel.GetTotalPoints(100); pts != 50 {
+		t.Errorf("expected 50 points for level 100, got %d", pts)
 	}
 
-	// Level 100 promoted -> 50 points
-	if pts := wheel.GetTotalPoints(100, true); pts != 50 {
-		t.Errorf("expected 50 points for level 100 promoted, got %d", pts)
+	// Level 500 -> 450 points
+	if pts := wheel.GetTotalPoints(500); pts != 450 {
+		t.Errorf("expected 450 points for level 500, got %d", pts)
 	}
 
-	// Level 500 promoted -> 450 points
-	if pts := wheel.GetTotalPoints(500, true); pts != 450 {
-		t.Errorf("expected 450 points for level 500 promoted, got %d", pts)
+	// Level 699 -> 649 points
+	if pts := wheel.GetTotalPoints(699); pts != 649 {
+		t.Errorf("expected 649 points for level 699, got %d", pts)
 	}
 }
 

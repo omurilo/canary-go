@@ -3050,8 +3050,7 @@ func playerGetwheelpoints(L *lua.LState) int {
 		return 1
 	}
 	wheel := p.GetWheel()
-	isPromoted := p.Vocation > 0 && (p.Vocation > 4)
-	L.Push(lua.LNumber(wheel.GetTotalPoints(p.Level, isPromoted)))
+	L.Push(lua.LNumber(wheel.GetTotalPoints(p.Level)))
 	return 1
 }
 

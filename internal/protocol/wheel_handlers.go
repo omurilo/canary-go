@@ -80,8 +80,7 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	}
 	w.AddByte(vocationByte)
 
-	isPromoted := g.player.Vocation > 0 && (g.player.Vocation > 4)
-	totalPoints := wheel.GetTotalPoints(g.player.Level, isPromoted)
+	totalPoints := wheel.GetTotalPoints(g.player.Level)
 
 	w.AddU16(totalPoints)
 	w.AddU16(wheel.BonusPoints) // extra points

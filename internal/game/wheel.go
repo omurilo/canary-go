@@ -17,14 +17,14 @@ func NewWheelOfDestiny() *WheelOfDestiny {
 	}
 }
 
-// GetTotalPoints returns total available Wheel Points for a given level and vocation state.
-// Promoted vocations earn 1 point per level above level 50.
-func (w *WheelOfDestiny) GetTotalPoints(level uint16, isPromoted bool) uint16 {
+// GetTotalPoints returns total available Wheel Points for a given level.
+// Characters earn 1 point per level above level 50.
+func (w *WheelOfDestiny) GetTotalPoints(level uint16) uint16 {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
 	var levelPoints uint16
-	if isPromoted && level > 50 {
+	if level > 50 {
 		levelPoints = level - 50
 	}
 	return levelPoints + w.BonusPoints
