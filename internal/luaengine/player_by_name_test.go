@@ -80,3 +80,17 @@ func TestTileMethods(t *testing.T) {
 		t.Fatalf("Lua execution error: %v", err)
 	}
 }
+
+func TestItemTypeClass(t *testing.T) {
+	w := game.NewWorld()
+	e := New(w, nil)
+	L := e.L
+	err := L.DoString(`
+		local it = ItemType(2160)
+		if not it then error("expected ItemType(2160)") end
+		if type(it:getName()) ~= "string" then error("expected string from getName()") end
+	`)
+	if err != nil {
+		t.Fatalf("Lua ItemType error: %v", err)
+	}
+}

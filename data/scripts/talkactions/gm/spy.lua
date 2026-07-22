@@ -17,7 +17,7 @@ local function getItemsInContainer(container, sep)
 			text = text .. "\n" .. tsep .. ItemType(item.itemid):getName() .. " " .. count
 		else
 			if item:getSize() > 0 then
-				text = text .. "\n" .. tsep .. ItemType(item.itemd):getName()
+				text = text .. "\n" .. tsep .. ItemType(item.itemid):getName()
 				text = text .. getItemsInContainer(item, sep + 2)
 			else
 				text = text .. "\n" .. tsep .. ItemType(item.itemid):getName()

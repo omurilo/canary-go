@@ -103,6 +103,7 @@ func (e *Engine) registerAPI() {
 	e.registerNpc()
 	e.registerPosition()
 	e.registerItem()
+	e.registerItemType()
 	e.registerContainer()
 	e.registerTile()
 	e.registerAction()
@@ -184,7 +185,6 @@ func (e *Engine) registerAPI() {
 	mockClass("Guild")
 	mockClass("Group")
 	mockClass("House")
-	mockClass("ItemType")
 	mockClass("Zone")
 
 	// rawgetmetatable allows scripts (like revscriptsys) to retrieve the type metatable
