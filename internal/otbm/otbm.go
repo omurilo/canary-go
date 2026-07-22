@@ -287,6 +287,7 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 
 	if house {
 		_ = r.u32() // house id
+		tile.Flags |= 1 // House tiles are protection zones
 	}
 
 	// Inline tile attributes.

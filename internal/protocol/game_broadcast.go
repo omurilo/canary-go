@@ -40,6 +40,9 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 	// and skipped here. Without this, Lua teleportTo (temple/citizen, quest
 	// teleports) moved the player server-side but their screen never updated.
 	if p, ok := c.(*game.Player); ok {
+		if gp, ok := p.Session.(*GameProtocol); ok {
+			gp.SendIcons()
+		}
 		if oldPos.Z != newPos.Z || chebyshev(oldPos, newPos) > 1 {
 			if gp, ok := p.Session.(*GameProtocol); ok {
 				gp.sendFullMapAt(newPos)

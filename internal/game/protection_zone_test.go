@@ -169,3 +169,22 @@ func TestCondition_TickSelfDeadlock(t *testing.T) {
 	}
 }
 
+func TestProtectionZone_PlayerIcons(t *testing.T) {
+	w := NewWorld()
+	p := &Player{}
+	p.World = w
+	p.SetPosition(Position{X: 100, Y: 100, Z: 7})
+
+	// 1. Outside PZ -> Protection Zone icon (bit 14) is 0
+	w.Map.SetTile(p.GetPosition(), &Tile{Ground: &Item{ID: 1}, Flags: 0})
+	if (p.GetIcons() & (1 << 14)) != 0 {
+		t.Error("expected protection zone icon bit (bit 14) to be 0 outside protection zone")
+	}
+
+	// 2. Inside PZ -> Protection Zone icon (bit 14) is set
+	w.Map.SetTile(p.GetPosition(), &Tile{Ground: &Item{ID: 1}, Flags: 1})
+	if (p.GetIcons() & (1 << 14)) == 0 {
+		t.Error("expected protection zone icon bit (bit 14) to be set inside protection zone")
+	}
+}
+

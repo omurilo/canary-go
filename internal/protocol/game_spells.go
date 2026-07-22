@@ -82,6 +82,11 @@ func (g *GameProtocol) spellCastCheck(sp *spells.Spell) bool {
 		return false
 	}
 
+	if sp.Aggressive && p.IsInProtectionZone() {
+		g.failCast("A protection zone blocks this action.")
+		return false
+	}
+
 	cds := p.Cooldowns()
 	if cds.HasGroupCooldown(uint32(sp.Group)) || cds.HasCooldown(sp.SpellID) ||
 		(sp.SecondaryGroup != spells.SpellGroupNone && cds.HasGroupCooldown(uint32(sp.SecondaryGroup))) {

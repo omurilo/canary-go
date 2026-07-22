@@ -442,6 +442,9 @@ func (g *GameProtocol) enterWorld() {
 
 	g.SendToClient(w)
 
+	// Send initial condition/protection zone icons
+	g.SendIcons()
+
 	// Keep-alive pings start once the player is in the world.
 	g.startPingLoop()
 

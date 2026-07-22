@@ -585,10 +585,21 @@ func (p *Player) GetEffectiveSkill(skill Skill) uint16 {
 
 func (p *Player) GetCreatureType() uint8 { return 0 } // CREATURETYPE_PLAYER
 
+func (p *Player) IsInProtectionZone() bool {
+	if p == nil || p.World == nil || p.World.Map == nil {
+		return false
+	}
+	tile := p.World.Map.GetTile(p.Pos)
+	return tile.IsProtectionZone()
+}
+
 func (p *Player) GetIcons() uint64 {
 	var icons uint64
 	for _, cond := range p.Conditions() {
 		icons |= cond.GetIcons()
+	}
+	if p.IsInProtectionZone() {
+		icons |= (1 << 14) // Pigeon icon (Protection Zone icon, bit 14)
 	}
 	return icons
 }
