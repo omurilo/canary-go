@@ -69,11 +69,13 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	}
 
 	w.AddByte(1) // canUse = true
-	w.AddByte(0) // options
+	w.AddByte(1) // options = 1 (1 = can increase and decrease points)
 
 	// Map vocation (1..4 base vocation)
 	vocationByte := byte(g.player.Vocation)
-	if vocationByte > 4 {
+	if vocationByte == 0 {
+		vocationByte = 1
+	} else if vocationByte > 4 {
 		vocationByte = ((vocationByte - 1) % 4) + 1
 	}
 	w.AddByte(vocationByte)
@@ -90,13 +92,13 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 		w.AddU16(slotPoints[slotID])
 	}
 
-	w.AddByte(0) // promotion scrolls count
-	w.AddByte(0) // monk quest bonus flag
-	w.AddU16(0)  // monk quest bonus amount
+	w.AddU16(0)  // promotion scrolls count (u16 = 2 bytes)
+	w.AddByte(0) // monk quest bonus flag (u8 = 1 byte)
+	w.AddU16(0)  // monk quest bonus amount (u16 = 2 bytes)
 
 	// Gems section
-	w.AddByte(0) // active gems count
-	w.AddU16(0)  // revealed gems count
+	w.AddByte(0) // active gems count (u8)
+	w.AddU16(0)  // revealed gems count (u16)
 
 	// Grade modifiers section
 	// Basic grade modifiers (46 entries)
