@@ -1,6 +1,8 @@
 package luaengine
 
 import (
+	"strings"
+
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/talkactions"
 	lua "github.com/yuin/gopher-lua"
@@ -17,7 +19,14 @@ func (e *Engine) registerTalkAction() {
 }
 
 func talkActionConstructor(L *lua.LState) int {
-	words := L.CheckString(2)
+	top := L.GetTop()
+	var wordsList []string
+	for i := 2; i <= top; i++ {
+		if s := L.OptString(i, ""); s != "" {
+			wordsList = append(wordsList, s)
+		}
+	}
+	words := strings.Join(wordsList, ",")
 	t := &talkactions.TalkAction{
 		Words: words,
 	}

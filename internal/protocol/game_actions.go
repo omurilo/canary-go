@@ -507,6 +507,9 @@ func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 		return
 	}
 	g.deps.Log.Debug("handleSay parsed chat message", "player", g.player.Name, "talkType", talkType, "text", text)
+	if g.tryTalkAction(talkType, text) {
+		return
+	}
 	if g.handleCommand(text) {
 		return // GM command — handled, not broadcast as chat
 	}
@@ -516,11 +519,40 @@ func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 	if g.tryCastSpell(talkType, text) {
 		return
 	}
-	if g.tryTalkAction(talkType, text) {
-		return
-	}
 	g.broadcastSay(g.player, talkType, text)
 	g.deps.Lua.Call("onPlayerSay", g.player.Name, text)
+}
+
+func requiredGroupLevel(groupType string) uint8 {
+	switch strings.ToLower(groupType) {
+	case "tutor":
+		return 2
+	case "seniortutor", "senior tutor":
+		return 3
+	case "gamemaster", "gm":
+		return 4
+	case "communitymanager", "community manager", "cm":
+		return 5
+	case "god":
+		return 5
+	default:
+		return 1
+	}
+}
+
+func hasTalkActionPermission(p *game.Player, groupType string) bool {
+	req := requiredGroupLevel(groupType)
+	if req <= 1 {
+		return true
+	}
+	if p.AccountType >= 5 || p.GroupID >= 5 {
+		return true
+	}
+	playerLevel := p.AccountType
+	if p.GroupID > uint16(playerLevel) {
+		playerLevel = uint8(p.GroupID)
+	}
+	return playerLevel >= req
 }
 
 func (g *GameProtocol) tryTalkAction(talkType byte, text string) bool {
@@ -529,36 +561,14 @@ func (g *GameProtocol) tryTalkAction(talkType byte, text string) bool {
 		return false
 	}
 	
-	// Check group type (e.g., god). Canary DB schema account types:
-	// 1 = ACCOUNT_TYPE_NORMAL, 2 = ACCOUNT_TYPE_TUTOR,
-	// 3 = ACCOUNT_TYPE_SENIOR_TUTOR, 4 = ACCOUNT_TYPE_GAMEMASTER,
-	// 5 = ACCOUNT_TYPE_GOD
-	if ta.GroupType != "" {
-		reqAcc := uint8(1)
-		switch strings.ToLower(ta.GroupType) {
-		case "tutor":
-			reqAcc = 2
-		case "senior tutor":
-			reqAcc = 3
-		case "gamemaster":
-			reqAcc = 4
-		case "community manager":
-			reqAcc = 5
-		case "god":
-			reqAcc = 5
-		}
-		if g.player.AccountType < reqAcc {
-			return false
-		}
+	if !hasTalkActionPermission(g.player, ta.GroupType) {
+		g.sendStatusText("You cannot execute this command.")
+		return true
 	}
 
 	// Call lua callback
-	success := g.deps.Lua.CallTalkAction(ta, g.player, talkType, ta.Words, param)
-	
-	// Regardless of success/failure of the lua script returning true/false, 
-	// typically talkactions returning true mean "consumed" and false mean "not consumed".
-	// But in standard OTServ if it matches the prefix, it is consumed. Let's return true.
-	return success
+	_ = g.deps.Lua.CallTalkAction(ta, g.player, talkType, ta.Words, param)
+	return true
 }
 
 func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text string) {

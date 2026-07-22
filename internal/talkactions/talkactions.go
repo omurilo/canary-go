@@ -30,47 +30,59 @@ func Register(t *TalkAction) {
 	}
 }
 
-// FindByWords finds the longest matching talkaction and returns it along with the unparsed param.
+// FindByWords finds the matching talkaction and returns it along with the unparsed param.
 func FindByWords(words string) (*TalkAction, string) {
 	talkActionsMu.RLock()
 	defer talkActionsMu.RUnlock()
 
 	lower := strings.ToLower(words)
-	var result *TalkAction
+	var bestMatch *TalkAction
+	var bestMatchedWord string
+	bestLen := 0
+
 	for _, t := range all {
-		w := strings.ToLower(t.Words)
-		if len(lower) >= len(w) && lower[:len(w)] == w {
-			if result == nil || len(w) > len(result.Words) {
-				// Must either match exactly, or have the talkaction's separator next
-				if len(lower) == len(w) {
-					result = t
-					break
-				}
-				sepLen := len(t.Separator)
-				if sepLen == 0 {
-					// Fallback: If separator is empty string (""), default to space in Lua, but here just assume it requires space to separate.
-					// Actually, Canary defaults separator to `""` in Lua which means " ". Let's check:
-					// wait, if separator is "", it means no separator is enforced, it just takes the rest.
-					// But let's check t.Separator. If it's " ", it expects a space.
-					result = t
-				} else if len(lower) >= len(w)+sepLen && lower[len(w):len(w)+sepLen] == t.Separator {
-					result = t
+		wordList := strings.Split(t.Words, ",")
+		for _, w := range wordList {
+			w = strings.TrimSpace(w)
+			if w == "" {
+				continue
+			}
+			lowerW := strings.ToLower(w)
+			if len(lower) >= len(lowerW) && lower[:len(lowerW)] == lowerW {
+				if len(lower) == len(lowerW) {
+					if len(lowerW) > bestLen {
+						bestMatch = t
+						bestMatchedWord = w
+						bestLen = len(lowerW)
+					}
+				} else {
+					sep := t.Separator
+					if sep == "" || sep == `""` {
+						sep = " "
+					}
+					rest := words[len(w):]
+					if strings.HasPrefix(rest, sep) || strings.HasPrefix(rest, " ") {
+						if len(lowerW) > bestLen {
+							bestMatch = t
+							bestMatchedWord = w
+							bestLen = len(lowerW)
+						}
+					}
 				}
 			}
 		}
 	}
 
-	if result == nil {
+	if bestMatch == nil {
 		return nil, ""
 	}
 
 	param := ""
-	prefix := result.Words
-	if len(words) > len(prefix) {
-		paramStr := words[len(prefix):]
-		sep := result.Separator
-		if sep == `""` || sep == "" {
-			sep = " " // Default separator is space if empty
+	if len(words) > len(bestMatchedWord) {
+		paramStr := words[len(bestMatchedWord):]
+		sep := bestMatch.Separator
+		if sep == "" || sep == `""` {
+			sep = " "
 		}
 		if strings.HasPrefix(paramStr, sep) {
 			paramStr = paramStr[len(sep):]
@@ -78,5 +90,5 @@ func FindByWords(words string) (*TalkAction, string) {
 		param = strings.TrimSpace(paramStr)
 	}
 
-	return result, param
+	return bestMatch, param
 }

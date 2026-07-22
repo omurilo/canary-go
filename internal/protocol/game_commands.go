@@ -85,6 +85,12 @@ func (g *GameProtocol) handleCommand(text string) bool {
 	args := fields[1:]
 	p := g.player
 
+	// Staff commands require gamemaster group level
+	if !hasTalkActionPermission(p, "gamemaster") {
+		g.sendStatusText("You cannot execute this command.")
+		return true
+	}
+
 	switch cmd {
 	case "pos", "position":
 		g.sendStatusText(fmt.Sprintf("Position: [%d, %d, %d]", p.Pos.X, p.Pos.Y, p.Pos.Z))
@@ -107,7 +113,7 @@ func (g *GameProtocol) handleCommand(text string) bool {
 	case "commands", "help":
 		g.sendStatusText("Commands: /pos /goto x y z /up /down /town <name> /i <id> [count] /addskill <skill> [n] /save /b <text>")
 	default:
-		g.sendStatusText("Command /" + cmd + " is not migrated yet.")
+		g.sendStatusText("Invalid command.")
 	}
 	return true
 }
