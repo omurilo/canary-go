@@ -251,11 +251,37 @@ func (e *Engine) combatExecute(L *lua.LState) int {
 					e.L.SetMetatable(ud, e.L.GetTypeMetatable("Creature"))
 				}
 
+				skill := int32(0)
+				attack := int32(7)
+				factor := float32(1.0)
+
+				if p, ok := caster.(*game.Player); ok {
+					if e.world != nil {
+						catalog := e.world.Items
+						tool := p.GetWeapon(catalog, false)
+						if tool != nil {
+							attack = tool.Attack(catalog)
+							if tool.WeaponType(catalog) == "ammo" {
+								launcher := p.GetWeapon(catalog, true)
+								if launcher != nil {
+									attack += launcher.Attack(catalog)
+								}
+							}
+							skill = int32(p.GetWeaponSkill(catalog, tool))
+						} else {
+							skill = int32(p.GetWeaponSkill(catalog, nil))
+						}
+					} else {
+						skill = int32(p.GetWeaponSkill(nil, nil))
+					}
+					factor = float32(p.GetAttackFactor())
+				}
+
 				if err := e.L.CallByParam(lua.P{
 					Fn:      fn,
 					NRet:    2,
 					Protect: true,
-				}, ud, lua.LNumber(0), lua.LNumber(0), lua.LNumber(0)); err == nil {
+				}, ud, lua.LNumber(skill), lua.LNumber(attack), lua.LNumber(factor)); err == nil {
 					minDamage := int32(e.L.ToNumber(-2))
 					maxDamage := int32(e.L.ToNumber(-1))
 					e.L.Pop(2)

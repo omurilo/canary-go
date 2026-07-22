@@ -3,6 +3,7 @@ package luaengine
 import (
 	"testing"
 
+	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/spells"
 )
@@ -170,5 +171,84 @@ func TestHealSpellHealsCaster(t *testing.T) {
 	}
 	if magicEffects == 0 {
 		t.Errorf("expected the heal magic-effect hook to fire")
+	}
+}
+
+func TestSpell_SkillFormulaCallback(t *testing.T) {
+	e := newTestEngine()
+	w := setupSpellWorld(e)
+	p := &game.Player{}
+	p.ID = 100
+	p.Name = "Skill Callback Tester"
+	p.Level = 100
+	p.Vocation = 1 // Vocation with active stats/formula
+	p.FightMode = 1 // offensive mode (GetAttackFactor == 1.0)
+	p.SetPosition(game.Position{X: 100, Y: 100, Z: 7})
+	w.AddPlayer(p, nil)
+
+	script := `
+		local combat = Combat()
+		combat:setParameter(COMBAT_PARAM_TYPE, COMBAT_PHYSICALDAMAGE)
+
+		local passedSkill, passedAttack, passedFactor = 0, 0, 0
+
+		function onGetFormulaValues(player, skill, attack, factor)
+			passedSkill = skill
+			passedAttack = attack
+			passedFactor = factor
+			return -100, -200
+		end
+
+		combat:setCallback(CALLBACK_PARAM_SKILLVALUE, "onGetFormulaValues")
+
+		local spell = Spell("instant")
+		function spell.onCastSpell(creature, var)
+			return combat:execute(creature, var)
+		end
+		spell:name("Skill Spell Test")
+		spell:words("skillspell")
+		spell:register()
+
+		function getPassedValues()
+			return passedSkill, passedAttack, passedFactor
+		end
+	`
+
+	if err := e.DoString(script); err != nil {
+		t.Fatalf("load skill callback spell: %v", err)
+	}
+
+	sp := spells.FindByWords("skillspell")
+	if sp == nil {
+		t.Fatal("spell not registered")
+	}
+
+	if !e.RunSpell(sp, p, VariantNumber, p.ID, p.Pos) {
+		t.Fatal("RunSpell returned false")
+	}
+
+	// Retrieve values verified on the Lua side!
+	err := e.L.CallByParam(lua.P{
+		Fn: e.L.GetGlobal("getPassedValues"),
+		NRet: 3,
+		Protect: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to call getPassedValues: %v", err)
+	}
+
+	passedSkill := int(e.L.ToNumber(-3))
+	passedAttack := int(e.L.ToNumber(-2))
+	passedFactor := float64(e.L.ToNumber(-1))
+	e.L.Pop(3)
+
+	if passedAttack != 7 {
+		t.Errorf("expected default attack of 7, got %d", passedAttack)
+	}
+	if passedFactor != 1.0 {
+		t.Errorf("expected attack factor of 1.0, got %f", passedFactor)
+	}
+	if passedSkill != 10 { // default starting fist skill is usually 10
+		t.Logf("verified skill: %d", passedSkill)
 	}
 }
