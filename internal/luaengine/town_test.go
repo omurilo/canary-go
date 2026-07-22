@@ -23,7 +23,13 @@ func TestTownClassAndSetTown(t *testing.T) {
 		assert(town:getName() == "Thais", "name=" .. tostring(town:getName()))
 		local p = town:getTemplePosition()
 		assert(p.x == 5556 and p.y == 5098 and p.z == 7, "temple pos")
+
+		local townByName = Town("Thais")
+		assert(townByName ~= nil, "Town('Thais') nil")
+		assert(townByName:getId() == 8, "townByName id")
+
 		assert(Town(999) == nil, "unknown town should be nil")
+		assert(Town("UnknownTown") == nil, "unknown town name should be nil")
 	`); err != nil {
 		t.Fatalf("Town class: %v", err)
 	}

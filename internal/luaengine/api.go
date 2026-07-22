@@ -425,6 +425,12 @@ func (e *Engine) registerAPI() {
 
 	// QuestTrackerServerConfig fallback
 	qtConfigTbl := L.NewTable()
+	L.SetField(qtConfigTbl, "kvScope", lua.LString("quest-tracker"))
+	L.SetField(qtConfigTbl, "trackedMissionsKey", lua.LString("tracked-missions"))
+	L.SetField(qtConfigTbl, "knownQuestsKey", lua.LString("known-quests"))
+	L.SetField(qtConfigTbl, "autoTrackNewQuestsKey", lua.LString("auto-track-new-quests"))
+	L.SetField(qtConfigTbl, "autoUntrackCompletedQuestsKey", lua.LString("auto-untrack-completed-quests"))
+	L.SetField(qtConfigTbl, "completedMissionRemovalDelay", lua.LNumber(5000))
 	L.SetField(qtConfigTbl, "loginLoadDelay", lua.LNumber(1000))
 	L.SetField(qtConfigTbl, "initialSyncWindow", lua.LNumber(5000))
 	L.SetGlobal("QuestTrackerServerConfig", qtConfigTbl)

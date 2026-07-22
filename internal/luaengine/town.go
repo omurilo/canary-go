@@ -43,22 +43,44 @@ func (e *Engine) registerTown() {
 	e.L.SetFuncs(mt, methods)
 	e.L.SetField(mt, "__index", mt)
 
-	// Town(id) constructor. Returns nil for an unknown town so scripts that do
+	// Town(idOrName) constructor. Returns nil for an unknown town so scripts that do
 	// `if not town then return end` behave correctly.
 	classTable := e.L.NewTable()
 	e.L.SetFuncs(classTable, methods)
 	ctorMt := e.L.NewTypeMetatable(townTypeName + "_ClassCtor")
 	e.L.SetField(ctorMt, "__call", e.L.NewFunction(func(L *lua.LState) int {
-		id := uint16(L.CheckInt(2)) // arg 1 is the class table
 		if e.world == nil {
 			L.Push(lua.LNil)
 			return 1
 		}
-		if _, ok := e.world.TempleByTownID(id); !ok {
+		var townID uint16
+		found := false
+		arg := L.Get(2) // arg 1 is the class table, arg 2 is the parameter passed to Town(...)
+
+		switch arg.Type() {
+		case lua.LTNumber:
+			id := uint16(lua.LVAsNumber(arg))
+			if _, ok := e.world.TempleByTownID(id); ok {
+				townID = id
+				found = true
+			}
+		case lua.LTString:
+			if id, ok := e.world.TownIDByName(arg.String()); ok {
+				townID = id
+				found = true
+			}
+		case lua.LTUserData:
+			if id, ok := arg.(*lua.LUserData).Value.(uint16); ok {
+				townID = id
+				found = true
+			}
+		}
+
+		if !found {
 			L.Push(lua.LNil)
 			return 1
 		}
-		pushTown(L, id)
+		pushTown(L, townID)
 		return 1
 	}))
 	e.L.SetMetatable(classTable, ctorMt)

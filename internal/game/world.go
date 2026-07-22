@@ -109,6 +109,19 @@ func (w *World) TownTemple(name string) (Position, bool) {
 	return p, ok
 }
 
+// TownIDByName returns the town id for a (case-insensitive) town name.
+func (w *World) TownIDByName(name string) (uint16, bool) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	target := strings.ToLower(strings.TrimSpace(name))
+	for id, tName := range w.TownNames {
+		if strings.ToLower(strings.TrimSpace(tName)) == target {
+			return id, true
+		}
+	}
+	return 0, false
+}
+
 // SetPosition moves a player to an absolute position under the world lock,
 // correctly updating the tile creature tracking.
 func (w *World) SetPosition(p *Player, pos Position) {
