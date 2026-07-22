@@ -256,11 +256,13 @@ func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 	c.SetParam(combat.CombatParamBlockArmor, 1)
 	c.SetParam(combat.CombatParamBlockShield, 1)
 
-	c.DoCombatHealth(adaptCreature(attacker), adaptCreature(target), combat.CombatDamage{
+	if !c.DoCombatHealth(adaptCreature(attacker), adaptCreature(target), combat.CombatDamage{
 		PrimaryType:  combat.CombatPhysical,
 		PrimaryValue: int32(dmg),
 		Origin:       combat.OriginMelee,
-	})
+	}) {
+		return
+	}
 
 	effect := uint16(effectDrawBlood)
 	if dmg <= 0 {
@@ -326,11 +328,13 @@ func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item) {
 	c.SetParam(combat.CombatParamBlockArmor, 1)
 	c.SetParam(combat.CombatParamBlockShield, 1)
 
-	c.DoCombatHealth(adaptCreature(p), adaptCreature(target), combat.CombatDamage{
+	if !c.DoCombatHealth(adaptCreature(p), adaptCreature(target), combat.CombatDamage{
 		PrimaryType:  combat.CombatPhysical,
 		PrimaryValue: dmg,
 		Origin:       combat.OriginRanged,
-	})
+	}) {
+		return
+	}
 
 	// Dispatch distance shoot effect
 	shootStr := ammo.ShootType(e.world.Items)
@@ -393,11 +397,13 @@ func (e *CombatEngine) doWandHit(p *Player, target Creature, wand *Item) {
 	c := combat.NewCombat()
 	c.SetParam(combat.CombatParamType, uint32(combatType))
 
-	c.DoCombatHealth(adaptCreature(p), adaptCreature(target), combat.CombatDamage{
+	if !c.DoCombatHealth(adaptCreature(p), adaptCreature(target), combat.CombatDamage{
 		PrimaryType:  combatType,
 		PrimaryValue: dmg,
 		Origin:       combat.OriginRanged,
-	})
+	}) {
+		return
+	}
 
 	// Dispatch distance projectile effect
 	if e.world.OnDistanceEffect != nil {
@@ -741,11 +747,13 @@ func (e *CombatEngine) executeMonsterSpell(m *Monster, target Creature, s creatu
 
 	c.SetParam(combat.CombatParamType, uint32(cType))
 
-	c.DoCombatHealth(adaptCreature(m), adaptCreature(target), combat.CombatDamage{
+	if !c.DoCombatHealth(adaptCreature(m), adaptCreature(target), combat.CombatDamage{
 		PrimaryType:  cType,
 		PrimaryValue: int32(dmg),
 		Origin:       combat.OriginSpell,
-	})
+	}) {
+		return
+	}
 
 	if e.world.OnCreatureHealthChange != nil {
 		e.world.OnCreatureHealthChange(target)

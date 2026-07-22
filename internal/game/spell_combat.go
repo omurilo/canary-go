@@ -109,9 +109,13 @@ func (e *CombatEngine) applySpellHit(c *combat.Combat, caster, target Creature, 
 	amount := dmg.PrimaryValue
 
 	if c.IsManaDrain() {
-		c.DoCombatMana(adaptCreature(caster), adaptCreature(target), dmg)
+		if !c.DoCombatMana(adaptCreature(caster), adaptCreature(target), dmg) {
+			return
+		}
 	} else {
-		c.DoCombatHealth(adaptCreature(caster), adaptCreature(target), dmg)
+		if !c.DoCombatHealth(adaptCreature(caster), adaptCreature(target), dmg) {
+			return
+		}
 	}
 
 	if e.world.OnCreatureHealthChange != nil {
