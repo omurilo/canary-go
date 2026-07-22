@@ -115,6 +115,8 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 	case "primarytype", "primaryType":
 		if attr.Value == "quivers" {
 			it.IsQuiver = true
+		} else if attr.Value == "ammunition" {
+			it.WeaponType = "ammunition"
 		}
 	case "transformequipto", "transformEquipTo":
 		if v, err := strconv.ParseUint(attr.Value, 10, 16); err == nil {

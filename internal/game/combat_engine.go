@@ -193,7 +193,7 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 
 		if weapon != nil {
 			weaponType = weapon.WeaponType(e.world.Items)
-			if weaponType == "distance" || weaponType == "missile" || weaponType == "ammunition" {
+			if weaponType == "distance" || weaponType == "missile" || weaponType == "ammunition" || weaponType == "ammo" {
 				if launcher != nil {
 					maxRange = launcher.Range(e.world.Items)
 				} else {
@@ -222,7 +222,7 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 	if p, ok := attacker.(*Player); ok {
 		if weaponType == "wand" {
 			e.doWandHit(p, target, weapon)
-		} else if weaponType == "distance" || weaponType == "missile" || weaponType == "ammunition" {
+		} else if weaponType == "distance" || weaponType == "missile" || weaponType == "ammunition" || weaponType == "ammo" {
 			e.doDistanceHit(p, target, weapon)
 		} else {
 			e.doMeleeHit(combat.NewCombat(), p, target)
@@ -448,7 +448,7 @@ func (e *CombatEngine) meleeDamage(attacker Creature) int {
 
 		skill := int(a.GetWeaponSkill(e.world.Items, weapon))
 		attackValue := fistAttackValue
-		if weapon != nil && weaponType != "distance" && weaponType != "missile" && weaponType != "wand" {
+		if weapon != nil && weaponType != "distance" && weaponType != "missile" && weaponType != "wand" && weaponType != "ammunition" && weaponType != "ammo" {
 			attackValue = int(weapon.Attack(e.world.Items))
 		}
 
