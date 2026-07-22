@@ -51,24 +51,40 @@ func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
 	}
 }
 
-// SendWheelOfDestiny sends the Wheel of Destiny payload (Opcode 0x5F) to client.
+// SendWheelOfDestiny sends the full Wheel of Destiny payload (Opcode 0x5F) to client.
 func (g *GameProtocol) SendWheelOfDestiny() {
 	wheel := g.player.GetWheel()
-	isPromoted := g.player.Vocation > 0 && (g.player.Vocation > 4)
 
-	totalPoints := wheel.GetTotalPoints(g.player.Level, isPromoted)
+	// Vocation check: Vocation 0 (no vocation) cannot use Wheel of Destiny
+	canUse := g.player.Vocation > 0
 
 	w := netmsg.NewWriter()
 	w.AddByte(0x5F) // Wheel window response opcode
 	w.AddU32(g.player.ID)
+
+	if !canUse {
+		w.AddByte(0) // canUse = false
+		g.SendToClient(w)
+		return
+	}
+
 	w.AddByte(1) // canUse = true
 	w.AddByte(0) // options
-	w.AddByte(byte(g.player.Vocation))
+
+	// Map vocation (1..4 base vocation)
+	vocationByte := byte(g.player.Vocation)
+	if vocationByte > 4 {
+		vocationByte = ((vocationByte - 1) % 4) + 1
+	}
+	w.AddByte(vocationByte)
+
+	isPromoted := g.player.Vocation > 0 && (g.player.Vocation > 4)
+	totalPoints := wheel.GetTotalPoints(g.player.Level, isPromoted)
 
 	w.AddU16(totalPoints)
 	w.AddU16(wheel.BonusPoints) // extra points
 
-	// Write slot allocations for standard 36 slots
+	// Write slot allocations for 36 slots
 	slotPoints := wheel.GetSlotPointsCopy()
 	for slotID := uint16(1); slotID <= 36; slotID++ {
 		w.AddU16(slotPoints[slotID])
@@ -78,5 +94,33 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	w.AddByte(0) // monk quest bonus flag
 	w.AddU16(0)  // monk quest bonus amount
 
+	// Gems section
+	w.AddByte(0) // active gems count
+	w.AddU16(0)  // revealed gems count
+
+	// Grade modifiers section
+	// Basic grade modifiers (46 entries)
+	w.AddByte(46)
+	for i := byte(0); i < 46; i++ {
+		w.AddByte(i)
+		w.AddByte(0) // grade 0
+	}
+
+	// Supreme grade modifiers (23 entries)
+	w.AddByte(23)
+	for i := byte(0); i < 23; i++ {
+		w.AddByte(i)
+		w.AddByte(0) // grade 0
+	}
+
 	g.SendToClient(w)
+
+	// Send resource balance updates expected by Wheel UI
+	g.sendResourceBalance(0, g.player.BankBalance)
+	g.sendResourceBalance(1, uint64(g.player.GetMoney()))
+	g.sendResourceBalance(27, 0) // RESOURCE_LESSER_GEMS
+	g.sendResourceBalance(28, 0) // RESOURCE_REGULAR_GEMS
+	g.sendResourceBalance(29, 0) // RESOURCE_GREATER_GEMS
+	g.sendResourceBalance(30, 0) // RESOURCE_LESSER_FRAGMENT
+	g.sendResourceBalance(31, 0) // RESOURCE_GREATER_FRAGMENT
 }
