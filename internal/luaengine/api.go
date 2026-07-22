@@ -1,8 +1,10 @@
 package luaengine
 
 import (
+	"strconv"
 	"strings"
 
+	"github.com/opentibiabr/canary-go/internal/config"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -218,10 +220,52 @@ func (e *Engine) registerAPI() {
 	// defaults so datapack scripts that read config (e.g. boss cooldowns via
 	// configKeys.*) degrade gracefully instead of erroring on a nil table.
 	configManagerTbl := L.NewTable()
-	L.SetField(configManagerTbl, "getNumber", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }))
-	L.SetField(configManagerTbl, "getFloat", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }))
+	L.SetField(configManagerTbl, "getNumber", L.NewFunction(func(L *lua.LState) int {
+		key := strings.ToLower(L.OptString(1, ""))
+		if config.Active != nil && config.Active.Custom != nil {
+			if val, exists := config.Active.Custom[key]; exists {
+				if num, ok := val.(lua.LNumber); ok {
+					L.Push(num)
+					return 1
+				}
+				if str, ok := val.(lua.LString); ok {
+					if f, err := strconv.ParseFloat(string(str), 64); err == nil {
+						L.Push(lua.LNumber(f))
+						return 1
+					}
+				}
+			}
+		}
+		L.Push(lua.LNumber(0))
+		return 1
+	}))
+	L.SetField(configManagerTbl, "getFloat", L.NewFunction(func(L *lua.LState) int {
+		key := strings.ToLower(L.OptString(1, ""))
+		if config.Active != nil && config.Active.Custom != nil {
+			if val, exists := config.Active.Custom[key]; exists {
+				if num, ok := val.(lua.LNumber); ok {
+					L.Push(num)
+					return 1
+				}
+				if str, ok := val.(lua.LString); ok {
+					if f, err := strconv.ParseFloat(string(str), 64); err == nil {
+						L.Push(lua.LNumber(f))
+						return 1
+					}
+				}
+			}
+		}
+		L.Push(lua.LNumber(0))
+		return 1
+	}))
 	L.SetField(configManagerTbl, "getString", L.NewFunction(func(L *lua.LState) int {
 		key := strings.ToLower(L.OptString(1, ""))
+		if config.Active != nil && config.Active.Custom != nil {
+			if val, exists := config.Active.Custom[key]; exists {
+				L.Push(lua.LString(val.String()))
+				return 1
+			}
+		}
 		if strings.Contains(key, "save_time") || strings.Contains(key, "savetime") {
 			L.Push(lua.LString("03:00:00"))
 			return 1
@@ -229,7 +273,29 @@ func (e *Engine) registerAPI() {
 		L.Push(lua.LString(""))
 		return 1
 	}))
-	L.SetField(configManagerTbl, "getBoolean", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LFalse); return 1 }))
+	L.SetField(configManagerTbl, "getBoolean", L.NewFunction(func(L *lua.LState) int {
+		key := strings.ToLower(L.OptString(1, ""))
+		if config.Active != nil && config.Active.Custom != nil {
+			if val, exists := config.Active.Custom[key]; exists {
+				if b, ok := val.(lua.LBool); ok {
+					L.Push(b)
+					return 1
+				}
+				if str, ok := val.(lua.LString); ok {
+					s := strings.ToLower(string(str))
+					if s == "true" || s == "yes" || s == "1" {
+						L.Push(lua.LTrue)
+						return 1
+					} else if s == "false" || s == "no" || s == "0" {
+						L.Push(lua.LFalse)
+						return 1
+					}
+				}
+			}
+		}
+		L.Push(lua.LFalse)
+		return 1
+	}))
 	L.SetGlobal("configManager", configManagerTbl)
 
 	// configKeys.X resolves to the key name itself (never nil), so callers can

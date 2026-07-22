@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	lua "github.com/yuin/gopher-lua"
 )
+
+// Active is a package-level variable holding the currently loaded configuration.
+var Active *Config = Default()
 
 // Config holds the subset of settings the Go server currently uses. Unknown
 // keys in config.lua are simply ignored.
@@ -35,6 +39,8 @@ type Config struct {
 
 	RSAKeyFile string
 	WorldFile  string
+
+	Custom     map[string]lua.LValue
 }
 
 // Default returns a config with sane defaults for local development.
@@ -55,6 +61,7 @@ func Default() *Config {
 		MOTD:          "Welcome to Canary-Go!",
 		AllowOldProto: true,
 		RSAKeyFile:    "key.pem",
+		Custom:        make(map[string]lua.LValue),
 	}
 }
 
@@ -133,6 +140,13 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyEnv(cfg)
+
+	cfg.Custom = make(map[string]lua.LValue)
+	g.ForEach(func(k, v lua.LValue) {
+		cfg.Custom[strings.ToLower(k.String())] = v
+	})
+	Active = cfg
+
 	return cfg, nil
 }
 
