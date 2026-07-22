@@ -113,7 +113,50 @@ func (e *Engine) registerNpcType() {
 			return 1
 		},
 	}
+
+	// Register event callbacks on NpcType
+	npcTypeMethods["eventType"] = func(L *lua.LState) int {
+		L.Push(L.Get(1))
+		return 1
+	}
+	npcEvents := []string{"onThink", "onAppear", "onDisappear", "onMove", "onSay", "onPlayerAttack", "onSpawn", "onBuyItem", "onSellItem", "onCheckItem", "onCloseChannel"}
+	for _, key := range npcEvents {
+		k := key
+		npcTypeMethods[k] = func(L *lua.LState) int {
+			n := checkNpcType(L)
+			if L.GetTop() >= 2 {
+				if fn, ok := L.Get(2).(*lua.LFunction); ok {
+					e.npcCallbacksMu.Lock()
+					if e.npcCallbacks == nil {
+						e.npcCallbacks = make(map[string]map[string]*lua.LFunction)
+					}
+					name := strings.ToLower(n.Name)
+					if e.npcCallbacks[name] == nil {
+						e.npcCallbacks[name] = make(map[string]*lua.LFunction)
+					}
+					e.npcCallbacks[name][k] = fn
+					e.npcCallbacksMu.Unlock()
+				}
+			}
+			L.Push(L.Get(1))
+			return 1
+		}
+	}
+
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), npcTypeMethods))
+
+	// Populate methods onto the global class table so they are discoverable via pairs()
+	var tbl *lua.LTable
+	classTable := e.L.GetGlobal(luaNpcTypeName)
+	if classTable.Type() == lua.LTTable {
+		tbl = classTable.(*lua.LTable)
+	} else {
+		tbl = e.L.NewTable()
+		e.L.SetGlobal(luaNpcTypeName, tbl)
+	}
+	for k, v := range npcTypeMethods {
+		e.L.SetField(tbl, k, e.L.NewFunction(v))
+	}
 	// Datapack NPC scripts assign event callbacks directly on the userdata, e.g.
 	// `npcType.onThink = function(npc, interval) ... end`. Without a __newindex,
 	// gopher-lua raises "attempt to index a non-table object(userdata)". Accept

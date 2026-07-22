@@ -1,6 +1,8 @@
 package luaengine
 
 import (
+	"strings"
+
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -124,6 +126,17 @@ func (e *Engine) registerAPI() {
 	mockClass("Spawns")
 	mockClass("BedItem")
 	mockClass("DropLoot")
+	mockClass("Charm")
+	mockClass("ItemClassification")
+	mockClass("Teleport")
+	mockClass("EventCallback")
+	mockClass("Vocation")
+	mockClass("GemAtelier")
+	mockClass("Guild")
+	mockClass("Group")
+	mockClass("House")
+	mockClass("ItemType")
+	mockClass("Zone")
 
 	// rawgetmetatable allows scripts (like revscriptsys) to retrieve the type metatable
 	L.SetGlobal("rawgetmetatable", L.NewFunction(func(L *lua.LState) int {
@@ -191,20 +204,14 @@ func (e *Engine) registerAPI() {
 	setCreatureConstructor("Monster")
 	setCreatureConstructor("Npc")
 	setCreatureConstructor("Creature")
-	ensureClassTable("ItemType")
 	ensureClassTable("MonsterType")
-	ensureClassTable("Teleport")
-	ensureClassTable("Vocation")
+	ensureClassTable("NpcType")
+	ensureClassTable("Spell")
 	ensureClassTable("Party")
-	ensureClassTable("GemAtelier")
-	ensureClassTable("Guild")
-	ensureClassTable("Group")
 	ensureClassTable("Town")
-	ensureClassTable("House")
 	ensureClassTable("Variant")
 	ensureClassTable("Condition")
 	ensureClassTable("Combat")
-	ensureClassTable("Zone")
 
 	// configManager / configKeys mirror the C++ globals that expose config.lua.
 	// The full server reads real config values here; this slice provides safe
@@ -213,7 +220,15 @@ func (e *Engine) registerAPI() {
 	configManagerTbl := L.NewTable()
 	L.SetField(configManagerTbl, "getNumber", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }))
 	L.SetField(configManagerTbl, "getFloat", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }))
-	L.SetField(configManagerTbl, "getString", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LString("")); return 1 }))
+	L.SetField(configManagerTbl, "getString", L.NewFunction(func(L *lua.LState) int {
+		key := strings.ToLower(L.OptString(1, ""))
+		if strings.Contains(key, "save_time") || strings.Contains(key, "savetime") {
+			L.Push(lua.LString("03:00:00"))
+			return 1
+		}
+		L.Push(lua.LString(""))
+		return 1
+	}))
 	L.SetField(configManagerTbl, "getBoolean", L.NewFunction(func(L *lua.LState) int { L.Push(lua.LFalse); return 1 }))
 	L.SetGlobal("configManager", configManagerTbl)
 

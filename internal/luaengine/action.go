@@ -26,10 +26,12 @@ func actionConstructor(L *lua.LState) int {
 }
 
 var actionMethods = map[string]lua.LGFunction{
-	"id":       actionId,
-	"aid":      actionAid,
-	"uid":      actionUid,
-	"register": actionRegister,
+	"id":          actionId,
+	"aid":         actionAid,
+	"uid":         actionUid,
+	"allowFarUse": actionAllowFarUse,
+	"onUse":       actionOnUse,
+	"register":    actionRegister,
 }
 
 func checkAction(L *lua.LState) *actions.Action {
@@ -86,6 +88,28 @@ func actionRegister(L *lua.LState) int {
 	a := checkAction(L)
 	actions.Register(a)
 	L.Push(lua.LTrue)
+	return 1
+}
+
+func actionAllowFarUse(L *lua.LState) int {
+	a := checkAction(L)
+	if L.GetTop() >= 2 {
+		a.AllowFarUse = L.CheckBool(2)
+	} else {
+		a.AllowFarUse = true
+	}
+	L.Push(L.Get(1))
+	return 1
+}
+
+func actionOnUse(L *lua.LState) int {
+	a := checkAction(L)
+	if L.GetTop() >= 2 {
+		if fn, ok := L.Get(2).(*lua.LFunction); ok {
+			a.OnUse = fn
+		}
+	}
+	L.Push(L.Get(1))
 	return 1
 }
 

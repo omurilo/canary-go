@@ -112,6 +112,11 @@ func RegisterEnums(L *lua.LState) {
 		"ITEM_TYPE_KEY":         8,
 		"ITEM_TYPE_SUPPLY":      9,
 
+		// Item Coin IDs
+		"ITEM_GOLD_COIN":        3031,
+		"ITEM_PLATINUM_COIN":    3035,
+		"ITEM_CRYSTAL_COIN":     3043,
+
 		// Skills
 		"SKILL_NONE":                0,
 		"SKILL_FIST":                1,
@@ -134,6 +139,14 @@ func RegisterEnums(L *lua.LState) {
 		"WORLD_TYPE_NO_PVP":       0,
 		"WORLD_TYPE_PVP":          1,
 		"WORLD_TYPE_PVP_ENFORCED": 2,
+
+		// Tile States
+		"TILESTATE_NONE":           0,
+		"TILESTATE_PROTECTIONZONE": 1,
+		"TILESTATE_NOPVP":          2,
+		"TILESTATE_NOLOGOUT":       4,
+		"TILESTATE_PVPZONE":        8,
+		"TILESTATE_REFRESH":        16,
 
 		// Zones
 		"ZONE_PROTECTION": 0,

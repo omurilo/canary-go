@@ -127,6 +127,19 @@ func (e *Engine) registerMonsterType() {
 	})
 	e.L.SetField(mt, "__index", mtIndex)
 
+	// Populate methods onto the global class table so they are discoverable via pairs()
+	var tbl *lua.LTable
+	classTable := e.L.GetGlobal(luaMonsterTypeName)
+	if classTable.Type() == lua.LTTable {
+		tbl = classTable.(*lua.LTable)
+	} else {
+		tbl = e.L.NewTable()
+		e.L.SetGlobal(luaMonsterTypeName, tbl)
+	}
+	for k, v := range monsterTypeMethods {
+		e.L.SetField(tbl, k, e.L.NewFunction(v))
+	}
+
 	// Game.createMonsterType
 	gameTable := e.L.GetGlobal("Game")
 	if gameTable.Type() == lua.LTTable {

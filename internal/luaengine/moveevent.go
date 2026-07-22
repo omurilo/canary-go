@@ -25,11 +25,17 @@ func moveEventConstructor(L *lua.LState) int {
 }
 
 var moveEventMethods = map[string]lua.LGFunction{
-	"type":     moveEventType,
-	"id":       moveEventId,
-	"aid":      moveEventAid,
-	"uid":      moveEventUid,
-	"register": moveEventRegister,
+	"type":         moveEventType,
+	"id":           moveEventId,
+	"aid":          moveEventAid,
+	"uid":          moveEventUid,
+	"onStepIn":     moveEventOnStepIn,
+	"onStepOut":    moveEventOnStepOut,
+	"onEquip":      moveEventNoOp,
+	"onDeEquip":    moveEventNoOp,
+	"onAddItem":    moveEventNoOp,
+	"onRemoveItem": moveEventNoOp,
+	"register":     moveEventRegister,
 }
 
 func checkMoveEvent(L *lua.LState) *moveevents.MoveEvent {
@@ -87,6 +93,33 @@ func moveEventUid(L *lua.LState) int {
 	for i := 2; i <= top; i++ {
 		m.UniqueIDs = append(m.UniqueIDs, uint16(L.CheckInt(i)))
 	}
+	L.Push(L.Get(1))
+	return 1
+}
+
+func moveEventOnStepIn(L *lua.LState) int {
+	m := checkMoveEvent(L)
+	if L.GetTop() >= 2 {
+		if fn, ok := L.Get(2).(*lua.LFunction); ok {
+			m.OnStepIn = fn
+		}
+	}
+	L.Push(L.Get(1))
+	return 1
+}
+
+func moveEventOnStepOut(L *lua.LState) int {
+	m := checkMoveEvent(L)
+	if L.GetTop() >= 2 {
+		if fn, ok := L.Get(2).(*lua.LFunction); ok {
+			m.OnStepOut = fn
+		}
+	}
+	L.Push(L.Get(1))
+	return 1
+}
+
+func moveEventNoOp(L *lua.LState) int {
 	L.Push(L.Get(1))
 	return 1
 }

@@ -66,6 +66,12 @@ func checkTile(L *lua.LState, n int) luaTile {
 func (e *Engine) tileMethods() map[string]lua.LGFunction {
 	return map[string]lua.LGFunction{
 		"isTile": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
+		"hasFlag": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			flag := uint32(L.CheckInt(2))
+			L.Push(lua.LBool((uint32(t.tile.Flags) & flag) != 0))
+			return 1
+		},
 		"getPosition": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			pushPosition(L, t.pos)

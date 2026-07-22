@@ -8,10 +8,11 @@ import (
 
 // Action represents a Lua action script.
 type Action struct {
-	ItemIDs   []uint16
-	ActionIDs []uint16
-	UniqueIDs []uint16
-	OnUse     *lua.LFunction
+	ItemIDs     []uint16
+	ActionIDs   []uint16
+	UniqueIDs   []uint16
+	OnUse       *lua.LFunction
+	AllowFarUse bool
 }
 
 // Engine represents the global Actions Engine
