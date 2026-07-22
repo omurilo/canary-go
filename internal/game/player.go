@@ -310,6 +310,9 @@ func (p *Player) ensureDefaults() {
 	if p.LastLogin == 0 && p.OfflineTrainingTime == 0 {
 		p.OfflineTrainingTime = 43200 * 1000 // default to full 12-hour training pool
 	}
+	if p.OfflineTrainingSkill == 0 {
+		p.OfflineTrainingSkill = -1
+	}
 
 	for i := range p.Skills {
 		if p.Skills[i] == 0 {

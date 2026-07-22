@@ -158,7 +158,7 @@ func RegisterEnums(L *lua.LState) {
 		"ITEM_CRYSTAL_COIN":     3043,
 
 		// Skills
-		"SKILL_NONE":                0,
+		"SKILL_NONE":                -1,
 		"SKILL_FIST":                1,
 		"SKILL_CLUB":                2,
 		"SKILL_SWORD":               3,
