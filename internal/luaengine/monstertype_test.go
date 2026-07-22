@@ -34,7 +34,7 @@ func monsterDataDir() string {
 func newTestEngine() *Engine {
 	w := game.NewWorld()
 	w.TypeRegistry = creatures.NewTypeRegistry()
-	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	return New(w, log)
 }
 

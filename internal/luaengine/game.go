@@ -154,8 +154,22 @@ func (e *Engine) gameCreateSoulPitMonster(L *lua.LState) int { return 0 }
 func (e *Engine) gameCreateNpc(L *lua.LState) int { return 0 }
 func (e *Engine) gameGenerateNpc(L *lua.LState) int { return 0 }
 func (e *Engine) gameCreateTile(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateBestiaryCharm(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateItemClassification(L *lua.LState) int { return 0 }
+func (e *Engine) gameCreateBestiaryCharm(L *lua.LState) int {
+	mt := L.GetTypeMetatable("BestiaryCharm")
+	ud := L.NewUserData()
+	ud.Value = "BestiaryCharm"
+	L.SetMetatable(ud, mt)
+	L.Push(ud)
+	return 1
+}
+func (e *Engine) gameCreateItemClassification(L *lua.LState) int {
+	mt := L.GetTypeMetatable("ItemClassification")
+	ud := L.NewUserData()
+	ud.Value = "ItemClassification"
+	L.SetMetatable(ud, mt)
+	L.Push(ud)
+	return 1
+}
 func (e *Engine) gameGetBestiaryCharm(L *lua.LState) int { return 0 }
 func (e *Engine) gameStartRaid(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetClientVersion(L *lua.LState) int { return 0 }

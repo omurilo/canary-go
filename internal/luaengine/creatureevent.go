@@ -16,14 +16,36 @@ type LuaCreatureEvent struct {
 // registerCreatureEvent registers the CreatureEvent global constructor and metatable
 func (e *Engine) registerCreatureEvent() {
 	mt := e.L.NewTypeMetatable(luaCreatureEventTypeName)
-	e.setClassConstructor("CreatureEvent", creatureEventConstructor, map[string]lua.LGFunction{
+	methods := map[string]lua.LGFunction{
 		"register": e.creatureEventRegister,
 		"type":     creatureEventType,
-	})
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), map[string]lua.LGFunction{
-		"register": e.creatureEventRegister,
-		"type":     creatureEventType,
-	}))
+		"onLogin": func(L *lua.LState) int {
+			ev := checkCreatureEvent(L)
+			if fn, ok := L.Get(2).(*lua.LFunction); ok {
+				ev.OnLogin = fn
+			}
+			return 0
+		},
+		"onLogout": func(L *lua.LState) int {
+			ev := checkCreatureEvent(L)
+			if fn, ok := L.Get(2).(*lua.LFunction); ok {
+				ev.OnLogout = fn
+			}
+			return 0
+		},
+		"onThink":          func(L *lua.LState) int { return 0 },
+		"onPrepareDeath":   func(L *lua.LState) int { return 0 },
+		"onDeath":          func(L *lua.LState) int { return 0 },
+		"onKill":           func(L *lua.LState) int { return 0 },
+		"onAdvance":        func(L *lua.LState) int { return 0 },
+		"onModalWindow":    func(L *lua.LState) int { return 0 },
+		"onTextEdit":       func(L *lua.LState) int { return 0 },
+		"onHealthChange":   func(L *lua.LState) int { return 0 },
+		"onManaChange":     func(L *lua.LState) int { return 0 },
+		"onExtendedOpcode": func(L *lua.LState) int { return 0 },
+	}
+	e.setClassConstructor("CreatureEvent", creatureEventConstructor, methods)
+	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
 	e.L.SetField(mt, "__newindex", e.L.NewFunction(creatureEventNewIndex))
 }
 

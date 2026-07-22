@@ -252,3 +252,69 @@ func TestSpell_SkillFormulaCallback(t *testing.T) {
 		t.Logf("verified skill: %d", passedSkill)
 	}
 }
+
+func TestSpellWithRevscriptsys(t *testing.T) {
+	e := newTestEngine()
+	// define dummy table.contains
+	if err := e.DoString(`
+		table.contains = function(tbl, val)
+			for _, v in ipairs(tbl) do
+				if v == val then return true end
+			end
+			return false
+		end
+		-- Mock Tile constructor
+		Tile = function(pos) return { getTopDownItem = function() return nil end } end
+	`); err != nil {
+		t.Fatalf("setup mocks: %v", err)
+	}
+
+	// Load revscriptsys.lua
+	if err := e.DoFile("../../data/libs/functions/revscriptsys.lua"); err != nil {
+		t.Fatalf("load revscriptsys.lua: %v", err)
+	}
+
+	// Diagnostic print
+	if err := e.DoString(`
+		local rune = Spell("rune")
+		print("RUNE TYPE:", type(rune))
+		print("RUNE METATABLE:", getmetatable(rune))
+		print("RUNE METATABLE INDEX:", getmetatable(rune).__index)
+		print("RUNE ONCASTSPELL:", rune.onCastSpell)
+		print("RUNE ONCASTSPELL TYPE:", type(rune.onCastSpell))
+	`); err != nil {
+		t.Fatalf("diagnostics: %v", err)
+	}
+
+	// Load animate_dead_rune.lua
+	if err := e.DoFile("../../data/scripts/runes/animate_dead_rune.lua"); err != nil {
+		t.Fatalf("load animate_dead_rune.lua: %v", err)
+	}
+}
+
+func TestOfflineTrainingWithRevscriptsys(t *testing.T) {
+	e := newTestEngine()
+	// define dummy table.contains
+	if err := e.DoString(`
+		table.contains = function(tbl, val)
+			for _, v in ipairs(tbl) do
+				if v == val then return true end
+			end
+			return false
+		end
+	`); err != nil {
+		t.Fatalf("setup mocks: %v", err)
+	}
+
+	// Load revscriptsys.lua
+	if err := e.DoFile("../../data/libs/functions/revscriptsys.lua"); err != nil {
+		t.Fatalf("load revscriptsys.lua: %v", err)
+	}
+
+	// Load offline_training.lua
+	if err := e.DoFile("../../data/scripts/creaturescripts/player/offline_training.lua"); err != nil {
+		t.Fatalf("load offline_training.lua: %v", err)
+	}
+}
+
+
