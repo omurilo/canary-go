@@ -462,9 +462,9 @@ func (g *GameProtocol) addStats(w *netmsg.Writer) {
 	p := g.player
 	w.AddByte(opPlayerStats)
 	w.AddU32(p.Health)
-	w.AddU32(p.MaxHealth)
+	w.AddU32(p.GetMaxHealth())
 
-	totalCap := p.Capacity * 100
+	totalCap := p.GetCapacity()
 	usedCap := g.getPlayerTotalWeight()
 	freeCap := uint32(0)
 	if totalCap > usedCap {
@@ -480,7 +480,7 @@ func (g *GameProtocol) addStats(w *netmsg.Writer) {
 	w.AddU16(0)   // xp boost percent
 	w.AddU16(0)   // stamina multiplier
 	w.AddU32(p.Mana)
-	w.AddU32(p.MaxMana)
+	w.AddU32(p.GetMaxMana())
 	w.AddByte(p.Soul)
 	w.AddU16(2520) // stamina minutes
 	w.AddU16(p.Speed)

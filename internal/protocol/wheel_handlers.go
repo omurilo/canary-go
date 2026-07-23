@@ -182,11 +182,11 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	g.sendGiftOfLifeCooldown()
 
 	// Send resource balance updates expected by Wheel UI
-	g.sendResourceBalance(0, g.player.BankBalance)
-	g.sendResourceBalance(1, uint64(g.player.GetMoney()))
-	g.sendResourceBalance(27, 0) // RESOURCE_LESSER_GEMS
-	g.sendResourceBalance(28, 0) // RESOURCE_REGULAR_GEMS
-	g.sendResourceBalance(29, 0) // RESOURCE_GREATER_GEMS
-	g.sendResourceBalance(30, 0) // RESOURCE_LESSER_FRAGMENT
-	g.sendResourceBalance(31, 0) // RESOURCE_GREATER_FRAGMENT
+	g.sendResourceBalance(0x00, g.player.BankBalance)
+	g.sendResourceBalance(0x01, uint64(g.player.GetMoney()))
+	g.sendResourceBalance(0x51, 0) // RESOURCE_LESSER_GEMS
+	g.sendResourceBalance(0x52, 0) // RESOURCE_REGULAR_GEMS
+	g.sendResourceBalance(0x53, 0) // RESOURCE_GREATER_GEMS
+	g.sendResourceBalance(0x54, 0) // RESOURCE_LESSER_FRAGMENT
+	g.sendResourceBalance(0x55, 0) // RESOURCE_GREATER_FRAGMENT
 }
