@@ -70,6 +70,7 @@ type World struct {
 	Combat *CombatEngine
 
 	TypeRegistry *creatures.TypeRegistry
+	Fiendish     *FiendishManager
 }
 
 // PlayerByName returns an online player by (case-insensitive) name, or nil.
@@ -106,6 +107,7 @@ func NewWorld() *World {
 		byName:       make(map[string]*Player),
 		creatures:    make(map[uint32]Creature),
 		TypeRegistry: creatures.NewTypeRegistry(),
+		Fiendish:     NewFiendishManager(3),
 	}
 	w.Combat = NewCombatEngine(w)
 	w.Decay = NewDecayManager(w)

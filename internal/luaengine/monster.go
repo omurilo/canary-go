@@ -127,12 +127,21 @@ func monsterChangetargetdistance(L *lua.LState) int {
 }
 
 func monsterClearfiendishstatus(L *lua.LState) int {
-	// TODO: implement clearFiendishStatus
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	m.ClearFiendishStatus()
 	return 0
 }
 
 func monsterConfigureforgesystem(L *lua.LState) int {
-	// TODO: implement configureForgeSystem
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	stack := uint16(L.OptInt(2, 0))
+	m.ConfigureForgeSystem(stack)
 	return 0
 }
 
@@ -152,7 +161,10 @@ func monsterGetdefense(L *lua.LState) int {
 }
 
 func monsterGetforgestack(L *lua.LState) int {
-	// TODO: implement getForgeStack
+	if m := checkMonster(L); m != nil {
+		L.Push(lua.LNumber(m.ForgeStack))
+		return 1
+	}
 	return 0
 }
 
@@ -167,7 +179,10 @@ func monsterGetfriendlist(L *lua.LState) int {
 }
 
 func monsterGetmonsterforgeclassification(L *lua.LState) int {
-	// TODO: implement getMonsterForgeClassification
+	if m := checkMonster(L); m != nil {
+		L.Push(lua.LNumber(m.ForgeClassification))
+		return 1
+	}
 	return 0
 }
 
@@ -200,7 +215,10 @@ func monsterGettargetlist(L *lua.LState) int {
 }
 
 func monsterGettimetochangefiendish(L *lua.LState) int {
-	// TODO: implement getTimeToChangeFiendish
+	if m := checkMonster(L); m != nil {
+		L.Push(lua.LNumber(m.TimeToChangeFiendish))
+		return 1
+	}
 	return 0
 }
 
@@ -250,7 +268,10 @@ func monsterIsdead(L *lua.LState) int {
 }
 
 func monsterIsforgeable(L *lua.LState) int {
-	// TODO: implement isForgeable
+	if m := checkMonster(L); m != nil {
+		L.Push(lua.LBool(m.CanBeForgeMonster()))
+		return 1
+	}
 	return 0
 }
 
@@ -305,7 +326,12 @@ func monsterSelecttarget(L *lua.LState) int {
 }
 
 func monsterSetforgestack(L *lua.LState) int {
-	// TODO: implement setForgeStack
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	m.ForgeStack = uint16(L.CheckInt(2))
+	m.ApplyStacks()
 	return 0
 }
 
@@ -315,7 +341,11 @@ func monsterSetidle(L *lua.LState) int {
 }
 
 func monsterSetmonsterforgeclassification(L *lua.LState) int {
-	// TODO: implement setMonsterForgeClassification
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	m.ForgeClassification = game.ForgeClassification(L.CheckInt(2))
 	return 0
 }
 
@@ -330,7 +360,11 @@ func monsterSetspawnposition(L *lua.LState) int {
 }
 
 func monsterSettimetochangefiendish(L *lua.LState) int {
-	// TODO: implement setTimeToChangeFiendish
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	m.TimeToChangeFiendish = int64(L.CheckInt(2))
 	return 0
 }
 

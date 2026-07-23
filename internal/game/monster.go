@@ -6,6 +6,14 @@ import (
 	"github.com/opentibiabr/canary-go/internal/creatures"
 )
 
+type ForgeClassification byte
+
+const (
+	ForgeClassifications_None       ForgeClassification = 0
+	ForgeClassifications_Influenced ForgeClassification = 1
+	ForgeClassifications_Fiendish   ForgeClassification = 2
+)
+
 type Monster struct {
 	BaseCreature
 	TargetDistance int32
@@ -16,6 +24,10 @@ type Monster struct {
 	// Type is the shared, immutable monster definition (attacks, loot,
 	// experience, flags). May be nil for synthetic/test monsters.
 	Type *creatures.MonsterType
+
+	ForgeClassification ForgeClassification
+	ForgeStack          uint16
+	TimeToChangeFiendish int64
 }
 
 func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {
@@ -89,4 +101,43 @@ func (m *Monster) Experience() uint64 {
 		return 0
 	}
 	return m.Type.Experience
+}
+
+// CanBeForgeMonster checks if the monster is eligible to become influenced or fiendish.
+func (m *Monster) CanBeForgeMonster() bool {
+	return m.ForgeStack == 0 && m.Type != nil && m.Type.RaceID > 0
+}
+
+// ApplyStacks scales health based on forge stack level.
+func (m *Monster) ApplyStacks() {
+	if m.ForgeStack == 0 {
+		return
+	}
+	percent := 1.0 + float64(15*m.ForgeStack+35)/100.0
+	newMax := uint32(float64(m.MaxHealth) * percent)
+	if newMax == 0 {
+		newMax = 100
+	}
+	m.MaxHealth = newMax
+	m.Health = newMax
+}
+
+// ConfigureForgeSystem sets up stacks and HP scaling for Influenced or Fiendish monsters.
+func (m *Monster) ConfigureForgeSystem(stack uint16) {
+	if m.ForgeClassification == ForgeClassifications_Fiendish {
+		m.ForgeStack = 15
+	} else if m.ForgeClassification == ForgeClassifications_Influenced {
+		if stack == 0 {
+			stack = uint16(1 + (time.Now().UnixNano() % 5))
+		}
+		m.ForgeStack = stack
+	}
+	m.ApplyStacks()
+}
+
+// ClearFiendishStatus resets fiendish classification and stacks.
+func (m *Monster) ClearFiendishStatus() {
+	m.ForgeClassification = ForgeClassifications_None
+	m.ForgeStack = 0
+	m.TimeToChangeFiendish = 0
 }
