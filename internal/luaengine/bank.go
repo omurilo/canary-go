@@ -80,12 +80,23 @@ func (e *Engine) registerBank() {
 	}))
 
 	e.L.SetField(bank, "credit", e.L.NewFunction(func(L *lua.LState) int {
-		p := checkPlayer(L)
+		p := e.resolveTargetPlayer(L, 1)
 		amount := uint64(L.CheckNumber(2))
 		if p != nil {
 			p.BankBalance += amount
+			L.Push(lua.LTrue)
+			return 1
 		}
-		L.Push(lua.LTrue)
+		v := L.Get(1)
+		if v.Type() == lua.LTString && e.database != nil && e.database.SQL != nil {
+			name := v.String()
+			_, err := e.database.SQL.Exec("UPDATE players SET balance = balance + ? WHERE LOWER(name) = LOWER(?)", amount, name)
+			if err == nil {
+				L.Push(lua.LTrue)
+				return 1
+			}
+		}
+		L.Push(lua.LFalse)
 		return 1
 	}))
 

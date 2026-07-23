@@ -256,7 +256,32 @@ func (e *Engine) gameReload(L *lua.LState) int { return 0 }
 func (e *Engine) gameHasDistanceEffect(L *lua.LState) int { return 0 }
 func (e *Engine) gameHasEffect(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetOfflinePlayer(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetNormalizedPlayerName(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetNormalizedPlayerName(L *lua.LState) int {
+	name := L.CheckString(1)
+	if name == "" {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	if e.world != nil {
+		if p := e.world.PlayerByName(name); p != nil {
+			L.Push(lua.LString(p.Name))
+			return 1
+		}
+	}
+
+	if e.database != nil && e.database.SQL != nil {
+		var dbName string
+		err := e.database.SQL.QueryRow("SELECT name FROM players WHERE LOWER(name) = LOWER(?) LIMIT 1", name).Scan(&dbName)
+		if err == nil && dbName != "" {
+			L.Push(lua.LString(dbName))
+			return 1
+		}
+	}
+
+	L.Push(lua.LNil)
+	return 1
+}
 func (e *Engine) gameGetNormalizedGuildName(L *lua.LState) int { return 0 }
 func (e *Engine) gameAddInfluencedMonster(L *lua.LState) int { return 0 }
 func (e *Engine) gameRemoveInfluencedMonster(L *lua.LState) int { return 0 }
