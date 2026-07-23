@@ -97,6 +97,9 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	if err := d.LoadPlayerItems(ctx, p); err != nil {
 		return nil, err
 	}
+	// Rebuild quick-loot managed containers from the per-container bitmask
+	// attributes now that the inventory is loaded.
+	p.RebuildManagedContainers()
 
 	// Load player storages
 	p.Storages = make(map[uint32]int32)

@@ -48,6 +48,7 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 	case "forceuse":
 		it.ForceUse = (attr.Value == "1")
 	case "type":
+		it.TypeName = attr.Value
 		if attr.Value == "ladder" {
 			it.IsLadder = true
 		} else if attr.Value == "door" {

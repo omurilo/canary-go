@@ -208,7 +208,39 @@ func (w *World) PlayerSetQuickLootFallback(playerID uint32, fallback bool) {
 	p.QuickLootFallbackToMain = fallback
 }
 
-// PlayerSetManagedContainer sets managed container for a category.
+// setQuickLootBit sets or clears the category bit in the container's persisted
+// loot/obtain bitmask attribute (ATTR_QUICKLOOTCONTAINER / ATTR_OBTAINCONTAINER).
+func (i *Item) setQuickLootBit(category uint8, isLoot, on bool) {
+	if i == nil {
+		return
+	}
+	if i.Attr == nil {
+		i.Attr = &ItemAttributes{}
+	}
+	field := &i.Attr.QuickLootContainer
+	if !isLoot {
+		field = &i.Attr.ObtainContainer
+	}
+	var v uint32
+	if *field != nil {
+		v = **field
+	}
+	if on {
+		v |= 1 << category
+	} else {
+		v &^= 1 << category
+	}
+	if v == 0 {
+		*field = nil
+	} else {
+		*field = &v
+	}
+}
+
+// PlayerSetManagedContainer assigns the inventory container `itemID` as the
+// managed loot (or obtain) container for a category. The assignment is stored
+// both in the fast-lookup map and as a persisted bitmask attribute on the
+// container item, mirroring C++ ATTR_QUICKLOOTCONTAINER/ATTR_OBTAINCONTAINER.
 func (w *World) PlayerSetManagedContainer(playerID uint32, category uint8, pos Position, itemID uint16, stackpos uint8, isLootContainer bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -217,20 +249,50 @@ func (w *World) PlayerSetManagedContainer(playerID uint32, category uint8, pos P
 	if !ok {
 		return
 	}
-
 	_ = pos
 	_ = stackpos
-	if isLootContainer {
-		if p.ManagedContainers == nil {
-			p.ManagedContainers = make(map[uint8]uint16)
-		}
-		p.ManagedContainers[category] = itemID
-	} else {
-		if p.ManagedObtainContainers == nil {
-			p.ManagedObtainContainers = make(map[uint8]uint16)
-		}
-		p.ManagedObtainContainers[category] = itemID
+
+	m := &p.ManagedContainers
+	if !isLootContainer {
+		m = &p.ManagedObtainContainers
 	}
+	if *m == nil {
+		*m = make(map[uint8]uint16)
+	}
+	(*m)[category] = itemID
+
+	if c := p.findInventoryContainer(w.Items, itemID); c != nil {
+		c.setQuickLootBit(category, isLootContainer, true)
+	}
+}
+
+// RebuildManagedContainers repopulates the managed-container maps from the
+// persisted per-container bitmask attributes. Called on login after the
+// inventory is loaded so quick-loot assignments survive relog.
+func (p *Player) RebuildManagedContainers() {
+	p.ManagedContainers = make(map[uint8]uint16)
+	p.ManagedObtainContainers = make(map[uint8]uint16)
+	p.WalkInventory(func(it *Item) {
+		if it.Attr == nil {
+			return
+		}
+		if it.Attr.QuickLootContainer != nil {
+			mask := *it.Attr.QuickLootContainer
+			for cat := uint8(0); cat <= 31; cat++ {
+				if mask&(1<<cat) != 0 {
+					p.ManagedContainers[cat] = it.ID
+				}
+			}
+		}
+		if it.Attr.ObtainContainer != nil {
+			mask := *it.Attr.ObtainContainer
+			for cat := uint8(0); cat <= 31; cat++ {
+				if mask&(1<<cat) != 0 {
+					p.ManagedObtainContainers[cat] = it.ID
+				}
+			}
+		}
+	})
 }
 
 // PlayerClearManagedContainer clears a managed container.
@@ -243,10 +305,18 @@ func (w *World) PlayerClearManagedContainer(playerID uint32, category uint8, isL
 		return
 	}
 
-	if isLootContainer && p.ManagedContainers != nil {
-		delete(p.ManagedContainers, category)
-	} else if !isLootContainer && p.ManagedObtainContainers != nil {
-		delete(p.ManagedObtainContainers, category)
+	m := p.ManagedContainers
+	if !isLootContainer {
+		m = p.ManagedObtainContainers
+	}
+	if m == nil {
+		return
+	}
+	if itemID, exists := m[category]; exists {
+		if c := p.findInventoryContainer(w.Items, itemID); c != nil {
+			c.setQuickLootBit(category, isLootContainer, false)
+		}
+		delete(m, category)
 	}
 }
 

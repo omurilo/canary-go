@@ -305,10 +305,18 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 			if err := ps.Skip(1); err != nil {
 				return nil, subType, err
 			}
-		case attrQuickLootContainer, attrObtainContainer: // uint32
-			if err := ps.Skip(4); err != nil {
+		case attrQuickLootContainer: // uint32 category bitmask
+			v, err := ps.ReadUint32()
+			if err != nil {
 				return nil, subType, err
 			}
+			a.QuickLootContainer = &v
+		case attrObtainContainer: // uint32 category bitmask
+			v, err := ps.ReadUint32()
+			if err != nil {
+				return nil, subType, err
+			}
+			a.ObtainContainer = &v
 		case attrSpecial, attrStoreInboxCategory: // string
 			if _, err := ps.ReadString(); err != nil {
 				return nil, subType, err
@@ -438,6 +446,14 @@ func (a *ItemAttributes) Encode(subType uint16) []byte {
 	if a.Owner != nil {
 		w.WriteUint8(attrOwner)
 		w.WriteUint32(*a.Owner)
+	}
+	if a.QuickLootContainer != nil {
+		w.WriteUint8(attrQuickLootContainer)
+		w.WriteUint32(*a.QuickLootContainer)
+	}
+	if a.ObtainContainer != nil {
+		w.WriteUint8(attrObtainContainer)
+		w.WriteUint32(*a.ObtainContainer)
 	}
 
 	return w.GetStream()

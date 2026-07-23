@@ -65,7 +65,10 @@ type ItemType struct {
 	SlotPosition string
 	SlotType     string
 	WeaponType   string
-	FloorChange  string
+	// TypeName is the items.xml `type` attribute (e.g. "rune", "container",
+	// "teleport"). Used by getObjectCategory for exact type-based loot routing.
+	TypeName    string
+	FloorChange string
 	ForceUse     bool
 	IsLadder     bool
 	IsDoor       bool

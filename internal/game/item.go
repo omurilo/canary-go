@@ -163,6 +163,12 @@ type ItemAttributes struct {
 	Amount         *uint16 // ATTR_AMOUNT (39)    uint16
 	Owner          *uint32 // ATTR_OWNER (43)     uint32
 	TeleDest       *Position // ATTR_TELE_DEST (8) x(u16) y(u16) z(u8)
+	// QuickLootContainer / ObtainContainer are bitmasks of the ObjectCategory
+	// values this container is the managed loot / obtain container for
+	// (ATTR_QUICKLOOTCONTAINER 38 / ATTR_OBTAINCONTAINER 44, u32). They persist
+	// the quick-loot assignment per container instance, like C++.
+	QuickLootContainer *uint32
+	ObtainContainer    *uint32
 }
 
 // Outfit describes a creature's appearance.
@@ -272,6 +278,14 @@ func (i *Item) GetObjectCategory(catalog *items.Catalog) uint8 {
 	it := catalog.Get(i.ID)
 	if it == nil {
 		return ObjectCategoryDefault
+	}
+
+	// Exact item-type routing (items.xml `type`) takes precedence over the name
+	// heuristics below. Only a few categories are typed in items.xml (rune);
+	// food/potion/valuables fall through to the heuristic.
+	switch it.TypeName {
+	case "rune":
+		return ObjectCategoryRunes
 	}
 
 	// 1. Weapon checks
