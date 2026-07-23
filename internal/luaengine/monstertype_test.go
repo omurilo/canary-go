@@ -244,4 +244,32 @@ func TestDiagnosticRealSpawnsMatching(t *testing.T) {
 	}
 }
 
+func TestMonsterTypeConstructorAndRaceId(t *testing.T) {
+	e := newTestEngine()
+	defer e.Close()
+
+	drume := &creatures.MonsterType{
+		Name:   "Drume",
+		RaceID: 1823,
+	}
+	e.world.TypeRegistry.Monsters["drume"] = drume
+
+	e.registerMonsterType()
+
+	script := `
+		local mType = MonsterType("Drume")
+		assert(mType ~= nil, "MonsterType('Drume') must return non-nil")
+		assert(mType:name() == "Drume", "expected name Drume, got " .. tostring(mType:name()))
+		assert(mType:raceId() == 1823, "expected raceId 1823, got " .. tostring(mType:raceId()))
+
+		local mTypeByRace = MonsterType(1823)
+		assert(mTypeByRace ~= nil, "MonsterType(1823) must return non-nil")
+		assert(mTypeByRace:name() == "Drume", "expected name Drume from raceId")
+	`
+	if err := e.DoString(script); err != nil {
+		t.Fatalf("MonsterType constructor test failed: %v", err)
+	}
+}
+
+
 

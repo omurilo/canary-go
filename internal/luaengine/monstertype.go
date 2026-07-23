@@ -108,6 +108,20 @@ func (e *Engine) registerMonsterType() {
 			L.Push(lua.LNumber(val))
 			return 1
 		},
+		"raceId": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			L.Push(lua.LNumber(m.RaceID))
+			return 1
+		},
+		"getRaceId": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			L.Push(lua.LNumber(m.RaceID))
+			return 1
+		},
+		"isMonsterType": func(L *lua.LState) int {
+			L.Push(lua.LTrue)
+			return 1
+		},
 	}
 	
 	// Resilient __index fallback: if a method on MonsterType doesn't exist,
@@ -139,6 +153,44 @@ func (e *Engine) registerMonsterType() {
 	for k, v := range monsterTypeMethods {
 		e.L.SetField(tbl, k, e.L.NewFunction(v))
 	}
+
+	// Set constructor __call metamethod on MonsterType global table
+	ctorMt := e.L.NewTable()
+	e.L.SetField(ctorMt, "__call", e.L.NewFunction(func(L *lua.LState) int {
+		if L.GetTop() < 2 {
+			return 0
+		}
+		var mType *creatures.MonsterType
+		arg := L.Get(2)
+		if arg.Type() == lua.LTNumber {
+			raceId := uint16(lua.LVAsNumber(arg))
+			if e != nil && e.world != nil && e.world.TypeRegistry != nil {
+				for _, m := range e.world.TypeRegistry.Monsters {
+					if m.RaceID == raceId {
+						mType = m
+						break
+					}
+				}
+			}
+		} else if arg.Type() == lua.LTString {
+			name := strings.ToLower(arg.String())
+			if e != nil && e.world != nil && e.world.TypeRegistry != nil {
+				mType = e.world.TypeRegistry.Monsters[name]
+			}
+			if mType == nil {
+				mType = &creatures.MonsterType{Name: arg.String()}
+			}
+		}
+		if mType == nil {
+			return 0
+		}
+		ud := L.NewUserData()
+		ud.Value = mType
+		L.SetMetatable(ud, mt)
+		L.Push(ud)
+		return 1
+	}))
+	e.L.SetMetatable(tbl, ctorMt)
 
 	// Game.createMonsterType
 	gameTable := e.L.GetGlobal("Game")
