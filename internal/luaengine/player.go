@@ -84,8 +84,10 @@ var playerMethods = map[string]lua.LGFunction{
 	"charmExpansion":                 playerCharmexpansion,
 	"getCharmMonsterType":            playerGetcharmmonstertype,
 	"isMonsterPrey":                  playerIsmonsterprey,
-	"getPreyCards":                playerGetpreycards,
-	"getPreyLootPercentage":       playerGetpreylootpercentage,
+	"getPreyCards":                   playerGetpreycards,
+	"canReceiveStoreItems":           playerCanreceivestoreitems,
+	"sendButtonIndication":           playerSendbuttonindication,
+	"getPreyLootPercentage":          playerGetpreylootpercentage,
 	"getPreyExperiencePercentage":    playerGetpreyexperiencepercentage,
 	"preyThirdSlot":                  playerPreythirdslot,
 	"taskHuntingThirdSlot":           playerTaskhuntingthirdslot,
@@ -1167,7 +1169,13 @@ func playerGetclient(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(L.NewTable()) // not modelled yet; safe default
+	// Return a client info table. Scripts read `.version` to branch old/new
+	// protocol (e.g. the gamestore module); report a modern protocol version so
+	// the current-client code paths are taken.
+	t := L.NewTable()
+	L.SetField(t, "version", lua.LNumber(1340))
+	L.SetField(t, "os", lua.LNumber(2))
+	L.Push(t)
 	return 1
 }
 
@@ -2703,6 +2711,20 @@ func playerOpenchannel(L *lua.LState) int {
 		return 0
 	}
 	L.Push(lua.LTrue) // not modelled yet; safe default
+	return 1
+}
+
+// playerCanreceivestoreitems reports whether the player can receive store items
+// right now (C++ checks capacity/house/pz; a lenient default of true is used
+// until those constraints are modeled).
+func playerCanreceivestoreitems(L *lua.LState) int {
+	L.Push(lua.LTrue)
+	return 1
+}
+
+// playerSendbuttonindication is the store button blink hint; a no-op here.
+func playerSendbuttonindication(L *lua.LState) int {
+	L.Push(lua.LTrue)
 	return 1
 }
 

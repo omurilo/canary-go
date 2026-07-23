@@ -267,8 +267,21 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	_ = d.SavePlayerWheel(ctx, p)
 	_ = d.SavePlayerPrey(ctx, p)
 	_ = d.SavePlayerTaskHunter(ctx, p)
+	_ = d.SaveAccountCoins(ctx, p)
 
 	return d.SavePlayerItems(ctx, p)
+}
+
+// SaveAccountCoins persists the account's Tibia Coin balances (store purchases
+// and transfers debit them in memory; this writes them back to the accounts
+// row so they survive relog).
+func (d *DB) SaveAccountCoins(ctx context.Context, p *game.Player) error {
+	if p.AccountID == 0 {
+		return nil
+	}
+	const q = `UPDATE accounts SET coins=?, coins_transferable=? WHERE id=?`
+	_, err := d.SQL.ExecContext(ctx, q, p.CoinBalance, p.CoinTransferable, p.AccountID)
+	return err
 }
 
 // TownTemple returns the temple position of a town.
