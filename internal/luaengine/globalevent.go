@@ -37,6 +37,17 @@ func (e *Engine) registerGlobalEventClass() {
 			L.Push(L.Get(1))
 			return 1
 		},
+		// interval/time configure onThink/onTime scheduling. onThink/onTime aren't
+		// driven by the Go engine yet, so these are chainable no-ops that let the
+		// scripts load (a missing method aborts the whole script at load time).
+		"interval": func(L *lua.LState) int {
+			L.Push(L.Get(1))
+			return 1
+		},
+		"time": func(L *lua.LState) int {
+			L.Push(L.Get(1))
+			return 1
+		},
 		"onTime": func(L *lua.LState) int {
 			L.Push(L.Get(1))
 			return 1
