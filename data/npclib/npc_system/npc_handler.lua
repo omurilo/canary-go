@@ -547,8 +547,6 @@ if NpcHandler == nil then
 	function NpcHandler:onFarewell(npc, player)
 		if self:checkInteraction(npc, player) then
 			self:unGreet(npc, player)
-			NpcDialog.remove(player, npc:getId())
-			NpcDialog.sendWindow(player)
 			return true
 		end
 	end
@@ -582,8 +580,6 @@ if NpcHandler == nil then
 				elseif message ~= "" then
 					npc:sayWithDelay(npc:getId(), message, TALKTYPE_SAY, self.talkDelay, self.eventDelayedSay)
 				end
-				NpcDialog.remove(player, npc:getId())
-				NpcDialog.sendWindow(player)
 				self:resetNpc(npc, player)
 				self:removeInteraction(npc, player)
 			end

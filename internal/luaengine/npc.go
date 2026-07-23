@@ -142,8 +142,36 @@ func npcGetspeechbubble(L *lua.LState) int {
 }
 
 func npcIsintalkrange(L *lua.LState) int {
-	// No range check modelled; assume in range so dialogue proceeds.
-	L.Push(lua.LTrue)
+	n := checkNpc(L)
+	if n == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	targetPos, ok := parsePosition(L, 2)
+	if !ok {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	talkRange := 4
+	if L.GetTop() >= 3 {
+		if r := L.OptInt(3, 4); r > 0 {
+			talkRange = r
+		}
+	}
+	npcPos := n.GetPosition()
+	if npcPos.Z != targetPos.Z {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	dx := int(npcPos.X) - int(targetPos.X)
+	if dx < 0 {
+		dx = -dx
+	}
+	dy := int(npcPos.Y) - int(targetPos.Y)
+	if dy < 0 {
+		dy = -dy
+	}
+	L.Push(lua.LBool(dx <= talkRange && dy <= talkRange))
 	return 1
 }
 
