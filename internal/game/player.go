@@ -140,6 +140,12 @@ type Player struct {
 	Prey       *PlayerPrey
 	TaskHunter *PlayerTaskHunter
 
+	// Exaltation Forge resources
+	ForgeDust      uint32
+	ForgeDustLimit uint32
+	ForgeSlivers   uint32
+	ForgeCores     uint32
+
 	// Inventory holds equipment slots 1..10 (CONST_SLOT_HEAD..CONST_SLOT_AMMO);
 	// index 0 is unused. Slot 11 (store inbox, CONST_SLOT_LAST) is intentionally
 	// omitted. Persistence of these is a later milestone.
@@ -355,11 +361,74 @@ func (p *Player) ensureDefaults() {
 		p.OfflineTrainingSkill = -1
 	}
 
+	if p.ForgeDustLimit == 0 {
+		p.ForgeDustLimit = 100
+	}
+
 	for i := range p.Skills {
 		if p.Skills[i] == 0 {
 			p.Skills[i] = 10
 		}
 	}
+}
+
+// GetForgeDust returns current forge dust.
+func (p *Player) GetForgeDust() uint32 { return p.ForgeDust }
+
+// GetForgeDustLimit returns maximum forge dust limit.
+func (p *Player) GetForgeDustLimit() uint32 {
+	if p.ForgeDustLimit == 0 {
+		return 100
+	}
+	return p.ForgeDustLimit
+}
+
+// AddForgeDust increases forge dust up to the player's dust limit.
+func (p *Player) AddForgeDust(amount uint32) {
+	limit := p.GetForgeDustLimit()
+	p.ForgeDust += amount
+	if p.ForgeDust > limit {
+		p.ForgeDust = limit
+	}
+}
+
+// RemoveForgeDust deducts forge dust if available.
+func (p *Player) RemoveForgeDust(amount uint32) bool {
+	if p.ForgeDust < amount {
+		return false
+	}
+	p.ForgeDust -= amount
+	return true
+}
+
+// GetForgeSlivers returns current forge slivers.
+func (p *Player) GetForgeSlivers() uint32 { return p.ForgeSlivers }
+
+// AddForgeSlivers increases forge slivers.
+func (p *Player) AddForgeSlivers(amount uint32) { p.ForgeSlivers += amount }
+
+// RemoveForgeSlivers deducts forge slivers if available.
+func (p *Player) RemoveForgeSlivers(amount uint32) bool {
+	if p.ForgeSlivers < amount {
+		return false
+	}
+	p.ForgeSlivers -= amount
+	return true
+}
+
+// GetForgeCores returns current exaltation cores.
+func (p *Player) GetForgeCores() uint32 { return p.ForgeCores }
+
+// AddForgeCores increases exaltation cores.
+func (p *Player) AddForgeCores(amount uint32) { p.ForgeCores += amount }
+
+// RemoveForgeCores deducts exaltation cores if available.
+func (p *Player) RemoveForgeCores(amount uint32) bool {
+	if p.ForgeCores < amount {
+		return false
+	}
+	p.ForgeCores -= amount
+	return true
 }
 
 // GetStorageValue returns the player's value for a storage key, or -1 when the

@@ -106,6 +106,25 @@ func (i *Item) HoldingCount() int {
 	return total
 }
 
+// GetTier returns the forge tier of the item (0..10).
+func (i *Item) GetTier() uint8 {
+	if i == nil || i.Attr == nil || i.Attr.Tier == nil {
+		return 0
+	}
+	return *i.Attr.Tier
+}
+
+// SetTier sets the forge tier of the item.
+func (i *Item) SetTier(tier uint8) {
+	if i == nil {
+		return
+	}
+	if i.Attr == nil {
+		i.Attr = &ItemAttributes{}
+	}
+	i.Attr.Tier = &tier
+}
+
 // ItemAttributes is the structured form of the OTBR ATTR_* TLV blob stored in
 // the player_items.attributes column. Each optional field is a pointer whose
 // non-nil value marks the attribute as present, so a decode→encode round-trip

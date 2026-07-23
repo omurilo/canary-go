@@ -700,6 +700,10 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseSetOutfit(r)
 	case 0xE5:
 		g.parseCyclopediaCharacterInfo(r)
+	case 0xBF:
+		g.parseForgeEnter(r)
+	case 0xC0:
+		g.parseForgeBrowseHistory(r)
 	case 0xEA, 0xEB:
 		g.parsePreyAction(r)
 	case 0xEC:

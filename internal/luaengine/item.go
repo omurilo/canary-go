@@ -213,6 +213,18 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		"clone": stubItemMethod,
 		"split": stubItemMethod,
 		"remove": itemRemove,
+		"getTier": func(L *lua.LState) int {
+			it := checkItem(L)
+			L.Push(lua.LNumber(it.item.GetTier()))
+			return 1
+		},
+		"setTier": func(L *lua.LState) int {
+			it := checkItem(L)
+			tier := uint8(L.CheckInt(2))
+			it.item.SetTier(tier)
+			L.Push(lua.LBool(true))
+			return 1
+		},
 		"getActionId": func(L *lua.LState) int {
 			it := checkItem(L)
 			if it.item.Attr != nil && it.item.Attr.ActionID != nil {
