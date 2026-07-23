@@ -445,6 +445,10 @@ func (g *GameProtocol) enterWorld() {
 	// Send initial condition/protection zone icons
 	g.SendIcons()
 
+	// Send Prey data & prices
+	g.SendPreyPrices()
+	g.SendAllPreyData()
+
 	// Keep-alive pings start once the player is in the world.
 	g.startPingLoop()
 
