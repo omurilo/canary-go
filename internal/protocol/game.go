@@ -405,6 +405,16 @@ func (g *GameProtocol) sendCoinBalance() {
 	g.SendToClient(w)
 }
 
+// dispatchStore forwards a store packet's payload (bytes after the opcode) to
+// the gamestore Lua module.
+func (g *GameProtocol) dispatchStore(op byte, r *netmsg.Reader) {
+	if g.player == nil || g.deps == nil || g.deps.Lua == nil {
+		return
+	}
+	data := r.GetBytes(r.Remaining())
+	g.deps.Lua.DispatchStorePacket(g.player, op, data)
+}
+
 // enterWorld sends the full login sequence as a single message.
 func (g *GameProtocol) enterWorld() {
 	p := g.player
@@ -768,6 +778,11 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseWheelOfDestiny(r)
 	case 0xBA:
 		g.parseTaskHuntingAction(r)
+	case 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xE8, 0xE9, 0xEF:
+		// In-game store packets (C_OpenStore/RequestStoreOffers/BuyStoreOffer/
+		// transaction history, plus GetOfferDescription/StoreEvent/TransferCoins).
+		// Routed to the gamestore Lua module's onRecvbyte handler.
+		g.dispatchStore(op, r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
 	default:
