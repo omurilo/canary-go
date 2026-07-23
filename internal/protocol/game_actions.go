@@ -86,26 +86,35 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 	if tile := g.deps.World.Map.GetTile(newPos); tile != nil {
 		var stepInEvents []*moveevents.MoveEvent
 		var stepInItems []*game.Item
+		// Dedupe by event: the same MoveEvent may be reachable via the ground's
+		// and an item's action id (and by position), but it must fire at most once
+		// per tile entry. teleportTo queues its move asynchronously, so p.Pos is
+		// unchanged when the loop's post-teleport break is evaluated; without this
+		// dedup the event would run twice (the second time after the script cleared
+		// its own storage), e.g. sending the adventurers'-guild return to the home
+		// town instead of the stored one.
+		seen := make(map[*moveevents.MoveEvent]bool)
+		add := func(evt *moveevents.MoveEvent, it *game.Item) {
+			if evt == nil || seen[evt] {
+				return
+			}
+			seen[evt] = true
+			stepInEvents = append(stepInEvents, evt)
+			stepInItems = append(stepInItems, it)
+		}
 
 		if tile.Ground != nil {
-			if evt := findStepIn(tile.Ground); evt != nil {
-				stepInEvents = append(stepInEvents, evt)
-				stepInItems = append(stepInItems, tile.Ground)
-			}
+			add(findStepIn(tile.Ground), tile.Ground)
 		}
 		for _, it := range tile.Items {
-			if evt := findStepIn(it); evt != nil {
-				stepInEvents = append(stepInEvents, evt)
-				stepInItems = append(stepInItems, it)
-			}
+			add(findStepIn(it), it)
 		}
 		if evt := moveevents.FindStepInByPosition(newPos); evt != nil {
-			stepInEvents = append(stepInEvents, evt)
 			ground := tile.Ground
 			if ground == nil {
 				ground = &game.Item{}
 			}
-			stepInItems = append(stepInItems, ground)
+			add(evt, ground)
 		}
 
 		for i, evt := range stepInEvents {
