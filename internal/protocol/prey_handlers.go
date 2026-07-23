@@ -7,6 +7,41 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
+// getPreyMonsterInfo looks up a monster's name and outfit by raceID.
+func (g *GameProtocol) getPreyMonsterInfo(raceID uint16) (string, uint16, byte, byte, byte, byte, byte) {
+	if g.deps != nil && g.deps.World != nil && g.deps.World.TypeRegistry != nil {
+		for _, m := range g.deps.World.TypeRegistry.Monsters {
+			if m != nil && m.RaceID == raceID {
+				return m.Name, m.Outfit.LookType, m.Outfit.Head, m.Outfit.Body, m.Outfit.Legs, m.Outfit.Feet, m.Outfit.Addons
+			}
+		}
+	}
+
+	// Fallback map for common monsters
+	switch raceID {
+	case 5:
+		return "Orc", 5, 0, 0, 0, 0, 0
+	case 15:
+		return "Troll", 15, 0, 0, 0, 0, 0
+	case 22:
+		return "Cyclops", 22, 0, 0, 0, 0, 0
+	case 26:
+		return "Rotworm", 26, 0, 0, 0, 0, 0
+	case 33:
+		return "Skeleton", 33, 0, 0, 0, 0, 0
+	case 34:
+		return "Dragon", 34, 0, 0, 0, 0, 0
+	case 35:
+		return "Demon", 35, 0, 0, 0, 0, 0
+	case 38:
+		return "Giant Spider", 38, 0, 0, 0, 0, 0
+	case 55:
+		return "Behemoth", 55, 0, 0, 0, 0, 0
+	default:
+		return "Monster", 35, 0, 0, 0, 0, 0
+	}
+}
+
 // parsePreyAction handles Opcode 0xEA (Prey Action / Reroll / Selection).
 func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 	if g.player == nil {
@@ -37,13 +72,22 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 
 	switch action {
 	case 0: // Reroll Monster List
+		slot.ReloadMonsterGrid()
 		slot.State = game.PreyDataState_Selection
 		slot.Option = option
 	case 1: // Select Monster from List
+		if len(slot.RaceIDList) == 0 {
+			slot.ReloadMonsterGrid()
+		}
 		if index >= 0 && int(index) < len(slot.RaceIDList) {
 			slot.SelectedRaceID = slot.RaceIDList[index]
 			slot.State = game.PreyDataState_Active
 			slot.BonusTimeLeft = 7200
+			if slot.BonusPercentage == 0 {
+				slot.Bonus = game.PreyBonus_XPBonus
+				slot.BonusPercentage = 25
+				slot.BonusRarity = 5
+			}
 		}
 	case 2: // Lock Option / Wildcard
 		slot.State = game.PreyDataState_Active
@@ -54,6 +98,11 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 		slot.SelectedRaceID = raceID
 		slot.State = game.PreyDataState_Active
 		slot.BonusTimeLeft = 7200
+		if slot.BonusPercentage == 0 {
+			slot.Bonus = game.PreyBonus_XPBonus
+			slot.BonusPercentage = 25
+			slot.BonusRarity = 5
+		}
 	}
 
 	g.SendPreyData(slot)
@@ -63,6 +112,10 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 func (g *GameProtocol) SendPreyData(slot *game.PreySlot) {
 	if g.player == nil || slot == nil {
 		return
+	}
+
+	if len(slot.RaceIDList) == 0 {
+		slot.ReloadMonsterGrid()
 	}
 
 	w := netmsg.NewWriter()
@@ -76,13 +129,14 @@ func (g *GameProtocol) SendPreyData(slot *game.PreySlot) {
 	case game.PreyDataState_Inactive:
 		// empty
 	case game.PreyDataState_Active:
-		w.AddString("Demon") // Monster Name
-		w.AddU16(35)         // LookType
-		w.AddByte(0)         // LookHead
-		w.AddByte(0)         // LookBody
-		w.AddByte(0)         // LookLegs
-		w.AddByte(0)         // LookFeet
-		w.AddByte(0)         // LookAddons
+		name, lookType, head, body, legs, feet, addons := g.getPreyMonsterInfo(slot.SelectedRaceID)
+		w.AddString(name)
+		w.AddU16(lookType)
+		w.AddByte(head)
+		w.AddByte(body)
+		w.AddByte(legs)
+		w.AddByte(feet)
+		w.AddByte(addons)
 
 		w.AddByte(byte(slot.Bonus))
 		w.AddU16(slot.BonusPercentage)
@@ -90,13 +144,33 @@ func (g *GameProtocol) SendPreyData(slot *game.PreySlot) {
 		w.AddU16(slot.BonusTimeLeft)
 
 	case game.PreyDataState_Selection:
-		w.AddByte(0) // count of monsters in list
+		w.AddByte(byte(len(slot.RaceIDList)))
+		for _, rID := range slot.RaceIDList {
+			name, lookType, head, body, legs, feet, addons := g.getPreyMonsterInfo(rID)
+			w.AddString(name)
+			w.AddU16(lookType)
+			w.AddByte(head)
+			w.AddByte(body)
+			w.AddByte(legs)
+			w.AddByte(feet)
+			w.AddByte(addons)
+		}
 
 	case game.PreyDataState_SelectionChangeMonster:
 		w.AddByte(byte(slot.Bonus))
 		w.AddU16(slot.BonusPercentage)
 		w.AddByte(slot.BonusRarity)
-		w.AddByte(0) // count of monsters in list
+		w.AddByte(byte(len(slot.RaceIDList)))
+		for _, rID := range slot.RaceIDList {
+			name, lookType, head, body, legs, feet, addons := g.getPreyMonsterInfo(rID)
+			w.AddString(name)
+			w.AddU16(lookType)
+			w.AddByte(head)
+			w.AddByte(body)
+			w.AddByte(legs)
+			w.AddByte(feet)
+			w.AddByte(addons)
+		}
 
 	case game.PreyDataState_ListSelection:
 		w.AddU16(0) // count of bestiary list

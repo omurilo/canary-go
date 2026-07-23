@@ -42,16 +42,26 @@ type PlayerPrey struct {
 	Slots [3]*PreySlot
 }
 
+var DefaultPreyRaceIDs = []uint16{15, 26, 22, 33, 35, 34, 55, 38, 5}
+
+func (slot *PreySlot) ReloadMonsterGrid() {
+	// Rotate or pick 9 default race IDs
+	slot.RaceIDList = make([]uint16, len(DefaultPreyRaceIDs))
+	copy(slot.RaceIDList, DefaultPreyRaceIDs)
+}
+
 func NewPlayerPrey() *PlayerPrey {
 	pp := &PlayerPrey{}
 	for i := byte(0); i < 3; i++ {
-		pp.Slots[i] = &PreySlot{
+		slot := &PreySlot{
 			ID:                  i,
 			State:               PreyDataState_Selection,
 			RaceIDList:          []uint16{},
 			BonusTimeLeft:       7200, // 2 hours default
 			FreeRerollTimeStamp: 0,
 		}
+		slot.ReloadMonsterGrid()
+		pp.Slots[i] = slot
 	}
 	return pp
 }
