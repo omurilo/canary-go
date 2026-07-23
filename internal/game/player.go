@@ -392,8 +392,8 @@ func (p *Player) GetName() string { return p.Name }
 func (p *Player) GetHealth() uint32 { return p.Health }
 func (p *Player) SetHealth(health uint32) {
 	p.Health = health
-	if p.Health > p.MaxHealth {
-		p.Health = p.MaxHealth
+	if maxHP := p.GetMaxHealth(); p.Health > maxHP {
+		p.Health = maxHP
 	}
 }
 func (p *Player) GetWheel() *WheelOfDestiny {
@@ -430,8 +430,8 @@ func (p *Player) GetMaxHealth() uint32 {
 func (p *Player) AddHealth(amount int32) {
 	if amount > 0 {
 		p.Health += uint32(amount)
-		if p.Health > p.MaxHealth {
-			p.Health = p.MaxHealth
+		if maxHP := p.GetMaxHealth(); p.Health > maxHP {
+			p.Health = maxHP
 		}
 	} else {
 		sub := uint32(-amount)
@@ -738,8 +738,8 @@ func (p *Player) GetMaxMana() uint32 {
 func (p *Player) AddMana(amount int32) {
 	if amount > 0 {
 		p.Mana += uint32(amount)
-		if p.Mana > p.MaxMana {
-			p.Mana = p.MaxMana
+		if maxMana := p.GetMaxMana(); p.Mana > maxMana {
+			p.Mana = maxMana
 		}
 	} else {
 		sub := uint32(-amount)

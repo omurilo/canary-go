@@ -544,19 +544,7 @@ func playerAddmana(L *lua.LState) int {
 	}
 	amount := int32(L.CheckNumber(2))
 	game.GlobalDispatcher.AddEvent(0, func() {
-		if amount > 0 {
-			p.Mana += uint32(amount)
-			if p.Mana > p.MaxMana {
-				p.Mana = p.MaxMana
-			}
-		} else {
-			sub := uint32(-amount)
-			if sub > p.Mana {
-				p.Mana = 0
-			} else {
-				p.Mana -= sub
-			}
-		}
+		p.AddMana(amount)
 	})
 	return 0
 }

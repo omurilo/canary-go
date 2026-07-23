@@ -204,7 +204,7 @@ func spellManaCost(sp *spells.Spell, p *game.Player) int {
 		return sp.Mana
 	}
 	if sp.ManaPercent != 0 {
-		return int(p.MaxMana) * sp.ManaPercent / 100
+		return int(p.GetMaxMana()) * sp.ManaPercent / 100
 	}
 	return 0
 }

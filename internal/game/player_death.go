@@ -60,8 +60,8 @@ func (p *Player) ApplyDeathPenalty() {
 	// clearing all is a safe superset for the current condition set).
 	p.ClearConditions()
 	// Refill vitals. Black-skull respawn (40 HP / 0 mana) is not modelled.
-	p.Health = p.MaxHealth
-	p.Mana = p.MaxMana
+	p.Health = p.GetMaxHealth()
+	p.Mana = p.GetMaxMana()
 	p.Dead = false
 }
 

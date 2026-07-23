@@ -89,13 +89,13 @@ func (e *CombatEngine) regenTick() {
 		}
 		// Heal once every 3 seconds to preserve standard regeneration rate
 		if (p.RegenTicks / 1000) % 3 == 0 {
-			if p.Health < p.MaxHealth {
+			if p.Health < p.GetMaxHealth() {
 				p.AddHealth(1)
 				if e.world.OnCreatureHealthChange != nil {
 					e.world.OnCreatureHealthChange(p)
 				}
 			}
-			if p.Mana < p.MaxMana {
+			if p.Mana < p.GetMaxMana() {
 				p.AddMana(1)
 			}
 		}
