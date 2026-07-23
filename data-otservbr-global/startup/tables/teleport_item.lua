@@ -140,6 +140,14 @@ TeleportItemAction = {
 			{ x = 33396, y = 31129, z = 9 },
 		},
 	},
+	[30255] = {
+		itemId = 31673,
+		itemPos = {
+			{ x = 33315, y = 32647, z = 6 },
+		},
+		destination = { x = 33384, y = 32627, z = 7 },
+		effect = CONST_ME_TELEPORT,
+	},
 }
 
 TeleportItemUnique = {
@@ -152,7 +160,7 @@ TeleportItemUnique = {
 	[15002] = {
 		itemId = 1759,
 		itemPos = { x = 33383, y = 32626, z = 7 },
-		destination = { x = 33314, y = 32647, z = 6 },
+		destination = { x = 33316, y = 32647, z = 6 },
 		effect = CONST_ME_TELEPORT,
 	},
 	[15003] = {
