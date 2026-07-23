@@ -160,7 +160,7 @@ TeleportItemUnique = {
 	[15002] = {
 		itemId = 1759,
 		itemPos = { x = 33383, y = 32626, z = 7 },
-		destination = { x = 33314, y = 32647, z = 7 },
+		destination = { x = 33314, y = 32647, z = 6 },
 		effect = CONST_ME_TELEPORT,
 	},
 	[15003] = {
