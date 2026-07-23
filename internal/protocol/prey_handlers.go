@@ -389,10 +389,5 @@ func (g *GameProtocol) SendPreyPrices() {
 	w.AddByte(byte(config.Number("preyBonusRerollPrice", 1))) // bonus reroll (wildcards)
 	w.AddByte(byte(config.Number("preySelectListPrice", 5)))  // selection list (wildcards)
 
-	w.AddU32(g.player.GetTaskHuntingRerollPrice())
-	w.AddU32(g.player.GetTaskHuntingRerollPrice())
-	w.AddByte(byte(config.Number("taskHuntingSelectListPrice", 5)))  // task selection list
-	w.AddByte(byte(config.Number("taskHuntingBonusRerollPrice", 1))) // task bonus reroll
-
 	g.SendToClient(w)
 }
