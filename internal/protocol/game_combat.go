@@ -87,7 +87,7 @@ func (g *GameProtocol) sendTileAddItem(pos game.Position, item *game.Item) {
 // can see it (item #3 of the combat migration).
 func BroadcastCreatureHealth(w *game.World, c game.Creature) {
 	for _, s := range w.Spectators(c.GetPosition(), 0) {
-		if gp, ok := s.Session.(*GameProtocol); ok && gp.known[c.GetID()] {
+		if gp, ok := s.Session.(*GameProtocol); ok && gp.isKnown(c.GetID()) {
 			gp.sendCreatureHealth(c)
 		}
 	}

@@ -41,7 +41,6 @@ var (
 // Register stores the action in the maps.
 func Register(a *Action) {
 	for _, id := range a.ItemIDs {
-		fmt.Printf("RegisterAction: id %d\n", id)
 		byItemID[id] = a
 	}
 	for _, id := range a.ActionIDs {

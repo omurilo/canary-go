@@ -174,7 +174,7 @@ func (g *GameProtocol) broadcastAddItem(pos game.Position, item *game.Item) {
 	}
 	send(g)
 	for _, s := range g.deps.World.Spectators(pos, g.player.ID) {
-		if gp, ok := s.Session.(*GameProtocol); ok && gp.known[g.player.ID] {
+		if gp, ok := s.Session.(*GameProtocol); ok && gp.isKnown(g.player.ID) {
 			gp.SendRemoveCreatureAt(pos, 0)
 		}
 	}

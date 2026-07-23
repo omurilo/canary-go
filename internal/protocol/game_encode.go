@@ -96,12 +96,12 @@ func (g *GameProtocol) addItem(w *netmsg.Writer, it *game.Item) {
 // addCreature writes a creature description. When known, only the id marker is
 // sent; otherwise the full appearance follows.
 func (g *GameProtocol) addCreature(w *netmsg.Writer, c game.Creature) {
-	known := g.known[c.GetID()]
+	known := g.isKnown(c.GetID())
 	if known {
 		w.AddU16(creatureKnown)
 		w.AddU32(c.GetID())
 	} else {
-		g.known[c.GetID()] = true
+		g.setKnown(c.GetID(), true)
 		w.AddU16(creatureNew)
 		w.AddU32(0) // removedKnownId (cache not full)
 		w.AddU32(c.GetID())

@@ -58,7 +58,7 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 			continue
 		}
 		visited[s.ID] = true
-		if s.Pos.InRangeOf(newPos) && gp.known[c.GetID()] {
+		if s.Pos.InRangeOf(newPos) && gp.isKnown(c.GetID()) {
 			// Stack position in the old tile
 			oldStack := gp.StackPosWithIndex(oldPos, oldTileIndex)
 			gp.SendCreatureMove(oldPos, oldStack, newPos)
@@ -107,7 +107,7 @@ func BroadcastGhostModeChange(w *game.World, p *game.Player) {
 			if !gp.canSeeCreature(p) {
 				stack := gp.StackPosOf(p.Pos, p.ID)
 				gp.SendRemoveCreatureAt(p.Pos, stack)
-				gp.known[p.ID] = false
+				gp.setKnown(p.ID, false)
 			}
 		} else {
 			if gp.canSeeCreature(p) {

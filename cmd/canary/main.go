@@ -444,11 +444,8 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 			return nil // ignore if lib doesn't exist
 		}
 		if !d.IsDir() && filepath.Ext(path) == ".lua" {
-			log.Debug("loading lib script", "file", path)
 			if err := e.DoFile(path); err != nil {
 				log.Warn("script error", "file", path, "err", err)
-			} else {
-				log.Debug("loaded script", "file", path)
 			}
 		}
 		return nil
@@ -464,8 +461,6 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 			if _, err := os.Stat(primary); err == nil {
 				if err := e.DoFile(primary); err != nil {
 					log.Warn("script error", "file", primary, "err", err)
-				} else {
-					log.Debug("loaded script", "file", primary)
 				}
 			}
 		}
@@ -480,17 +475,13 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 			return filepath.SkipDir
 		}
 		if !d.IsDir() {
-			log.Debug("visiting file during walkthrough", "path", path, "ext", filepath.Ext(path))
 			if filepath.Ext(path) == ".lua" {
 				// Skip pre-loaded core npclib files
 				if filepath.Base(dir) == "npclib" && (strings.HasSuffix(path, "npc_handler.lua") || strings.HasSuffix(path, "modules.lua") || strings.HasSuffix(path, "custom_modules.lua")) {
 					return nil
 				}
-				log.Info("loading script file", "path", path)
 				if err := e.DoFile(path); err != nil {
 					log.Warn("script error", "file", path, "err", err)
-				} else {
-					log.Debug("loaded script", "file", path)
 				}
 			}
 		}

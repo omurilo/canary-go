@@ -102,8 +102,9 @@ type GameProtocol struct {
 	challengeRand uint8
 	loggedIn      bool
 
-	player *game.Player
-	known  map[uint32]bool
+	player  *game.Player
+	knownMu sync.RWMutex
+	known   map[uint32]bool
 
 	statementID uint32
 
@@ -112,6 +113,25 @@ type GameProtocol struct {
 
 	actionMu sync.Mutex    // serializes player movement (walk/turn/auto-walk step)
 	walkGen  atomic.Uint64 // bumping cancels the in-flight auto-walk path
+}
+
+func (g *GameProtocol) isKnown(id uint32) bool {
+	g.knownMu.RLock()
+	defer g.knownMu.RUnlock()
+	return g.known[id]
+}
+
+func (g *GameProtocol) setKnown(id uint32, known bool) {
+	g.knownMu.Lock()
+	defer g.knownMu.Unlock()
+	if g.known == nil {
+		g.known = make(map[uint32]bool)
+	}
+	if known {
+		g.known[id] = true
+	} else {
+		delete(g.known, id)
+	}
 }
 
 // openContainerByCID returns the container open under a client cid, preserving
