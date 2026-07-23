@@ -70,5 +70,6 @@ end
 for index, value in pairs(config) do
 	oreWagons:aid(index)
 end
+oreWagons:id(7131, 7132)
 
 oreWagons:register()

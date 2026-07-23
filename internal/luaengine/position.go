@@ -130,11 +130,15 @@ func checkPosition(L *lua.LState, n int) game.Position {
 	return game.Position{}
 }
 
-func pushPosition(L *lua.LState, p game.Position) {
+func PushPosition(L *lua.LState, p game.Position) {
 	ud := L.NewUserData()
 	ud.Value = p
 	L.SetMetatable(ud, L.GetTypeMetatable(positionTypeName))
 	L.Push(ud)
+}
+
+func pushPosition(L *lua.LState, p game.Position) {
+	PushPosition(L, p)
 }
 
 func positionIndex(L *lua.LState) int {

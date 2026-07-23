@@ -83,11 +83,10 @@ func (e *Engine) ExecuteOnLook(player *game.Player, thing interface{}, position 
 		}
 		L.Push(tUd)
 
-		posTable := L.NewTable()
-		L.SetField(posTable, "x", lua.LNumber(position.X))
-		L.SetField(posTable, "y", lua.LNumber(position.Y))
-		L.SetField(posTable, "z", lua.LNumber(position.Z))
-		L.Push(posTable)
+		pPosUd := L.NewUserData()
+		pPosUd.Value = position
+		L.SetMetatable(pPosUd, L.GetTypeMetatable("Position"))
+		L.Push(pPosUd)
 
 		L.Push(lua.LNumber(distance))
 
@@ -125,17 +124,15 @@ func (e *Engine) ExecuteOnMoveItem(player *game.Player, item *game.Item, count u
 		
 		L.Push(lua.LNumber(count))
 
-		fromPosTable := L.NewTable()
-		L.SetField(fromPosTable, "x", lua.LNumber(fromPos.X))
-		L.SetField(fromPosTable, "y", lua.LNumber(fromPos.Y))
-		L.SetField(fromPosTable, "z", lua.LNumber(fromPos.Z))
-		L.Push(fromPosTable)
+		fPosUd := L.NewUserData()
+		fPosUd.Value = fromPos
+		L.SetMetatable(fPosUd, L.GetTypeMetatable("Position"))
+		L.Push(fPosUd)
 
-		toPosTable := L.NewTable()
-		L.SetField(toPosTable, "x", lua.LNumber(toPos.X))
-		L.SetField(toPosTable, "y", lua.LNumber(toPos.Y))
-		L.SetField(toPosTable, "z", lua.LNumber(toPos.Z))
-		L.Push(toPosTable)
+		tPosUd := L.NewUserData()
+		tPosUd.Value = toPos
+		L.SetMetatable(tPosUd, L.GetTypeMetatable("Position"))
+		L.Push(tPosUd)
 
 		if err := L.PCall(5, 1, nil); err != nil {
 			fmt.Printf("Lua execution error in onMoveItem: %v\n", err)

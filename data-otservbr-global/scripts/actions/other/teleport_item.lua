@@ -47,6 +47,6 @@ for uniqueRange = 15001, 20000 do
 end
 
 teleportItem:aid(30255)
-teleportItem:id(1759, 31673)
+teleportItem:id(1759, 7131, 7132, 31673)
 
 teleportItem:register()

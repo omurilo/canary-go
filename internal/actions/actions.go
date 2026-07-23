@@ -113,12 +113,11 @@ func (e *ActionsEngine) ExecuteUse(player *game.Player, item *game.Item, fromPos
 	L.SetMetatable(iUd, L.GetTypeMetatable("Item"))
 	L.Push(iUd)
 	
-	// Create fromPos table
-	fPos := L.NewTable()
-	L.SetField(fPos, "x", lua.LNumber(fromPos.X))
-	L.SetField(fPos, "y", lua.LNumber(fromPos.Y))
-	L.SetField(fPos, "z", lua.LNumber(fromPos.Z))
-	L.Push(fPos)
+	// Create fromPos Position
+	fUd := L.NewUserData()
+	fUd.Value = fromPos
+	L.SetMetatable(fUd, L.GetTypeMetatable("Position"))
+	L.Push(fUd)
 	
 	// Target (Item or Creature)
 	if tItem, ok := target.(*game.Item); ok {
@@ -135,12 +134,11 @@ func (e *ActionsEngine) ExecuteUse(player *game.Player, item *game.Item, fromPos
 		L.Push(lua.LNil)
 	}
 
-	// Create toPos table
-	tPos := L.NewTable()
-	L.SetField(tPos, "x", lua.LNumber(toPos.X))
-	L.SetField(tPos, "y", lua.LNumber(toPos.Y))
-	L.SetField(tPos, "z", lua.LNumber(toPos.Z))
-	L.Push(tPos)
+	// Create toPos Position
+	tUd := L.NewUserData()
+	tUd.Value = toPos
+	L.SetMetatable(tUd, L.GetTypeMetatable("Position"))
+	L.Push(tUd)
 	
 	L.Push(lua.LBool(isHotkey))
 	
