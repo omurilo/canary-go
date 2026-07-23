@@ -700,7 +700,7 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseSetOutfit(r)
 	case 0xE5:
 		g.parseCyclopediaCharacterInfo(r)
-	case 0xEA:
+	case 0xEA, 0xEB:
 		g.parsePreyAction(r)
 	case 0xEC:
 		g.parseWheelOfDestiny(r)

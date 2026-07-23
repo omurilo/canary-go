@@ -175,7 +175,28 @@ func addPreyOutfit(w *netmsg.Writer, lookType uint16, head, body, legs, feet, ad
 	w.AddByte(addons)
 }
 
-// parsePreyAction handles Opcode 0xEA (Prey Action / Reroll / Selection).
+func (g *GameProtocol) reloadPreyGrid(slot *game.PreySlot) {
+	allIDs := g.getAllBestiaryRaceIDs()
+	if len(allIDs) < 9 {
+		slot.ReloadMonsterGrid()
+		return
+	}
+
+	shuffled := make([]uint16, len(allIDs))
+	copy(shuffled, allIDs)
+
+	seed := time.Now().UnixNano()
+	for i := len(shuffled) - 1; i > 0; i-- {
+		seed = seed*1103515245 + 12345
+		j := int((seed >> 16) & 0x7FFF) % (i + 1)
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	}
+
+	slot.RaceIDList = make([]uint16, 9)
+	copy(slot.RaceIDList, shuffled[:9])
+}
+
+// parsePreyAction handles Opcode 0xEB (Prey Action / Reroll / Selection).
 func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 	if g.player == nil {
 		return
@@ -205,25 +226,30 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 
 	switch action {
 	case 0: // PreyAction_ListReroll
-		slot.ReloadMonsterGrid()
+		g.reloadPreyGrid(slot)
+		slot.SelectedRaceID = 0
 		slot.State = game.PreyDataState_Selection
 	case 1: // PreyAction_BonusReroll
-		slot.Bonus = game.PreyBonusType(uint8(time.Now().UnixNano() % 4))
-		slot.BonusRarity = byte(5 + time.Now().UnixNano()%6)
+		if slot.BonusRarity == 0 {
+			slot.BonusRarity = 5
+		} else if slot.BonusRarity < 10 {
+			slot.BonusRarity++
+		}
+		slot.Bonus = game.PreyBonusType((uint8(time.Now().UnixNano()) + slot.ID) % 4)
 		slot.BonusPercentage = uint16(10 + slot.BonusRarity*3)
 		slot.BonusTimeLeft = 7200
 	case 2: // PreyAction_MonsterSelection
 		if len(slot.RaceIDList) == 0 {
-			slot.ReloadMonsterGrid()
+			g.reloadPreyGrid(slot)
 		}
 		if index >= 0 && int(index) < len(slot.RaceIDList) {
 			slot.SelectedRaceID = slot.RaceIDList[index]
 			slot.State = game.PreyDataState_Active
 			slot.BonusTimeLeft = 7200
 			if slot.BonusPercentage == 0 {
-				slot.Bonus = game.PreyBonus_XPBonus
-				slot.BonusPercentage = 25
+				slot.Bonus = game.PreyBonusType((uint8(time.Now().UnixNano()) + slot.ID) % 4)
 				slot.BonusRarity = 5
+				slot.BonusPercentage = uint16(10 + slot.BonusRarity*3)
 			}
 		}
 	case 3: // PreyAction_ListAll_Cards
@@ -233,9 +259,9 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 		slot.State = game.PreyDataState_Active
 		slot.BonusTimeLeft = 7200
 		if slot.BonusPercentage == 0 {
-			slot.Bonus = game.PreyBonus_XPBonus
-			slot.BonusPercentage = 25
+			slot.Bonus = game.PreyBonusType((uint8(time.Now().UnixNano()) + slot.ID) % 4)
 			slot.BonusRarity = 5
+			slot.BonusPercentage = uint16(10 + slot.BonusRarity*3)
 		}
 	case 5: // PreyAction_Option
 		slot.Option = option
@@ -252,7 +278,7 @@ func (g *GameProtocol) SendPreyData(slot *game.PreySlot) {
 	}
 
 	if len(slot.RaceIDList) == 0 {
-		slot.ReloadMonsterGrid()
+		g.reloadPreyGrid(slot)
 	}
 
 	w := netmsg.NewWriter()
