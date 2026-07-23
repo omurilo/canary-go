@@ -90,6 +90,9 @@ func checkItem(L *lua.LState) luaItem {
 	if v, ok := ud.Value.(luaItem); ok {
 		return v
 	}
+	if v, ok := ud.Value.(*game.Item); ok {
+		return luaItem{item: v}
+	}
 	// Container also inherits from Item
 	if v, ok := ud.Value.(luaContainer); ok {
 		return luaItem{item: v.item, pos: v.pos}

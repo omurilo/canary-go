@@ -242,7 +242,7 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			tbl := L.NewTable()
 			for i, it := range t.tile.Items {
 				ud := L.NewUserData()
-				ud.Value = it
+				ud.Value = luaItem{item: it, pos: t.pos}
 				L.SetMetatable(ud, L.GetTypeMetatable(itemTypeName))
 				tbl.RawSetInt(i+1, ud)
 			}
