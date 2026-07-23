@@ -111,14 +111,48 @@ func (g *GameProtocol) wheelOptions() byte {
 
 // parseWheelOfDestiny handles opcode 0xEC (Legacy / Alternative Wheel request).
 func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
-	action := r.GetByte()
-	switch action {
+	if r.Remaining() < 1 {
+		return
+	}
+	subOp := r.GetByte()
+	switch subOp {
 	case 0: // Request / Open Wheel Data
 		g.SendWheelOfDestiny()
 	case 1: // Save Wheel Allocation / Preset
-		_ = r.GetByte() // preset
 		g.applyWheelSave(r)
 	}
+}
+
+// parseWheelGemAction handles opcode 0xE7 (Wheel of Destiny Gem actions / enhance mod grade).
+func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
+	if r.Remaining() < 1 {
+		return
+	}
+	action := r.GetByte()
+	switch action {
+	case 0: // Destroy
+		if r.Remaining() >= 2 {
+			_ = r.GetU16()
+		}
+	case 1: // Reveal
+		if r.Remaining() >= 1 {
+			_ = r.GetByte()
+		}
+	case 2: // SwitchDomain
+		if r.Remaining() >= 2 {
+			_ = r.GetU16()
+		}
+	case 3: // ToggleLock
+		if r.Remaining() >= 2 {
+			_ = r.GetU16()
+		}
+	case 4: // ImproveGrade / Enhance Mod Grade
+		if r.Remaining() >= 2 {
+			_ = r.GetByte()
+			_ = r.GetByte()
+		}
+	}
+	g.SendWheelOfDestiny()
 }
 
 // SendWheelOfDestiny sends the full Wheel of Destiny payload (Opcode 0x5F) to client.

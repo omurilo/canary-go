@@ -720,6 +720,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseForgeBrowseHistory(r)
 	case 0xEA, 0xEB:
 		g.parsePreyAction(r)
+	case 0xE7:
+		g.parseWheelGemAction(r)
 	case 0xEC:
 		g.parseWheelOfDestiny(r)
 	case 0xBA:
