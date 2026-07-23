@@ -40,6 +40,11 @@ func (e *Engine) registerMonsterType() {
 			if val := table.RawGetString("raceId"); val.Type() == lua.LTNumber {
 				m.RaceID = uint16(lua.LVAsNumber(val))
 			}
+			if bt := table.RawGetString("Bestiary"); bt.Type() == lua.LTTable {
+				if val := bt.(*lua.LTable).RawGetString("Stars"); val.Type() == lua.LTNumber {
+					m.BestiaryStars = uint8(lua.LVAsNumber(val))
+				}
+			}
 			parseMonsterAttacks(m, table)
 			parseMonsterLoot(m, table)
 			parseMonsterFlags(m, table)

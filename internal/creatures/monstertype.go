@@ -26,7 +26,11 @@ type MonsterType struct {
 	Experience     uint64 // exp awarded to the killer (MonsterType::info.experience)
 	Corpse     uint16 // corpse item id dropped on death (0 = unknown)
 	RaceID     uint16 // bestiary race id (monster.raceId)
-	Outfit     Outfit
+	// BestiaryStars is the monster's bestiary difficulty tier (1..5, from
+	// monster.Bestiary.Stars). It drives task-hunting difficulty and prey grid
+	// staging. 0 means "not in the bestiary".
+	BestiaryStars uint8
+	Outfit        Outfit
 
 	// Attacks holds the monster's attack blocks. Only melee is applied by the
 	// combat engine today; spell/distance attacks are captured verbatim as data

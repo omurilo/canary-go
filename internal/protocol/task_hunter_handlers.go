@@ -50,10 +50,10 @@ func (g *GameProtocol) parseTaskHuntingAction(r *netmsg.Reader) {
 		}
 		slot.State = game.PreyTaskDataState_Selection
 	case 3: // MonsterSelection
-		// Difficulty/rarity would come from the monster's bestiary stars; until
-		// that is modeled StartTask defaults to Easy/1 and derives TargetKills
-		// from the option table (no more hardcoded 200).
-		slot.StartTask(raceID, slot.Difficulty, slot.Rarity, upgrade)
+		// Difficulty and rarity come from the monster's bestiary stars, which set
+		// the kill target and reward tier via the option table.
+		difficulty, rarity := g.taskDifficultyForRace(raceID)
+		slot.StartTask(raceID, difficulty, rarity, upgrade)
 	case 4: // Cancel
 		slot.State = game.PreyTaskDataState_Selection
 		slot.CurrentKills = 0
@@ -69,6 +69,36 @@ func (g *GameProtocol) parseTaskHuntingAction(r *netmsg.Reader) {
 
 	g.SendTaskHuntingData(slot)
 	g.sendResourceBalance(24, uint64(g.player.GetTaskHuntingPoints()))
+}
+
+// taskDifficultyForRace maps a monster's bestiary stars to a task difficulty
+// (≤1 Easy, ≤3 Medium, else Hard) and rarity (the star count, clamped 1..5),
+// mirroring the star→difficulty split in IOPrey::initializeTaskHuntOptions.
+func (g *GameProtocol) taskDifficultyForRace(raceID uint16) (byte, byte) {
+	var stars byte
+	if g.deps != nil && g.deps.World != nil && g.deps.World.TypeRegistry != nil {
+		for _, m := range g.deps.World.TypeRegistry.Monsters {
+			if m != nil && m.RaceID == raceID {
+				stars = m.BestiaryStars
+				break
+			}
+		}
+	}
+	rarity := stars
+	if rarity < 1 {
+		rarity = 1
+	}
+	if rarity > 5 {
+		rarity = 5
+	}
+	switch {
+	case stars <= 1:
+		return game.TaskDifficultyEasy, rarity
+	case stars <= 3:
+		return game.TaskDifficultyMedium, rarity
+	default:
+		return game.TaskDifficultyHard, rarity
+	}
 }
 
 // SendTaskHuntingData sends Opcode 0xBB (Task Hunting Data).
