@@ -134,7 +134,8 @@ type Player struct {
 	QuickLootFilter         uint8              // 0 = Accepted/Whitelist, 1 = Skipped/Blacklist
 	QuickLootList           []uint16           // List of item IDs
 	QuickLootFallbackToMain bool               // Fallback to main container if specific container full
-	ManagedContainers       map[uint8]Position // Map of ObjectCategory -> Container Position
+	ManagedContainers       map[uint8]Position // Map of ObjectCategory -> Container Position for Loot
+	ManagedObtainContainers map[uint8]Position // Map of ObjectCategory -> Container Position for Obtain
 
 	// Wheel of Destiny progression tree
 	Wheel *WheelOfDestiny

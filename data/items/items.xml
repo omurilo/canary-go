@@ -47043,8 +47043,8 @@ hands of its owner. Granted by TibiaRoyal.com"/>
 	</item>
 	<item id="23721" article="a" name="gold pouch">
 		<attribute key="description" value="A infinity bag where you can hold coins."/>
-		<attribute key="containersize" value="20"/>
-		<attribute key="movable" value="0"/>
+		<attribute key="containersize" value="40"/>
+		<attribute key="movable" value="1"/>
 	</item>
 	<item id="23722" article="a" name="gold converter">
 		<attribute key="primarytype" value="tools"/>
@@ -76548,7 +76548,7 @@ Granted by TibiaGoals.com"/>
 	<item id="44439" article="a" name="crystal of the mitmah">
 		<attribute key="primarytype" value="creature products"/>
 		<attribute key="weight" value="150"/>
-	</item> 
+	</item>
 	<item id="44440" article="a" name="yapunac dagger">
 		<attribute key="primarytype" value="creature products"/>
 		<attribute key="weight" value="200"/>
@@ -83236,7 +83236,7 @@ Granted by TibiaGoals.com"/>
 			<attribute key="weaponType" value="fist"/>
 			<attribute key="vocation" value="Monk;true, Exalted Monk"/>
 			<attribute key="slot" value="hand"/>
-		</attribute>	
+		</attribute>
 		<attribute key="imbuementslot" value="2">
 			<attribute key="elemental damage" value="3"/>
 			<attribute key="life leech" value="3"/>
@@ -83302,9 +83302,9 @@ Granted by TibiaGoals.com"/>
 		<attribute key="attack" value="41"/>
 		<attribute key="defense" value="16"/>
 		<attribute key="skillfist" value="1"/>
-		<attribute key="elementalbond" value="physical"/> 
+		<attribute key="elementalbond" value="physical"/>
 		<attribute key="slottype" value="dualwielding"/>
-		<attribute key="weight" value="7900"/> 
+		<attribute key="weight" value="7900"/>
 		<attribute key="script" value="moveevent;weapon">
 			<attribute key="level" value="75"/>
 			<attribute key="unproperly" value="true"/>
@@ -83383,7 +83383,7 @@ Granted by TibiaGoals.com"/>
 		<attribute key="weapontype" value="fist"/>
 		<attribute key="attack" value="44"/>
 		<attribute key="defense" value="20"/>
-		<attribute key="skillfist" value="4"/> 
+		<attribute key="skillfist" value="4"/>
 		<attribute key="elementalbond" value="earth"/>
 		<attribute key="slottype" value="two-handed"/>
 		<attribute key="weight" value="5600"/>
@@ -83432,7 +83432,7 @@ Granted by TibiaGoals.com"/>
 		<attribute key="weapontype" value="fist"/>
 		<attribute key="attack" value="44"/>
 		<attribute key="defense" value="20"/>
-		<attribute key="skillfist" value="2"/> 
+		<attribute key="skillfist" value="2"/>
 		<attribute key="magiclevelpoints" value="2"/>
 		<attribute key="elementalbond" value="energy"/>
 		<attribute key="reflectdamage" value="50"/>
@@ -83459,7 +83459,7 @@ Granted by TibiaGoals.com"/>
 		<attribute key="attack" value="44"/>
 		<attribute key="defense" value="20"/>
 		<attribute key="skillfist" value="2"/>
-		<attribute key="magiclevelpoints" value="2"/> 
+		<attribute key="magiclevelpoints" value="2"/>
 		<attribute key="reflectdamage" value="50"/>
 		<attribute key="elementalbond" value="energy"/>
 		<attribute key="slottype" value="two-handed"/>
@@ -83479,7 +83479,7 @@ Granted by TibiaGoals.com"/>
 			<attribute key="skillboost fist" value="3"/>
 		</attribute>
 	</item>
-	<item id="50171" name="jo staff"> 
+	<item id="50171" name="jo staff">
 		<attribute key="primarytype" value="fist weapons"/>
 		<attribute key="weapontype" value="fist"/>
 		<attribute key="attack" value="18"/>
@@ -83505,11 +83505,11 @@ Granted by TibiaGoals.com"/>
 		<attribute key="weapontype" value="fist"/>
 		<attribute key="attack" value="42"/>
 		<attribute key="defense" value="18"/>
-		<attribute key="skillfist" value="2"/> 
+		<attribute key="skillfist" value="2"/>
 		<attribute key="magiclevelpoints" value="1"/>
 		<attribute key="elementalbond" value="energy"/>
 		<attribute key="slottype" value="dualwielding"/>
-		<attribute key="weight" value="6400"/> 
+		<attribute key="weight" value="6400"/>
 		<attribute key="script" value="moveevent;weapon">
 			<attribute key="level" value="135"/>
 			<attribute key="unproperly" value="true"/>
@@ -83733,7 +83733,7 @@ Granted by TibiaGoals.com"/>
 		<attribute key="skillfist" value="1"/>
 		<attribute key="duration" value="3600"/>
 		<attribute key="decayTo" value="22062"/>
-		<attribute key="armor" value="9"/> 
+		<attribute key="armor" value="9"/>
 		<attribute key="weight" value="2500"/>
 		<attribute key="script" value="moveevent">
 			<attribute key="level" value="100"/>
@@ -83899,11 +83899,11 @@ Granted by TibiaGoals.com"/>
 		<attribute key="weapontype" value="fist"/>
 		<attribute key="attack" value="45"/>
 		<attribute key="defense" value="21"/>
-		<attribute key="skillfist" value="4"/> 
+		<attribute key="skillfist" value="4"/>
 		<attribute key="elementalbond" value="energy"/>
 		<attribute key="slottype" value="dualwielding"/>
 		<attribute key="imbuementslot" value="1"/>
-		<attribute key="weight" value="8400"/> 
+		<attribute key="weight" value="8400"/>
 		<attribute key="criticalhitchance" value="1000"/>
 		<attribute key="criticalhitdamage" value="5800"/>
 		<attribute key="script" value="moveevent;weapon">
@@ -83926,7 +83926,7 @@ Granted by TibiaGoals.com"/>
 		<attribute key="weapontype" value="fist"/>
 		<attribute key="attack" value="45"/>
 		<attribute key="defense" value="21"/>
-		<attribute key="skillfist" value="4"/> 
+		<attribute key="skillfist" value="4"/>
 		<attribute key="lifeleechchance" value="10000"/>
 		<attribute key="lifeleechamount" value="2900"/>
 		<attribute key="elementalbond" value="energy"/>
@@ -84452,16 +84452,16 @@ Granted by TibiaGoals.com"/>
 		<attribute key="armor" value="9"/>
 		<attribute key="mantra" value="14"/>
 		<attribute key="skillfist" value="4"/>
-		<attribute key="absorbpercentearth" value="8"/> 
+		<attribute key="absorbpercentearth" value="8"/>
 		<attribute key="absorbpercentfire" value="-8"/>
 		<attribute key="weight" value="7500"/>
-		<attribute key="description" value="Monk robe with mysticals leaves woven into it."/>	
+		<attribute key="description" value="Monk robe with mysticals leaves woven into it."/>
 		<attribute key="script" value="moveevent">
 			<attribute key="level" value="200"/>
 			<attribute key="unproperly" value="true"/>
 			<attribute key="vocation" value="Monk;true, Exalted Monk"/>
 			<attribute key="slot" value="body"/>
-		</attribute>	
+		</attribute>
 	</item>
 	<item id="50278" name="magma robe">
 		<attribute key="primarytype" value="armors"/>
@@ -84470,7 +84470,7 @@ Granted by TibiaGoals.com"/>
 		<attribute key="absorbpercentfire" value="8"/>
 		<attribute key="absorbpercentice" value="-8"/>
 		<attribute key="weight" value="7500"/>
-		<attribute key="description" value="Monk robe strengthened with plates of cooled magma."/>	
+		<attribute key="description" value="Monk robe strengthened with plates of cooled magma."/>
 		<attribute key="script" value="moveevent">
 			<attribute key="level" value="200"/>
 			<attribute key="unproperly" value="true"/>
@@ -84978,11 +84978,11 @@ Granted by TibiaGoals.com"/>
 		<attribute key="weapontype" value="fist"/>
 		<attribute key="attack" value="45"/>
 		<attribute key="defense" value="18"/>
-		<attribute key="skillfist" value="2"/> 
+		<attribute key="skillfist" value="2"/>
 		<attribute key="magiclevelpoints" value="1"/>
 		<attribute key="elementalbond" value="energy"/>
 		<attribute key="slottype" value="dualwielding"/>
-		<attribute key="weight" value="6400"/> 
+		<attribute key="weight" value="6400"/>
 		<attribute key="imbuementslot" value="2">
 			<attribute key="elemental damage" value="3"/>
 			<attribute key="life leech" value="3"/>

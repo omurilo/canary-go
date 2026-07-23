@@ -708,7 +708,7 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parsePreyAction(r)
 	case 0xEC:
 		g.parseWheelOfDestiny(r)
-	case 0xED:
+	case 0xBA:
 		g.parseTaskHuntingAction(r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.

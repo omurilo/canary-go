@@ -88,5 +88,6 @@ func (p *Player) GetTaskHuntingRerollPrice() uint32 {
 	if lvl < 1 {
 		lvl = 1
 	}
-	return uint32(lvl * 20)
+	// C++ config preyRerollPricePerLevel is 200
+	return uint32(lvl * 200)
 }

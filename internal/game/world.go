@@ -19,6 +19,7 @@ type World struct {
 	TownNames      map[uint16]string   // town id -> name (from the OTBM)
 	DefaultSpawn   Position
 	WorldType      uint8 // 1 = WORLD_TYPE_NO_PVP, 2 = WORLD_TYPE_PVP, 3 = WORLD_TYPE_PVP_ENFORCED
+	AutoBank       bool
 	players        map[uint32]*Player
 	byName         map[string]*Player
 	creatures      map[uint32]Creature

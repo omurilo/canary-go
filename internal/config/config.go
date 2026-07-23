@@ -36,6 +36,7 @@ type Config struct {
 
 	MOTD          string
 	AllowOldProto bool
+	AutoBank      bool
 
 	RSAKeyFile string
 	WorldFile  string
@@ -130,6 +131,7 @@ func Load(path string) (*Config, error) {
 	// Fallback to serverMotd if motd is not defined (to support config.lua.dist)
 	cfg.MOTD = str("serverMotd", str("motd", cfg.MOTD))
 	cfg.AllowOldProto = boolean("allowOldProtocol", cfg.AllowOldProto)
+	cfg.AutoBank = boolean("autoBank", cfg.AutoBank)
 	cfg.RSAKeyFile = str("rsaKeyFile", cfg.RSAKeyFile)
 
 	// Fallback to constructing the world path from dataPackDirectory + mapName

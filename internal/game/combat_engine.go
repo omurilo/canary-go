@@ -250,8 +250,8 @@ func (e *CombatEngine) ready(id uint32, interval time.Duration) bool {
 }
 
 func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
-	dmg := e.meleeDamage(attacker)
-
+	dmg := int32(e.meleeDamage(attacker))
+	dmg = applyDamageModifiers(attacker, target, dmg)
 	// Apply through the combat engine so the armor/condition/blocking hooks are exercised.
 	c.SetParam(combat.CombatParamType, uint32(combat.CombatPhysical))
 	c.SetParam(combat.CombatParamBlockArmor, 1)
@@ -330,6 +330,7 @@ func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item, lau
 	if maxDmg > 0 {
 		dmg = randomRange(int(minDmg), int(maxDmg))
 	}
+	dmg = applyDamageModifiers(p, target, dmg)
 
 	// Consume ammunition
 	ammoType := ammo.AmmoType(e.world.Items)
@@ -401,7 +402,7 @@ func (e *CombatEngine) doWandHit(p *Player, target Creature, wand *Item) {
 	}
 	lo := int(float64(attack) * 0.8)
 	hi := int(float64(attack) * 1.2)
-	dmg := randomRange(lo, hi)
+	dmg := applyDamageModifiers(p, target, randomRange(lo, hi))
 
 	combatType := combat.CombatEnergy
 	shootStr := wand.ShootType(e.world.Items)
@@ -459,6 +460,47 @@ func (e *CombatEngine) doWandHit(p *Player, target Creature, wand *Item) {
 	if target.GetHealth() == 0 {
 		e.handleDeath(target, p)
 	}
+}
+
+// applyDamageModifiers applies Prey and Fiendish multipliers to raw damage.
+func applyDamageModifiers(attacker, target Creature, dmg int32) int32 {
+	if dmg <= 0 {
+		return 0
+	}
+	multiplier := 1.0
+
+	// 1. Fiendish / Influenced multipliers
+	if m, ok := attacker.(*Monster); ok {
+		// getAttackMultiplier (1.35 + (stacks-1)*0.1)
+		if m.ForgeStack > 0 {
+			multiplier *= (1.35 + float64(m.ForgeStack-1)*0.1)
+		}
+	}
+	if m, ok := target.(*Monster); ok {
+		// getDefenseMultiplier (1 + 0.1*stacks)
+		// More defense means LESS damage taken.
+		if m.ForgeStack > 0 {
+			multiplier /= (1.0 + 0.1*float64(m.ForgeStack))
+		}
+	}
+
+	// 2. Prey Bonuses
+	if p, ok := attacker.(*Player); ok {
+		if m, ok := target.(*Monster); ok && m.Type != nil {
+			if bonus, ok := p.GetPrey().GetPreyBonus(m.Type.RaceID, PreyBonus_DamageBoost); ok {
+				multiplier *= float64(100+bonus) / 100.0
+			}
+		}
+	}
+	if p, ok := target.(*Player); ok {
+		if m, ok := attacker.(*Monster); ok && m.Type != nil {
+			if bonus, ok := p.GetPrey().GetPreyBonus(m.Type.RaceID, PreyBonus_DamageReduction); ok {
+				multiplier *= float64(100-bonus) / 100.0
+			}
+		}
+	}
+
+	return int32(float64(dmg) * multiplier)
 }
 
 func (e *CombatEngine) meleeDamage(attacker Creature) int {
@@ -571,13 +613,14 @@ func absDamageRange(minDamage, maxDamage int) (lo, hi int) {
 // dynamic 95..105% jitter, gut/charm bonuses, and unique-item de-duplication are
 // omitted (rate assumed 1x). Stackability is inferred from CountMax rather than
 // item metadata because the combat engine has no item catalog.
-func rollLoot(loot []creatures.LootBlock) []*Item {
+func rollLoot(loot []creatures.LootBlock, lootMultiplier float64) []*Item {
 	var out []*Item
 	for _, lb := range loot {
 		if lb.ID == 0 {
 			continue // unresolved name; skip
 		}
-		if rand.Intn(maxLootChance) >= int(lb.Chance) {
+		chance := int(float64(lb.Chance) * lootMultiplier)
+		if rand.Intn(maxLootChance) >= chance {
 			continue
 		}
 		count := uint16(1)
@@ -597,7 +640,7 @@ func rollLoot(loot []creatures.LootBlock) []*Item {
 		}
 		item := &Item{ID: lb.ID, Count: count}
 		if len(lb.ChildLoot) > 0 {
-			item.Contents = rollLoot(lb.ChildLoot)
+			item.Contents = rollLoot(lb.ChildLoot, lootMultiplier)
 		}
 		out = append(out, item)
 	}
@@ -645,6 +688,8 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 		corpseID = m.CorpseID
 	}
 
+	lootMultiplier := 1.0
+
 	// Award experience to the killer. Basic version of Creature::onDeath's
 	// experienceMap -> onGainExperience: the whole reward goes to the last hitter
 	// (no damage-share split, party, stamina or bonus multipliers yet).
@@ -666,6 +711,15 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 				}
 			}
 			p.GetTaskHunter().OnKillMonster(raceID)
+
+			if bonus, ok := p.GetPrey().GetPreyBonus(raceID, PreyBonus_ImprovedLoot); ok {
+				lootMultiplier *= float64(100+bonus) / 100.0
+			}
+
+			if m.ForgeClassification == ForgeClassifications_Fiendish {
+				// Grant dust to killer player
+				p.ForgeDusts += uint64(3 + rand.Intn(3)) // 3-5 dust
+			}
 		}
 	}
 
@@ -674,7 +728,7 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	// container whose Contents are the rolled loot table.
 	corpse := &Item{ID: corpseID, Count: 1}
 	if m, ok := victim.(*Monster); ok && m.Type != nil && m.Type.Flags.LootDrop {
-		corpse.Contents = rollLoot(m.Type.Loot)
+		corpse.Contents = rollLoot(m.Type.Loot, lootMultiplier)
 	}
 	if e.world.AddItem(pos, corpse) && e.world.OnItemAppear != nil {
 		e.world.OnItemAppear(pos, corpse)

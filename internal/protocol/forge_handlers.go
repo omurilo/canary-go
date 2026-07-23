@@ -54,8 +54,11 @@ func (g *GameProtocol) parseForgeEnter(r *netmsg.Reader) {
 			g.sendForgeError(res.Err)
 			return
 		}
+		// Refresh the bag (consumed items + new exaltation chest) first, then let
+		// sendForgeResult repaint the forge window (0x8A → 0x87 → 0x86 → resources)
+		// so the resource balances are the last thing the client sees.
+		g.refreshForgeInventory()
 		g.sendForgeResult(res)
-		g.refreshForge()
 
 	case game.ForgeActionTransfer:
 		res := g.player.ForgeTransferItemTier(g.deps.Items, firstItem, tier, secondItem, convergence)
@@ -63,14 +66,22 @@ func (g *GameProtocol) parseForgeEnter(r *netmsg.Reader) {
 			g.sendForgeError(res.Err)
 			return
 		}
+		g.refreshForgeInventory()
 		g.sendForgeResult(res)
-		g.refreshForge()
 
 	default:
 		if actionType <= game.ForgeActionIncreaseLimit {
-			g.player.ForgeResourceConversion(g.deps.Items, actionType)
-			g.sendForgingData()
-			g.refreshForge()
+			if !g.player.ForgeResourceConversion(g.deps.Items, actionType) {
+				// Mirrors Player::forgeResourceConversion sending sendForgeError on
+				// insufficient resources; also stops the "infinite convert" illusion
+				// once the client's stale count is corrected.
+				g.sendForgeError("You do not have the required resources.")
+				return
+			}
+			// Bag changed (slivers/cores are items); repaint it, then the forge
+			// window with fresh resource balances last.
+			g.refreshForgeInventory()
+			g.sendOpenForge()
 		}
 	}
 }
@@ -150,19 +161,19 @@ func (g *GameProtocol) sendForgingData() {
 		}
 	}
 
-	w.AddByte(game.ForgeCostOneSliver)            // dust cost of 1 sliver batch input
-	w.AddByte(game.ForgeSliverAmount)             // slivers produced
-	w.AddByte(game.ForgeCoreCost)                 // slivers per core
-	w.AddByte(game.ForgeDustLevelBase)            // dustLevel - this = increase cost
-	w.AddU16(g.player.GetForgeDustLevel())        // current stored dust limit
-	w.AddU16(game.ForgeMaxDust)                   // max stored dust limit
-	w.AddByte(game.ForgeFusionDustCost)           // normal fusion dust
-	w.AddByte(game.ForgeConvergenceFusionCost)    // convergence fusion dust
-	w.AddByte(game.ForgeTransferDustCost)         // normal transfer dust
-	w.AddByte(game.ForgeConvergenceTransferCost)  // convergence transfer dust
-	w.AddByte(game.ForgeBaseSuccessRate)          // base success rate
-	w.AddByte(game.ForgeBonusSuccessRate)         // core bonus success rate
-	w.AddByte(game.ForgeTierLossReduction)        // tier-loss chance after reduction
+	w.AddByte(game.ForgeCostOneSliver)           // dust cost of 1 sliver batch input
+	w.AddByte(game.ForgeSliverAmount)            // slivers produced
+	w.AddByte(game.ForgeCoreCost)                // slivers per core
+	w.AddByte(game.ForgeDustLevelBase)           // dustLevel - this = increase cost
+	w.AddU16(g.player.GetForgeDustLevel())       // current stored dust limit
+	w.AddU16(game.ForgeMaxDust)                  // max stored dust limit
+	w.AddByte(game.ForgeFusionDustCost)          // normal fusion dust
+	w.AddByte(game.ForgeConvergenceFusionCost)   // convergence fusion dust
+	w.AddByte(game.ForgeTransferDustCost)        // normal transfer dust
+	w.AddByte(game.ForgeConvergenceTransferCost) // convergence transfer dust
+	w.AddByte(game.ForgeBaseSuccessRate)         // base success rate
+	w.AddByte(game.ForgeBonusSuccessRate)        // core bonus success rate
+	w.AddByte(game.ForgeTierLossReduction)       // tier-loss chance after reduction
 
 	g.SendToClient(w)
 	g.sendForgeResources()
@@ -426,9 +437,11 @@ func (g *GameProtocol) sendForgeResources() {
 	g.sendResourceBalance(0x01, uint64(g.player.GetMoney()))
 }
 
-// refreshForge re-sends inventory, open containers, stats and forge resources
-// after a forge operation mutated the player's items.
-func (g *GameProtocol) refreshForge() {
+// refreshForgeInventory re-sends inventory, open containers and stats after a
+// forge operation mutated the player's items. It intentionally does NOT send the
+// forge resource balances — the caller sends the forge window packets (which
+// carry the fresh balances) afterwards so those are the client's last update.
+func (g *GameProtocol) refreshForgeInventory() {
 	p := g.player
 	if p == nil {
 		return
@@ -445,7 +458,6 @@ func (g *GameProtocol) refreshForge() {
 		g.refreshContainerIfOpen(c)
 	}
 	g.sendStats()
-	g.sendForgeResources()
 }
 
 // SendOpenForge is the Session entry point used by player:openForge().

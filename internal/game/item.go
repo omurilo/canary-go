@@ -1,6 +1,10 @@
 package game
 
-import "github.com/opentibiabr/canary-go/internal/items"
+import (
+	"strings"
+
+	"github.com/opentibiabr/canary-go/internal/items"
+)
 
 // Item is an item instance: a client item id, a stack count/subtype, and the
 // decoded OTBR attribute blob (see ItemAttributes).
@@ -211,6 +215,38 @@ func (i *Item) GetWeight(catalog *items.Catalog) uint32 {
 	return total
 }
 
+const (
+	ObjectCategoryNone             uint8 = 0
+	ObjectCategoryArmors           uint8 = 1
+	ObjectCategoryNecklaces        uint8 = 2
+	ObjectCategoryBoots            uint8 = 3
+	ObjectCategoryContainers       uint8 = 4
+	ObjectCategoryDecoration       uint8 = 5
+	ObjectCategoryFood             uint8 = 6
+	ObjectCategoryHelmets          uint8 = 7
+	ObjectCategoryLegs             uint8 = 8
+	ObjectCategoryOthers           uint8 = 9
+	ObjectCategoryPotions          uint8 = 10
+	ObjectCategoryRings            uint8 = 11
+	ObjectCategoryRunes            uint8 = 12
+	ObjectCategoryShields          uint8 = 13
+	ObjectCategoryTools            uint8 = 14
+	ObjectCategoryValuables        uint8 = 15
+	ObjectCategoryAmmo             uint8 = 16
+	ObjectCategoryAxes             uint8 = 17
+	ObjectCategoryClubs            uint8 = 18
+	ObjectCategoryDistanceWeapons  uint8 = 19
+	ObjectCategorySwords           uint8 = 20
+	ObjectCategoryWands            uint8 = 21
+	ObjectCategoryPremiumScrolls   uint8 = 22
+	ObjectCategoryTibiaCoins       uint8 = 23
+	ObjectCategoryCreatureProducts uint8 = 24
+	ObjectCategoryQuivers          uint8 = 25
+	ObjectCategoryFistWeapons      uint8 = 27
+	ObjectCategoryGold             uint8 = 30
+	ObjectCategoryDefault          uint8 = 31
+)
+
 // WeaponType returns the item's weapon type, e.g. "sword", "axe", "club", "distance", "wand", etc.
 func (i *Item) WeaponType(catalog *items.Catalog) string {
 	if catalog == nil {
@@ -220,6 +256,80 @@ func (i *Item) WeaponType(catalog *items.Catalog) string {
 		return t.WeaponType
 	}
 	return ""
+}
+
+// GetObjectCategory categorizes an item for quick loot / stash routing.
+func (i *Item) GetObjectCategory(catalog *items.Catalog) uint8 {
+	if catalog == nil {
+		return ObjectCategoryNone
+	}
+
+	// Example: Gold items have worth (we could hardcode IDs for gold, platinum, crystal coin)
+	if i.ID == 2148 || i.ID == 2152 || i.ID == 2160 {
+		return ObjectCategoryGold
+	}
+
+	it := catalog.Get(i.ID)
+	if it == nil {
+		return ObjectCategoryDefault
+	}
+
+	// 1. Weapon checks
+	if it.WeaponType != "" && it.WeaponType != "none" {
+		switch it.WeaponType {
+		case "fist":
+			return ObjectCategoryFistWeapons
+		case "sword":
+			return ObjectCategorySwords
+		case "club":
+			return ObjectCategoryClubs
+		case "axe":
+			return ObjectCategoryAxes
+		case "shield":
+			return ObjectCategoryShields
+		case "distance", "missile":
+			return ObjectCategoryDistanceWeapons
+		case "wand":
+			return ObjectCategoryWands
+		case "ammunition", "ammo":
+			return ObjectCategoryAmmo
+		}
+	} else if it.SlotPosition != "" && it.SlotPosition != "hand" && it.SlotPosition != "two-handed" { // Check slots
+		// We do a simple contains or match
+		slot := it.SlotPosition
+		if strings.Contains(slot, "head") {
+			return ObjectCategoryHelmets
+		} else if strings.Contains(slot, "necklace") {
+			return ObjectCategoryNecklaces
+		} else if strings.Contains(slot, "backpack") {
+			return ObjectCategoryContainers
+		} else if strings.Contains(slot, "armor") || strings.Contains(slot, "body") {
+			return ObjectCategoryArmors
+		} else if strings.Contains(slot, "legs") {
+			return ObjectCategoryLegs
+		} else if strings.Contains(slot, "feet") {
+			return ObjectCategoryBoots
+		} else if strings.Contains(slot, "ring") {
+			return ObjectCategoryRings
+		}
+	} else {
+		// Based on name or string tags as fallback (since we lack full item flags)
+		name := strings.ToLower(it.Name)
+		if strings.Contains(name, "rune") {
+			return ObjectCategoryRunes
+		} else if strings.Contains(name, "potion") {
+			return ObjectCategoryPotions
+		} else if strings.Contains(name, "food") || strings.Contains(name, "meat") || strings.Contains(name, "fish") || strings.Contains(name, "cheese") || strings.Contains(name, "apple") {
+			return ObjectCategoryFood
+		} else if strings.Contains(name, "creature product") {
+			return ObjectCategoryCreatureProducts
+		} else {
+			// Some heuristics for missing types
+			return ObjectCategoryOthers
+		}
+	}
+
+	return ObjectCategoryDefault
 }
 
 // Attack returns the item's attack value, prioritizing custom attributes.
@@ -312,5 +422,18 @@ func (i *Item) AmmoType(catalog *items.Catalog) string {
 		return t.AmmoType
 	}
 	return ""
+}
+
+// Worth returns the monetary value of an item based on its ID.
+func (i *Item) Worth() uint64 {
+	switch i.ID {
+	case 2148: // gold coin
+		return 1
+	case 2152: // platinum coin
+		return 100
+	case 2160: // crystal coin
+		return 10000
+	}
+	return 0
 }
 

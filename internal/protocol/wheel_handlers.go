@@ -98,11 +98,33 @@ func (g *GameProtocol) applyWheelSave(r *netmsg.Reader) {
 		g.SendWheelOfDestiny()
 		return
 	}
+	// Removing invested points lowers the wheel HP/mana bonus and therefore the
+	// player's maximum; clamp the current values down to the new maxima (a max
+	// decrease must never leave current above max). Mirrors the stat reload in
+	// PlayerWheel::reloadPlayerData.
+	if maxHP := g.player.GetMaxHealth(); g.player.Health > maxHP {
+		g.player.Health = maxHP
+	}
+	if maxMana := g.player.GetMaxMana(); g.player.Mana > maxMana {
+		g.player.Mana = maxMana
+	}
 	if g.deps != nil && g.deps.DB != nil && g.player != nil {
 		_ = g.deps.DB.SavePlayerWheel(context.Background(), g.player)
 	}
 	g.SendWheelOfDestiny()
 	g.SendStats()
+}
+
+// wheelOptions returns the "options" byte for the wheel window, mirroring
+// PlayerWheel::getOptions: 1 = can increase AND decrease points (only inside a
+// temple protection zone), 2 = can only increase points (anywhere else).
+func (g *GameProtocol) wheelOptions() byte {
+	if g.deps != nil && g.deps.World != nil {
+		if tile := g.deps.World.Map.GetTile(g.player.Pos); tile != nil && tile.IsProtectionZone() {
+			return 1
+		}
+	}
+	return 2
 }
 
 // parseWheelOfDestiny handles opcode 0xEC (Legacy / Alternative Wheel request).
@@ -135,8 +157,8 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 		return
 	}
 
-	w.AddByte(1) // canUse = true
-	w.AddByte(1) // options = 1 (1 = can increase and decrease points)
+	w.AddByte(1)                // canUse = true
+	w.AddByte(g.wheelOptions()) // options: 1 in a temple PZ (can decrease), else 2
 
 	// Map OT vocation ID to CIP client vocation ID
 	vocationByte := getCIPVocation(g.player.Vocation)

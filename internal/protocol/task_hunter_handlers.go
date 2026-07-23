@@ -25,22 +25,34 @@ func (g *GameProtocol) parseTaskHuntingAction(r *netmsg.Reader) {
 	}
 
 	switch action {
-	case 0: // Reroll Task List
+	case 0: // ListReroll
+		cost := uint64(g.player.GetTaskHuntingRerollPrice())
+		if g.player.BankBalance >= cost {
+			g.player.BankBalance -= cost
+			slot.State = game.PreyTaskDataState_Selection
+			// In a full implementation, we'd roll new monsters here.
+			// slot.ReloadMonsterGrid() 
+		}
+	case 1: // RewardsReroll
+		// Requires Prey Cards in C++, omitting real deduction for now (mocking infinite)
+		slot.Upgrade = upgrade
+	case 2: // ListAll (Cards)
+		// Select from full list using cards
 		slot.State = game.PreyTaskDataState_Selection
-	case 1: // Select Task Monster
+	case 3: // MonsterSelection
 		slot.SelectedRaceID = raceID
 		slot.Upgrade = upgrade
 		slot.CurrentKills = 0
+		// Should depend on difficulty and rarity; defaulting to 200 for now
 		slot.TargetKills = 200
 		slot.State = game.PreyTaskDataState_Active
-	case 2: // Upgrade / Select Option
-		slot.Upgrade = upgrade
-	case 3: // Cancel Task
+	case 4: // Cancel
 		slot.State = game.PreyTaskDataState_Selection
 		slot.CurrentKills = 0
-	case 4: // Claim Reward
+	case 5: // Claim
 		if slot.State == game.PreyTaskDataState_Completed {
-			taskHunter.Points += 10 // Grant task hunting points
+			// Calculate points: base (10) + difficulty multiplier. Using flat 10 for now as stub.
+			taskHunter.Points += 10 
 			slot.State = game.PreyTaskDataState_Selection
 			slot.CurrentKills = 0
 		}

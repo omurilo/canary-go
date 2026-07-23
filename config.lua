@@ -214,7 +214,7 @@ transcendenceAvatarDuration = 7000
 -- NOTE: bosstiaryKillMultiplier, multiplier value of boss killed, default 1
 bestiaryKillMultiplier = 1
 bosstiaryKillMultiplier = 1
-bestiaryRateCharmShopPrice  = 1.0
+bestiaryRateCharmShopPrice = 1.0
 boostedBossSlot = true
 boostedBossLootBonus = 250
 boostedBossKillBonus = 3
@@ -304,10 +304,10 @@ onlyPremiumAccount = false
 -- NOTE: minTownIdToBankTransferFromMain blocks towns less than defined from receiving money transfers
 -- NOTE: enableSupportOutfit enable GODS and GMS to select support outfit (gamemaster, customer support or community manager)
 depotChest = 4
-autoLoot = false
+autoLoot = true
 autoBank = false
-toggleGoldPouchAllowAnything = false
-toggleGoldPouchQuickLootOnly = false
+toggleGoldPouchAllowAnything = true
+toggleGoldPouchQuickLootOnly = true
 toggleServerIsRetroPVP = false
 toggleTravelsFree = false
 buyAolCommandFee = 0
@@ -462,7 +462,7 @@ passwordType = "sha1"
 --In general, a higher level of parallelism can make the algorithm faster on systems with multiple CPU cores, but it can also increase memory usage.
 -- NOTE: These settings have to be the same on the site and server.
 memoryConst = "1<<16"
-temporaryConst= 2
+temporaryConst = 2
 parallelism = 2
 
 -- Session Auth
@@ -678,14 +678,13 @@ metricsOstreamInterval = 1000
 -- NOTE: Features added in this list will be forced to be used on OTCR
 -- These features can be found in "modules/gamelib/const.lua"
 OTCRFeatures = {
-    enableFeature = {
-        101, -- g_game.enableFeature(GameItemShader)
-        102, -- g_game.enableFeature(GameCreatureAttachedEffect)
-        103, -- g_game.enableFeature(GameCreatureShader)
-        118  -- g_game.enableFeature(GameWingsAurasEffectsShader)
-    },
-    disableFeature = {
-    }
+	enableFeature = {
+		101, -- g_game.enableFeature(GameItemShader)
+		102, -- g_game.enableFeature(GameCreatureAttachedEffect)
+		103, -- g_game.enableFeature(GameCreatureShader)
+		118, -- g_game.enableFeature(GameWingsAurasEffectsShader)
+	},
+	disableFeature = {},
 }
 motd = "Welcome to Canary-Go! A Go migration of the Canary server."
 rsaKeyFile = "key.pem"
