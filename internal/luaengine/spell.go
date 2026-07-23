@@ -49,6 +49,7 @@ var spellMethods = map[string]lua.LGFunction{
 	"needTarget":                  spellNeedTarget,
 	"needDirection":               spellNeedDirection,
 	"blockWalls":                  spellBlockWalls,
+	"isBlockingWalls":             spellBlockWalls,
 	"needLearn":                   spellNeedLearn,
 	"needWeapon":                  spellNeedWeapon,
 	"isPremium":                   spellIsPremium,

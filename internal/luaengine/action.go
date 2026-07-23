@@ -76,6 +76,9 @@ func actionId(L *lua.LState) int {
 	a := checkAction(L)
 	top := L.GetTop()
 	for i := 2; i <= top; i++ {
+		if L.Get(i) == lua.LNil {
+			continue
+		}
 		a.ItemIDs = append(a.ItemIDs, uint16(L.CheckInt(i)))
 	}
 	L.Push(L.Get(1))
@@ -86,6 +89,9 @@ func actionAid(L *lua.LState) int {
 	a := checkAction(L)
 	top := L.GetTop()
 	for i := 2; i <= top; i++ {
+		if L.Get(i) == lua.LNil {
+			continue
+		}
 		a.ActionIDs = append(a.ActionIDs, uint16(L.CheckInt(i)))
 	}
 	L.Push(L.Get(1))
@@ -96,6 +102,9 @@ func actionUid(L *lua.LState) int {
 	a := checkAction(L)
 	top := L.GetTop()
 	for i := 2; i <= top; i++ {
+		if L.Get(i) == lua.LNil {
+			continue
+		}
 		a.UniqueIDs = append(a.UniqueIDs, uint16(L.CheckInt(i)))
 	}
 	L.Push(L.Get(1))

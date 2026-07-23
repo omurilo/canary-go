@@ -25,18 +25,26 @@ func moveEventConstructor(L *lua.LState) int {
 }
 
 var moveEventMethods = map[string]lua.LGFunction{
-	"type":         moveEventType,
-	"id":           moveEventId,
-	"aid":          moveEventAid,
-	"uid":          moveEventUid,
-	"position":     moveEventPosition,
-	"onStepIn":     moveEventOnStepIn,
-	"onStepOut":    moveEventOnStepOut,
-	"onEquip":      moveEventNoOp,
-	"onDeEquip":    moveEventNoOp,
-	"onAddItem":    moveEventNoOp,
-	"onRemoveItem": moveEventNoOp,
-	"register":     moveEventRegister,
+	"type":            moveEventType,
+	"id":              moveEventId,
+	"aid":             moveEventAid,
+	"uid":             moveEventUid,
+	"position":        moveEventPosition,
+	"onStepIn":        moveEventOnStepIn,
+	"onStepOut":       moveEventOnStepOut,
+	"onEquip":         moveEventNoOp,
+	"onDeEquip":       moveEventNoOp,
+	"onAddItem":       moveEventNoOp,
+	"onRemoveItem":    moveEventNoOp,
+	"slot":            moveEventNoOp,
+	"level":           moveEventNoOp,
+	"vocation":        moveEventNoOp,
+	"wieldUnequip":    moveEventNoOp,
+	"transformEquip":   moveEventNoOp,
+	"transformDeEquip": moveEventNoOp,
+	"tileItem":        moveEventNoOp,
+	"premium":         moveEventNoOp,
+	"register":        moveEventRegister,
 }
 
 func checkMoveEvent(L *lua.LState) *moveevents.MoveEvent {
