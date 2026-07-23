@@ -1,6 +1,7 @@
 package moveevents
 
 import (
+	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -10,6 +11,7 @@ type MoveEvent struct {
 	ItemIDs   []uint16
 	ActionIDs []uint16
 	UniqueIDs []uint16
+	Positions []game.Position
 	OnStepIn  *lua.LFunction
 	OnStepOut *lua.LFunction
 }
@@ -21,13 +23,15 @@ var (
 	// Many map-placed movements (e.g. the citizen/temple "set town" tiles in
 	// data-otservbr-global/scripts/movements/teleport/citizen.lua) register only
 	// by unique id, so indexing by item id alone would never fire them.
-	stepInByUniqueID  = make(map[uint16]*MoveEvent)
-	stepOutByUniqueID = make(map[uint16]*MoveEvent)
-	stepInByActionID  = make(map[uint16]*MoveEvent)
-	stepOutByActionID = make(map[uint16]*MoveEvent)
+	stepInByUniqueID   = make(map[uint16]*MoveEvent)
+	stepOutByUniqueID  = make(map[uint16]*MoveEvent)
+	stepInByActionID   = make(map[uint16]*MoveEvent)
+	stepOutByActionID  = make(map[uint16]*MoveEvent)
+	stepInByPosition  = make(map[game.Position]*MoveEvent)
+	stepOutByPosition = make(map[game.Position]*MoveEvent)
 )
 
-// Register stores the move event indexed by item id, unique id, and action id.
+// Register stores the move event indexed by item id, unique id, action id, and position.
 func Register(m *MoveEvent) {
 	isStepIn := m.Type == "stepin" || m.OnStepIn != nil
 	isStepOut := m.Type == "stepout" || m.OnStepOut != nil
@@ -47,6 +51,15 @@ func Register(m *MoveEvent) {
 	index(stepInByItemID, stepOutByItemID, m.ItemIDs)
 	index(stepInByUniqueID, stepOutByUniqueID, m.UniqueIDs)
 	index(stepInByActionID, stepOutByActionID, m.ActionIDs)
+
+	for _, pos := range m.Positions {
+		if isStepIn {
+			stepInByPosition[pos] = m
+		}
+		if isStepOut {
+			stepOutByPosition[pos] = m
+		}
+	}
 }
 
 // FindStepInByItemID looks up a step-in event by item ID.
@@ -66,3 +79,10 @@ func FindStepInByActionID(aid uint16) *MoveEvent { return stepInByActionID[aid] 
 
 // FindStepOutByActionID looks up a step-out event by the tile item's action id.
 func FindStepOutByActionID(aid uint16) *MoveEvent { return stepOutByActionID[aid] }
+
+// FindStepInByPosition looks up a step-in event by tile position.
+func FindStepInByPosition(pos game.Position) *MoveEvent { return stepInByPosition[pos] }
+
+// FindStepOutByPosition looks up a step-out event by tile position.
+func FindStepOutByPosition(pos game.Position) *MoveEvent { return stepOutByPosition[pos] }
+

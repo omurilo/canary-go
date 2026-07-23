@@ -126,6 +126,7 @@ type Player struct {
 	RegenTicks int32
 
 	Outfit Outfit
+	LastMount uint16
 
 	LightLevel uint8
 	LightColor uint8

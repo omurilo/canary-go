@@ -29,6 +29,7 @@ var moveEventMethods = map[string]lua.LGFunction{
 	"id":           moveEventId,
 	"aid":          moveEventAid,
 	"uid":          moveEventUid,
+	"position":     moveEventPosition,
 	"onStepIn":     moveEventOnStepIn,
 	"onStepOut":    moveEventOnStepOut,
 	"onEquip":      moveEventNoOp,
@@ -92,6 +93,17 @@ func moveEventUid(L *lua.LState) int {
 	top := L.GetTop()
 	for i := 2; i <= top; i++ {
 		m.UniqueIDs = append(m.UniqueIDs, uint16(L.CheckInt(i)))
+	}
+	L.Push(L.Get(1))
+	return 1
+}
+
+func moveEventPosition(L *lua.LState) int {
+	m := checkMoveEvent(L)
+	top := L.GetTop()
+	for i := 2; i <= top; i++ {
+		pos := checkPosition(L, i)
+		m.Positions = append(m.Positions, pos)
 	}
 	L.Push(L.Get(1))
 	return 1

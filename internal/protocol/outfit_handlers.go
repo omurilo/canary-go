@@ -177,6 +177,35 @@ func (g *GameProtocol) parseSetOutfit(r *netmsg.Reader) {
 		p.Outfit.Feet = lookFeet
 		p.Outfit.Addons = lookAddons
 		p.Outfit.LookMount = lookMount
+		if lookMount != 0 {
+			p.LastMount = lookMount
+		}
+	}
+
+	g.broadcastOutfit(p)
+}
+
+// parseToggleMount handles Opcode 0xD4 (Ctrl+R / Mount toggle).
+func (g *GameProtocol) parseToggleMount(r *netmsg.Reader) {
+	p := g.player
+	if p == nil {
+		return
+	}
+
+	mount := r.GetByte() != 0
+	if mount {
+		if p.Outfit.LookMount == 0 {
+			if p.LastMount != 0 {
+				p.Outfit.LookMount = p.LastMount
+			} else {
+				p.Outfit.LookMount = 388 // Default mount client id (Widow Queen)
+			}
+		}
+	} else {
+		if p.Outfit.LookMount != 0 {
+			p.LastMount = p.Outfit.LookMount
+			p.Outfit.LookMount = 0
+		}
 	}
 
 	g.broadcastOutfit(p)

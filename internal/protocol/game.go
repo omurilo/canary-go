@@ -710,6 +710,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.SendOutfitWindow()
 	case 0xD3:
 		g.parseSetOutfit(r)
+	case 0xD4:
+		g.parseToggleMount(r)
 	case 0xE5:
 		g.parseCyclopediaCharacterInfo(r)
 	case 0xBF:

@@ -99,6 +99,14 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 				stepInItems = append(stepInItems, it)
 			}
 		}
+		if evt := moveevents.FindStepInByPosition(newPos); evt != nil {
+			stepInEvents = append(stepInEvents, evt)
+			ground := tile.Ground
+			if ground == nil {
+				ground = &game.Item{}
+			}
+			stepInItems = append(stepInItems, ground)
+		}
 
 		for i, evt := range stepInEvents {
 			it := stepInItems[i]
