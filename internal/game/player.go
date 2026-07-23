@@ -153,6 +153,11 @@ type Player struct {
 	TaskHunter *PlayerTaskHunter
 	PreyCards  uint32
 
+	// Store / Tibia Coins (account-level: accounts.coins / coins_transferable).
+	// CoinBalance is the total; CoinTransferable is the transferable subset.
+	CoinBalance      uint32
+	CoinTransferable uint32
+
 	// Exaltation Forge resources
 	// Forge (Exaltation Forge). ForgeDusts is the dust resource amount;
 	// ForgeDustLevel is the stored-dust limit (schema forge_dust_level,

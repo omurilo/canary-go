@@ -386,6 +386,25 @@ func (g *GameProtocol) disconnect(msg string) {
 	g.conn.Close()
 }
 
+// sendCoinBalance pushes the account's Tibia Coin balance, mirroring
+// ProtocolGame::sendCoinBalance: 0xF2 (updating flag) then 0xDF with the normal
+// and transferable coin totals (plus a reserved auction total on modern
+// protocol).
+func (g *GameProtocol) sendCoinBalance() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xF2)
+	w.AddByte(0x01)
+	w.AddByte(0xDF)
+	w.AddByte(0x01)
+	w.AddU32(g.player.CoinBalance)      // normal coins
+	w.AddU32(g.player.CoinTransferable) // transferable coins
+	w.AddU32(g.player.CoinBalance)      // reserved auction coins (modern protocol)
+	g.SendToClient(w)
+}
+
 // enterWorld sends the full login sequence as a single message.
 func (g *GameProtocol) enterWorld() {
 	p := g.player
@@ -465,6 +484,9 @@ func (g *GameProtocol) enterWorld() {
 
 	// Send initial condition/protection zone icons
 	g.SendIcons()
+
+	// Store / Tibia Coins balance (shown on the store button).
+	g.sendCoinBalance()
 
 	// Send Prey data & prices
 	g.SendPreyPrices()
