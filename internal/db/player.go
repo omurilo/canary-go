@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/io/propstream"
 )
 
 // LoadPlayer loads a character by name into a game.Player. The town temple is
@@ -110,10 +111,63 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	           WHERE m.player_id = ? LIMIT 1`
 	_ = d.SQL.QueryRowContext(ctx, gQuery, p.DBID).Scan(&p.GuildName, &p.GuildRankName, &p.GuildNick)
 
+	// Load Wheel of Destiny slot allocations
+	_ = d.LoadPlayerWheel(ctx, p)
+
 	return p, nil
 }
 
-// SavePlayer persists mutable player state (position, vitals, experience, skills, and storages).
+// LoadPlayerWheel loads Wheel of Destiny points from player_wheeldata table.
+func (d *DB) LoadPlayerWheel(ctx context.Context, p *game.Player) error {
+	const q = `SELECT slot FROM player_wheeldata WHERE player_id = ?`
+	var slotBlob []byte
+	err := d.SQL.QueryRowContext(ctx, q, p.DBID).Scan(&slotBlob)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	if len(slotBlob) == 0 {
+		return nil
+	}
+
+	ps := propstream.NewPropStream(slotBlob)
+	pointsMap := make(map[uint16]uint16)
+	for ps.Size() >= 3 {
+		slotID, err1 := ps.ReadUint8()
+		pts, err2 := ps.ReadUint16()
+		if err1 != nil || err2 != nil {
+			break
+		}
+		if pts > 0 {
+			pointsMap[uint16(slotID)] = pts
+		}
+	}
+	p.GetWheel().SaveSlotPoints(pointsMap)
+	return nil
+}
+
+// SavePlayerWheel persists Wheel of Destiny points to player_wheeldata table.
+func (d *DB) SavePlayerWheel(ctx context.Context, p *game.Player) error {
+	if p.Wheel == nil {
+		return nil
+	}
+	slotPoints := p.Wheel.GetSlotPointsCopy()
+	ws := propstream.NewPropWriteStream()
+	for slotID := uint8(1); slotID <= 36; slotID++ {
+		pts := slotPoints[uint16(slotID)]
+		ws.WriteUint8(slotID)
+		ws.WriteUint16(pts)
+	}
+	blob := ws.GetStream()
+	const q = `INSERT INTO player_wheeldata (player_id, slot) VALUES (?, ?)
+	           ON DUPLICATE KEY UPDATE slot = VALUES(slot)`
+	_, err := d.SQL.ExecContext(ctx, q, p.DBID, blob)
+	return err
+}
+
+// SavePlayer persists mutable player state (position, vitals, experience, skills, storages, wheel).
 func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	const q = `UPDATE players SET
 	              level=?, experience=?, health=?, healthmax=?,
@@ -168,6 +222,9 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 			_, _ = d.SQL.ExecContext(ctx, "INSERT INTO player_storage (player_id, `key`, `value`) VALUES (?, ?, ?)", p.DBID, k, v)
 		}
 	}
+
+	// Save Wheel of Destiny
+	_ = d.SavePlayerWheel(ctx, p)
 
 	return d.SavePlayerItems(ctx, p)
 }

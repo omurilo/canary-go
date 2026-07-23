@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"context"
+
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -83,7 +85,11 @@ func (g *GameProtocol) parseSaveWheel(r *netmsg.Reader) {
 	}
 	wheel := g.player.GetWheel()
 	wheel.SaveSlotPoints(pointsMap)
+	if g.deps != nil && g.deps.DB != nil && g.player != nil {
+		_ = g.deps.DB.SavePlayerWheel(context.Background(), g.player)
+	}
 	g.SendWheelOfDestiny()
+	g.SendStats()
 }
 
 // parseWheelOfDestiny handles opcode 0xEC (Legacy / Alternative Wheel request).
@@ -103,7 +109,11 @@ func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
 		}
 		wheel := g.player.GetWheel()
 		wheel.SaveSlotPoints(pointsMap)
+		if g.deps != nil && g.deps.DB != nil && g.player != nil {
+			_ = g.deps.DB.SavePlayerWheel(context.Background(), g.player)
+		}
 		g.SendWheelOfDestiny()
+		g.SendStats()
 	}
 }
 

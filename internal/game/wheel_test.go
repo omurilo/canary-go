@@ -78,4 +78,16 @@ func TestPlayer_MaxHealthWithWheel(t *testing.T) {
 	if hp := player.GetMaxHealth(); hp != 1100 {
 		t.Errorf("expected 1100 MaxHealth with Wheel, got %d", hp)
 	}
+
+	// MaxMana with Wheel (+100 Mana)
+	player.MaxMana = 500
+	if mana := player.GetMaxMana(); mana != 600 {
+		t.Errorf("expected 600 MaxMana with Wheel, got %d", mana)
+	}
+
+	// Capacity with Wheel (+100 oz = 10000 hundredths)
+	player.Capacity = 1000
+	if cap := player.GetCapacity(); cap != 11000 {
+		t.Errorf("expected 11000 Capacity with Wheel, got %d", cap)
+	}
 }

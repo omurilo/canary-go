@@ -30,16 +30,20 @@ func (w *WheelOfDestiny) GetTotalPoints(level uint16) uint16 {
 	return levelPoints + w.BonusPoints
 }
 
-// GetSpentPoints calculates total points currently invested across all slots.
-func (w *WheelOfDestiny) GetSpentPoints() uint16 {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
-
+func (w *WheelOfDestiny) getSpentPointsLocked() uint16 {
 	var spent uint16
 	for _, pts := range w.SlotPoints {
 		spent += pts
 	}
 	return spent
+}
+
+// GetSpentPoints calculates total points currently invested across all slots.
+func (w *WheelOfDestiny) GetSpentPoints() uint16 {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	return w.getSpentPointsLocked()
 }
 
 // SaveSlotPoints updates the slot point allocation map.
@@ -73,7 +77,7 @@ func (w *WheelOfDestiny) GetBonusHealth() uint32 {
 	defer w.mu.RUnlock()
 
 	// Every invested point grants 1 HP bonus
-	return uint32(w.GetSpentPoints())
+	return uint32(w.getSpentPointsLocked())
 }
 
 // GetBonusMana returns additional max mana granted by invested points.
@@ -82,7 +86,7 @@ func (w *WheelOfDestiny) GetBonusMana() uint32 {
 	defer w.mu.RUnlock()
 
 	// Every invested point grants 1 Mana bonus
-	return uint32(w.GetSpentPoints())
+	return uint32(w.getSpentPointsLocked())
 }
 
 // GetBonusCapacity returns additional capacity granted by invested points.
@@ -91,5 +95,5 @@ func (w *WheelOfDestiny) GetBonusCapacity() uint32 {
 	defer w.mu.RUnlock()
 
 	// Every invested point grants 1 oz (100 hundredths of an oz)
-	return uint32(w.GetSpentPoints()) * 100
+	return uint32(w.getSpentPointsLocked()) * 100
 }

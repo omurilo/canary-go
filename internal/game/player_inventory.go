@@ -17,7 +17,13 @@ func (p *Player) GetInventoryItem(slot int) *Item {
 // GetCapacity returns the player's total capacity (base + bonus). Mirrors
 // Player::getCapacity (varStats/wheel bonuses are TODO and folded into
 // BonusCapacity when modelled).
-func (p *Player) GetCapacity() uint32 { return p.Capacity + p.BonusCapacity }
+func (p *Player) GetCapacity() uint32 {
+	cap := p.Capacity + p.BonusCapacity
+	if p.Wheel != nil {
+		cap += p.Wheel.GetBonusCapacity()
+	}
+	return cap
+}
 
 // GetFreeCapacity returns capacity minus carried weight, clamped at 0. Mirrors
 // Player::getFreeCapacity. Relies on InventoryWeight being kept current.

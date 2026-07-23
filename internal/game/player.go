@@ -713,6 +713,9 @@ func (p *Player) AttackSpeed() time.Duration {
 func (p *Player) GetMana() uint32    { return p.Mana }
 func (p *Player) GetMaxMana() uint32 {
 	val := int32(p.MaxMana)
+	if p.Wheel != nil {
+		val += int32(p.Wheel.GetBonusMana())
+	}
 	percent := int32(100)
 
 	for _, cond := range p.Conditions() {
