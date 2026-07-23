@@ -28,6 +28,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/game/vocations"
 	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/luaengine"
+	"github.com/opentibiabr/canary-go/internal/mounts"
 	"github.com/opentibiabr/canary-go/internal/network"
 	"github.com/opentibiabr/canary-go/internal/otbm"
 	"github.com/opentibiabr/canary-go/internal/protocol"
@@ -154,6 +155,13 @@ func run(o runOpts, log *slog.Logger) error {
 			log.Warn("vocations not loaded", "path", vocFile, "err", err)
 		} else {
 			log.Info("loaded vocations", "path", vocFile)
+		}
+
+		mountsFile := filepath.Join(cfg.Core, "XML", "mounts.xml")
+		if err := mounts.Load(mountsFile); err != nil {
+			log.Warn("mounts not loaded", "path", mountsFile, "err", err)
+		} else {
+			log.Info("loaded mounts", "path", mountsFile, "count", len(mounts.All()))
 		}
 	}
 

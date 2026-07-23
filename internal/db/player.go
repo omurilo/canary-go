@@ -111,6 +111,19 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 			}
 		}
 	}
+
+	// Load player mounts
+	p.Mounts = make(map[uint16]bool)
+	mRows, err := d.SQL.QueryContext(ctx, "SELECT mount_id FROM player_mounts WHERE player_id = ?", p.DBID)
+	if err == nil {
+		defer mRows.Close()
+		for mRows.Next() {
+			var mid uint16
+			if err := mRows.Scan(&mid); err == nil {
+				p.AddMount(mid)
+			}
+		}
+	}
 	// Load player guild membership
 	gQuery := `SELECT g.name, r.name, m.nick
 	           FROM guild_membership m
@@ -236,6 +249,14 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		// Then insert current storages
 		for k, v := range p.Storages {
 			_, _ = d.SQL.ExecContext(ctx, "INSERT INTO player_storage (player_id, `key`, `value`) VALUES (?, ?, ?)", p.DBID, k, v)
+		}
+	}
+
+	// Save player mounts
+	if p.Mounts != nil {
+		_, _ = d.SQL.ExecContext(ctx, "DELETE FROM player_mounts WHERE player_id = ?", p.DBID)
+		for mid := range p.Mounts {
+			_, _ = d.SQL.ExecContext(ctx, "INSERT INTO player_mounts (player_id, mount_id) VALUES (?, ?)", p.DBID, mid)
 		}
 	}
 

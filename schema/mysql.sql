@@ -86,6 +86,12 @@ CREATE TABLE IF NOT EXISTS player_storage (
     PRIMARY KEY (player_id, `key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS player_mounts (
+    player_id INT NOT NULL,
+    mount_id  INT NOT NULL,
+    PRIMARY KEY (player_id, mount_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS global_storage (
     `key` INT NOT NULL,
     value INT NOT NULL DEFAULT 0,

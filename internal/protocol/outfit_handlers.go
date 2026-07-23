@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/mounts"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -117,8 +118,20 @@ func (g *GameProtocol) SendOutfitWindow() {
 		}
 	}
 
-	// Mounts count (uint16) - 0
-	w.AddU16(0)
+	// Mounts count & list
+	var availableMounts []mounts.Mount
+	for _, m := range mounts.All() {
+		if p.GroupID >= 3 || p.AccountType >= 5 || p.HasMount(m.ID) {
+			availableMounts = append(availableMounts, m)
+		}
+	}
+
+	w.AddU16(uint16(len(availableMounts)))
+	for _, m := range availableMounts {
+		w.AddU16(m.ClientID)
+		w.AddString(m.Name)
+		w.AddByte(0) // store: 0
+	}
 
 	// Familiars count (uint16) - 0
 	w.AddU16(0)

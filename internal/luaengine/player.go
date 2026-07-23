@@ -610,9 +610,12 @@ func playerAddmoney(L *lua.LState) int {
 func playerAddmount(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LFalse)
+		return 1
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	mountID := uint16(L.CheckInt(2))
+	p.AddMount(mountID)
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -2273,10 +2276,11 @@ func playerHaslearnedspell(L *lua.LState) int {
 func playerHasmount(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LFalse)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	mountID := uint16(L.CheckInt(2))
+	L.Push(lua.LBool(p.HasMount(mountID)))
 	return 1
 }
 
@@ -2940,9 +2944,12 @@ func playerRemovemoney(L *lua.LState) int {
 func playerRemovemount(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LFalse)
+		return 1
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	mountID := uint16(L.CheckInt(2))
+	p.RemoveMount(mountID)
+	L.Push(lua.LTrue)
 	return 1
 }
 

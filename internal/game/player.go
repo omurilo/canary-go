@@ -127,6 +127,7 @@ type Player struct {
 
 	Outfit Outfit
 	LastMount uint16
+	Mounts map[uint16]bool
 
 	LightLevel uint8
 	LightColor uint8
@@ -1316,4 +1317,24 @@ func (p *Player) GetBossCooldown(boss string) int64 {
 // Player::canFightBoss (now >= stored cooldown).
 func (p *Player) CanFightBoss(boss string, now int64) bool {
 	return now >= p.GetBossCooldown(boss)
+}
+
+func (p *Player) AddMount(mountID uint16) {
+	if p.Mounts == nil {
+		p.Mounts = make(map[uint16]bool)
+	}
+	p.Mounts[mountID] = true
+}
+
+func (p *Player) HasMount(mountID uint16) bool {
+	if p.Mounts == nil {
+		return false
+	}
+	return p.Mounts[mountID]
+}
+
+func (p *Player) RemoveMount(mountID uint16) {
+	if p.Mounts != nil {
+		delete(p.Mounts, mountID)
+	}
 }
