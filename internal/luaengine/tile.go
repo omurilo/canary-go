@@ -68,7 +68,10 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		"isTile": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
 		"hasFlag": func(L *lua.LState) int {
 			t := checkTile(L, 1)
-			flag := uint32(L.CheckInt(2))
+			// Lenient like C++ getNumber: a nil/absent flag (e.g. a TILESTATE_*
+			// constant the datapack references but the engine doesn't define) reads
+			// as 0 instead of raising, so the calling script keeps running.
+			flag := uint32(L.OptInt(2, 0))
 			L.Push(lua.LBool((uint32(t.tile.Flags) & flag) != 0))
 			return 1
 		},

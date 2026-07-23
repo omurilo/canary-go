@@ -3,6 +3,7 @@ package luaengine
 import (
 	"strings"
 	"sync"
+	"time"
 
 	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -290,6 +291,9 @@ var playerMethods = map[string]lua.LGFunction{
 	"getWheelSpellAdditionalDuration": playerGetwheelspelladditionalduration,
 	"wheelUnlockScroll": playerWheelunlockscroll,
 	"openForge": playerOpenforge,
+	"canFightBoss":    playerCanfightboss,
+	"setBossCooldown": playerSetbosscooldown,
+	"getBossCooldown": playerGetbosscooldown,
 	"closeForge": playerCloseforge,
 	"addForgeDusts": playerAddforgedusts,
 	"removeForgeDusts": playerRemoveforgedusts,
@@ -2706,6 +2710,40 @@ func playerOpenforge(L *lua.LState) int {
 		p.Session.SendOpenForge()
 	}
 	L.Push(lua.LTrue)
+	return 1
+}
+
+// playerCanfightboss mirrors Player:canFightBoss(name) — true when the boss
+// fight cooldown has elapsed.
+func playerCanfightboss(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	L.Push(lua.LBool(p.CanFightBoss(L.CheckString(2), time.Now().Unix())))
+	return 1
+}
+
+// playerSetbosscooldown mirrors Player:setBossCooldown(name, timestamp).
+func playerSetbosscooldown(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		return 0
+	}
+	p.SetBossCooldown(L.CheckString(2), int64(L.CheckNumber(3)))
+	L.Push(lua.LTrue)
+	return 1
+}
+
+// playerGetbosscooldown mirrors Player:getBossCooldown(name).
+func playerGetbosscooldown(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	L.Push(lua.LNumber(p.GetBossCooldown(L.CheckString(2))))
 	return 1
 }
 

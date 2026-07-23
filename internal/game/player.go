@@ -131,11 +131,16 @@ type Player struct {
 	LightColor uint8
 
 	// Quick Loot settings
-	QuickLootFilter         uint8              // 0 = Accepted/Whitelist, 1 = Skipped/Blacklist
-	QuickLootList           []uint16           // List of item IDs
-	QuickLootFallbackToMain bool               // Fallback to main container if specific container full
-	ManagedContainers       map[uint8]Position // Map of ObjectCategory -> Container Position for Loot
-	ManagedObtainContainers map[uint8]Position // Map of ObjectCategory -> Container Position for Obtain
+	QuickLootFilter         uint8             // 0 = Skipped/Blacklist, 1 = Accepted/Whitelist
+	QuickLootList           []uint16          // List of item IDs
+	QuickLootFallbackToMain bool              // Fallback to main container when no category container is set
+	// ManagedContainers / ManagedObtainContainers map an ObjectCategory to the
+	// item id of the inventory container assigned to it. Loot containers are
+	// inventory containers (the client sends pos.x==0xffff), so they are resolved
+	// by searching the inventory for a container of this id rather than by a map
+	// tile position (mirrors C++ m_managedContainers holding container references).
+	ManagedContainers       map[uint8]uint16 // ObjectCategory -> loot container item id
+	ManagedObtainContainers map[uint8]uint16 // ObjectCategory -> obtain container item id
 
 	// Wheel of Destiny progression tree
 	Wheel *WheelOfDestiny
@@ -1241,6 +1246,44 @@ func (p *Player) GetPreyCards() uint32 {
 
 func (p *Player) GetTaskHuntingPoints() uint32 {
 	return p.GetTaskHunter().Points
+}
+
+// AddTaskHuntingPoints credits hunting-task points, mirroring
+// Player::addTaskHuntingPoints.
+func (p *Player) AddTaskHuntingPoints(amount uint32) {
+	th := p.GetTaskHunter()
+	th.mu.Lock()
+	th.Points += amount
+	th.mu.Unlock()
+}
+
+// bossCooldownKey namespaces per-boss fight cooldowns inside KVStore.
+func bossCooldownKey(boss string) string { return "boss-cooldown:" + boss }
+
+// SetBossCooldown records the unix timestamp until which the player may not
+// fight the named boss again (mirrors Player::setBossCooldown's KV store).
+func (p *Player) SetBossCooldown(boss string, timestamp int64) {
+	if p.KVStore == nil {
+		p.KVStore = make(map[string]any)
+	}
+	p.KVStore[bossCooldownKey(boss)] = timestamp
+}
+
+// GetBossCooldown returns the stored fight cooldown timestamp for a boss, or 0.
+func (p *Player) GetBossCooldown(boss string) int64 {
+	if p.KVStore == nil {
+		return 0
+	}
+	if v, ok := p.KVStore[bossCooldownKey(boss)].(int64); ok {
+		return v
+	}
+	return 0
+}
+
+// CanFightBoss reports whether the boss fight cooldown has elapsed, mirroring
+// Player::canFightBoss (now >= stored cooldown).
+func (p *Player) CanFightBoss(boss string, now int64) bool {
+	return now >= p.GetBossCooldown(boss)
 }
 
 

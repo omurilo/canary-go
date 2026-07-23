@@ -3,6 +3,7 @@ package protocol
 import (
 	"time"
 
+	"github.com/opentibiabr/canary-go/internal/config"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
@@ -188,7 +189,7 @@ func (g *GameProtocol) reloadPreyGrid(slot *game.PreySlot) {
 	seed := time.Now().UnixNano()
 	for i := len(shuffled) - 1; i > 0; i-- {
 		seed = seed*1103515245 + 12345
-		j := int((seed >> 16) & 0x7FFF) % (i + 1)
+		j := int((seed>>16)&0x7FFF) % (i + 1)
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 	}
 
@@ -236,7 +237,7 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 			slot.BonusRarity++
 		}
 		slot.Bonus = game.PreyBonusType((uint8(time.Now().UnixNano()) + slot.ID) % 4)
-		slot.BonusPercentage = uint16(10 + slot.BonusRarity*3)
+		slot.BonusPercentage = game.PreyBonusPercentage(slot.Bonus, slot.BonusRarity)
 		slot.BonusTimeLeft = 7200
 	case 2: // PreyAction_MonsterSelection
 		if len(slot.RaceIDList) == 0 {
@@ -249,7 +250,7 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 			if slot.BonusPercentage == 0 {
 				slot.Bonus = game.PreyBonusType((uint8(time.Now().UnixNano()) + slot.ID) % 4)
 				slot.BonusRarity = 5
-				slot.BonusPercentage = uint16(10 + slot.BonusRarity*3)
+				slot.BonusPercentage = game.PreyBonusPercentage(slot.Bonus, slot.BonusRarity)
 			}
 		}
 	case 3: // PreyAction_ListAll_Cards
@@ -261,7 +262,7 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 		if slot.BonusPercentage == 0 {
 			slot.Bonus = game.PreyBonusType((uint8(time.Now().UnixNano()) + slot.ID) % 4)
 			slot.BonusRarity = 5
-			slot.BonusPercentage = uint16(10 + slot.BonusRarity*3)
+			slot.BonusPercentage = game.PreyBonusPercentage(slot.Bonus, slot.BonusRarity)
 		}
 	case 5: // PreyAction_Option
 		slot.Option = option
@@ -364,13 +365,13 @@ func (g *GameProtocol) SendPreyPrices() {
 	w := netmsg.NewWriter()
 	w.AddByte(0xE9)
 	w.AddU32(g.player.GetPreyRerollPrice())
-	w.AddByte(5) // Bonus Reroll Price (wildcards)
-	w.AddByte(5) // Selection List Price (wildcards)
+	w.AddByte(byte(config.Number("preyBonusRerollPrice", 1))) // bonus reroll (wildcards)
+	w.AddByte(byte(config.Number("preySelectListPrice", 5)))  // selection list (wildcards)
 
 	w.AddU32(g.player.GetTaskHuntingRerollPrice())
 	w.AddU32(g.player.GetTaskHuntingRerollPrice())
-	w.AddByte(2) // Task Selection List Price
-	w.AddByte(1) // Task Bonus Reroll Price
+	w.AddByte(byte(config.Number("taskHuntingSelectListPrice", 5)))  // task selection list
+	w.AddByte(byte(config.Number("taskHuntingBonusRerollPrice", 1))) // task bonus reroll
 
 	g.SendToClient(w)
 }

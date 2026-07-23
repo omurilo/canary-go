@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -594,10 +595,21 @@ func (g *GameProtocol) addBasicData(w *netmsg.Writer) {
 
 // OnPacket dispatches steady-state game packets.
 func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
+	var op byte
+	// A panic while handling one packet (a missing Lua binding, a nil deref in a
+	// teleport/map render, a malformed payload) must never take down the whole
+	// server. Recover, log it with the offending opcode, and keep the session
+	// alive so the player can carry on.
+	defer func() {
+		if rec := recover(); rec != nil && g.deps != nil && g.deps.Log != nil {
+			g.deps.Log.Error("recovered panic while handling packet",
+				"opcode", fmt.Sprintf("0x%02X", op), "panic", rec, "stack", string(debug.Stack()))
+		}
+	}()
 	if g.player == nil {
 		return
 	}
-	op := r.GetByte()
+	op = r.GetByte()
 	switch op {
 	case inLogout:
 		c.Close()

@@ -219,13 +219,27 @@ func RegisterEnums(L *lua.LState) {
 		"WORLD_TYPE_PVP":          1,
 		"WORLD_TYPE_PVP_ENFORCED": 2,
 
-		// Tile States
+		// Tile states. Values match the OTBM tile-flag bits actually stored in
+		// Tile.Flags by the map loader (io_definitions.hpp OTBM_TILEFLAG_*):
+		// PZ=1<<0, NOPVP=1<<2, NOLOGOUT=1<<3, PVP=1<<4. The remaining TILESTATE_*
+		// constants are runtime-only in C++ and are not populated by the loader
+		// (they read back as absent); they are defined here so datapack scripts
+		// that reference them get a number rather than nil.
 		"TILESTATE_NONE":           0,
-		"TILESTATE_PROTECTIONZONE": 1,
-		"TILESTATE_NOPVP":          2,
-		"TILESTATE_NOLOGOUT":       4,
-		"TILESTATE_PVPZONE":        8,
-		"TILESTATE_REFRESH":        16,
+		"TILESTATE_PROTECTIONZONE": 1 << 0,
+		"TILESTATE_NOPVPZONE":      1 << 2,
+		"TILESTATE_NOPVP":          1 << 2,
+		"TILESTATE_NOLOGOUT":       1 << 3,
+		"TILESTATE_PVPZONE":        1 << 4,
+		"TILESTATE_TELEPORT":       1 << 11,
+		"TILESTATE_MAGICFIELD":     1 << 12,
+		"TILESTATE_MAILBOX":        1 << 13,
+		"TILESTATE_TRASHHOLDER":    1 << 14,
+		"TILESTATE_BED":            1 << 15,
+		"TILESTATE_DEPOT":          1 << 16,
+		// House is not a distinct OTBM bit (house tiles are stored as protection
+		// zones); a high, never-set bit keeps hasFlag(TILESTATE_HOUSE) false.
+		"TILESTATE_HOUSE": 1 << 30,
 
 		// Item / Tile Properties (CONST_PROP_*)
 		"CONST_PROP_BLOCKSOLID":                0,

@@ -88,15 +88,15 @@ func TestForgeResourceConversionDustToSlivers(t *testing.T) {
 	if p.GetForgeDusts() != 40 {
 		t.Fatalf("dusts = %d, want 40", p.GetForgeDusts())
 	}
-	if got := p.GetForgeSlivers(cat); got != ForgeSliverAmount {
-		t.Fatalf("slivers = %d, want %d", got, ForgeSliverAmount)
+	if got := p.GetForgeSlivers(cat); got != uint32(ForgeSliverAmount()) {
+		t.Fatalf("slivers = %d, want %d", got, ForgeSliverAmount())
 	}
 }
 
 func TestForgeResourceConversionSliversToCore(t *testing.T) {
 	cat := forgeCatalog()
 	p := forgePlayer()
-	addToBackpack(p, &Item{ID: ItemForgeSliver, Count: ForgeCoreCost})
+	addToBackpack(p, &Item{ID: ItemForgeSliver, Count: uint16(ForgeCoreCost())})
 
 	if !p.ForgeResourceConversion(cat, ForgeActionSliverToCore) {
 		t.Fatalf("sliver->core should succeed")

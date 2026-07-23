@@ -118,12 +118,13 @@ func (g *GameProtocol) sendForgingData() {
 	convFusion := map[uint8]uint64{}
 	convTransfer := map[uint8]uint64{}
 
+	maxTier := uint8(game.ForgeMaxItemTier())
 	w.AddByte(byte(len(ids)))
 	for _, id := range ids {
 		tiers := classes[id]
 		w.AddByte(id)
 		w.AddByte(byte(len(tiers)))
-		for t := uint8(1); t <= game.ForgeMaxItemTier; t++ {
+		for t := uint8(1); t <= maxTier; t++ {
 			info, ok := tiers[t]
 			if !ok {
 				continue
@@ -138,7 +139,7 @@ func (g *GameProtocol) sendForgingData() {
 
 	// Exalted core cost per tier.
 	w.AddByte(byte(len(corePrices)))
-	for t := uint8(1); t <= game.ForgeMaxItemTier; t++ {
+	for t := uint8(1); t <= maxTier; t++ {
 		if c, ok := corePrices[t]; ok {
 			w.AddByte(t)
 			w.AddByte(c)
@@ -146,7 +147,7 @@ func (g *GameProtocol) sendForgingData() {
 	}
 	// Convergence fusion prices per tier.
 	w.AddByte(byte(len(convFusion)))
-	for t := uint8(1); t <= game.ForgeMaxItemTier; t++ {
+	for t := uint8(1); t <= maxTier; t++ {
 		if p, ok := convFusion[t]; ok {
 			w.AddByte(t - 1)
 			w.AddU64(p)
@@ -154,26 +155,26 @@ func (g *GameProtocol) sendForgingData() {
 	}
 	// Convergence transfer prices per tier.
 	w.AddByte(byte(len(convTransfer)))
-	for t := uint8(1); t <= game.ForgeMaxItemTier; t++ {
+	for t := uint8(1); t <= maxTier; t++ {
 		if p, ok := convTransfer[t]; ok {
 			w.AddByte(t)
 			w.AddU64(p)
 		}
 	}
 
-	w.AddByte(game.ForgeCostOneSliver)           // dust cost of 1 sliver batch input
-	w.AddByte(game.ForgeSliverAmount)            // slivers produced
-	w.AddByte(game.ForgeCoreCost)                // slivers per core
-	w.AddByte(game.ForgeDustLevelBase)           // dustLevel - this = increase cost
-	w.AddU16(g.player.GetForgeDustLevel())       // current stored dust limit
-	w.AddU16(game.ForgeMaxDust)                  // max stored dust limit
-	w.AddByte(game.ForgeFusionDustCost)          // normal fusion dust
-	w.AddByte(game.ForgeConvergenceFusionCost)   // convergence fusion dust
-	w.AddByte(game.ForgeTransferDustCost)        // normal transfer dust
-	w.AddByte(game.ForgeConvergenceTransferCost) // convergence transfer dust
-	w.AddByte(game.ForgeBaseSuccessRate)         // base success rate
-	w.AddByte(game.ForgeBonusSuccessRate)        // core bonus success rate
-	w.AddByte(game.ForgeTierLossReduction)       // tier-loss chance after reduction
+	w.AddByte(byte(game.ForgeCostOneSliver()))           // dust cost of 1 sliver batch input
+	w.AddByte(byte(game.ForgeSliverAmount()))            // slivers produced
+	w.AddByte(byte(game.ForgeCoreCost()))                // slivers per core
+	w.AddByte(game.ForgeDustLevelBase)                   // dustLevel - this = increase cost
+	w.AddU16(g.player.GetForgeDustLevel())               // current stored dust limit
+	w.AddU16(uint16(game.ForgeMaxDust()))                // max stored dust limit
+	w.AddByte(byte(game.ForgeFusionDustCost()))          // normal fusion dust
+	w.AddByte(byte(game.ForgeConvergenceFusionCost()))   // convergence fusion dust
+	w.AddByte(byte(game.ForgeTransferDustCost()))        // normal transfer dust
+	w.AddByte(byte(game.ForgeConvergenceTransferCost())) // convergence transfer dust
+	w.AddByte(byte(game.ForgeBaseSuccessRate()))         // base success rate
+	w.AddByte(byte(game.ForgeBonusSuccessRate()))        // core bonus success rate
+	w.AddByte(byte(game.ForgeTierLossReduction()))       // tier-loss chance after reduction
 
 	g.SendToClient(w)
 	g.sendForgeResources()
@@ -200,7 +201,7 @@ func (g *GameProtocol) sendOpenForge() {
 		return
 	}
 	cat := g.deps.Items
-	maxConfigTier := uint8(game.ForgeMaxItemTier)
+	maxConfigTier := uint8(game.ForgeMaxItemTier())
 
 	fusion := forgeInfoMap{}
 	donor := forgeInfoMap{}

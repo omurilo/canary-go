@@ -2,6 +2,8 @@ package game
 
 import (
 	"sync"
+
+	"github.com/opentibiabr/canary-go/internal/config"
 )
 
 type PreyBonusType byte
@@ -106,11 +108,23 @@ func (pp *PlayerPrey) TickStamina(seconds uint16) {
 	}
 }
 
-// GetPreyRerollPrice returns gold cost per level to reroll list.
+// GetPreyRerollPrice returns the gold cost to reroll the prey list, mirroring
+// Player::getPreyRerollPrice (level * preyRerollPricePerLevel; config.lua, 200).
 func (p *Player) GetPreyRerollPrice() uint32 {
-	lvl := p.Level
-	if lvl < 1 {
-		lvl = 1
+	return uint32(p.Level) * uint32(config.Number("preyRerollPricePerLevel", 200))
+}
+
+// PreyBonusPercentage returns the bonus percentage for a bonus type at a rarity,
+// mirroring PreySlot::reloadBonusValue: Damage 2*r+5, Defense 2*r+10,
+// XP/Loot 3*r+10.
+func PreyBonusPercentage(bonusType PreyBonusType, rarity uint8) uint16 {
+	r := uint16(rarity)
+	switch bonusType {
+	case PreyBonus_DamageBoost:
+		return 2*r + 5
+	case PreyBonus_DamageReduction:
+		return 2*r + 10
+	default: // XP / Loot
+		return 3*r + 10
 	}
-	return uint32(lvl * 20)
 }

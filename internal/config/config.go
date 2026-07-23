@@ -14,6 +14,45 @@ import (
 // Active is a package-level variable holding the currently loaded configuration.
 var Active *Config = Default()
 
+// normalizeKey matches the key transform applied when populating Custom
+// (lower-cased, underscores stripped), so callers can use the config.lua name.
+func normalizeKey(key string) string {
+	return strings.ReplaceAll(strings.ToLower(key), "_", "")
+}
+
+// Number returns the integer value of a config.lua key (by its config.lua name),
+// or def when the key is absent or not numeric. Mirrors g_configManager().getNumber.
+func (c *Config) Number(key string, def int64) int64 {
+	if c == nil || c.Custom == nil {
+		return def
+	}
+	if v, ok := c.Custom[normalizeKey(key)]; ok {
+		if n, ok := v.(lua.LNumber); ok {
+			return int64(n)
+		}
+	}
+	return def
+}
+
+// Bool returns the boolean value of a config.lua key, or def when absent.
+func (c *Config) Bool(key string, def bool) bool {
+	if c == nil || c.Custom == nil {
+		return def
+	}
+	if v, ok := c.Custom[normalizeKey(key)]; ok {
+		if b, ok := v.(lua.LBool); ok {
+			return bool(b)
+		}
+	}
+	return def
+}
+
+// Number reads an integer config value from the active configuration.
+func Number(key string, def int64) int64 { return Active.Number(key, def) }
+
+// Bool reads a boolean config value from the active configuration.
+func Bool(key string, def bool) bool { return Active.Bool(key, def) }
+
 // Config holds the subset of settings the Go server currently uses. Unknown
 // keys in config.lua are simply ignored.
 type Config struct {
@@ -41,7 +80,7 @@ type Config struct {
 	RSAKeyFile string
 	WorldFile  string
 
-	Custom     map[string]lua.LValue
+	Custom map[string]lua.LValue
 }
 
 // Default returns a config with sane defaults for local development.
@@ -71,7 +110,7 @@ func Default() *Config {
 // not fatal: defaults + env still apply.
 func Load(path string) (*Config, error) {
 	cfg := Default()
-	
+
 	// Support sharing the configuration with the C++ server in the root directory.
 	// If the default "config.lua" is used, check if there's a "../config.lua" first.
 	resolvedPath := path

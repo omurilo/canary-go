@@ -1,8 +1,10 @@
 package game
 
 import (
+	"fmt"
 	"math/rand"
 
+	"github.com/opentibiabr/canary-go/internal/config"
 	"github.com/opentibiabr/canary-go/internal/items"
 )
 
@@ -38,25 +40,37 @@ const (
 	ItemExaltationChest uint16 = 37561
 )
 
-// Forge configuration constants. Values mirror the shipped config.lua.dist
-// defaults (Go does not parse config.lua.dist for these yet).
-const (
-	ForgeMaxItemTier             = 10
-	ForgeCostOneSliver           = 20
-	ForgeSliverAmount            = 3
-	ForgeCoreCost                = 50
-	ForgeMaxDust                 = 225
-	ForgeFusionDustCost          = 100
-	ForgeConvergenceFusionCost   = 130
-	ForgeTransferDustCost        = 100
-	ForgeConvergenceTransferCost = 160
-	ForgeBaseSuccessRate         = 50
-	ForgeBonusSuccessRate        = 15
-	ForgeTierLossReduction       = 50
-	// ForgeDustLevelBase is subtracted from the current dust level to get the
-	// dust cost of raising the stored-dust limit by one (C++: dustLevel - 75).
-	ForgeDustLevelBase = 75
-)
+// Forge configuration is read from config.lua (same keys as the C++
+// g_configManager), falling back to the shipped config.lua.dist defaults. The
+// only hardcoded value is ForgeDustLevelBase (75), which the C++ hardcodes too.
+const ForgeDustLevelBase = 75
+
+func ForgeMaxItemTier() int   { return int(config.Number("forgeMaxItemTier", 10)) }
+func ForgeCostOneSliver() int { return int(config.Number("forgeCostOneSliver", 20)) }
+func ForgeSliverAmount() int  { return int(config.Number("forgeSliverAmount", 3)) }
+func ForgeCoreCost() int      { return int(config.Number("forgeCoreCost", 50)) }
+func ForgeMaxDust() int       { return int(config.Number("forgeMaxDust", 225)) }
+func ForgeFusionDustCost() int {
+	return int(config.Number("forgeFusionDustCost", 100))
+}
+func ForgeConvergenceFusionCost() int {
+	return int(config.Number("forgeConvergenceFusionDustCost", 130))
+}
+func ForgeTransferDustCost() int {
+	return int(config.Number("forgeTransferDustCost", 100))
+}
+func ForgeConvergenceTransferCost() int {
+	return int(config.Number("forgeConvergenceTransferCost", 160))
+}
+func ForgeBaseSuccessRate() int {
+	return int(config.Number("forgeBaseSuccessRate", 50))
+}
+func ForgeBonusSuccessRate() int {
+	return int(config.Number("forgeBonusSuccessRate", 15))
+}
+func ForgeTierLossReduction() int {
+	return int(config.Number("forgeTierLossReduction", 50))
+}
 
 // ForgeTierPrice holds the gold/core costs to reach a given tier for a
 // classification, mirroring ItemClassification::Tier.
@@ -213,9 +227,10 @@ func (p *Player) GetForgeDustLevel() uint16 {
 
 // AddForgeDustLevel raises the stored-dust limit, capped at ForgeMaxDust.
 func (p *Player) AddForgeDustLevel(amount uint16) {
+	maxDust := uint16(ForgeMaxDust())
 	p.ForgeDustLevel = p.GetForgeDustLevel() + amount
-	if p.ForgeDustLevel > ForgeMaxDust {
-		p.ForgeDustLevel = ForgeMaxDust
+	if p.ForgeDustLevel > maxDust {
+		p.ForgeDustLevel = maxDust
 	}
 }
 
@@ -229,9 +244,54 @@ func (p *Player) GetForgeCores(cat *items.Catalog) uint32 {
 	return p.GetItemTypeCount(cat, ItemForgeCore, -1)
 }
 
-// AddForgeHistory appends an entry to the forge log.
+// AddForgeHistory appends an entry to the forge log, building its human-readable
+// description first (mirrors Player::registerForgeHistoryDescription).
 func (p *Player) AddForgeHistory(h ForgeHistory) {
+	if h.Description == "" {
+		h.Description = h.describe()
+	}
 	p.ForgeHistory = append(p.ForgeHistory, h)
+}
+
+// describe builds the history entry text shown in the 0x88 window, condensed
+// from Player::registerForgeHistoryDescription.
+func (h ForgeHistory) describe() string {
+	conv := ""
+	if h.Convergence {
+		conv = " (convergence)"
+	}
+	switch h.ActionType {
+	case ForgeActionFusion:
+		outcome := "Unsuccessful"
+		if h.Success {
+			outcome = "Successful"
+		}
+		secondFate := "consumed"
+		if h.Bonus == 8 {
+			secondFate = "unchanged"
+		}
+		gold := h.Cost
+		if h.Bonus == 3 { // gold refunded by the bonus
+			gold = 0
+		}
+		return fmt.Sprintf(
+			"%s fusion%s — %s (tier %d) + %s. First item: tier +1, second item: %s. Invested: %d cores, %d dust, %d gold.",
+			outcome, conv, h.FirstItemName, h.Tier, h.SecondItemName, secondFate,
+			h.CoresCost, h.DustCost, gold,
+		)
+	case ForgeActionTransfer:
+		return fmt.Sprintf(
+			"Transfer%s — moved tier %d from %s to %s. Invested: %d gold.",
+			conv, h.Tier, h.FirstItemName, h.SecondItemName, h.Cost,
+		)
+	case ForgeActionDustToSliver:
+		return fmt.Sprintf("Converted %d dust into %d slivers.", h.Cost, h.Gained)
+	case ForgeActionSliverToCore:
+		return fmt.Sprintf("Converted %d slivers into %d exalted core.", h.Cost, h.Gained)
+	case ForgeActionIncreaseLimit:
+		return fmt.Sprintf("Increased the dust limit (from %d) for %d dust.", h.Gained, h.Cost)
+	}
+	return ""
 }
 
 // --- Item lookup / classification ---
@@ -323,9 +383,9 @@ func (p *Player) ForgeFuseItems(cat *items.Catalog, firstItemID uint16, tier uin
 	if reduceTierLoss {
 		coreCount++
 	}
-	finalRate := ForgeBaseSuccessRate
+	finalRate := ForgeBaseSuccessRate()
 	if usedCore {
-		finalRate += ForgeBonusSuccessRate
+		finalRate += ForgeBonusSuccessRate()
 	}
 	success := rand.Intn(100)+1 <= finalRate
 	bonus := uint8(0)
@@ -360,9 +420,9 @@ func (p *Player) applyFusion(cat *items.Catalog, firstItemID uint16, tier uint8,
 	}
 	classification := itemClassificationOf(cat, firstItemID)
 
-	dustCost := uint64(ForgeFusionDustCost)
+	dustCost := uint64(ForgeFusionDustCost())
 	if convergence {
-		dustCost = ForgeConvergenceFusionCost
+		dustCost = uint64(ForgeConvergenceFusionCost())
 	}
 
 	// Pre-validate resources (read-only) before mutating anything.
@@ -455,7 +515,7 @@ func (p *Player) applyFusion(cat *items.Catalog, firstItemID uint16, tier uint8,
 			// Failure: roll tier loss (reduced chance when reduceTierLoss).
 			lossChance := 100
 			if reduceTierLoss {
-				lossChance = ForgeTierLossReduction
+				lossChance = ForgeTierLossReduction()
 			}
 			isTierLost := rand.Intn(100)+1 <= lossChance
 			if isTierLost {
@@ -524,9 +584,9 @@ func (p *Player) ForgeTransferItemTier(cat *items.Catalog, donorItemID uint16, t
 		return res
 	}
 
-	dustCost := uint64(ForgeTransferDustCost)
+	dustCost := uint64(ForgeTransferDustCost())
 	if convergence {
-		dustCost = ForgeConvergenceTransferCost
+		dustCost = uint64(ForgeConvergenceTransferCost())
 	}
 	if p.GetForgeDusts() < dustCost {
 		res.Err = "You do not have enough dust."
@@ -599,33 +659,35 @@ func (p *Player) ForgeTransferItemTier(cat *items.Catalog, donorItemID uint16, t
 func (p *Player) ForgeResourceConversion(cat *items.Catalog, actionType uint8) bool {
 	switch actionType {
 	case ForgeActionDustToSliver:
-		cost := uint64(ForgeCostOneSliver * ForgeSliverAmount)
+		sliverAmount := uint32(ForgeSliverAmount())
+		cost := uint64(ForgeCostOneSliver()) * uint64(sliverAmount)
 		if p.GetForgeDusts() < cost {
 			return false
 		}
-		if _, ok := p.InternalAddItem(cat, ItemForgeSliver, ForgeSliverAmount, -1, ConstSlotWhereever); !ok {
+		if _, ok := p.InternalAddItem(cat, ItemForgeSliver, sliverAmount, -1, ConstSlotWhereever); !ok {
 			return false
 		}
 		p.RemoveForgeDusts(cost)
-		p.AddForgeHistory(ForgeHistory{ActionType: actionType, Success: true, Cost: cost, Gained: ForgeSliverAmount})
+		p.AddForgeHistory(ForgeHistory{ActionType: actionType, Success: true, Cost: cost, Gained: uint64(sliverAmount)})
 		return true
 
 	case ForgeActionSliverToCore:
-		if p.GetForgeSlivers(cat) < ForgeCoreCost {
+		coreCost := uint32(ForgeCoreCost())
+		if p.GetForgeSlivers(cat) < coreCost {
 			return false
 		}
-		if !p.RemoveItemOfType(cat, ItemForgeSliver, ForgeCoreCost, -1, false) {
+		if !p.RemoveItemOfType(cat, ItemForgeSliver, coreCost, -1, false) {
 			return false
 		}
 		if _, ok := p.InternalAddItem(cat, ItemForgeCore, 1, -1, ConstSlotWhereever); !ok {
 			return false
 		}
-		p.AddForgeHistory(ForgeHistory{ActionType: actionType, Success: true, Cost: ForgeCoreCost, Gained: 1})
+		p.AddForgeHistory(ForgeHistory{ActionType: actionType, Success: true, Cost: uint64(coreCost), Gained: 1})
 		return true
 
 	case ForgeActionIncreaseLimit:
 		level := p.GetForgeDustLevel()
-		if level >= ForgeMaxDust {
+		if level >= uint16(ForgeMaxDust()) {
 			return false
 		}
 		upgradeCost := uint64(level) - ForgeDustLevelBase

@@ -7,24 +7,6 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
-// getCIPVocation maps server OT vocation ID to CIP client vocation ID used in Wheel UI packets.
-// Server OT Vocations: 1=Sorcerer, 2=Druid, 3=Paladin, 4=Knight (and 5..8 for promoted).
-// CIP Client Vocations: 1=Knight, 2=Paladin, 3=Sorcerer, 4=Druid.
-func getCIPVocation(vocation uint16) byte {
-	switch vocation {
-	case 1, 5: // Sorcerer / Master Sorcerer
-		return 3
-	case 2, 6: // Druid / Elder Druid
-		return 4
-	case 3, 7: // Paladin / Royal Paladin
-		return 2
-	case 4, 8: // Knight / Elite Knight
-		return 1
-	default:
-		return 1 // Fallback
-	}
-}
-
 // getSupremeModifiers returns the exact WheelGemSupremeModifier_t enum values per vocation matching C++ modsSupremePositionByVocation.
 func getSupremeModifiers(vocation uint16) []byte {
 	switch vocation {
@@ -144,8 +126,10 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	wheel := g.player.GetWheel()
 	wheel.SetVocation(game.CIPVocation(g.player.Vocation))
 
-	// Vocation check: Vocation 0 (no vocation) cannot use Wheel of Destiny
-	canUse := g.player.Vocation > 0
+	// Mirrors PlayerWheel::canOpenWheel: needs a vocation and level > 50. (C++
+	// also requires premium + promotion; Go models neither yet, so those are
+	// intentionally lenient.)
+	canUse := g.player.Vocation > 0 && g.player.Level > 50
 
 	w := netmsg.NewWriter()
 	w.AddByte(0x5F) // Wheel window response opcode
@@ -160,9 +144,9 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	w.AddByte(1)                // canUse = true
 	w.AddByte(g.wheelOptions()) // options: 1 in a temple PZ (can decrease), else 2
 
-	// Map OT vocation ID to CIP client vocation ID
-	vocationByte := getCIPVocation(g.player.Vocation)
-	w.AddByte(vocationByte)
+	// Map OT vocation ID to CIP client vocation ID (handles Monk → 5), matching
+	// getPlayerVocationEnum.
+	w.AddByte(game.CIPVocation(g.player.Vocation))
 
 	// First field is the base points (level-derived, excluding extras); the
 	// second is the extra points. Mirrors getWheelPoints(false) + getExtraPoints.

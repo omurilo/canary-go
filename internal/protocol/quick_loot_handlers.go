@@ -103,8 +103,8 @@ func (g *GameProtocol) SendLootContainers() {
 
 	w.AddByte(containerCount)
 	for i := uint8(0); i <= 31; i++ {
-		lootPos, hasLoot := g.player.ManagedContainers[i]
-		obtainPos, hasObtain := g.player.ManagedObtainContainers[i]
+		lootID, hasLoot := g.player.ManagedContainers[i]
+		obtainID, hasObtain := g.player.ManagedObtainContainers[i]
 		
 		if !hasLoot && !hasObtain {
 			continue
@@ -112,27 +112,10 @@ func (g *GameProtocol) SendLootContainers() {
 		
 		w.AddByte(i) // category
 
-		var lootItemID, obtainItemID uint16
-		
-		// Map positions to items (stub logic: just rely on the tile top item if any)
-		if hasLoot {
-			if t := g.deps.World.Map.GetTile(lootPos); t != nil && len(t.Items) > 0 {
-				if it := t.Items[len(t.Items)-1]; it.IsContainer(g.deps.World.Items) {
-					lootItemID = it.ID
-				}
-			}
-		}
-		
-		if hasObtain {
-			if t := g.deps.World.Map.GetTile(obtainPos); t != nil && len(t.Items) > 0 {
-				if it := t.Items[len(t.Items)-1]; it.IsContainer(g.deps.World.Items) {
-					obtainItemID = it.ID
-				}
-			}
-		}
-
-		w.AddU16(lootItemID)
-		w.AddU16(obtainItemID)
+		// Managed containers are stored by their container item id, so report it
+		// directly (no map-tile lookup — loot containers live in the inventory).
+		w.AddU16(lootID)
+		w.AddU16(obtainID)
 	}
 
 	g.player.Session.SendToClient(w)

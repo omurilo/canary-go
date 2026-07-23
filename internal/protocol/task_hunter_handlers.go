@@ -7,7 +7,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
-// parseTaskHuntingAction handles Opcode 0xED (Task Hunting Action).
+// parseTaskHuntingAction handles Opcode 0xBA (Task Hunting Action).
 func (g *GameProtocol) parseTaskHuntingAction(r *netmsg.Reader) {
 	if g.player == nil {
 		return
@@ -40,19 +40,18 @@ func (g *GameProtocol) parseTaskHuntingAction(r *netmsg.Reader) {
 		// Select from full list using cards
 		slot.State = game.PreyTaskDataState_Selection
 	case 3: // MonsterSelection
-		slot.SelectedRaceID = raceID
-		slot.Upgrade = upgrade
-		slot.CurrentKills = 0
-		// Should depend on difficulty and rarity; defaulting to 200 for now
-		slot.TargetKills = 200
-		slot.State = game.PreyTaskDataState_Active
+		// Difficulty/rarity would come from the monster's bestiary stars; until
+		// that is modeled StartTask defaults to Easy/1 and derives TargetKills
+		// from the option table (no more hardcoded 200).
+		slot.StartTask(raceID, slot.Difficulty, slot.Rarity, upgrade)
 	case 4: // Cancel
 		slot.State = game.PreyTaskDataState_Selection
 		slot.CurrentKills = 0
 	case 5: // Claim
 		if slot.State == game.PreyTaskDataState_Completed {
-			// Calculate points: base (10) + difficulty multiplier. Using flat 10 for now as stub.
-			taskHunter.Points += 10 
+			if reward, ok := slot.ClaimReward(); ok {
+				g.player.AddTaskHuntingPoints(uint32(reward))
+			}
 			slot.State = game.PreyTaskDataState_Selection
 			slot.CurrentKills = 0
 		}
