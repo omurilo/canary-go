@@ -337,7 +337,7 @@ func (p *Player) ensureDefaults() {
 		p.Level = 1
 	}
 	if p.Capacity == 0 {
-		p.Capacity = 400
+		p.Capacity = 40000
 	}
 	if p.FightMode == 0 {
 		p.FightMode = 1 // offensive

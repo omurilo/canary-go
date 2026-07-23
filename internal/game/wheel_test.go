@@ -86,8 +86,8 @@ func TestPlayer_MaxHealthWithWheel(t *testing.T) {
 	}
 
 	// Capacity with Wheel (+100 oz = 10000 hundredths)
-	player.Capacity = 1000
-	if cap := player.GetCapacity(); cap != 11000 {
-		t.Errorf("expected 11000 Capacity with Wheel, got %d", cap)
+	player.Capacity = 10000
+	if cap := player.GetCapacity(); cap != 20000 {
+		t.Errorf("expected 20000 Capacity with Wheel, got %d", cap)
 	}
 }

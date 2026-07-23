@@ -64,7 +64,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		return nil, err
 	}
 
-	p.Capacity = capValue
+	p.Capacity = capValue * 100
 	p.Outfit = game.Outfit{
 		LookType:  lookType,
 		Head:      uint8(lookHead),
@@ -190,7 +190,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	           WHERE id=?`
 	_, err := d.SQL.ExecContext(ctx, q,
 		p.Level, p.Experience, p.Health, p.MaxHealth,
-		p.Mana, p.MaxMana, p.Soul, p.Capacity, p.BankBalance,
+		p.Mana, p.MaxMana, p.Soul, p.Capacity / 100, p.BankBalance,
 		p.Pos.X, p.Pos.Y, p.Pos.Z,
 		p.Outfit.LookType, p.Outfit.Head, p.Outfit.Body, p.Outfit.Legs,
 		p.Outfit.Feet, p.Outfit.Addons,
