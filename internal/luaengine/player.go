@@ -3202,7 +3202,12 @@ func playerSendoutfitwindow(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	if p.Session != nil {
+		if s, ok := p.Session.(interface{ SendOutfitWindow() }); ok {
+			s.SendOutfitWindow()
+		}
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 

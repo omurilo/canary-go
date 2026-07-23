@@ -694,6 +694,10 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseInspectionObject(r)
 	case 0xCE:
 		g.parseInspectPlayer(r)
+	case 0xD2:
+		g.SendOutfitWindow()
+	case 0xD3:
+		g.parseSetOutfit(r)
 	case 0xE5:
 		g.parseCyclopediaCharacterInfo(r)
 	case 0xEA:

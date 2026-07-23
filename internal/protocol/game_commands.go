@@ -110,6 +110,8 @@ func (g *GameProtocol) handleCommand(text string) bool {
 		g.cmdSave()
 	case "b", "broadcast":
 		g.cmdBroadcast(args)
+	case "outfit":
+		g.SendOutfitWindow()
 	case "commands", "help":
 		g.sendStatusText("Commands: /pos /goto x y z /up /down /town <name> /i <id> [count] /addskill <skill> [n] /save /b <text>")
 	default:

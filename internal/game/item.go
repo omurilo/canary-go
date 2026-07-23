@@ -156,6 +156,7 @@ type Outfit struct {
 	MountBody  uint8
 	MountLegs  uint8
 	MountFeet  uint8
+	FamiliarsType uint16
 }
 
 // GetWeight returns the total weight of the item (and its contents if it's a container).
