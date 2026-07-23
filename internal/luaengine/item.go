@@ -149,6 +149,19 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			L.Push(lua.LNumber(it.item.ID))
 			return 1 
 		},
+		"getName": func(L *lua.LState) int {
+			it := checkItem(L)
+			if it.item != nil {
+				if cat := e.itemCatalog(); cat != nil {
+					if ct := cat.Get(it.item.ID); ct != nil && ct.Name != "" {
+						L.Push(lua.LString(ct.Name))
+						return 1
+					}
+				}
+			}
+			L.Push(lua.LString(""))
+			return 1
+		},
 		"getCount": func(L *lua.LState) int {
 			it := checkItem(L)
 			L.Push(lua.LNumber(it.item.Count))

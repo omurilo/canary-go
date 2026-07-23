@@ -14,13 +14,14 @@ function tileInfo.onSay(player, words, param)
 
 	local ground = tile:getGround()
 	if ground then
-		text = text .. string.format("[Ground] ID: %d | AID: %d | UID: %d\n", ground:getId(), ground:getActionId(), ground:getUniqueId())
+		local gName = ItemType(ground:getId()):getName()
+		text = text .. string.format("[Ground] %s (ID: %d, AID: %d, UID: %d)\n", gName, ground:getId(), ground:getActionId(), ground:getUniqueId())
 	end
 
 	local items = tile:getItems()
 	if items and #items > 0 then
 		for _, item in ipairs(items) do
-			local name = item:getName()
+			local name = ItemType(item:getId()):getName()
 			if name == "" then name = "Item" end
 			text = text .. string.format("[%s] ID: %d | AID: %d | UID: %d\n", name, item:getId(), item:getActionId(), item:getUniqueId())
 		end
