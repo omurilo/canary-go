@@ -237,6 +237,18 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			L.Push(lua.LNumber(count))
 			return 1
 		},
+		"getItems": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			tbl := L.NewTable()
+			for i, it := range t.tile.Items {
+				ud := L.NewUserData()
+				ud.Value = it
+				L.SetMetatable(ud, L.GetTypeMetatable(itemTypeName))
+				tbl.RawSetInt(i+1, ud)
+			}
+			L.Push(tbl)
+			return 1
+		},
 		"getThingCount": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			count := len(t.tile.Items) + len(t.tile.Creatures)

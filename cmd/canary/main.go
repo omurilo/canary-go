@@ -384,6 +384,8 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Warn("loading npcs", "err", err)
 	}
 
+	lengine.RunStartupGlobalEvents()
+
 	eventsEngine := events.NewEngine(lengine.L)
 
 	spawnEngine.Start()
