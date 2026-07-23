@@ -27,6 +27,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	                  p.skill_fishing, p.skill_fishing_tries,
 	                  p.offlinetraining_time, p.offlinetraining_skill,
 	                  p.forge_dusts, p.forge_dust_level,
+	                  p.task_points, p.quickloot_fallback,
 	                  p.lastlogin, p.lastlogout,
 	                  p.blessings1, p.blessings2, p.blessings3, p.blessings4,
 	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8
@@ -39,6 +40,8 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	var posx, posy uint16
 	var posz uint8
 	var offlineTimeSeconds int32
+	var taskPoints uint32
+	var quickLootFallback bool
 	err := d.SQL.QueryRowContext(ctx, q, name).Scan(
 		&p.DBID, &p.AccountID, &p.AccountType, &p.GroupID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
 		&p.Health, &p.MaxHealth, &p.Mana, &p.MaxMana, &p.Experience,
@@ -54,6 +57,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		&p.Skills[game.SkillFishing], &p.SkillTries[game.SkillFishing],
 		&offlineTimeSeconds, &p.OfflineTrainingSkill,
 		&p.ForgeDusts, &p.ForgeDustLevel,
+		&taskPoints, &quickLootFallback,
 		&p.LastLogin, &p.LastLogout,
 		&p.Blessings[0], &p.Blessings[1], &p.Blessings[2], &p.Blessings[3],
 		&p.Blessings[4], &p.Blessings[5], &p.Blessings[6], &p.Blessings[7],
@@ -67,6 +71,8 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	}
 
 	p.Capacity = capValue * 100
+	p.GetTaskHunter().Points = taskPoints
+	p.QuickLootFallbackToMain = quickLootFallback
 	p.Outfit = game.Outfit{
 		LookType:  lookType,
 		Head:      uint8(lookHead),
@@ -115,6 +121,8 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 
 	// Load Wheel of Destiny slot allocations
 	_ = d.LoadPlayerWheel(ctx, p)
+	_ = d.LoadPlayerPrey(ctx, p)
+	_ = d.LoadPlayerTaskHunter(ctx, p)
 
 	return p, nil
 }
@@ -190,6 +198,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	              offlinetraining_time=?, offlinetraining_skill=?,
 	              lastlogin=?, lastlogout=?,
 	              forge_dusts=?, forge_dust_level=?,
+	              task_points=?, quickloot_fallback=?,
 	              blessings1=?, blessings2=?, blessings3=?, blessings4=?,
 	              blessings5=?, blessings6=?, blessings7=?, blessings8=?
 	           WHERE id=?`
@@ -210,6 +219,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		p.OfflineTrainingTime / 1000, p.OfflineTrainingSkill,
 		p.LastLogin, p.LastLogout,
 		p.ForgeDusts, p.GetForgeDustLevel(),
+		p.GetTaskHunter().Points, p.QuickLootFallbackToMain,
 		p.Blessings[0], p.Blessings[1], p.Blessings[2], p.Blessings[3],
 		p.Blessings[4], p.Blessings[5], p.Blessings[6], p.Blessings[7],
 		p.DBID,
@@ -229,8 +239,10 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		}
 	}
 
-	// Save Wheel of Destiny
+	// Save Wheel of Destiny, Prey and Task Hunting slots.
 	_ = d.SavePlayerWheel(ctx, p)
+	_ = d.SavePlayerPrey(ctx, p)
+	_ = d.SavePlayerTaskHunter(ctx, p)
 
 	return d.SavePlayerItems(ctx, p)
 }
