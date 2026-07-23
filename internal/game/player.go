@@ -136,6 +136,10 @@ type Player struct {
 	// Wheel of Destiny progression tree
 	Wheel *WheelOfDestiny
 
+	// Prey & Task Hunting systems
+	Prey       *PlayerPrey
+	TaskHunter *PlayerTaskHunter
+
 	// Inventory holds equipment slots 1..10 (CONST_SLOT_HEAD..CONST_SLOT_AMMO);
 	// index 0 is unused. Slot 11 (store inbox, CONST_SLOT_LAST) is intentionally
 	// omitted. Persistence of these is a later milestone.
@@ -1189,6 +1193,28 @@ func skillNameOf(skill Skill) string {
 		return "fishing"
 	}
 	return "skill"
+}
+
+func (p *Player) GetPrey() *PlayerPrey {
+	if p.Prey == nil {
+		p.Prey = NewPlayerPrey()
+	}
+	return p.Prey
+}
+
+func (p *Player) GetTaskHunter() *PlayerTaskHunter {
+	if p.TaskHunter == nil {
+		p.TaskHunter = NewPlayerTaskHunter()
+	}
+	return p.TaskHunter
+}
+
+func (p *Player) GetPreyCards() uint32 {
+	return 5 // Default initial prey cards
+}
+
+func (p *Player) GetTaskHuntingPoints() uint32 {
+	return p.GetTaskHunter().Points
 }
 
 

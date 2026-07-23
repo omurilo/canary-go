@@ -651,14 +651,21 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	// (src/creatures/creature.cpp:609-656, player.cpp:3560).
 	if m, ok := victim.(*Monster); ok {
 		if p, ok := killer.(*Player); ok {
+			var raceID uint16
+			if m.Type != nil {
+				raceID = m.Type.RaceID
+			}
 			if exp := m.Experience(); exp > 0 {
-				// TODO(loot/xp): split experience across all damagers, apply
-				// party sharing and rate/stamina/VIP multipliers.
-				p.AddExperience(exp)
+				finalExp := exp
+				if bonus, ok := p.GetPrey().GetPreyBonus(raceID, PreyBonus_XPBonus); ok {
+					finalExp = uint64(float64(exp) * float64(100+bonus) / 100.0)
+				}
+				p.AddExperience(finalExp)
 				if e.world.OnPlayerStatsChange != nil {
 					e.world.OnPlayerStatsChange(p)
 				}
 			}
+			p.GetTaskHunter().OnKillMonster(raceID)
 		}
 	}
 
