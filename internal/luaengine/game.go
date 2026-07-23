@@ -102,9 +102,79 @@ func (e *Engine) registerGame() {
 
 
 func (e *Engine) gameGetMonsterTypeByName(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetSpectators(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetBoostedCreature(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetBestiaryList(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetSpectators(L *lua.LState) int {
+	table := L.NewTable()
+	if L.GetTop() == 0 {
+		L.Push(table)
+		return 1
+	}
+
+	centerPos := checkPosition(L, 1)
+	multifloor := L.OptBool(2, false)
+	onlyPlayers := L.OptBool(3, false)
+	minRangeX := uint16(L.OptInt(4, 7))
+	maxRangeX := uint16(L.OptInt(5, 7))
+	minRangeY := uint16(L.OptInt(6, 5))
+	maxRangeY := uint16(L.OptInt(7, 5))
+
+	if e.world == nil || e.world.Map == nil {
+		L.Push(table)
+		return 1
+	}
+
+	var startZ, endZ uint8
+	if multifloor {
+		startZ = 0
+		endZ = 15
+	} else {
+		startZ = centerPos.Z
+		endZ = centerPos.Z
+	}
+
+	var minX, maxX, minY, maxY uint16
+	if centerPos.X >= minRangeX {
+		minX = centerPos.X - minRangeX
+	} else {
+		minX = 0
+	}
+	maxX = centerPos.X + maxRangeX
+
+	if centerPos.Y >= minRangeY {
+		minY = centerPos.Y - minRangeY
+	} else {
+		minY = 0
+	}
+	maxY = centerPos.Y + maxRangeY
+
+	for z := startZ; z <= endZ; z++ {
+		for x := minX; x <= maxX; x++ {
+			for y := minY; y <= maxY; y++ {
+				tile := e.world.Map.GetTile(game.Position{X: x, Y: y, Z: z})
+				if tile == nil {
+					continue
+				}
+				for _, cr := range tile.Creatures {
+					if cr == nil {
+						continue
+					}
+					if onlyPlayers {
+						if _, ok := cr.(*game.Player); !ok {
+							continue
+						}
+					}
+					e.pushCreature(L, cr)
+					table.Append(L.Get(-1))
+					L.Pop(1)
+				}
+			}
+		}
+	}
+
+	L.Push(table)
+	return 1
+}
+func (e *Engine) gameGetBoostedCreature(L *lua.LState) int { L.Push(lua.LNil); return 1 }
+func (e *Engine) gameGetBestiaryList(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetPlayers(L *lua.LState) int {
 	var players []*game.Player
 	if e.world != nil {
@@ -123,18 +193,18 @@ func (e *Engine) gameGetPlayers(L *lua.LState) int {
 }
 func (e *Engine) gameLoadMap(L *lua.LState) int { return 0 }
 func (e *Engine) gameLoadMapChunk(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetExperienceForLevel(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetMonsterCount(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetPlayerCount(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetNpcCount(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetMonsterTypes(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetTowns(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetHouses(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetGameState(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetExperienceForLevel(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
+func (e *Engine) gameGetMonsterCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
+func (e *Engine) gameGetPlayerCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
+func (e *Engine) gameGetNpcCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
+func (e *Engine) gameGetMonsterTypes(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetTowns(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetHouses(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetGameState(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameSetGameState(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetWorldType(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetWorldType(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameSetWorldType(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetReturnMessage(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetReturnMessage(L *lua.LState) int { L.Push(lua.LString("")); return 1 }
 func (e *Engine) gameCreateItem(L *lua.LState) int {
 	id := L.CheckInt(1)
 	count := L.OptInt(2, 1)
@@ -282,15 +352,15 @@ func (e *Engine) gameGetNormalizedPlayerName(L *lua.LState) int {
 	L.Push(lua.LNil)
 	return 1
 }
-func (e *Engine) gameGetNormalizedGuildName(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetNormalizedGuildName(L *lua.LState) int { L.Push(lua.LString("")); return 1 }
 func (e *Engine) gameAddInfluencedMonster(L *lua.LState) int { return 0 }
 func (e *Engine) gameRemoveInfluencedMonster(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetInfluencedMonsters(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetInfluencedMonsters(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameMakeFiendishMonster(L *lua.LState) int { return 0 }
 func (e *Engine) gameRemoveFiendishMonster(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetFiendishMonsters(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetBoostedBoss(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetLadderIds(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetFiendishMonsters(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetBoostedBoss(L *lua.LState) int { L.Push(lua.LString("")); return 1 }
+func (e *Engine) gameGetLadderIds(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetDummies(L *lua.LState) int {
 	dummies := map[uint16]uint16{
 		28558: 100,
@@ -309,17 +379,17 @@ func (e *Engine) gameGetDummies(L *lua.LState) int {
 	L.Push(tbl)
 	return 1
 }
-func (e *Engine) gameGetTalkActions(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetEventCallbacks(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetTalkActions(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetEventCallbacks(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameRegisterAchievement(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetAchievementInfoById(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetAchievementInfoByName(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetSecretAchievements(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetPublicAchievements(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetAchievements(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetSoulCoreItems(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetMonstersByRace(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetMonstersByBestiaryStars(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetAchievementInfoById(L *lua.LState) int { L.Push(lua.LNil); return 1 }
+func (e *Engine) gameGetAchievementInfoByName(L *lua.LState) int { L.Push(lua.LNil); return 1 }
+func (e *Engine) gameGetSecretAchievements(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetPublicAchievements(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetAchievements(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetSoulCoreItems(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetMonstersByRace(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetMonstersByBestiaryStars(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameBroadcastMessage(L *lua.LState) int {
 	message := L.CheckString(1)
 	messageType := L.OptInt(2, 0xB4) // opTextMessage (e.g. MESSAGE_STATUS_WARNING)
