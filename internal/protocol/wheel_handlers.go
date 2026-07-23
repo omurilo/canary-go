@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 
+	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -76,6 +77,13 @@ func (g *GameProtocol) parseOpenWheel(r *netmsg.Reader) {
 // parseSaveWheel handles opcode 0x62 (Save Wheel of Destiny allocations).
 // In Tibia 13.x protocol, the client sends 36 uint16 values representing allocated points for slots 1..36.
 func (g *GameProtocol) parseSaveWheel(r *netmsg.Reader) {
+	g.applyWheelSave(r)
+}
+
+// applyWheelSave reads the 36 slot values and applies them through the validated
+// path (per-slot cap + total budget + adjacency), then persists, recomputes and
+// refreshes. Mirrors PlayerWheel::saveSlotPointsOnPressSaveButton.
+func (g *GameProtocol) applyWheelSave(r *netmsg.Reader) {
 	pointsMap := make(map[uint16]uint16)
 	for slotID := uint16(1); slotID <= 36 && r.Remaining() >= 2; slotID++ {
 		pts := r.GetU16()
@@ -84,7 +92,12 @@ func (g *GameProtocol) parseSaveWheel(r *netmsg.Reader) {
 		}
 	}
 	wheel := g.player.GetWheel()
-	wheel.SaveSlotPoints(pointsMap)
+	wheel.SetVocation(game.CIPVocation(g.player.Vocation))
+	if !wheel.ValidateAndSave(pointsMap, wheel.GetTotalPoints(g.player.Level)) {
+		g.player.SendTextMessage(0x14, "Something went wrong, try relogging and try again.")
+		g.SendWheelOfDestiny()
+		return
+	}
 	if g.deps != nil && g.deps.DB != nil && g.player != nil {
 		_ = g.deps.DB.SavePlayerWheel(context.Background(), g.player)
 	}
@@ -100,26 +113,14 @@ func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
 		g.SendWheelOfDestiny()
 	case 1: // Save Wheel Allocation / Preset
 		_ = r.GetByte() // preset
-		pointsMap := make(map[uint16]uint16)
-		for slotID := uint16(1); slotID <= 36 && r.Remaining() >= 2; slotID++ {
-			pts := r.GetU16()
-			if pts > 0 {
-				pointsMap[slotID] = pts
-			}
-		}
-		wheel := g.player.GetWheel()
-		wheel.SaveSlotPoints(pointsMap)
-		if g.deps != nil && g.deps.DB != nil && g.player != nil {
-			_ = g.deps.DB.SavePlayerWheel(context.Background(), g.player)
-		}
-		g.SendWheelOfDestiny()
-		g.SendStats()
+		g.applyWheelSave(r)
 	}
 }
 
 // SendWheelOfDestiny sends the full Wheel of Destiny payload (Opcode 0x5F) to client.
 func (g *GameProtocol) SendWheelOfDestiny() {
 	wheel := g.player.GetWheel()
+	wheel.SetVocation(game.CIPVocation(g.player.Vocation))
 
 	// Vocation check: Vocation 0 (no vocation) cannot use Wheel of Destiny
 	canUse := g.player.Vocation > 0
@@ -141,9 +142,13 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	vocationByte := getCIPVocation(g.player.Vocation)
 	w.AddByte(vocationByte)
 
-	totalPoints := wheel.GetTotalPoints(g.player.Level)
-
-	w.AddU16(totalPoints)
+	// First field is the base points (level-derived, excluding extras); the
+	// second is the extra points. Mirrors getWheelPoints(false) + getExtraPoints.
+	var basePoints uint16
+	if g.player.Level > 50 {
+		basePoints = uint16(g.player.Level) - 50
+	}
+	w.AddU16(basePoints)
 	w.AddU16(wheel.BonusPoints) // extra points
 
 	// Write slot allocations for 36 slots

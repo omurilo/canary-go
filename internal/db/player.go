@@ -146,7 +146,9 @@ func (d *DB) LoadPlayerWheel(ctx context.Context, p *game.Player) error {
 			pointsMap[uint16(slotID)] = pts
 		}
 	}
-	p.GetWheel().SaveSlotPoints(pointsMap)
+	wheel := p.GetWheel()
+	wheel.SetVocation(game.CIPVocation(p.Vocation))
+	wheel.SaveSlotPoints(pointsMap)
 	return nil
 }
 
