@@ -26,6 +26,12 @@ func (g *GameProtocol) parseForgeEnter(r *netmsg.Reader) {
 	if g.player == nil {
 		return
 	}
+	// Rate-limit forge actions (mirrors Game::playerForge* isUIExhausted), so a
+	// client can't spam fuse/convert faster than the UI cooldown.
+	if g.player.IsUIExhausted(250) {
+		return
+	}
+	g.player.UpdateUIExhausted()
 	actionType := r.GetByte()
 
 	var (

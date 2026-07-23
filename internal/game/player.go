@@ -201,6 +201,10 @@ type Player struct {
 	target      Creature
 	ShopOwnerID uint32 // ID of the NPC currently being traded with
 
+	// lastUIInteraction is the unix-millis timestamp of the last rate-limited UI
+	// action (forge, wheel, ...), mirroring Player::lastUIInteraction.
+	lastUIInteraction int64
+
 	// cooldowns tracks per-spell and per-group spell cooldowns, mirroring the
 	// CONDITION_SPELLCOOLDOWN / CONDITION_SPELLGROUPCOOLDOWN conditions applied
 	// by Spell::applyCooldownConditions (src/creatures/combat/spells.cpp:795).
@@ -1242,6 +1246,18 @@ func (p *Player) GetTaskHunter() *PlayerTaskHunter {
 	}
 	return p.TaskHunter
 }
+
+// IsUIExhausted reports whether a rate-limited UI action happened within the
+// last exhaustionMS milliseconds (default 250), mirroring Player::isUIExhausted.
+func (p *Player) IsUIExhausted(exhaustionMS int64) bool {
+	if exhaustionMS <= 0 {
+		exhaustionMS = 250
+	}
+	return time.Now().UnixMilli()-p.lastUIInteraction < exhaustionMS
+}
+
+// UpdateUIExhausted stamps the current time as the last UI interaction.
+func (p *Player) UpdateUIExhausted() { p.lastUIInteraction = time.Now().UnixMilli() }
 
 // GetPreyCards returns the player's prey-card (wildcard) balance.
 func (p *Player) GetPreyCards() uint32 { return p.PreyCards }
