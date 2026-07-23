@@ -8,33 +8,23 @@ import (
 )
 
 // getSupremeModifiers returns the exact WheelGemSupremeModifier_t enum values per vocation matching C++ modsSupremePositionByVocation.
+// getSupremeModifiers returns the WheelGemSupremeModifier_t enum positions for a
+// vocation (23 entries), transcribed from modsSupreme<Voc>Position keyed by the
+// vocation base id (1=Sorc, 2=Druid, 3=Paladin, 4=Knight, 9=Monk; promotions
+// share the base list). Currently latent (all grades sent as 0), but the
+// positions must match once gems are modeled.
 func getSupremeModifiers(vocation uint16) []byte {
 	switch vocation {
 	case 1, 5: // Sorcerer / Master Sorcerer
-		return []byte{
-			0, 1, 2, 3, 4, 5,
-			43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-		}
+		return []byte{0, 1, 2, 3, 4, 5, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58}
 	case 2, 6: // Druid / Elder Druid
-		return []byte{
-			0, 1, 2, 3, 4, 5,
-			61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77,
-		}
+		return []byte{0, 1, 2, 3, 4, 5, 59, 60, 61, 62, 63, 64, 66, 65, 67, 68, 69, 70, 71, 72, 73, 74, 75}
 	case 3, 7: // Paladin / Royal Paladin
-		return []byte{
-			0, 1, 2, 3, 5,
-			24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
-		}
-	case 4, 8: // Knight / Elite Knight
-		return []byte{
-			0, 1, 2, 3, 5,
-			6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-		}
-	default: // Default Knight fallback
-		return []byte{
-			0, 1, 2, 3, 5,
-			6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-		}
+		return []byte{0, 1, 2, 3, 5, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41}
+	case 9, 10: // Monk / Exalted Monk
+		return []byte{0, 1, 2, 3, 5, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93}
+	default: // Knight / Elite Knight (and fallback)
+		return []byte{0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 14, 16, 17, 19, 18, 20, 21, 22, 23}
 	}
 }
 
