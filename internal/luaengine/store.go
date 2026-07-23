@@ -21,8 +21,10 @@ func (e *Engine) DispatchStorePacket(p *game.Player, opcode byte, data []byte) b
 	L := e.L
 	fn := L.GetGlobal("onRecvbyte")
 	if fn.Type() != lua.LTFunction {
+		e.log.Warn("store packet received but gamestore onRecvbyte is not defined (module not loaded?)", "opcode", opcode)
 		return false
 	}
+	e.log.Info("dispatching store packet to gamestore module", "opcode", opcode)
 
 	playerUd := L.NewUserData()
 	playerUd.Value = game.Creature(p)

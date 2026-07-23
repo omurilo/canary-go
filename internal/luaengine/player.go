@@ -2481,6 +2481,7 @@ func (e *Engine) registerKVStoreType() {
 	ud.Value = gKv
 	e.L.SetMetatable(ud, mt)
 	e.L.SetGlobal("KV", ud)
+	e.L.SetGlobal("kv", ud)
 }
 
 func kvStoreGet(L *lua.LState) int {

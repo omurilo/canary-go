@@ -377,16 +377,22 @@ func run(o runOpts, log *slog.Logger) error {
 	if err := loadScripts(lengine, scriptsDir, log); err != nil {
 		log.Warn("loading scripts", "err", err)
 	}
-	// In-game store: the gamestore Lua module (data/modules/scripts/gamestore)
-	// bootstraps its own libs via dofile/require. It lives outside the scripts
-	// dir, so load its entry point explicitly.
-	gs := filepath.Join(cfg.DataPack, "modules", "scripts", "gamestore", "gamestore.lua")
+	// In-game store: the gamestore Lua module lives under the CORE data dir
+	// (data/modules/scripts/gamestore), not the datapack. It bootstraps its own
+	// libs via dofile/require, so load its entry point explicitly.
+	storeBase := coreData
+	if storeBase == "" {
+		storeBase = cfg.Core
+	}
+	gs := filepath.Join(storeBase, "modules", "scripts", "gamestore", "gamestore.lua")
 	if _, statErr := os.Stat(gs); statErr == nil {
 		if err := lengine.DoFile(gs); err != nil {
 			log.Warn("loading gamestore module", "err", err)
 		} else {
-			log.Info("loaded in-game store module")
+			log.Info("loaded in-game store module", "path", gs)
 		}
+	} else {
+		log.Warn("gamestore module not found", "path", gs)
 	}
 	log.Info("registered actions (lua)", "count", actions.Count())
 	log.Info("registered instant spells (lua)", "count", spells.Count())

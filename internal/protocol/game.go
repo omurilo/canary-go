@@ -412,6 +412,7 @@ func (g *GameProtocol) dispatchStore(op byte, r *netmsg.Reader) {
 		return
 	}
 	data := r.GetBytes(r.Remaining())
+	g.deps.Log.Info("store opcode received", "op", fmt.Sprintf("0x%02X", op), "payloadLen", len(data))
 	g.deps.Lua.DispatchStorePacket(g.player, op, data)
 }
 

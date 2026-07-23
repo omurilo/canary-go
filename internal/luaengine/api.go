@@ -84,19 +84,69 @@ func (e *Engine) registerAPI() {
 
 	// Logger table mirroring the C++ `logger` global.
 	logger := L.NewTable()
-	L.SetField(logger, "info", L.NewFunction(func(L *lua.LState) int {
-		e.log.Info("lua", "msg", L.CheckString(1))
-		return 0
-	}))
-	L.SetField(logger, "warn", L.NewFunction(func(L *lua.LState) int {
-		e.log.Warn("lua", "msg", L.CheckString(1))
-		return 0
-	}))
-	L.SetField(logger, "error", L.NewFunction(func(L *lua.LState) int {
-		e.log.Error("lua", "msg", L.CheckString(1))
-		return 0
-	}))
+	logFunc := func(level string) lua.LGFunction {
+		return func(L *lua.LState) int {
+			top := L.GetTop()
+			if top == 0 {
+				return 0
+			}
+			msg := L.ToString(1)
+			if top > 1 {
+				for i := 2; i <= top; i++ {
+					val := L.ToString(i)
+					if strings.Contains(msg, "{}") {
+						msg = strings.Replace(msg, "{}", val, 1)
+					} else {
+						msg += " " + val
+					}
+				}
+			}
+			switch level {
+			case "trace", "debug":
+				e.log.Debug("lua", "msg", msg)
+			case "info":
+				e.log.Info("lua", "msg", msg)
+			case "warn":
+				e.log.Warn("lua", "msg", msg)
+			case "error":
+				e.log.Error("lua", "msg", msg)
+			}
+			return 0
+		}
+	}
+	L.SetField(logger, "trace", L.NewFunction(logFunc("trace")))
+	L.SetField(logger, "debug", L.NewFunction(logFunc("debug")))
+	L.SetField(logger, "info", L.NewFunction(logFunc("info")))
+	L.SetField(logger, "warn", L.NewFunction(logFunc("warn")))
+	L.SetField(logger, "error", L.NewFunction(logFunc("error")))
 	L.SetGlobal("logger", logger)
+
+	// Item and fluid enums used across Lua scripts
+	L.SetGlobal("HIRELING_LAMP", lua.LNumber(29432))
+	L.SetGlobal("ITEM_STORE_COIN", lua.LNumber(22118))
+	L.SetGlobal("FLUID_NONE", lua.LNumber(0))
+	L.SetGlobal("FLUID_WATER", lua.LNumber(1))
+	L.SetGlobal("FLUID_WINE", lua.LNumber(2))
+	L.SetGlobal("FLUID_BEER", lua.LNumber(3))
+	L.SetGlobal("FLUID_MUD", lua.LNumber(4))
+	L.SetGlobal("FLUID_BLOOD", lua.LNumber(5))
+	L.SetGlobal("FLUID_SLIME", lua.LNumber(6))
+	L.SetGlobal("FLUID_OIL", lua.LNumber(7))
+	L.SetGlobal("FLUID_URINE", lua.LNumber(8))
+	L.SetGlobal("FLUID_MILK", lua.LNumber(9))
+	L.SetGlobal("FLUID_MANA", lua.LNumber(10))
+	L.SetGlobal("FLUID_LIFE", lua.LNumber(11))
+	L.SetGlobal("FLUID_LEMONADE", lua.LNumber(12))
+	L.SetGlobal("FLUID_RUM", lua.LNumber(13))
+	L.SetGlobal("FLUID_FRUITJUICE", lua.LNumber(14))
+	L.SetGlobal("FLUID_COCONUTMILK", lua.LNumber(15))
+	L.SetGlobal("FLUID_MEAD", lua.LNumber(16))
+	L.SetGlobal("FLUID_TEA", lua.LNumber(17))
+	L.SetGlobal("FLUID_INK", lua.LNumber(18))
+
+	// Player sex enums
+	L.SetGlobal("PLAYERSEX_FEMALE", lua.LNumber(0))
+	L.SetGlobal("PLAYERSEX_MALE", lua.LNumber(1))
 
 	e.registerGame()
 	e.registerCreatureType()
@@ -149,7 +199,22 @@ func (e *Engine) registerAPI() {
 		idxTable := L.NewTable()
 		idxMt := L.NewTable()
 		L.SetField(idxMt, "__index", L.NewFunction(func(L *lua.LState) int {
-			L.Push(L.NewFunction(func(L *lua.LState) int { return 0 }))
+			key := L.CheckString(2)
+			L.Push(L.NewFunction(func(L *lua.LState) int {
+				if strings.HasPrefix(key, "count") {
+					L.Push(lua.LNumber(0))
+					return 1
+				}
+				if key == "getPositions" || key == "getZones" || key == "getCreatures" || key == "getPlayers" || key == "getMonsters" {
+					L.Push(L.NewTable())
+					return 1
+				}
+				ud := L.NewUserData()
+				ud.Value = name
+				L.SetMetatable(ud, mt)
+				L.Push(ud)
+				return 1
+			}))
 			return 1
 		}))
 		L.SetMetatable(idxTable, idxMt)

@@ -1,4 +1,7 @@
 -- Custom Modules, created to help us in this datapack
+if not KeywordHandler then
+	dofile(CORE_DIRECTORY .. "/npclib/npc_system/keyword_handler.lua")
+end
 local travelDiscounts = {
 	["postman"] = { price = 10, storage = Storage.Quest.ExampleQuest, value = 1 },
 }
