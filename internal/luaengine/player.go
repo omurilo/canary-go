@@ -490,7 +490,8 @@ func playerAddforgedustlevel(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	p.AddForgeDustLevel(uint16(L.CheckInt(2)))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -499,7 +500,8 @@ func playerAddforgedusts(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	p.AddForgeDusts(uint64(L.CheckInt(2)))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -1267,7 +1269,9 @@ func playerGetforgecores(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	// Cores are inventory items; this free binding has no catalog handle, so it
+	// reports 0. The core forge flow reads the real count via the protocol layer.
+	L.Push(lua.LNumber(0))
 	return 1
 }
 
@@ -1277,7 +1281,7 @@ func playerGetforgedustlevel(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	L.Push(lua.LNumber(p.GetForgeDustLevel()))
 	return 1
 }
 
@@ -1287,7 +1291,7 @@ func playerGetforgedusts(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	L.Push(lua.LNumber(p.GetForgeDusts()))
 	return 1
 }
 
@@ -1297,7 +1301,9 @@ func playerGetforgeslivers(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	// Slivers are inventory items; this free binding has no catalog handle, so it
+	// reports 0. The core forge flow reads the real count via the protocol layer.
+	L.Push(lua.LNumber(0))
 	return 1
 }
 
@@ -2696,7 +2702,10 @@ func playerOpenforge(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	if p.Session != nil {
+		p.Session.SendOpenForge()
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -2843,7 +2852,7 @@ func playerRemoveforgedusts(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	L.Push(lua.LBool(p.RemoveForgeDusts(uint64(L.CheckInt(2)))))
 	return 1
 }
 
@@ -3380,7 +3389,8 @@ func playerSetforgedusts(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	p.SetForgeDusts(uint64(L.CheckInt(2)))
+	L.Push(lua.LTrue)
 	return 1
 }
 

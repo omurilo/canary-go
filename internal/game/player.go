@@ -39,6 +39,9 @@ type Session interface {
 	// Conditions / Icons
 	SendChangeSpeed(c Creature) // 0x8F
 	SendIcons()                 // 0xA2
+
+	// Exaltation Forge. Opens the forge window (0x87 + 0x86) for the player.
+	SendOpenForge()
 }
 
 // Equipment slot indices (CONST_SLOT_*). Slot 0 is "wherever" (auto-place).
@@ -141,10 +144,14 @@ type Player struct {
 	TaskHunter *PlayerTaskHunter
 
 	// Exaltation Forge resources
-	ForgeDust      uint32
-	ForgeDustLimit uint32
-	ForgeSlivers   uint32
-	ForgeCores     uint32
+	// Forge (Exaltation Forge). ForgeDusts is the dust resource amount;
+	// ForgeDustLevel is the stored-dust limit (schema forge_dust_level,
+	// default 100, max ForgeMaxDust). Slivers and cores are NOT counters — they
+	// are real inventory items (ItemForgeSliver / ItemForgeCore), mirroring C++.
+	// See forge.go.
+	ForgeDusts     uint64
+	ForgeDustLevel uint16
+	ForgeHistory   []ForgeHistory
 
 	// Inventory holds equipment slots 1..10 (CONST_SLOT_HEAD..CONST_SLOT_AMMO);
 	// index 0 is unused. Slot 11 (store inbox, CONST_SLOT_LAST) is intentionally
@@ -361,8 +368,8 @@ func (p *Player) ensureDefaults() {
 		p.OfflineTrainingSkill = -1
 	}
 
-	if p.ForgeDustLimit == 0 {
-		p.ForgeDustLimit = 100
+	if p.ForgeDustLevel == 0 {
+		p.ForgeDustLevel = 100
 	}
 
 	for i := range p.Skills {
@@ -372,64 +379,10 @@ func (p *Player) ensureDefaults() {
 	}
 }
 
-// GetForgeDust returns current forge dust.
-func (p *Player) GetForgeDust() uint32 { return p.ForgeDust }
-
-// GetForgeDustLimit returns maximum forge dust limit.
-func (p *Player) GetForgeDustLimit() uint32 {
-	if p.ForgeDustLimit == 0 {
-		return 100
-	}
-	return p.ForgeDustLimit
-}
-
-// AddForgeDust increases forge dust up to the player's dust limit.
-func (p *Player) AddForgeDust(amount uint32) {
-	limit := p.GetForgeDustLimit()
-	p.ForgeDust += amount
-	if p.ForgeDust > limit {
-		p.ForgeDust = limit
-	}
-}
-
-// RemoveForgeDust deducts forge dust if available.
-func (p *Player) RemoveForgeDust(amount uint32) bool {
-	if p.ForgeDust < amount {
-		return false
-	}
-	p.ForgeDust -= amount
-	return true
-}
-
-// GetForgeSlivers returns current forge slivers.
-func (p *Player) GetForgeSlivers() uint32 { return p.ForgeSlivers }
-
-// AddForgeSlivers increases forge slivers.
-func (p *Player) AddForgeSlivers(amount uint32) { p.ForgeSlivers += amount }
-
-// RemoveForgeSlivers deducts forge slivers if available.
-func (p *Player) RemoveForgeSlivers(amount uint32) bool {
-	if p.ForgeSlivers < amount {
-		return false
-	}
-	p.ForgeSlivers -= amount
-	return true
-}
-
-// GetForgeCores returns current exaltation cores.
-func (p *Player) GetForgeCores() uint32 { return p.ForgeCores }
-
-// AddForgeCores increases exaltation cores.
-func (p *Player) AddForgeCores(amount uint32) { p.ForgeCores += amount }
-
-// RemoveForgeCores deducts exaltation cores if available.
-func (p *Player) RemoveForgeCores(amount uint32) bool {
-	if p.ForgeCores < amount {
-		return false
-	}
-	p.ForgeCores -= amount
-	return true
-}
+// Forge dust/sliver/core resource helpers live in forge.go alongside the forge
+// engine (GetForgeDusts, SetForgeDusts, AddForgeDusts, RemoveForgeDusts,
+// GetForgeDustLevel, AddForgeDustLevel, and the item-backed sliver/core
+// counts).
 
 // GetStorageValue returns the player's value for a storage key, or -1 when the
 // key was never set (mirroring Player::getStorageValue). Quest/NPC scripts rely

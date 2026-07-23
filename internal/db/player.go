@@ -26,6 +26,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	                  p.skill_shielding, p.skill_shielding_tries,
 	                  p.skill_fishing, p.skill_fishing_tries,
 	                  p.offlinetraining_time, p.offlinetraining_skill,
+	                  p.forge_dusts, p.forge_dust_level,
 	                  p.lastlogin, p.lastlogout,
 	                  p.blessings1, p.blessings2, p.blessings3, p.blessings4,
 	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8
@@ -52,6 +53,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		&p.Skills[game.SkillShielding], &p.SkillTries[game.SkillShielding],
 		&p.Skills[game.SkillFishing], &p.SkillTries[game.SkillFishing],
 		&offlineTimeSeconds, &p.OfflineTrainingSkill,
+		&p.ForgeDusts, &p.ForgeDustLevel,
 		&p.LastLogin, &p.LastLogout,
 		&p.Blessings[0], &p.Blessings[1], &p.Blessings[2], &p.Blessings[3],
 		&p.Blessings[4], &p.Blessings[5], &p.Blessings[6], &p.Blessings[7],
@@ -185,6 +187,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	              skill_fishing=?, skill_fishing_tries=?,
 	              offlinetraining_time=?, offlinetraining_skill=?,
 	              lastlogin=?, lastlogout=?,
+	              forge_dusts=?, forge_dust_level=?,
 	              blessings1=?, blessings2=?, blessings3=?, blessings4=?,
 	              blessings5=?, blessings6=?, blessings7=?, blessings8=?
 	           WHERE id=?`
@@ -204,6 +207,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		p.Skills[game.SkillFishing], p.SkillTries[game.SkillFishing],
 		p.OfflineTrainingTime / 1000, p.OfflineTrainingSkill,
 		p.LastLogin, p.LastLogout,
+		p.ForgeDusts, p.GetForgeDustLevel(),
 		p.Blessings[0], p.Blessings[1], p.Blessings[2], p.Blessings[3],
 		p.Blessings[4], p.Blessings[5], p.Blessings[6], p.Blessings[7],
 		p.DBID,
