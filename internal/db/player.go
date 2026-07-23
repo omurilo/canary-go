@@ -27,7 +27,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	                  p.skill_fishing, p.skill_fishing_tries,
 	                  p.offlinetraining_time, p.offlinetraining_skill,
 	                  p.forge_dusts, p.forge_dust_level,
-	                  p.task_points, p.quickloot_fallback,
+	                  p.task_points, p.quickloot_fallback, p.prey_wildcard,
 	                  p.lastlogin, p.lastlogout,
 	                  p.blessings1, p.blessings2, p.blessings3, p.blessings4,
 	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8
@@ -57,7 +57,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		&p.Skills[game.SkillFishing], &p.SkillTries[game.SkillFishing],
 		&offlineTimeSeconds, &p.OfflineTrainingSkill,
 		&p.ForgeDusts, &p.ForgeDustLevel,
-		&taskPoints, &quickLootFallback,
+		&taskPoints, &quickLootFallback, &p.PreyCards,
 		&p.LastLogin, &p.LastLogout,
 		&p.Blessings[0], &p.Blessings[1], &p.Blessings[2], &p.Blessings[3],
 		&p.Blessings[4], &p.Blessings[5], &p.Blessings[6], &p.Blessings[7],
@@ -74,12 +74,12 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	p.GetTaskHunter().Points = taskPoints
 	p.QuickLootFallbackToMain = quickLootFallback
 	p.Outfit = game.Outfit{
-		LookType:  lookType,
-		Head:      uint8(lookHead),
-		Body:      uint8(lookBody),
-		Legs:      uint8(lookLegs),
-		Feet:      uint8(lookFeet),
-		Addons:    uint8(lookAddons),
+		LookType: lookType,
+		Head:     uint8(lookHead),
+		Body:     uint8(lookBody),
+		Legs:     uint8(lookLegs),
+		Feet:     uint8(lookFeet),
+		Addons:   uint8(lookAddons),
 	}
 	p.Pos = game.Position{X: posx, Y: posy, Z: posz}
 	p.TownID = uint16(townID)
@@ -198,13 +198,13 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	              offlinetraining_time=?, offlinetraining_skill=?,
 	              lastlogin=?, lastlogout=?,
 	              forge_dusts=?, forge_dust_level=?,
-	              task_points=?, quickloot_fallback=?,
+	              task_points=?, quickloot_fallback=?, prey_wildcard=?,
 	              blessings1=?, blessings2=?, blessings3=?, blessings4=?,
 	              blessings5=?, blessings6=?, blessings7=?, blessings8=?
 	           WHERE id=?`
 	_, err := d.SQL.ExecContext(ctx, q,
 		p.Level, p.Experience, p.Health, p.MaxHealth,
-		p.Mana, p.MaxMana, p.Soul, p.Capacity / 100, p.BankBalance,
+		p.Mana, p.MaxMana, p.Soul, p.Capacity/100, p.BankBalance,
 		p.Pos.X, p.Pos.Y, p.Pos.Z,
 		p.Outfit.LookType, p.Outfit.Head, p.Outfit.Body, p.Outfit.Legs,
 		p.Outfit.Feet, p.Outfit.Addons,
@@ -216,10 +216,10 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		p.Skills[game.SkillDistance], p.SkillTries[game.SkillDistance],
 		p.Skills[game.SkillShielding], p.SkillTries[game.SkillShielding],
 		p.Skills[game.SkillFishing], p.SkillTries[game.SkillFishing],
-		p.OfflineTrainingTime / 1000, p.OfflineTrainingSkill,
+		p.OfflineTrainingTime/1000, p.OfflineTrainingSkill,
 		p.LastLogin, p.LastLogout,
 		p.ForgeDusts, p.GetForgeDustLevel(),
-		p.GetTaskHunter().Points, p.QuickLootFallbackToMain,
+		p.GetTaskHunter().Points, p.QuickLootFallbackToMain, p.PreyCards,
 		p.Blessings[0], p.Blessings[1], p.Blessings[2], p.Blessings[3],
 		p.Blessings[4], p.Blessings[5], p.Blessings[6], p.Blessings[7],
 		p.DBID,
@@ -232,7 +232,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	if p.Storages != nil {
 		// First delete existing storages for the player
 		_, _ = d.SQL.ExecContext(ctx, "DELETE FROM player_storage WHERE player_id = ?", p.DBID)
-		
+
 		// Then insert current storages
 		for k, v := range p.Storages {
 			_, _ = d.SQL.ExecContext(ctx, "INSERT INTO player_storage (player_id, `key`, `value`) VALUES (?, ?, ?)", p.DBID, k, v)

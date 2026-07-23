@@ -80,12 +80,12 @@ const (
 type Player struct {
 	conditionStore
 
-	ID        uint32 // creature id (assigned at spawn)
-	DBID      uint32 // players.id
-	AccountID uint32
-	AccountType uint8
-	GroupID   uint16 // players.group_id — staff groups 4/5/6 cannot be attacked
-	Ghost     bool   // ghost mode (invisible; not targetable by monsters)
+	ID            uint32 // creature id (assigned at spawn)
+	DBID          uint32 // players.id
+	AccountID     uint32
+	AccountType   uint8
+	GroupID       uint16 // players.group_id — staff groups 4/5/6 cannot be attacked
+	Ghost         bool   // ghost mode (invisible; not targetable by monsters)
 	Name          string
 	GuildName     string
 	GuildRankName string
@@ -94,23 +94,23 @@ type Player struct {
 	Pos       Position
 	Direction Direction
 
-	Level      uint16
-	Experience uint64
+	Level       uint16
+	Experience  uint64
 	BankBalance uint64 // players.balance — bank money
-	Health     uint32
-	MaxHealth  uint32
-	Mana       uint32
-	MaxMana    uint32
-	Soul       uint8
+	Health      uint32
+	MaxHealth   uint32
+	Mana        uint32
+	MaxMana     uint32
+	Soul        uint8
 	// Capacity is the player's TOTAL base capacity (players.cap column), in the
 	// client unit (hundredths of an oz). Free capacity = Capacity + BonusCapacity
 	// - InventoryWeight (see GetCapacity/GetFreeCapacity).
 	Capacity        uint32
 	BonusCapacity   uint32 // additive bonus (equipment/wheel/varStats — stubbed 0)
 	InventoryWeight uint32 // cached total weight of all carried items
-	Speed      uint16
-	Vocation   uint16
-	Sex        uint8
+	Speed           uint16
+	Vocation        uint16
+	Sex             uint8
 
 	MagLevel uint16
 	Skills   [SkillCount]uint16
@@ -131,9 +131,9 @@ type Player struct {
 	LightColor uint8
 
 	// Quick Loot settings
-	QuickLootFilter         uint8             // 0 = Skipped/Blacklist, 1 = Accepted/Whitelist
-	QuickLootList           []uint16          // List of item IDs
-	QuickLootFallbackToMain bool              // Fallback to main container when no category container is set
+	QuickLootFilter         uint8    // 0 = Skipped/Blacklist, 1 = Accepted/Whitelist
+	QuickLootList           []uint16 // List of item IDs
+	QuickLootFallbackToMain bool     // Fallback to main container when no category container is set
 	// ManagedContainers / ManagedObtainContainers map an ObjectCategory to the
 	// item id of the inventory container assigned to it. Loot containers are
 	// inventory containers (the client sends pos.x==0xffff), so they are resolved
@@ -145,9 +145,11 @@ type Player struct {
 	// Wheel of Destiny progression tree
 	Wheel *WheelOfDestiny
 
-	// Prey & Task Hunting systems
+	// Prey & Task Hunting systems. PreyCards is the wildcard/prey-card resource
+	// (schema players.prey_wildcard) spent on bonus rerolls and list selection.
 	Prey       *PlayerPrey
 	TaskHunter *PlayerTaskHunter
+	PreyCards  uint32
 
 	// Exaltation Forge resources
 	// Forge (Exaltation Forge). ForgeDusts is the dust resource amount;
@@ -173,21 +175,21 @@ type Player struct {
 	// Death / respawn state (Phase 5). LoginPosition is the temple the player
 	// returns to on death; TownID selects it. SkillLoss gates the exp/skill
 	// penalty. Blessings/SkillTries/ManaSpent feed the penalty math.
-	TownID          uint16
-	LoginPosition   Position
-	Dead            bool
-	IsTraining      bool
-	SkillLoss       bool
-	Skull           uint8
-	Blessings       [8]uint8
+	TownID               uint16
+	LoginPosition        Position
+	Dead                 bool
+	IsTraining           bool
+	SkillLoss            bool
+	Skull                uint8
+	Blessings            [8]uint8
 	OfflineTrainingTime  int32
 	OfflineTrainingSkill int8
 	LastLogin            uint64
 	LastLogout           uint64
-	SkillTries      [SkillCount]uint64
-	ManaSpent       uint64
-	MagLevelPercent uint8
-	LevelPercent    uint8
+	SkillTries           [SkillCount]uint64
+	ManaSpent            uint64
+	MagLevelPercent      uint8
+	LevelPercent         uint8
 
 	// Party is the party this player belongs to (as leader or member), nil when
 	// ungrouped. partyInvitations are parties that have invited this player but
@@ -195,10 +197,9 @@ type Player struct {
 	Party            *Party
 	partyInvitations []*Party
 
-	TargetID uint32
-	target   Creature
+	TargetID    uint32
+	target      Creature
 	ShopOwnerID uint32 // ID of the NPC currently being traded with
-
 
 	// cooldowns tracks per-spell and per-group spell cooldowns, mirroring the
 	// CONDITION_SPELLCOOLDOWN / CONDITION_SPELLGROUPCOOLDOWN conditions applied
@@ -291,7 +292,7 @@ func (p *Player) SendTextWindow(windowTextID uint32, itemID uint16, text string)
 		}
 		w.AddString(text) // AddString writes uint16(len) + string bytes
 		w.AddU16(0)       // writer name (empty)
-		w.AddByte(0)       // show traded
+		w.AddByte(0)      // show traded
 		w.AddU16(0)       // date (empty)
 		p.Session.SendToClient(w)
 	}
@@ -415,8 +416,8 @@ func (p *Player) SetStorageValue(key uint32, value int32) {
 	p.Storages[key] = value
 }
 
-func (p *Player) GetID() uint32 { return p.ID }
-func (p *Player) GetName() string { return p.Name }
+func (p *Player) GetID() uint32     { return p.ID }
+func (p *Player) GetName() string   { return p.Name }
 func (p *Player) GetHealth() uint32 { return p.Health }
 func (p *Player) SetHealth(health uint32) {
 	p.Health = health
@@ -470,6 +471,7 @@ func (p *Player) AddHealth(amount int32) {
 		}
 	}
 }
+
 // ExpForLevel returns the total experience required to reach a level, mirroring
 // Player::getExpForLevel (src/creatures/players/player.cpp:4438):
 // (((level-6)*level + 17)*level - 12) / 6 * 100.
@@ -525,15 +527,16 @@ func (p *Player) SetTarget(target Creature) {
 		p.TargetID = 0
 	}
 }
-func (p *Player) SetAttackTarget(id uint32) { p.TargetID = id }
+func (p *Player) SetAttackTarget(id uint32)           { p.TargetID = id }
 func (p *Player) ChangeTargetDistance(distance int32) {}
-func (p *Player) GetPosition() Position { return p.Pos }
-func (p *Player) SetPosition(pos Position) { p.Pos = pos }
-func (p *Player) GetDirection() Direction { return p.Direction }
-func (p *Player) SetDirection(dir Direction) { p.Direction = dir }
-func (p *Player) GetOutfit() Outfit { return p.Outfit }
-func (p *Player) GetLightLevel() uint8 { return p.LightLevel }
-func (p *Player) GetLightColor() uint8 { return p.LightColor }
+func (p *Player) GetPosition() Position               { return p.Pos }
+func (p *Player) SetPosition(pos Position)            { p.Pos = pos }
+func (p *Player) GetDirection() Direction             { return p.Direction }
+func (p *Player) SetDirection(dir Direction)          { p.Direction = dir }
+func (p *Player) GetOutfit() Outfit                   { return p.Outfit }
+func (p *Player) GetLightLevel() uint8                { return p.LightLevel }
+func (p *Player) GetLightColor() uint8                { return p.LightColor }
+
 // GetBaseSpeed returns the level-scaled base speed, mirroring
 // Player::updateBaseSpeed: vocation base speed + (level - 1). The vocation base
 // speed defaults to 110 (Canary's "None" vocation) when the registry is empty.
@@ -738,7 +741,7 @@ func (p *Player) AttackSpeed() time.Duration {
 
 // GetMana/GetMaxMana/AddMana expose the player's mana pool for the combat
 // adapter. AddMana clamps like Creature::changeMana (src/creatures/creature.cpp).
-func (p *Player) GetMana() uint32    { return p.Mana }
+func (p *Player) GetMana() uint32 { return p.Mana }
 func (p *Player) GetMaxMana() uint32 {
 	val := int32(p.MaxMana)
 	if p.Wheel != nil {
@@ -1240,8 +1243,20 @@ func (p *Player) GetTaskHunter() *PlayerTaskHunter {
 	return p.TaskHunter
 }
 
-func (p *Player) GetPreyCards() uint32 {
-	return 5 // Default initial prey cards
+// GetPreyCards returns the player's prey-card (wildcard) balance.
+func (p *Player) GetPreyCards() uint32 { return p.PreyCards }
+
+// AddPreyCards credits prey cards.
+func (p *Player) AddPreyCards(amount uint32) { p.PreyCards += amount }
+
+// UsePreyCards spends `amount` prey cards, returning false (and spending
+// nothing) when the balance is insufficient. Mirrors Player::usePreyCards.
+func (p *Player) UsePreyCards(amount uint32) bool {
+	if p.PreyCards < amount {
+		return false
+	}
+	p.PreyCards -= amount
+	return true
 }
 
 func (p *Player) GetTaskHuntingPoints() uint32 {
@@ -1285,6 +1300,3 @@ func (p *Player) GetBossCooldown(boss string) int64 {
 func (p *Player) CanFightBoss(boss string, now int64) bool {
 	return now >= p.GetBossCooldown(boss)
 }
-
-
-

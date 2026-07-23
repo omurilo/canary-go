@@ -226,11 +226,24 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 	}
 
 	switch action {
-	case 0: // PreyAction_ListReroll
+	case 0: // PreyAction_ListReroll — free once per PREY_FREE_REROLL_TIME, else costs gold.
+		now := time.Now().Unix()
+		if slot.FreeRerollTimeStamp > now {
+			if !g.player.RemoveMoney(uint64(g.player.GetPreyRerollPrice()), true) {
+				g.player.SendTextMessage(0x14, "You don't have enough money to reroll the prey slot.")
+				return
+			}
+		} else {
+			slot.FreeRerollTimeStamp = now + config.Number("preyFreeRerollTime", 20*60*60)
+		}
 		g.reloadPreyGrid(slot)
 		slot.SelectedRaceID = 0
 		slot.State = game.PreyDataState_Selection
-	case 1: // PreyAction_BonusReroll
+	case 1: // PreyAction_BonusReroll — costs prey cards.
+		if !g.player.UsePreyCards(uint32(config.Number("preyBonusRerollPrice", 1))) {
+			g.player.SendTextMessage(0x14, "You don't have enough prey cards to reroll this prey bonus.")
+			return
+		}
 		if slot.BonusRarity == 0 {
 			slot.BonusRarity = 5
 		} else if slot.BonusRarity < 10 {
@@ -253,7 +266,11 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 				slot.BonusPercentage = game.PreyBonusPercentage(slot.Bonus, slot.BonusRarity)
 			}
 		}
-	case 3: // PreyAction_ListAll_Cards
+	case 3: // PreyAction_ListAll_Cards — costs prey cards to browse the full list.
+		if !g.player.UsePreyCards(uint32(config.Number("preySelectListPrice", 5))) {
+			g.player.SendTextMessage(0x14, "You don't have enough prey cards to choose a monster from the list.")
+			return
+		}
 		slot.State = game.PreyDataState_ListSelection
 	case 4: // PreyAction_ListAll_Selection
 		slot.SelectedRaceID = raceID
@@ -270,6 +287,10 @@ func (g *GameProtocol) parsePreyAction(r *netmsg.Reader) {
 
 	g.SendPreyPrices()
 	g.SendAllPreyData()
+	// Refresh the resource bar (prey cards + money) the window reads.
+	g.sendResourceBalance(0x0A, uint64(g.player.GetPreyCards())) // RESOURCE_PREY_CARDS
+	g.sendResourceBalance(0x00, g.player.BankBalance)
+	g.sendResourceBalance(0x01, uint64(g.player.GetMoney()))
 }
 
 // SendPreyData sends Opcode 0xE8 for a single Prey Slot.

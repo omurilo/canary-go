@@ -3,6 +3,7 @@ package protocol
 import (
 	"time"
 
+	"github.com/opentibiabr/canary-go/internal/config"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
@@ -25,19 +26,28 @@ func (g *GameProtocol) parseTaskHuntingAction(r *netmsg.Reader) {
 	}
 
 	switch action {
-	case 0: // ListReroll
-		cost := uint64(g.player.GetTaskHuntingRerollPrice())
-		if g.player.BankBalance >= cost {
-			g.player.BankBalance -= cost
-			slot.State = game.PreyTaskDataState_Selection
-			// In a full implementation, we'd roll new monsters here.
-			// slot.ReloadMonsterGrid() 
+	case 0: // ListReroll — free once per taskHuntingFreeRerollTime, else costs gold.
+		now := time.Now().Unix()
+		if slot.FreeRerollTimeStamp > now {
+			if !g.player.RemoveMoney(uint64(g.player.GetTaskHuntingRerollPrice()), true) {
+				g.player.SendTextMessage(0x14, "You don't have enough money to reroll the task slot.")
+				return
+			}
+		} else {
+			slot.FreeRerollTimeStamp = now + config.Number("taskHuntingFreeRerollTime", 20*60*60)
 		}
-	case 1: // RewardsReroll
-		// Requires Prey Cards in C++, omitting real deduction for now (mocking infinite)
+		slot.State = game.PreyTaskDataState_Selection
+	case 1: // RewardsReroll — costs prey cards.
+		if !g.player.UsePreyCards(uint32(config.Number("taskHuntingBonusRerollPrice", 1))) {
+			g.player.SendTextMessage(0x14, "You don't have enough prey cards to reroll this task.")
+			return
+		}
 		slot.Upgrade = upgrade
-	case 2: // ListAll (Cards)
-		// Select from full list using cards
+	case 2: // ListAll (Cards) — costs prey cards to browse the full list.
+		if !g.player.UsePreyCards(uint32(config.Number("taskHuntingSelectListPrice", 5))) {
+			g.player.SendTextMessage(0x14, "You don't have enough prey cards to choose a task from the list.")
+			return
+		}
 		slot.State = game.PreyTaskDataState_Selection
 	case 3: // MonsterSelection
 		// Difficulty/rarity would come from the monster's bestiary stars; until
