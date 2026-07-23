@@ -62,4 +62,15 @@ func TestTileAndItemLuaMethods(t *testing.T) {
 	if err := e.DoString(scriptTile); err != nil {
 		t.Fatalf("tile getItemById tests failed: %v", err)
 	}
+
+	// Test 3: Item:setDestination() and Item:getDestination()
+	scriptTeleport := `
+		local dest = Position(123, 456, 7)
+		myDummy:setDestination(dest)
+		local gotDest = myDummy:getDestination()
+		assert(gotDest.x == 123 and gotDest.y == 456 and gotDest.z == 7)
+	`
+	if err := e.DoString(scriptTeleport); err != nil {
+		t.Fatalf("item setDestination tests failed: %v", err)
+	}
 }

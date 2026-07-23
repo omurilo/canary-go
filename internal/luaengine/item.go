@@ -244,6 +244,25 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			L.Push(lua.LBool(true))
 			return 1
 		},
+		"setDestination": func(L *lua.LState) int {
+			it := checkItem(L)
+			pos := checkPosition(L, 2)
+			if it.item.Attr == nil {
+				it.item.Attr = &game.ItemAttributes{}
+			}
+			it.item.Attr.TeleDest = &pos
+			L.Push(lua.LBool(true))
+			return 1
+		},
+		"getDestination": func(L *lua.LState) int {
+			it := checkItem(L)
+			if it.item.Attr != nil && it.item.Attr.TeleDest != nil {
+				pushPosition(L, *it.item.Attr.TeleDest)
+				return 1
+			}
+			pushPosition(L, game.Position{})
+			return 1
+		},
 		"hasAttribute": func(L *lua.LState) int {
 			it := checkItem(L)
 			attrId := L.CheckInt(2)
@@ -288,6 +307,8 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 					has = it.item.Attr.Duration != nil
 				case 19: // DECAYSTATE
 					has = it.item.Attr.DecayState != nil
+				case 20: // TELEPORT_DESTINATION
+					has = it.item.Attr.TeleDest != nil
 				case 21: // CHARGES
 					has = it.item.Attr.Charges != nil
 				case 29: // AMOUNT
@@ -404,6 +425,11 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 						L.Push(lua.LNumber(*it.item.Attr.DecayState))
 						return 1
 					}
+				case 20: // TELEPORT_DESTINATION
+					if it.item.Attr.TeleDest != nil {
+						pushPosition(L, *it.item.Attr.TeleDest)
+						return 1
+					}
 				case 21: // CHARGES
 					if it.item.Attr.Charges != nil {
 						L.Push(lua.LNumber(*it.item.Attr.Charges))
@@ -494,6 +520,9 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			case 19: // DECAYSTATE
 				n := uint8(L.CheckInt(3))
 				it.item.Attr.DecayState = &n
+			case 20: // TELEPORT_DESTINATION
+				pos := checkPosition(L, 3)
+				it.item.Attr.TeleDest = &pos
 			case 21: // CHARGES
 				n := uint16(L.CheckInt(3))
 				it.item.Attr.Charges = &n
