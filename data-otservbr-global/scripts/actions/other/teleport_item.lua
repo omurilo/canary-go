@@ -5,17 +5,19 @@ local teleportItem = Action()
 
 function teleportItem.onUse(player, item, fromPosition, target, toPosition, isHotkey)
 	local setting = TeleportItemUnique[item.uid] or TeleportItemAction[item.actionid]
-	if not setting then
+	if not (setting and setting.destination) then
+		setting = nil
 		for _, v in pairs(TeleportItemUnique) do
-			if v.itemPos and v.itemPos.x == fromPosition.x and v.itemPos.y == fromPosition.y and v.itemPos.z == fromPosition.z then
+			if v.destination and v.itemPos and v.itemPos.x == fromPosition.x and v.itemPos.y == fromPosition.y and v.itemPos.z == fromPosition.z then
 				setting = v
 				break
 			end
 		end
 	end
-	if not setting then
+	if not (setting and setting.destination) then
+		setting = nil
 		for _, v in pairs(TeleportItemAction) do
-			if v.itemPos then
+			if v.destination and v.itemPos then
 				if type(v.itemPos) == "table" and v.itemPos.x == fromPosition.x and v.itemPos.y == fromPosition.y and v.itemPos.z == fromPosition.z then
 					setting = v
 					break
@@ -28,13 +30,14 @@ function teleportItem.onUse(player, item, fromPosition, target, toPosition, isHo
 					end
 				end
 			end
-			if setting then break end
+			if setting and setting.destination then break end
 		end
 	end
 
-	if setting then
+	if setting and setting.destination then
 		player:teleportTo(setting.destination)
-		player:getPosition():sendMagicEffect(setting.effect)
+		local eff = setting.effect or CONST_ME_TELEPORT
+		player:getPosition():sendMagicEffect(eff)
 	end
 	return true
 end

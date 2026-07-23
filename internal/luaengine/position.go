@@ -17,7 +17,10 @@ func (e *Engine) registerPosition() {
 		},
 		"sendMagicEffect": func(L *lua.LState) int {
 			p := checkPosition(L, 1)
-			effect := uint16(L.CheckInt(2))
+			var effect uint16
+			if L.GetTop() >= 2 && L.Get(2) != lua.LNil {
+				effect = uint16(L.OptInt(2, 0))
+			}
 			if e.world.OnMagicEffect != nil {
 				e.world.OnMagicEffect(p, effect)
 			}
