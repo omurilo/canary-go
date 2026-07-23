@@ -73,4 +73,16 @@ func TestTileAndItemLuaMethods(t *testing.T) {
 	if err := e.DoString(scriptTeleport); err != nil {
 		t.Fatalf("item setDestination tests failed: %v", err)
 	}
+
+	// Test 4: Tile:getTopVisibleThing() and Tile:getGround()
+	scriptTopThing := `
+		local topThing = myTile:getTopVisibleThing()
+		assert(topThing ~= nil)
+		assert(topThing:isItem() == true)
+		local ground = myTile:getGround()
+		assert(ground ~= nil)
+	`
+	if err := e.DoString(scriptTopThing); err != nil {
+		t.Fatalf("tile getTopVisibleThing tests failed: %v", err)
+	}
 }

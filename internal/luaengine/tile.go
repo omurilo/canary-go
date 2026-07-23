@@ -123,6 +123,87 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			L.Push(lua.LNil)
 			return 1
 		},
+		"getBottomCreature": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if len(t.tile.Creatures) > 0 {
+				e.pushCreature(L, t.tile.Creatures[len(t.tile.Creatures)-1])
+				return 1
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getTopVisibleCreature": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if len(t.tile.Creatures) > 0 {
+				e.pushCreature(L, t.tile.Creatures[0])
+				return 1
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getTopVisibleThing": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if len(t.tile.Creatures) > 0 {
+				e.pushCreature(L, t.tile.Creatures[0])
+				return 1
+			}
+			if len(t.tile.Items) > 0 {
+				e.pushItem(L, t.tile.Items[len(t.tile.Items)-1])
+				return 1
+			}
+			if t.tile.Ground != nil {
+				e.pushItem(L, t.tile.Ground)
+				return 1
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getGround": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if t.tile.Ground != nil {
+				e.pushItem(L, t.tile.Ground)
+				return 1
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getTopTopItem": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if len(t.tile.Items) > 0 {
+				e.pushItem(L, t.tile.Items[len(t.tile.Items)-1])
+				return 1
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getTopDownItem": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if len(t.tile.Items) > 0 {
+				e.pushItem(L, t.tile.Items[0])
+				return 1
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getThing": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			idx := L.OptInt(2, 0)
+			if idx <= 0 {
+				if len(t.tile.Items) > 0 {
+					e.pushItem(L, t.tile.Items[len(t.tile.Items)-1])
+					return 1
+				}
+				if t.tile.Ground != nil {
+					e.pushItem(L, t.tile.Ground)
+					return 1
+				}
+			} else if idx <= len(t.tile.Items) {
+				e.pushItem(L, t.tile.Items[idx-1])
+				return 1
+			}
+			L.Push(lua.LNil)
+			return 1
+		},
 		"getCreatureCount": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			L.Push(lua.LNumber(len(t.tile.Creatures)))
