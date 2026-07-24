@@ -280,6 +280,21 @@ func (e *Engine) registerAPI() {
 	mockClass("ZoneEvent")
 	mockClass("HazardMonster")
 	mockClass("Party")
+	mockClass("Webhook")
+
+	L.SetGlobal("WEBHOOK_COLOR_GREEN", lua.LNumber(0x00FF00))
+	L.SetGlobal("WEBHOOK_COLOR_RED", lua.LNumber(0xFF0000))
+	L.SetGlobal("WEBHOOK_COLOR_YELLOW", lua.LNumber(0xFFFF00))
+	L.SetGlobal("WEBHOOK_COLOR_BLUE", lua.LNumber(0x0000FF))
+	L.SetGlobal("WEBHOOK_COLOR_WARNING", lua.LNumber(0xFFFF00))
+
+	announcementChannels := L.NewTable()
+	L.SetField(announcementChannels, "serverAnnouncements", lua.LString(""))
+	L.SetField(announcementChannels, "raids", lua.LString(""))
+	L.SetField(announcementChannels, "player-kills", lua.LString(""))
+	L.SetField(announcementChannels, "player-levels", lua.LString(""))
+	L.SetField(announcementChannels, "reports", lua.LString(""))
+	L.SetGlobal("announcementChannels", announcementChannels)
 
 	// rawgetmetatable allows scripts (like revscriptsys) to retrieve the type metatable
 	L.SetGlobal("rawgetmetatable", L.NewFunction(func(L *lua.LState) int {

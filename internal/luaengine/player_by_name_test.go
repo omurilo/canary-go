@@ -50,6 +50,23 @@ func TestPositionConstructorUserdata(t *testing.T) {
 	}
 }
 
+func TestWebhookAndAnnouncementChannels(t *testing.T) {
+	w := game.NewWorld()
+	e := New(w, nil)
+
+	err := e.L.DoString(`
+		assert(Webhook ~= nil, "Webhook must not be nil")
+		assert(announcementChannels ~= nil, "announcementChannels must not be nil")
+		assert(WEBHOOK_COLOR_WARNING ~= nil, "WEBHOOK_COLOR_WARNING must not be nil")
+
+		Webhook.sendMessage("test title", "test message", WEBHOOK_COLOR_WARNING, announcementChannels["serverAnnouncements"])
+		Webhook.sendMessage(":man_wearing_turban: test message", announcementChannels["serverAnnouncements"])
+	`)
+	if err != nil {
+		t.Fatalf("Webhook test failed: %v", err)
+	}
+}
+
 func TestTileMethods(t *testing.T) {
 	w := game.NewWorld()
 	e := New(w, nil)
