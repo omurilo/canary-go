@@ -81,6 +81,9 @@ type Result struct {
 	MajorVersion  uint32
 	MinorVersion  uint32
 	Description   string
+	HouseFile     string
+	SpawnMonFile  string
+	SpawnNPCFile  string
 	Towns         []Town
 	TileCount     int
 	ItemCount     int
@@ -215,7 +218,13 @@ func (p *parser) parseMapData() error {
 		switch tag {
 		case attrDescription:
 			p.res.Description = r.str()
-		case attrExtFile, attrExtSpawnMon, attrExtSpawnNPC, attrExtHouse, 24: // 24 = EXT_ZONE_FILE at map level
+		case attrExtFile, attrExtHouse:
+			p.res.HouseFile = r.str()
+		case attrExtSpawnMon:
+			p.res.SpawnMonFile = r.str()
+		case attrExtSpawnNPC:
+			p.res.SpawnNPCFile = r.str()
+		case 24: // 24 = EXT_ZONE_FILE at map level
 			_ = r.str()
 		default:
 			r.pos-- // not an attribute; a control byte / child

@@ -109,33 +109,33 @@ func (e *SpawnEngine) checkSpawns() {
 }
 
 func (e *SpawnEngine) spawnCreature(s *Spawn) {
-	var c Creature
-	id := e.world.nextCreatureID.Add(1)
-
 	if s.IsNPC {
 		var nType *creatures.NpcType
 		if e.Types != nil {
 			nType = e.Types.Npcs[strings.ToLower(s.Name)]
 		}
 		if nType == nil {
-			slog.Warn("spawned npc type not found in registry; falling back to default NPC attributes", "name", s.Name)
+			slog.Warn("spawned npc type not found in registry; skipping spawn", "name", s.Name)
+			return
 		}
+		id := e.world.nextCreatureID.Add(1)
 		npc := NewNpc(id, s.Name, nType)
 		npc.SetPosition(s.Pos)
-		c = npc
+		e.world.AddCreature(npc)
+		s.creatureID = npc.GetID()
 	} else {
 		var mType *creatures.MonsterType
 		if e.Types != nil {
 			mType = e.Types.Monsters[strings.ToLower(s.Name)]
 		}
 		if mType == nil {
-			slog.Warn("spawned monster type not found in registry; falling back to default Rat attributes", "name", s.Name)
+			slog.Warn("spawned monster type not found in registry; skipping spawn", "name", s.Name)
+			return
 		}
+		id := e.world.nextCreatureID.Add(1)
 		monster := NewMonster(id, s.Name, mType)
 		monster.SetPosition(s.Pos)
-		c = monster
+		e.world.AddCreature(monster)
+		s.creatureID = monster.GetID()
 	}
-
-	e.world.AddCreature(c)
-	s.creatureID = c.GetID()
 }

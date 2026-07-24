@@ -219,10 +219,14 @@ func run(o runOpts, log *slog.Logger) error {
 			log.Info("loaded OTBM map", "file", mapFilePath, "tiles", res.TileCount,
 				"items", res.ItemCount, "towns", len(res.Towns))
 
-			// Parse spawn files
+			// Parse spawn files (use OTBM header attributes if present, otherwise mapBase fallback)
+			mapDir := filepath.Dir(mapFilePath)
 			mapBase := strings.TrimSuffix(mapFilePath, filepath.Ext(mapFilePath))
 
 			monsterFile := mapBase + "-monster.xml"
+			if res.SpawnMonFile != "" {
+				monsterFile = filepath.Join(mapDir, res.SpawnMonFile)
+			}
 			if spawnsData, err := spawns.LoadSpawnFile(monsterFile); err == nil {
 				spawnEngine.LoadSpawns(spawnsData)
 				log.Info("loaded monster spawns", "file", monsterFile)
@@ -231,6 +235,9 @@ func run(o runOpts, log *slog.Logger) error {
 			}
 
 			npcFile := mapBase + "-npc.xml"
+			if res.SpawnNPCFile != "" {
+				npcFile = filepath.Join(mapDir, res.SpawnNPCFile)
+			}
 			if spawnsData, err := spawns.LoadSpawnFile(npcFile); err == nil {
 				spawnEngine.LoadSpawns(spawnsData)
 				log.Info("loaded npc spawns", "file", npcFile)
@@ -389,6 +396,7 @@ func run(o runOpts, log *slog.Logger) error {
 		if err := lengine.DoFile(gs); err != nil {
 			log.Warn("loading gamestore module", "err", err)
 		} else {
+			lengine.SyncStoreGlobal()
 			log.Info("loaded in-game store module", "path", gs)
 			lengine.LogStoreCatalogStatus()
 		}

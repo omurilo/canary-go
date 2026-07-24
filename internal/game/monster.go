@@ -33,7 +33,7 @@ type Monster struct {
 func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {
 	maxHealth := uint32(100)
 	speed := uint32(200)
-	outfit := Outfit{LookType: 21}
+	outfit := Outfit{}
 	corpse := uint16(0)
 
 	if mType != nil {

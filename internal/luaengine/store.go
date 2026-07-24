@@ -6,6 +6,30 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
+// SyncStoreGlobal reconciles the gamestore constants module table into the
+// global GameStore after the module loads.
+//
+// The gamestore module (init.lua) builds the global GameStore as a *shallow
+// copy* of the constants module table, then gamestore.lua sets Categories (and
+// runs its running-id pass) on the constants table itself — after the copy.
+// The senders/parsers read the global GameStore, so without this re-copy the
+// global's Categories stays nil and the store window renders empty. Re-copying
+// every key from the constants module (via package.loaded) picks up Categories
+// and any other field set post-copy, and since tables are copied by reference
+// the shared offer arrays stay consistent.
+func (e *Engine) SyncStoreGlobal() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if err := e.L.DoString(`
+		local c = package.loaded and package.loaded["gamestore.constants"]
+		if type(c) == "table" and type(GameStore) == "table" then
+			for k, v in pairs(c) do GameStore[k] = v end
+		end
+	`); err != nil {
+		e.log.Warn("store: failed to reconcile GameStore global", "err", err)
+	}
+}
+
 // LogStoreCatalogStatus inspects GameStore.Categories and logs how many
 // categories / total offers loaded, so a silently-empty catalog is visible.
 func (e *Engine) LogStoreCatalogStatus() {
