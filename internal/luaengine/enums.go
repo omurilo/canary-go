@@ -360,6 +360,16 @@ func RegisterEnums(L *lua.LState) {
 		"RARITY_ARCHFOE": 1,
 		"RARITY_NEMESIS": 2,
 
+		// Charm categories (charmCategory_t) and types (charm_t), used by
+		// data/scripts/systems/bestiary_charms.lua. Match internal/charms.
+		"CHARM_ALL":       0,
+		"CHARM_MAJOR":     1,
+		"CHARM_MINOR":     2,
+		"CHARM_UNDEFINED": 0,
+		"CHARM_OFFENSIVE": 1,
+		"CHARM_DEFENSIVE": 2,
+		"CHARM_PASSIVE":   3,
+
 		// Cylinder index / flags (src/items/cylinder.hpp, items_definitions.hpp).
 		// Used by addItemEx / internalAddItem (e.g. Player:addItemStoreInbox).
 		"INDEX_WHEREEVER":          -1,

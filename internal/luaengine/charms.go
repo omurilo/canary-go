@@ -39,6 +39,76 @@ func readChanceArray(t *lua.LTable) [3]float32 {
 	return out
 }
 
+// registerCharmPlayerMethods wires the Player charm talkaction bindings that
+// the datapack's data/scripts/talkactions/god/charms.lua relies on.
+func (e *Engine) registerCharmPlayerMethods() {
+	mt := e.L.GetTypeMetatable("Player")
+	tbl, ok := mt.(*lua.LTable)
+	if !ok {
+		return
+	}
+	e.L.SetField(tbl, "addMinorCharmEchoes", e.L.NewFunction(func(L *lua.LState) int {
+		p := checkPlayer(L)
+		if p == nil {
+			return 0
+		}
+		p.AddMinorCharmEchoes(uint32(L.CheckInt(2)), false)
+		return 0
+	}))
+	e.L.SetField(tbl, "getMinorCharmEchoes", e.L.NewFunction(func(L *lua.LState) int {
+		p := checkPlayer(L)
+		if p == nil {
+			L.Push(lua.LNumber(0))
+			return 1
+		}
+		L.Push(lua.LNumber(p.GetMinorCharmEchoes()))
+		return 1
+	}))
+	e.L.SetField(tbl, "charmExpansion", e.L.NewFunction(func(L *lua.LState) int {
+		p := checkPlayer(L)
+		if p == nil {
+			return 0
+		}
+		if L.GetTop() >= 2 {
+			p.CharmExpansion = L.ToBool(2)
+			return 0
+		}
+		L.Push(lua.LBool(p.CharmExpansion))
+		return 1
+	}))
+	e.L.SetField(tbl, "resetCharmsBestiary", e.L.NewFunction(func(L *lua.LState) int {
+		p := checkPlayer(L)
+		if p == nil {
+			return 0
+		}
+		if e.world != nil && e.world.Charms != nil {
+			for _, c := range e.world.Charms.List {
+				p.SetCharmRace(c.ID, 0)
+				p.SetCharmTier(c.ID, 0)
+			}
+		}
+		p.SetCharmPoints(p.MaxCharmPoints)
+		p.SetMinorCharmEchoes(0)
+		p.MaxMinorCharmEchoes = 0
+		p.UsedRunesBit = 0
+		p.UnlockedRunesBit = 0
+		return 0
+	}))
+	e.L.SetField(tbl, "unlockAllCharmRunes", e.L.NewFunction(func(L *lua.LState) int {
+		p := checkPlayer(L)
+		if p == nil || e.world == nil || e.world.Charms == nil {
+			return 0
+		}
+		for _, c := range e.world.Charms.List {
+			p.UnlockedRunesBit = uint32(charms.SetBit(int32(p.UnlockedRunesBit), c.ID))
+			if p.GetCharmTier(c.ID) == 0 {
+				p.SetCharmTier(c.ID, 1)
+			}
+		}
+		return 0
+	}))
+}
+
 // registerCharmType installs the real Charm type (overriding the api.go mock)
 // and rewires Game.createBestiaryCharm so the datapack's bestiary_charms.lua
 // populates the world charm registry. Mirrors Game.createBestiaryCharm +
@@ -200,6 +270,8 @@ func (e *Engine) registerCharmType() {
 		},
 	}
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
+
+	e.registerCharmPlayerMethods()
 
 	// Rewire Game.createBestiaryCharm(id) to build a real charm, add it to the
 	// registry immediately (like getBestiaryCharm force=true), and return the
