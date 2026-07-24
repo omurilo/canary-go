@@ -106,6 +106,11 @@ func TestOpenStorePacketOnWire(t *testing.T) {
 	}
 	leftover := r.Remaining()
 	t.Logf("S_OpenStore: total=%d bytes, categories=%d, leftover-after-parse=%d", len(pkt), categoryCount, leftover)
+	n := len(pkt)
+	if n > 96 {
+		n = 96
+	}
+	t.Logf("S_OpenStore hex prefix: %x", pkt[:n])
 	if categoryCount == 0 {
 		t.Fatalf("S_OpenStore carried 0 categories (store tree empty)")
 	}
