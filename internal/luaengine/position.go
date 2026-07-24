@@ -1,6 +1,8 @@
 package luaengine
 
 import (
+	"fmt"
+
 	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -55,6 +57,16 @@ func (e *Engine) registerPosition() {
 				dist = dy
 			}
 			L.Push(lua.LNumber(dist))
+			return 1
+		},
+		"toString": func(L *lua.LState) int {
+			p := checkPosition(L, 1)
+			L.Push(lua.LString(fmt.Sprintf("%d, %d, %d", p.X, p.Y, p.Z)))
+			return 1
+		},
+		"__tostring": func(L *lua.LState) int {
+			p := checkPosition(L, 1)
+			L.Push(lua.LString(fmt.Sprintf("%d, %d, %d", p.X, p.Y, p.Z)))
 			return 1
 		},
 	}

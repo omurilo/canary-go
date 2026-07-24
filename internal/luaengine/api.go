@@ -124,6 +124,7 @@ func (e *Engine) registerAPI() {
 	// Item and fluid enums used across Lua scripts
 	L.SetGlobal("HIRELING_LAMP", lua.LNumber(29432))
 	L.SetGlobal("ITEM_STORE_COIN", lua.LNumber(22118))
+	L.SetGlobal("ITEM_PRIMAL_POD", lua.LNumber(39176))
 	L.SetGlobal("FLUID_NONE", lua.LNumber(0))
 	L.SetGlobal("FLUID_WATER", lua.LNumber(1))
 	L.SetGlobal("FLUID_WINE", lua.LNumber(2))
@@ -143,6 +144,13 @@ func (e *Engine) registerAPI() {
 	L.SetGlobal("FLUID_MEAD", lua.LNumber(16))
 	L.SetGlobal("FLUID_TEA", lua.LNumber(17))
 	L.SetGlobal("FLUID_INK", lua.LNumber(18))
+	L.SetGlobal("FLUID_CANDY", lua.LNumber(19))
+	L.SetGlobal("FLUID_CHOCOLATE", lua.LNumber(20))
+
+	// Daily reward status enums
+	L.SetGlobal("DAILY_REWARD_COLLECTED", lua.LNumber(0))
+	L.SetGlobal("DAILY_REWARD_NOTCOLLECTED", lua.LNumber(1))
+	L.SetGlobal("DAILY_REWARD_NOTAVAILABLE", lua.LNumber(2))
 
 	// Player sex enums
 	L.SetGlobal("PLAYERSEX_FEMALE", lua.LNumber(0))
@@ -235,6 +243,21 @@ func (e *Engine) registerAPI() {
 		L.SetMetatable(classTable, mt)
 		L.SetGlobal(name, classTable)
 	}
+	// EventsScheduler global table
+	eventsScheduler := L.NewTable()
+	hundredFunc := L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(100))
+		return 1
+	})
+	L.SetField(eventsScheduler, "getEventSLoot", hundredFunc)
+	L.SetField(eventsScheduler, "getEventSBossLoot", hundredFunc)
+	L.SetField(eventsScheduler, "getEventSSkill", hundredFunc)
+	L.SetField(eventsScheduler, "getEventSExp", hundredFunc)
+	L.SetField(eventsScheduler, "getSpawnMonsterSchedule", hundredFunc)
+	L.SetGlobal("EventsScheduler", eventsScheduler)
+
+	L.SetGlobal("AUTH_TYPE", lua.LString("password"))
+
 	mockClass("Weapon")
 	mockClass("Result")
 	mockClass("Achievement")
@@ -253,6 +276,10 @@ func (e *Engine) registerAPI() {
 	mockClass("Group")
 	mockClass("House")
 	mockClass("Zone")
+	mockClass("Hazard")
+	mockClass("ZoneEvent")
+	mockClass("HazardMonster")
+	mockClass("Party")
 
 	// rawgetmetatable allows scripts (like revscriptsys) to retrieve the type metatable
 	L.SetGlobal("rawgetmetatable", L.NewFunction(func(L *lua.LState) int {
