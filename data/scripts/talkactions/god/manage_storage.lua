@@ -58,7 +58,7 @@ function Player.setStorageValueTalkaction(self, param)
 	local split = param:split(",")
 	local value = 1
 	if split[2] then
-		value = split[2]
+		value = tonumber(split[2]) or 1
 	end
 
 	-- Try to convert the first parameter to a number. If it's not a number, treat it as a storage name
