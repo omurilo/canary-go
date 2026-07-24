@@ -204,8 +204,11 @@ func (g *GameProtocol) stopPingLoop() {
 func (g *GameProtocol) Player() *game.Player { return g.player }
 
 // storeSendOpcodes are the server->client opcodes the gamestore module emits;
-// used only for temporary debug logging of the store wire.
+// used only for temporary debug logging of the store wire. 0x1C is the NPC
+// dialog window (NpcDialog.sendWindow) — logged to trace the "bye reopens the
+// NPC screen" bug (byte after opcode: 0x00 = open with buttons, 0x01 = close).
 var storeSendOpcodes = map[byte]string{
+	0x1C: "NpcDialog",
 	0xDF: "CoinBalance", 0xE0: "StoreError", 0xE1: "RequestPurchaseData",
 	0xEA: "OfferDescription", 0xF2: "CoinBalanceUpdating",
 	0xFB: "OpenStore", 0xFC: "StoreOffers", 0xFD: "TransactionHistory", 0xFE: "CompletePurchase",
