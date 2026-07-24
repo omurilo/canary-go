@@ -304,6 +304,10 @@ func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 		e.handleDeath(target, attacker)
 	} else if pl, ok := attacker.(*Player); ok {
 		e.applyCharmRune(pl, target, dmg)
+	} else if mon, ok := attacker.(*Monster); ok {
+		if tp, ok := target.(*Player); ok {
+			e.applyDefensiveCharmRune(mon, tp, dmg)
+		}
 	}
 }
 
@@ -689,6 +693,18 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 		return
 	}
 
+	// Carnage charm: splash damage to monsters adjacent to the dying monster if
+	// the killing player had Carnage set on it (before the corpse is placed).
+	if vm, ok := victim.(*Monster); ok {
+		ck := killer
+		if mk, ok := killer.(*Monster); ok && mk.Master != nil {
+			ck = mk.Master
+		}
+		if p, ok := ck.(*Player); ok {
+			e.applyCarnageOnDeath(vm, p)
+		}
+	}
+
 	pos := victim.GetPosition()
 
 	corpseID := uint16(defaultCorpseID)
@@ -892,6 +908,8 @@ func (e *CombatEngine) executeMonsterSpell(m *Monster, target Creature, s creatu
 
 	if target.GetHealth() == 0 {
 		e.handleDeath(target, m)
+	} else if tp, ok := target.(*Player); ok {
+		e.applyDefensiveCharmRune(m, tp, int32(dmg))
 	}
 }
 

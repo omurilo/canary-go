@@ -136,3 +136,84 @@ func TestApplyCharmRune_VampLeech(t *testing.T) {
 		t.Fatalf("vamp heal = %d, want 24", got)
 	}
 }
+
+func TestApplyDefensiveCharmRune_Parry(t *testing.T) {
+	w := newCombatWorld()
+	w.Charms.Add(&charms.Charm{
+		ID: charms.Parry, Category: charms.CategoryMajor, Type: charms.TypeDefensive,
+		Chance: [3]float32{100, 100, 100},
+	})
+	m := charmMonster(w, 1000) // attacker monster, race 21
+	e := NewCombatEngine(w)
+	p := &Player{Level: 50, MaxHealth: 10000, Health: 10000}
+	assignCharm(p, charms.Parry)
+
+	before := m.GetHealth()
+	e.applyDefensiveCharmRune(m, p, 200) // reflect 200 back
+	if got := before - m.GetHealth(); got != 200 {
+		t.Fatalf("parry reflected %d, want 200", got)
+	}
+}
+
+func TestApplyDefensiveCharmRune_Dodge(t *testing.T) {
+	w := newCombatWorld()
+	w.Charms.Add(&charms.Charm{
+		ID: charms.Dodge, Category: charms.CategoryMajor, Type: charms.TypeDefensive,
+		Chance: [3]float32{100, 100, 100},
+	})
+	m := charmMonster(w, 1000)
+	e := NewCombatEngine(w)
+	p := &Player{Level: 50, MaxHealth: 10000, Health: 9800} // just took 200
+	assignCharm(p, charms.Dodge)
+
+	e.applyDefensiveCharmRune(m, p, 200) // negate: heal 200 back
+	if p.Health != 10000 {
+		t.Fatalf("dodge health = %d, want 10000 (damage undone)", p.Health)
+	}
+}
+
+func TestApplyDefensiveCharmRune_Numb(t *testing.T) {
+	w := newCombatWorld()
+	w.Charms.Add(&charms.Charm{
+		ID: charms.Numb, Category: charms.CategoryMinor, Type: charms.TypeDefensive,
+		Chance: [3]float32{100, 100, 100},
+	})
+	m := charmMonster(w, 1000)
+	m.Speed = 220
+	e := NewCombatEngine(w)
+	p := &Player{Level: 50, MaxHealth: 1000, Health: 1000}
+	assignCharm(p, charms.Numb)
+
+	e.applyDefensiveCharmRune(m, p, 100)
+	if !m.HasCondition(combat.ConditionParalyze) {
+		t.Fatal("numb did not paralyze the attacker")
+	}
+}
+
+func TestApplyCarnageOnDeath(t *testing.T) {
+	w := newCombatWorld()
+	w.Charms.Add(&charms.Charm{
+		ID: charms.Carnage, Category: charms.CategoryMajor, Type: charms.TypeOffensive,
+		Percent: 15, Chance: [3]float32{100, 100, 100},
+	})
+	// Neighbor monster on the tile west of the victim.
+	neighborType := &creatures.MonsterType{Name: "Rat", RaceID: 99, MaxHealth: 1000}
+	neighbor := NewMonster(2, "Rat", neighborType)
+	neighbor.MaxHealth, neighbor.Health = 1000, 1000
+	neighbor.SetPosition(Position{X: 100, Y: 100, Z: 7})
+	w.AddCreature(neighbor)
+
+	victim := charmMonster(w, 1000) // at (101,100,7), race 21
+	e := NewCombatEngine(w)
+	p := &Player{Level: 50}
+	p.SetCharmTier(charms.Carnage, 1)
+	p.SetCharmRace(charms.Carnage, 21)
+	p.UsedRunesBit |= uint32(charms.SetBit(0, charms.Carnage))
+
+	before := neighbor.GetHealth()
+	e.applyCarnageOnDeath(victim, p)
+	// min(15% of 1000 = 150, 50*6 = 300) = 150.
+	if got := before - neighbor.GetHealth(); got != 150 {
+		t.Fatalf("carnage splash = %d, want 150", got)
+	}
+}

@@ -193,6 +193,104 @@ func (e *CombatEngine) applyOnHitCharm(p *Player, target Creature, m *Monster, c
 	}
 }
 
+// negativeConditions are the harmful condition types Cleanse can strip.
+var negativeConditions = []combat.ConditionType{
+	combat.ConditionPoison, combat.ConditionFire, combat.ConditionEnergy,
+	combat.ConditionBleeding, combat.ConditionFreezing, combat.ConditionDazzled,
+	combat.ConditionCursed, combat.ConditionParalyze,
+}
+
+// applyDefensiveCharmRune rolls the player's defensive charm(s) assigned to the
+// attacking monster after it lands a hit. Mirrors the target-as-player charm
+// block in Game::combatChangeHealth (Parry/Dodge/Adrenaline/Numb/Cleanse).
+func (e *CombatEngine) applyDefensiveCharmRune(m *Monster, p *Player, realDamage int32) {
+	if p == nil || m == nil || m.Type == nil || m.Type.RaceID == 0 ||
+		e.world == nil || e.world.Charms == nil || realDamage <= 0 {
+		return
+	}
+	major, minor := charmsForMonster(e.world.Charms, p, m.Type.RaceID)
+	for _, c := range [2]*charms.Charm{major, minor} {
+		if c == nil || c.Type != charms.TypeDefensive {
+			continue
+		}
+		if !chanceHit(c.Chance[charmChanceIndex(p.GetCharmTier(c.ID))]) {
+			continue
+		}
+		switch c.ID {
+		case charms.Parry:
+			// Reflect the damage back to the aggressor.
+			e.applyCharmDamage(p, m, realDamage, combat.CombatPhysical, c.Effect)
+		case charms.Dodge:
+			// Dodge the hit: undo the damage (the port applies charms post-hit).
+			p.AddHealth(realDamage)
+			if e.world.OnCreatureHealthChange != nil {
+				e.world.OnCreatureHealthChange(p)
+			}
+			if c.Effect != 0 && e.world.OnMagicEffect != nil {
+				e.world.OnMagicEffect(p.GetPosition(), c.Effect)
+			}
+		case charms.Adrenaline:
+			addSpeedCondition(p, combat.ConditionHaste, 10000, 2.5, 40, 2.5, 40)
+		case charms.Numb:
+			addSpeedCondition(m, combat.ConditionParalyze, 10000, -1, 0, -1, 0)
+		case charms.Cleanse:
+			e.cleansePlayer(p)
+		}
+		if c.MessageCancel != "" {
+			p.SendTextMessage(0x14, c.MessageCancel)
+		}
+	}
+}
+
+// cleansePlayer removes the first active negative condition, mirroring the
+// Cleanse charm (temporary immunity is not modelled).
+func (e *CombatEngine) cleansePlayer(p *Player) {
+	for _, t := range negativeConditions {
+		if p.HasCondition(t) {
+			p.RemoveCondition(t)
+			return
+		}
+	}
+}
+
+// applyCarnageOnDeath deals Carnage's physical splash to monsters adjacent to a
+// monster the killing player had the Carnage charm set on. Mirrors the
+// CHARM_CARNAGE branch of parseOffensiveCharmCombat + parseCharmCarnage.
+func (e *CombatEngine) applyCarnageOnDeath(victim *Monster, killer *Player) {
+	if victim == nil || killer == nil || victim.Type == nil || victim.Type.RaceID == 0 ||
+		e.world == nil || e.world.Charms == nil || e.world.Map == nil {
+		return
+	}
+	c := e.world.Charms.Get(charms.Carnage)
+	if c == nil || killer.GetCharmRace(charms.Carnage) != victim.Type.RaceID {
+		return
+	}
+	if !chanceHit(c.Chance[charmChanceIndex(killer.GetCharmTier(charms.Carnage))]) {
+		return
+	}
+	// Damage per adjacent monster: min(percent% of victim max HP, 6x level).
+	dmg := minInt32(
+		int32(math.Ceil(float64(victim.GetMaxHealth())*(c.Percent/100.0))),
+		int32(killer.Level)*6,
+	)
+	if dmg <= 0 {
+		return
+	}
+	pos := victim.GetPosition()
+	offsets := [4][2]int32{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
+	for _, off := range offsets {
+		tile := e.world.Map.GetTile(Position{X: uint16(int32(pos.X) + off[0]), Y: uint16(int32(pos.Y) + off[1]), Z: pos.Z})
+		if tile == nil {
+			continue
+		}
+		for _, cr := range tile.Creatures {
+			if nb, ok := cr.(*Monster); ok && nb.GetHealth() > 0 {
+				e.applyCharmDamage(killer, nb, dmg, combat.CombatPhysical, c.Effect)
+			}
+		}
+	}
+}
+
 // applyCharmDamage deals a one-off charm hit to the target and fires the health,
 // effect and death hooks, mirroring the tail of the melee/ranged hit handlers.
 func (e *CombatEngine) applyCharmDamage(attacker, target Creature, dmg int32, combatType combat.CombatType, effect uint16) {
