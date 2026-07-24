@@ -83,10 +83,10 @@ services:
       - "8080:80"
     volumes:
       - ../ip.txt:/var/www/html/install/ip.txt
-      - ../../config.lua:/var/www/html/config.lua
-      - ../data:/var/www/html/data:ro
-      - ../data-canary:/var/www/html/data-canary:ro
-      - ../data-otservbr-global:/var/www/html/data-otservbr-global:ro
+      - ../config.lua:/canary/config.lua
+      - ../data:/canary/data:ro
+      - ../data-canary:/canary/data-canary:ro
+      - ../data-otservbr-global:/canary/data-otservbr-global:ro
 
     depends_on:
       db:
