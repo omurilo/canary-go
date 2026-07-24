@@ -76,6 +76,9 @@ type World struct {
 	// OnBosstiaryEntryChanged fires when a player's boss reaches a new unlock
 	// level (protocol layer sends the cyclopedia entry-changed update).
 	OnBosstiaryEntryChanged func(p *Player, bossRaceID uint16)
+	// OnBestiaryEntryChanged fires when a player's bestiary monster reaches a new
+	// unlock stage.
+	OnBestiaryEntryChanged func(p *Player, raceID uint16)
 
 	// Combat is the world's combat engine, used by the spell system to resolve
 	// spell damage/heal through the same hit/death path as melee.

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opentibiabr/canary-go/internal/bestiary"
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 	"github.com/opentibiabr/canary-go/internal/game/vocations"
@@ -721,12 +722,23 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 			}
 			p.GetTaskHunter().OnKillMonster(raceID)
 
-			// Bosstiary: credit the boss kill and, on a level-up, refresh the
-			// cyclopedia entry.
+			// Bosstiary (bosses) / Bestiary (regular monsters): credit the kill
+			// and refresh the cyclopedia entry on a stage change.
 			if m.Type != nil && m.Type.IsBoss() {
 				if p.AddBosstiaryKill(m.Type.BosstiaryRaceID, m.Type.BosstiaryRace, 1) {
 					if e.world.OnBosstiaryEntryChanged != nil {
 						e.world.OnBosstiaryEntryChanged(p, m.Type.BosstiaryRaceID)
+					}
+				}
+			} else if m.Type != nil && m.Type.RaceID > 0 && m.Type.BestiaryToKill > 0 {
+				th := bestiary.Thresholds{
+					FirstUnlock:  m.Type.BestiaryFirstUnlock,
+					SecondUnlock: m.Type.BestiarySecondUnlock,
+					ToKill:       m.Type.BestiaryToKill,
+				}
+				if p.AddBestiaryKill(m.Type.RaceID, th, m.Type.BestiaryCharmsPoints, 1) {
+					if e.world.OnBestiaryEntryChanged != nil {
+						e.world.OnBestiaryEntryChanged(p, m.Type.RaceID)
 					}
 				}
 			}

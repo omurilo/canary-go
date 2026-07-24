@@ -355,6 +355,11 @@ func run(o runOpts, log *slog.Logger) error {
 			gp.SendBosstiaryEntryChanged(uint32(bossRaceID))
 		}
 	}
+	world.OnBestiaryEntryChanged = func(p *game.Player, raceID uint16) {
+		if gp, ok := p.Session.(*protocol.GameProtocol); ok {
+			gp.SendBestiaryEntryChanged(raceID)
+		}
+	}
 	world.OnPlayerStatsChange = func(p *game.Player) {
 		protocol.SendPlayerStats(p)
 	}

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/opentibiabr/canary-go/internal/bestiary"
 	"github.com/opentibiabr/canary-go/internal/bosstiary"
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
@@ -174,6 +175,17 @@ type Player struct {
 	BossSlotOne     uint32
 	BossSlotTwo     uint32
 	BossRemoveTimes uint8
+
+	// Bestiary/charms (player_charms). CharmPoints is the spendable currency
+	// earned by completing bestiary entries; MaxCharmPoints is the lifetime
+	// total. Runes bits are the unlocked/assigned charm bitmasks.
+	CharmPoints         uint32
+	MaxCharmPoints      uint32
+	MinorCharmEchoes    uint32
+	MaxMinorCharmEchoes uint32
+	CharmExpansion      bool
+	UsedRunesBit        uint32
+	UnlockedRunesBit    uint32
 
 	// Exaltation Forge resources
 	// Forge (Exaltation Forge). ForgeDusts is the dust resource amount;
@@ -527,6 +539,39 @@ func (p *Player) AddBosstiaryKill(raceID uint16, race bosstiary.Rarity, amount u
 		return true
 	}
 	return false
+}
+
+// GetCharmPoints returns the player's spendable charm points.
+func (p *Player) GetCharmPoints() uint32 { return p.CharmPoints }
+
+// AddCharmPoints adds spendable charm points (and bumps the lifetime max).
+func (p *Player) AddCharmPoints(amount uint32) {
+	p.CharmPoints += amount
+	p.MaxCharmPoints += amount
+}
+
+// SetCharmPoints sets the spendable charm points.
+func (p *Player) SetCharmPoints(amount uint32) { p.CharmPoints = amount }
+
+// AddBestiaryKill credits `amount` kills of a (non-boss) bestiary monster and,
+// when the kills complete the entry, awards its charm points. Returns true when
+// the kill crossed into a new unlock stage (caller sends the entry-changed
+// update). Mirrors IOBestiary::addBestiaryKill.
+func (p *Player) AddBestiaryKill(raceID uint16, t bestiary.Thresholds, charmPoints uint16, amount uint32) bool {
+	if raceID == 0 || amount == 0 || t.ToKill == 0 {
+		return false
+	}
+	old := p.GetBestiaryKillCount(raceID)
+	p.AddBestiaryKillCount(raceID, amount)
+	if bestiary.CrossedCompletion(old, amount, t) {
+		p.AddCharmPoints(uint32(charmPoints))
+	}
+	return bestiary.CrossedStage(old, amount, t)
+}
+
+// IsBestiaryComplete reports whether the player has fully unlocked a monster.
+func (p *Player) IsBestiaryComplete(raceID uint16, t bestiary.Thresholds) bool {
+	return bestiary.IsComplete(p.GetBestiaryKillCount(raceID), t)
 }
 
 func (p *Player) GetID() uint32     { return p.ID }
