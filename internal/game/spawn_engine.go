@@ -115,7 +115,7 @@ func (e *SpawnEngine) spawnCreature(s *Spawn) {
 			nType = e.Types.Npcs[strings.ToLower(s.Name)]
 		}
 		if nType == nil {
-			slog.Warn("spawned npc type not found in registry; skipping spawn", "name", s.Name)
+			slog.Debug("spawned npc type not found in registry; skipping spawn", "name", s.Name)
 			return
 		}
 		id := e.world.nextCreatureID.Add(1)
@@ -129,7 +129,7 @@ func (e *SpawnEngine) spawnCreature(s *Spawn) {
 			mType = e.Types.Monsters[strings.ToLower(s.Name)]
 		}
 		if mType == nil {
-			slog.Warn("spawned monster type not found in registry; skipping spawn", "name", s.Name)
+			slog.Debug("spawned monster type not found in registry; skipping spawn", "name", s.Name)
 			return
 		}
 		id := e.world.nextCreatureID.Add(1)
