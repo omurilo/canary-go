@@ -390,6 +390,7 @@ func run(o runOpts, log *slog.Logger) error {
 			log.Warn("loading gamestore module", "err", err)
 		} else {
 			log.Info("loaded in-game store module", "path", gs)
+			lengine.LogStoreCatalogStatus()
 		}
 	} else {
 		log.Warn("gamestore module not found", "path", gs)
