@@ -57,6 +57,7 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetField(mt, "setTown", e.L.NewFunction(e.playerSettown))
 	e.L.SetField(mt, "getTown", e.L.NewFunction(e.playerGettown))
 	e.L.SetField(mt, "__index", mt)
+	e.registerBosstiaryPlayerMethods()
 	e.registerKVStoreType()
 }
 

@@ -28,6 +28,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	                  p.offlinetraining_time, p.offlinetraining_skill,
 	                  p.forge_dusts, p.forge_dust_level,
 	                  p.task_points, p.quickloot_fallback, p.prey_wildcard,
+	                  p.boss_points,
 	                  p.lastlogin, p.lastlogout,
 	                  p.blessings1, p.blessings2, p.blessings3, p.blessings4,
 	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8
@@ -58,6 +59,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		&offlineTimeSeconds, &p.OfflineTrainingSkill,
 		&p.ForgeDusts, &p.ForgeDustLevel,
 		&taskPoints, &quickLootFallback, &p.PreyCards,
+		&p.BossPoints,
 		&p.LastLogin, &p.LastLogout,
 		&p.Blessings[0], &p.Blessings[1], &p.Blessings[2], &p.Blessings[3],
 		&p.Blessings[4], &p.Blessings[5], &p.Blessings[6], &p.Blessings[7],
@@ -218,6 +220,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	              lastlogin=?, lastlogout=?,
 	              forge_dusts=?, forge_dust_level=?,
 	              task_points=?, quickloot_fallback=?, prey_wildcard=?,
+	              boss_points=?,
 	              blessings1=?, blessings2=?, blessings3=?, blessings4=?,
 	              blessings5=?, blessings6=?, blessings7=?, blessings8=?
 	           WHERE id=?`
@@ -239,6 +242,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		p.LastLogin, p.LastLogout,
 		p.ForgeDusts, p.GetForgeDustLevel(),
 		p.GetTaskHunter().Points, p.QuickLootFallbackToMain, p.PreyCards,
+		p.BossPoints,
 		p.Blessings[0], p.Blessings[1], p.Blessings[2], p.Blessings[3],
 		p.Blessings[4], p.Blessings[5], p.Blessings[6], p.Blessings[7],
 		p.DBID,

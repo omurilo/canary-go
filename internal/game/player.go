@@ -163,6 +163,10 @@ type Player struct {
 	CoinBalance      uint32
 	CoinTransferable uint32
 
+	// BossPoints is the bosstiary points total (players.boss_points), earned by
+	// reaching boss unlock levels and spent implicitly via the loot bonus.
+	BossPoints uint32
+
 	// Exaltation Forge resources
 	// Forge (Exaltation Forge). ForgeDusts is the dust resource amount;
 	// ForgeDustLevel is the stored-dust limit (schema forge_dust_level,
@@ -455,6 +459,16 @@ func (p *Player) AddBestiaryKillCount(raceid uint16, amount uint32) {
 	old := p.GetBestiaryKillCount(raceid)
 	p.SetStorageValue(storageBestiaryKillCount+uint32(raceid), int32(old+amount))
 }
+
+// GetBossPoints returns the player's accumulated bosstiary points
+// (players.boss_points). Mirrors Player::getBossPoints.
+func (p *Player) GetBossPoints() uint32 { return p.BossPoints }
+
+// SetBossPoints sets the player's bosstiary points.
+func (p *Player) SetBossPoints(amount uint32) { p.BossPoints = amount }
+
+// AddBossPoints adds to the player's bosstiary points.
+func (p *Player) AddBossPoints(amount uint32) { p.BossPoints += amount }
 
 func (p *Player) GetID() uint32     { return p.ID }
 func (p *Player) GetName() string   { return p.Name }
