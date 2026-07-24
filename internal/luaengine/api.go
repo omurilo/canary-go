@@ -495,41 +495,33 @@ func (e *Engine) registerAPI() {
 	e.registerCondition()
 	e.registerDB()
 
-	// addPlayerEvent global fallback function if modules.lua isn't loaded yet
+	// addPlayerEvent global fallback function if modules.lua isn't loaded yet.
+	// Mirrors data/modules/lib/modules.lua: addPlayerEvent(callable, delay,
+	// playerId, ...) schedules callable(player, ...) after `delay` (the datapack
+	// re-checks the player is online first; our store senders resolve
+	// Player(playerId) themselves and no-op when nil, so forwarding the id is
+	// equivalent). luaAddEvent forwards args 3+ to the callback, so
+	// addEvent(fn, delay, target, args...) fires as fn(target, args...) — which
+	// is exactly what the callables (sendShowStoreOffers, sendStoreError, …)
+	// expect as their first parameter. The previous wrapper dropped the target
+	// (used arg 2 as the first parameter), so scheduled store offers were never
+	// sent and opening a category hung the client.
 	L.SetGlobal("addPlayerEvent", L.NewFunction(func(L *lua.LState) int {
 		fn := L.Get(1)
 		delay := L.CheckInt(2)
-		target := L.Get(3)
 		n := L.GetTop()
-		args := make([]lua.LValue, 0, n-3)
-		for i := 4; i <= n; i++ {
-			args = append(args, L.Get(i))
-		}
 		addEv := L.GetGlobal("addEvent")
-		if addEvFn, ok := addEv.(*lua.LFunction); ok {
-			wrapper := L.NewFunction(func(L *lua.LState) int {
-				pVal := L.Get(2)
-				callArgs := []lua.LValue{pVal}
-				top := L.GetTop()
-				for i := 3; i <= top; i++ {
-					callArgs = append(callArgs, L.Get(i))
-				}
-				L.Push(fn)
-				for _, arg := range callArgs {
-					L.Push(arg)
-				}
-				L.Call(len(callArgs), 0)
-				return 0
-			})
-			L.Push(addEvFn)
-			L.Push(wrapper)
-			L.Push(lua.LNumber(delay))
-			L.Push(target)
-			for _, arg := range args {
-				L.Push(arg)
-			}
-			L.Call(3+len(args), 0)
+		addEvFn, ok := addEv.(*lua.LFunction)
+		if !ok {
+			return 0
 		}
+		L.Push(addEvFn)
+		L.Push(fn)
+		L.Push(lua.LNumber(delay))
+		for i := 3; i <= n; i++ { // target + trailing args
+			L.Push(L.Get(i))
+		}
+		L.Call(n, 0) // fn, delay, target, args... => n arguments to addEvent
 		return 0
 	}))
 

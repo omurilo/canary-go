@@ -6,12 +6,46 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 	lua "github.com/yuin/gopher-lua"
 )
+
+// TestAddPlayerEventForwardsTargetAndArgs guards the addPlayerEvent fallback:
+// addPlayerEvent(callable, delay, target, ...) must fire callable(target, ...).
+// A previous wrapper dropped the target (used arg 2 as the first parameter), so
+// deferred store sends like sendShowStoreOffers(playerId, category) ran as
+// sendShowStoreOffers(category) — Player(category) failed, no offers packet was
+// sent, and opening a store category hung the client.
+func TestAddPlayerEventForwardsTargetAndArgs(t *testing.T) {
+	e := newTestEngine()
+	if err := e.DoString(`
+		_R = ""
+		function _rec(target, arg) _R = tostring(target) .. "|" .. tostring(arg) end
+	`); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := e.DoString(`addPlayerEvent(_rec, 5, "PID", "CAT")`); err != nil {
+		t.Fatalf("addPlayerEvent call: %v", err)
+	}
+	var got string
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		e.mu.Lock()
+		got = e.L.GetGlobal("_R").String()
+		e.mu.Unlock()
+		if got != "" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got != "PID|CAT" {
+		t.Fatalf("addPlayerEvent fired callback with wrong args: got %q, want %q (target dropped?)", got, "PID|CAT")
+	}
+}
 
 // TestOpenStorePacketOnWire drives the REAL gamestore onRecvbyte(C_OpenStore)
 // through the actual Go NetworkMessage/Player bindings and decodes the captured
