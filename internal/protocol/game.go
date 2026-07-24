@@ -813,6 +813,10 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseWheelOfDestiny(r)
 	case 0xBA:
 		g.parseTaskHuntingAction(r)
+	case 0xAE:
+		// C_SendBosstiary: open the Boss Cyclopedia -> send rules + boss list.
+		g.SendBosstiaryData()
+		g.SendBosstiaryInfo()
 	case 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xE8, 0xE9, 0xEF:
 		// In-game store packets (C_OpenStore/RequestStoreOffers/BuyStoreOffer/
 		// transaction history, plus GetOfferDescription/StoreEvent/TransferCoins).

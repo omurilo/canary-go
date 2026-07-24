@@ -24,6 +24,54 @@ func (g *GameProtocol) SendBosstiaryData() {
 	g.SendToClient(buildBosstiaryData())
 }
 
+// SendBosstiaryInfo sends the Boss Cyclopedia boss list (0x73): every boss with
+// this player's kill count and unlock category. Mirrors the 0x73 block of
+// ProtocolGame::parseSendBosstiary; layout matches otclient parseBosstiaryInfo
+// (u16 count, then per boss: u32 raceId, u8 race, u32 kills, u8 reserved, u8
+// tracker — the tracker flag is read at protocol >= 1320).
+// bossListEntry is one boss row in the cyclopedia list (0x73).
+type bossListEntry struct {
+	RaceID  uint16
+	Race    uint8
+	Kills   uint32
+	Tracked bool
+}
+
+func (g *GameProtocol) SendBosstiaryInfo() {
+	if g.player == nil || g.deps == nil || g.deps.World == nil || g.deps.World.TypeRegistry == nil {
+		return
+	}
+	bosses := g.deps.World.TypeRegistry.BosstiaryMonsters()
+	entries := make([]bossListEntry, 0, len(bosses))
+	for raceID, mt := range bosses {
+		entries = append(entries, bossListEntry{
+			RaceID: raceID,
+			Race:   uint8(mt.BosstiaryRace),
+			Kills:  g.player.GetBestiaryKillCount(raceID),
+		})
+	}
+	g.SendToClient(buildBosstiaryInfo(entries))
+}
+
+// buildBosstiaryInfo builds the 0x73 Boss Cyclopedia list packet.
+func buildBosstiaryInfo(entries []bossListEntry) *netmsg.Writer {
+	w := netmsg.NewWriter()
+	w.AddByte(0x73)
+	w.AddU16(uint16(len(entries)))
+	for _, e := range entries {
+		w.AddU32(uint32(e.RaceID))
+		w.AddByte(e.Race)
+		w.AddU32(e.Kills)
+		w.AddByte(0) // reserved
+		if e.Tracked {
+			w.AddByte(1)
+		} else {
+			w.AddByte(0)
+		}
+	}
+	return w
+}
+
 // buildBosstiaryData builds the 0x61 Boss Cyclopedia rules packet.
 func buildBosstiaryData() *netmsg.Writer {
 	w := netmsg.NewWriter()

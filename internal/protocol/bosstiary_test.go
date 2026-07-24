@@ -34,3 +34,44 @@ func TestBosstiaryDataPacket(t *testing.T) {
 		t.Fatalf("leftover %d bytes (client would desync)", r.Remaining())
 	}
 }
+
+// TestBosstiaryInfoPacket decodes the 0x73 boss-list packet exactly as otclient
+// parseBosstiaryInfo does (u16 count, then per boss: u32 raceId, u8 race, u32
+// kills, u8 reserved, u8 tracker for >=1320).
+func TestBosstiaryInfoPacket(t *testing.T) {
+	entries := []bossListEntry{
+		{RaceID: 900, Race: 1, Kills: 5, Tracked: false},
+		{RaceID: 46, Race: 0, Kills: 123, Tracked: true},
+	}
+	b := buildBosstiaryInfo(entries).Bytes()
+	if b[0] != 0x73 {
+		t.Fatalf("opcode = 0x%02X, want 0x73", b[0])
+	}
+	r := netmsg.NewReader(b[1:])
+	if got := r.GetU16(); got != 2 {
+		t.Fatalf("count = %d, want 2", got)
+	}
+	for i, e := range entries {
+		if got := uint16(r.GetU32()); got != e.RaceID {
+			t.Errorf("entry[%d] raceId = %d, want %d", i, got, e.RaceID)
+		}
+		if got := r.GetByte(); got != e.Race {
+			t.Errorf("entry[%d] race = %d, want %d", i, got, e.Race)
+		}
+		if got := r.GetU32(); got != e.Kills {
+			t.Errorf("entry[%d] kills = %d, want %d", i, got, e.Kills)
+		}
+		_ = r.GetByte() // reserved
+		track := r.GetByte()
+		wantTrack := byte(0)
+		if e.Tracked {
+			wantTrack = 1
+		}
+		if track != wantTrack {
+			t.Errorf("entry[%d] tracker = %d, want %d", i, track, wantTrack)
+		}
+	}
+	if r.Remaining() != 0 {
+		t.Fatalf("leftover %d bytes", r.Remaining())
+	}
+}
