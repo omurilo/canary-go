@@ -70,6 +70,9 @@ type World struct {
 	OnCreatureSay    func(speaker Creature, talkType byte, text string)
 	OnChangeSpeed    func(c Creature)
 	OnIconsUpdate    func(p *Player)
+	// OnBosstiaryEntryChanged fires when a player's boss reaches a new unlock
+	// level (protocol layer sends the cyclopedia entry-changed update).
+	OnBosstiaryEntryChanged func(p *Player, bossRaceID uint16)
 
 	// Combat is the world's combat engine, used by the spell system to resolve
 	// spell damage/heal through the same hit/death path as melee.

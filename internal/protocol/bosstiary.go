@@ -1,9 +1,40 @@
 package protocol
 
 import (
+	"time"
+
 	"github.com/opentibiabr/canary-go/internal/bosstiary"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
+
+// SendBosstiaryCooldownTimer sends the per-boss fight cooldowns (0xBD): u16
+// count, then per boss u32 raceId + u64 seconds remaining. Read from the
+// player's boss cooldown store (keyed by boss name). Sent on login and mirrors
+// ProtocolGame::sendBosstiaryCooldownTimer; empty (count 0) when no cooldowns.
+func (g *GameProtocol) SendBosstiaryCooldownTimer() {
+	if g.player == nil || g.deps == nil || g.deps.World == nil || g.deps.World.TypeRegistry == nil {
+		return
+	}
+	now := time.Now().Unix()
+	type entry struct {
+		raceID  uint16
+		seconds uint64
+	}
+	var entries []entry
+	for raceID, mt := range g.deps.World.TypeRegistry.BosstiaryMonsters() {
+		if ts := g.player.GetBossCooldown(mt.Name); ts > now {
+			entries = append(entries, entry{raceID, uint64(ts - now)})
+		}
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xBD)
+	w.AddU16(uint16(len(entries)))
+	for _, e := range entries {
+		w.AddU32(uint32(e.raceID))
+		w.AddU64(e.seconds)
+	}
+	g.SendToClient(w)
+}
 
 // SendBosstiaryEntryChanged notifies the client that a boss's cyclopedia entry
 // changed (new level/points) so it refreshes that entry. Mirrors

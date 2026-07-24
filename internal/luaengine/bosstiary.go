@@ -59,16 +59,8 @@ func (e *Engine) playerAddbosstiarykill(L *lua.LState) int {
 		amount = uint32(L.CheckInt(3))
 	}
 
-	raceID := mt.BosstiaryRaceID
-	race := mt.BosstiaryRace
-	oldLevel := bosstiary.Level(race, p.GetBestiaryKillCount(raceID))
-	p.AddBestiaryKillCount(raceID, amount)
-	newLevel := bosstiary.Level(race, p.GetBestiaryKillCount(raceID))
-
-	if newLevel > oldLevel {
-		// Match C++: award the (new) level's stage points.
-		p.AddBossPoints(uint32(bosstiary.PointsForLevel(race, newLevel)))
-		e.sendBosstiaryEntryChanged(p, raceID)
+	if p.AddBosstiaryKill(mt.BosstiaryRaceID, mt.BosstiaryRace, amount) {
+		e.sendBosstiaryEntryChanged(p, mt.BosstiaryRaceID)
 	}
 	L.Push(lua.LTrue)
 	return 1

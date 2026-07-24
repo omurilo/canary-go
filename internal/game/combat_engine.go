@@ -721,6 +721,16 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 			}
 			p.GetTaskHunter().OnKillMonster(raceID)
 
+			// Bosstiary: credit the boss kill and, on a level-up, refresh the
+			// cyclopedia entry.
+			if m.Type != nil && m.Type.IsBoss() {
+				if p.AddBosstiaryKill(m.Type.BosstiaryRaceID, m.Type.BosstiaryRace, 1) {
+					if e.world.OnBosstiaryEntryChanged != nil {
+						e.world.OnBosstiaryEntryChanged(p, m.Type.BosstiaryRaceID)
+					}
+				}
+			}
+
 			if bonus, ok := p.GetPrey().GetPreyBonus(raceID, PreyBonus_ImprovedLoot); ok {
 				lootMultiplier *= float64(100+bonus) / 100.0
 			}

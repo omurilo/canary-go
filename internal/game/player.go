@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/opentibiabr/canary-go/internal/bosstiary"
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 	"github.com/opentibiabr/canary-go/internal/game/vocations"
@@ -509,6 +510,24 @@ func (p *Player) GetRemoveTimes() uint8 {
 
 // AddRemoveTime increments the slot-boss removal counter (Player::addRemoveTime).
 func (p *Player) AddRemoveTime() { p.BossRemoveTimes = p.GetRemoveTimes() + 1 }
+
+// AddBosstiaryKill credits `amount` kills of a boss (bosstiary race id + rarity)
+// and, when the kills cross into a new unlock level, awards that level's boss
+// points. Returns true if the boss level increased (caller sends the cyclopedia
+// entry-changed update). Mirrors IOBosstiary::addBosstiaryKill.
+func (p *Player) AddBosstiaryKill(raceID uint16, race bosstiary.Rarity, amount uint32) bool {
+	if raceID == 0 || amount == 0 || !bosstiary.IsBoss(race) {
+		return false
+	}
+	oldLevel := bosstiary.Level(race, p.GetBestiaryKillCount(raceID))
+	p.AddBestiaryKillCount(raceID, amount)
+	newLevel := bosstiary.Level(race, p.GetBestiaryKillCount(raceID))
+	if newLevel > oldLevel {
+		p.AddBossPoints(uint32(bosstiary.PointsForLevel(race, newLevel)))
+		return true
+	}
+	return false
+}
 
 func (p *Player) GetID() uint32     { return p.ID }
 func (p *Player) GetName() string   { return p.Name }

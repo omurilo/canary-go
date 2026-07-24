@@ -535,6 +535,9 @@ func (g *GameProtocol) enterWorld() {
 	g.SendPreyPrices()
 	g.SendAllPreyData()
 
+	// Boss Cyclopedia fight cooldowns (empty when the player has none).
+	g.SendBosstiaryCooldownTimer()
+
 	// Keep-alive pings start once the player is in the world.
 	g.startPingLoop()
 
