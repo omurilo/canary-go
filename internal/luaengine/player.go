@@ -3077,12 +3077,28 @@ func playerRemovetibiacoins(L *lua.LState) int {
 	return 1
 }
 
+// playerRemovetransferableandtibiacoins spends from the combined coin pool,
+// transferable first then normal — C++ account->removeCoins(Transferable,
+// Normal, amount). Used by store purchases of Transferable-coin offers (the
+// default), so this must actually deduct or coins never decrease.
 func playerRemovetransferableandtibiacoins(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LFalse)
+		return 1
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	amount := uint32(L.CheckInt(2))
+	if p.CoinTransferable+p.CoinBalance < amount {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	if p.CoinTransferable >= amount {
+		p.CoinTransferable -= amount
+	} else {
+		p.CoinBalance -= amount - p.CoinTransferable
+		p.CoinTransferable = 0
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 

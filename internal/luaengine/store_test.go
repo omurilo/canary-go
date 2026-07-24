@@ -310,3 +310,27 @@ func TestGamestoreCatalogLoads(t *testing.T) {
 		t.Fatalf("openStore layout: %v", err)
 	}
 }
+
+// TestRemoveTransferableAndTibiaCoins verifies the combined coin deduction used
+// by store purchases (transferable first, then normal). A prior stub returned
+// true without deducting, so purchases never reduced the balance.
+func TestRemoveTransferableAndTibiaCoins(t *testing.T) {
+	w := game.NewWorld()
+	w.TypeRegistry = creatures.NewTypeRegistry()
+	e := New(w, slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})))
+	player := &game.Player{Name: "Buyer", CoinBalance: 100, CoinTransferable: 30}
+	w.AddPlayer(player, &recordSession{p: player})
+	e.mu.Lock()
+	up := e.L.NewUserData()
+	up.Value = player
+	e.L.SetMetatable(up, e.L.GetTypeMetatable("Player"))
+	e.L.SetGlobal("_p", up)
+	e.mu.Unlock()
+	if err := e.DoString(`if not _p:removeTransferableAndTibiaCoins(50) then error("returned false") end`); err != nil {
+		t.Fatalf("deduct: %v", err)
+	}
+	// 50 spent: 30 transferable + 20 normal => transferable 0, normal 80.
+	if player.CoinTransferable != 0 || player.CoinBalance != 80 {
+		t.Fatalf("after spending 50: transferable=%d normal=%d, want 0/80", player.CoinTransferable, player.CoinBalance)
+	}
+}
