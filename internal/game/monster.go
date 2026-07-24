@@ -17,6 +17,7 @@ const (
 type Monster struct {
 	BaseCreature
 	TargetDistance int32
+	Master         Creature
 	// CorpseID is the item id dropped on death. 0 means "unknown" and the
 	// combat engine falls back to a default. Populated from MonsterType.Corpse.
 	CorpseID uint16

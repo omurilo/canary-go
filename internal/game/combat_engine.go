@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"math/rand"
 	"strings"
 	"sync"
@@ -695,7 +696,12 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	// (no damage-share split, party, stamina or bonus multipliers yet).
 	// (src/creatures/creature.cpp:609-656, player.cpp:3560).
 	if m, ok := victim.(*Monster); ok {
-		if p, ok := killer.(*Player); ok {
+		actualKiller := killer
+		if mKiller, ok := killer.(*Monster); ok && mKiller.Master != nil {
+			actualKiller = mKiller.Master
+		}
+
+		if p, ok := actualKiller.(*Player); ok {
 			var raceID uint16
 			if m.Type != nil {
 				raceID = m.Type.RaceID
@@ -708,6 +714,9 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 				p.AddExperience(finalExp)
 				if e.world.OnPlayerStatsChange != nil {
 					e.world.OnPlayerStatsChange(p)
+				}
+				if e.world.OnTextMessage != nil {
+					e.world.OnTextMessage(p, 26, uint32(finalExp), fmt.Sprintf("You gained %d experience points.", finalExp))
 				}
 			}
 			p.GetTaskHunter().OnKillMonster(raceID)

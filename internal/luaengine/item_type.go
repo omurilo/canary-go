@@ -57,6 +57,51 @@ func (e *Engine) registerItemType() {
 			}
 			return 1
 		},
+		"isFluidContainer": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.IsFluidContainer()))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"getFluidSource": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LNumber(it.item.FluidSource))
+			} else {
+				L.Push(lua.LNumber(0))
+			}
+			return 1
+		},
+		"getCharges": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LNumber(it.item.Charges))
+			} else {
+				L.Push(lua.LNumber(0))
+			}
+			return 1
+		},
+		"isRune": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.TypeName == "rune"))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"getDecayId": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LNumber(it.item.DecayTo))
+			} else {
+				L.Push(lua.LNumber(0))
+			}
+			return 1
+		},
 		"isMovable": func(L *lua.LState) int {
 			it := checkItemType(L, 1)
 			if it.item != nil {

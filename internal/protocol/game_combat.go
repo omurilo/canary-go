@@ -12,6 +12,7 @@ import (
 const (
 	messageDamageDealt    = 23  // MESSAGE_DAMAGE_DEALT
 	messageDamageReceived = 24  // MESSAGE_DAMAGE_RECEIVED
+	textcolorWhite        = 215 // TEXTCOLOR_WHITE_EXP (experience gain)
 	textcolorRed          = 180 // TEXTCOLOR_RED (physical/blood damage)
 	textcolorNone         = 255 // TEXTCOLOR_NONE
 )
@@ -54,6 +55,13 @@ func (g *GameProtocol) sendDamageText(class byte, pos game.Position, value uint3
 	w.AddByte(textcolorNone) // secondary.color
 	w.AddString(text)
 	g.SendToClient(w)
+}
+
+// SendExpMessage sends an experience gained message + animated text to the player client.
+func SendExpMessage(p *game.Player, exp uint32, text string) {
+	if gp, ok := p.Session.(*GameProtocol); ok {
+		gp.sendDamageText(26, p.GetPosition(), exp, textcolorWhite, text)
+	}
 }
 
 // sendTileAddItem tells this client an item appeared on top of a tile

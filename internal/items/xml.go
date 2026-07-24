@@ -127,6 +127,47 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 		if v, err := strconv.ParseUint(attr.Value, 10, 16); err == nil {
 			it.TransformDeEquipTo = uint16(v)
 		}
+	case "fluidsource", "fluidSource":
+		var fluidType uint16
+		switch strings.ToLower(attr.Value) {
+		case "water":
+			fluidType = 1
+		case "wine":
+			fluidType = 2
+		case "beer":
+			fluidType = 3
+		case "mud":
+			fluidType = 4
+		case "blood":
+			fluidType = 5
+		case "slime":
+			fluidType = 6
+		case "oil":
+			fluidType = 7
+		case "urine":
+			fluidType = 8
+		case "milk":
+			fluidType = 9
+		case "mana":
+			fluidType = 10
+		case "life":
+			fluidType = 11
+		case "lemonade":
+			fluidType = 12
+		case "rum":
+			fluidType = 13
+		case "fruitjuice", "juice":
+			fluidType = 14
+		case "coconutmilk":
+			fluidType = 15
+		case "mead":
+			fluidType = 16
+		case "tea":
+			fluidType = 17
+		case "ink":
+			fluidType = 18
+		}
+		it.FluidSource = fluidType
 	default:
 		// Attempt to parse as int for Stats (e.g., skillSword, absorbpercentfire, elementice)
 		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {

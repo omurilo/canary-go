@@ -56,6 +56,9 @@ do
 	rawgetmetatable("Player").__index = CreatureIndex
 	rawgetmetatable("Monster").__index = CreatureIndex
 	rawgetmetatable("Npc").__index = CreatureIndex
+	if rawgetmetatable("Creature") then
+		rawgetmetatable("Creature").__index = CreatureIndex
+	end
 end
 
 -- Item index

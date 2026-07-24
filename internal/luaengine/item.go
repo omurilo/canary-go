@@ -758,6 +758,10 @@ func (e *Engine) itemTransform(L *lua.LState) int {
 	if newID > 0 {
 		e.world.TransformItem(li.pos, li.item, newID)
 	}
+	if L.GetTop() >= 3 && L.Get(3).Type() == lua.LTNumber {
+		subType := uint16(L.CheckNumber(3))
+		li.item.Count = subType
+	}
 	L.Push(lua.LBool(true))
 	return 1
 }

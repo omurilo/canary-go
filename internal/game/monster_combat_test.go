@@ -123,3 +123,41 @@ func TestNoLootWhenLootDropDisabled(t *testing.T) {
 		t.Errorf("expected empty corpse with lootDrop=false, got %+v", corpse.Contents)
 	}
 }
+
+// TestDeathAwardsExperienceToSummonMaster verifies that killing a monster via a summon
+// grants experience to the player master and triggers text messages.
+func TestDeathAwardsExperienceToSummonMaster(t *testing.T) {
+	w := NewWorld()
+	pos := Position{X: 100, Y: 100, Z: 7}
+	w.Map.SetTile(pos, &Tile{Ground: &Item{ID: 1}})
+
+	var textMsgPushed int
+	w.OnTextMessage = func(p *Player, class uint8, value uint32, text string) {
+		if class == 26 && value == 100 {
+			textMsgPushed++
+		}
+	}
+
+	mt := ratType()
+	mt.Experience = 100
+	monster := NewMonster(42, "Rat", mt)
+	monster.SetPosition(pos)
+	monster.SetHealth(0)
+
+	player := &Player{Level: 1, MaxHealth: 150, MaxMana: 30}
+	player.ID = 0x10000001
+
+	summon := NewMonster(43, "Summon", nil)
+	summon.Master = player
+
+	e := NewCombatEngine(w)
+	e.handleDeath(monster, summon)
+
+	if player.Experience != 100 {
+		t.Errorf("Experience = %d, want 100", player.Experience)
+	}
+	if textMsgPushed != 1 {
+		t.Errorf("OnTextMessage hook fired %d times, want 1", textMsgPushed)
+	}
+}
+

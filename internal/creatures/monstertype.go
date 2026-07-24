@@ -138,11 +138,12 @@ func NewTypeRegistry() *TypeRegistry {
 }
 
 type xmlMonster struct {
-	Name     string      `xml:"name,attr"`
-	Speed    uint32      `xml:"speed,attr"`
-	Health   xmlHealth   `xml:"health"`
-	Look     xmlLook     `xml:"look"`
-	Elements xmlElements `xml:"elements"`
+	Name       string      `xml:"name,attr"`
+	Speed      uint32      `xml:"speed,attr"`
+	Experience uint64      `xml:"experience,attr"`
+	Health     xmlHealth   `xml:"health"`
+	Look       xmlLook     `xml:"look"`
+	Elements   xmlElements `xml:"elements"`
 }
 
 type xmlElements struct {
@@ -202,10 +203,11 @@ func (r *TypeRegistry) LoadMonsters(dataDir string) error {
 		var mon xmlMonster
 		if err := xml.Unmarshal(data, &mon); err == nil && mon.Name != "" {
 			mType := &MonsterType{
-				Name:      mon.Name,
-				Speed:     mon.Speed,
-				MaxHealth: mon.Health.Max,
-				Corpse:    mon.Look.Corpse,
+				Name:       mon.Name,
+				Speed:      mon.Speed,
+				MaxHealth:  mon.Health.Max,
+				Experience: mon.Experience,
+				Corpse:     mon.Look.Corpse,
 				Outfit: Outfit{
 					LookType:  mon.Look.Type,
 					Head:      mon.Look.Head,

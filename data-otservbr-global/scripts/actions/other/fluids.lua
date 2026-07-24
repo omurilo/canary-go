@@ -115,9 +115,11 @@ function fluid.onUse(player, item, fromPosition, target, toPosition, isHotkey)
 	end
 
 	if target.itemid == 1 then
+		error("TARGET UID: " .. tostring(target.uid) .. " PLAYER UID: " .. tostring(player.uid))
 		if item.type == 0 then
 			player:sendTextMessage(MESSAGE_FAILURE, "It is empty.")
 		elseif target.uid == player.uid then
+			error("ITEM TYPE IS: " .. tostring(item.type))
 			if table.contains({ 2, 3, 13, 16 }, item.type) then
 				player:addCondition(drunk)
 			elseif item.type == 6 then

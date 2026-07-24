@@ -551,9 +551,7 @@ func playerAddmana(L *lua.LState) int {
 		return 0
 	}
 	amount := int32(L.CheckNumber(2))
-	game.GlobalDispatcher.AddEvent(0, func() {
-		p.AddMana(amount)
-	})
+	p.AddMana(amount)
 	return 0
 }
 

@@ -217,6 +217,24 @@ var creatureMethods = map[string]lua.LGFunction{
 	"unregisterEvent": creatureUnregisterevent,
 	"isRemoved": creatureIsremoved,
 	"isCreature": creatureIscreature,
+	"isPlayer": func(L *lua.LState) int {
+		c := checkCreature(L)
+		_, ok := c.(*game.Player)
+		L.Push(lua.LBool(ok))
+		return 1
+	},
+	"isMonster": func(L *lua.LState) int {
+		c := checkCreature(L)
+		_, ok := c.(*game.Monster)
+		L.Push(lua.LBool(ok))
+		return 1
+	},
+	"isNpc": func(L *lua.LState) int {
+		c := checkCreature(L)
+		_, ok := c.(*game.Npc)
+		L.Push(lua.LBool(ok))
+		return 1
+	},
 	// Native down-casts: `creature:getPlayer()` etc. return self when the
 	// underlying Go type matches, else nil. Many scripts start with
 	// `local player = creature:getPlayer()` (e.g. the temple/citizen movement),
@@ -336,9 +354,7 @@ func creatureAddhealth(L *lua.LState) int {
 		return 0
 	}
 	amount := int32(L.CheckNumber(2))
-	game.GlobalDispatcher.AddEvent(0, func() {
-		c.AddHealth(amount)
-	})
+	c.AddHealth(amount)
 	return 0
 }
 

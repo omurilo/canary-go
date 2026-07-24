@@ -181,7 +181,8 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 // stack is re-sent. `pos` is the item's source location as sent by the client
 // and `stackpos` is the map stack index (only used for map items).
 func (g *GameProtocol) reconcileUsedItem(item *game.Item, pos netmsg.Position, stackpos uint8) {
-	consumed := item.Count == 0
+	t := g.deps.Items.Get(item.ID)
+	consumed := item.Count == 0 && (t != nil && t.Stackable)
 	if pos.X == 0xFFFF {
 		if pos.Y >= 0x40 { // inside a container
 			cid := uint8(pos.Y - 0x40)

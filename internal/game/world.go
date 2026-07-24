@@ -47,6 +47,9 @@ type World struct {
 	// experience/level changes, e.g. on a monster kill.
 	OnPlayerStatsChange func(p *Player)
 
+	// OnTextMessage pushes a text message / animated text packet (0xB4) to a player.
+	OnTextMessage func(p *Player, class uint8, value uint32, text string)
+
 	// OnPlayerDeath is fired when a player's health reaches 0. The protocol
 	// layer applies the death penalty, teleports the player to their temple,
 	// and refreshes the client (the model-side penalty is applied before this

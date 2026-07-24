@@ -321,6 +321,9 @@ func run(o runOpts, log *slog.Logger) error {
 	world.OnPlayerStatsChange = func(p *game.Player) {
 		protocol.SendPlayerStats(p)
 	}
+	world.OnTextMessage = func(p *game.Player, class uint8, value uint32, text string) {
+		protocol.SendExpMessage(p, value, text)
+	}
 	world.OnPlayerDeath = func(p *game.Player, killer game.Creature) {
 		protocol.HandlePlayerDeath(world, p, killer)
 		// Persist the penalty immediately so a crash/relog can't revert it.

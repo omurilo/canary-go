@@ -128,7 +128,16 @@ func (e *ActionsEngine) ExecuteUse(player *game.Player, item *game.Item, fromPos
 	} else if tCreature, ok := target.(game.Creature); ok {
 		tUd := L.NewUserData()
 		tUd.Value = tCreature
-		L.SetMetatable(tUd, L.GetTypeMetatable("Creature"))
+		mtName := "Creature"
+		switch tCreature.(type) {
+		case *game.Player:
+			mtName = "Player"
+		case *game.Npc:
+			mtName = "Npc"
+		case *game.Monster:
+			mtName = "Monster"
+		}
+		L.SetMetatable(tUd, L.GetTypeMetatable(mtName))
 		L.Push(tUd)
 	} else {
 		L.Push(lua.LNil)

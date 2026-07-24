@@ -78,6 +78,7 @@ type ItemType struct {
 	Armor        int32
 	Attack       int32
 	Defense      int32
+	FluidSource  uint16
 	ExtraDefense int32
 	DecayTo      uint16
 	Duration     uint32
@@ -104,7 +105,7 @@ func (t *ItemType) AlwaysOnTop() bool { return t.AlwaysOnTopOrder > 0 }
 
 func (t *ItemType) IsContainer() bool      { return t.Group == GroupContainer }
 func (t *ItemType) IsGround() bool         { return t.Group == GroupGround }
-func (t *ItemType) IsFluidContainer() bool { return t.Group == GroupFluid }
+func (t *ItemType) IsFluidContainer() bool { return t.ID > 1 && t.Group == GroupFluid }
 func (t *ItemType) IsSplash() bool         { return t.Group == GroupSplash }
 
 func (t *ItemType) GetWeight() uint32 {

@@ -185,6 +185,13 @@ func (e *Engine) CallAction(a *actions.Action, player *game.Player, item *game.I
 			targetUd = ud
 		}
 	}
+	if targetUd == lua.LNil {
+		dummyItem := &game.Item{ID: 1, Count: 0}
+		ud := L.NewUserData()
+		ud.Value = luaItem{item: dummyItem, pos: toPos}
+		L.SetMetatable(ud, L.GetTypeMetatable("Item"))
+		targetUd = ud
+	}
 
 	toPosUd := L.NewUserData()
 	toPosUd.Value = toPos
