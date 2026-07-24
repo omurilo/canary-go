@@ -18,6 +18,11 @@ func (e *Engine) registerMonsterType() {
 			L.Push(lua.LString(m.Name))
 			return 1
 		},
+		"getName": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			L.Push(lua.LString(m.Name))
+			return 1
+		},
 		"register": func(L *lua.LState) int {
 			m := checkMonsterType(L)
 			table := L.CheckTable(2)
@@ -352,4 +357,11 @@ func checkMonsterType(L *lua.LState) *creatures.MonsterType {
 	}
 	L.ArgError(1, "MonsterType expected")
 	return nil
+}
+
+func pushMonsterType(L *lua.LState, m *creatures.MonsterType) {
+	ud := L.NewUserData()
+	ud.Value = m
+	L.SetMetatable(ud, L.GetTypeMetatable(luaMonsterTypeName))
+	L.Push(ud)
 }

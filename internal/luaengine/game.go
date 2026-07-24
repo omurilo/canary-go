@@ -101,7 +101,18 @@ func (e *Engine) registerGame() {
 }
 
 
-func (e *Engine) gameGetMonsterTypeByName(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetMonsterTypeByName(L *lua.LState) int {
+	name := strings.ToLower(L.CheckString(1))
+	if e == nil || e.world == nil || e.world.TypeRegistry == nil {
+		return 0
+	}
+	mType := e.world.TypeRegistry.Monsters[name]
+	if mType == nil {
+		return 0
+	}
+	pushMonsterType(L, mType)
+	return 1
+}
 func (e *Engine) gameGetSpectators(L *lua.LState) int {
 	table := L.NewTable()
 	if L.GetTop() == 0 {
@@ -197,7 +208,19 @@ func (e *Engine) gameGetExperienceForLevel(L *lua.LState) int { L.Push(lua.LNumb
 func (e *Engine) gameGetMonsterCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameGetPlayerCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameGetNpcCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
-func (e *Engine) gameGetMonsterTypes(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetMonsterTypes(L *lua.LState) int {
+	tbl := L.NewTable()
+	if e != nil && e.world != nil && e.world.TypeRegistry != nil {
+		for name, mType := range e.world.TypeRegistry.Monsters {
+			ud := L.NewUserData()
+			ud.Value = mType
+			L.SetMetatable(ud, L.GetTypeMetatable(luaMonsterTypeName))
+			L.SetField(tbl, name, ud)
+		}
+	}
+	L.Push(tbl)
+	return 1
+}
 func (e *Engine) gameGetTowns(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetHouses(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetGameState(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }

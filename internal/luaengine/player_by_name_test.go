@@ -3,6 +3,7 @@ package luaengine
 import (
 	"testing"
 
+	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
 )
 
@@ -64,6 +65,28 @@ func TestWebhookAndAnnouncementChannels(t *testing.T) {
 	`)
 	if err != nil {
 		t.Fatalf("Webhook test failed: %v", err)
+	}
+}
+
+func TestMonsterTypeByNameAndAddItem(t *testing.T) {
+	w := game.NewWorld()
+	w.TypeRegistry.Monsters["dragon"] = &creatures.MonsterType{Name: "Dragon"}
+	e := New(w, nil)
+
+	err := e.L.DoString(`
+		local mt = Game.getMonsterTypeByName("Dragon")
+		assert(mt ~= nil, "Game.getMonsterTypeByName('Dragon') returned nil")
+		assert(mt:getName() == "Dragon", "Expected name Dragon")
+
+		local types = Game.getMonsterTypes()
+		assert(types["dragon"] ~= nil, "Game.getMonsterTypes() missing dragon")
+
+		local container = Container(1988)
+		local item = container:addItem(2160, 10)
+		assert(item ~= nil, "container:addItem must return item")
+	`)
+	if err != nil {
+		t.Fatalf("TestMonsterTypeByNameAndAddItem failed: %v", err)
 	}
 }
 

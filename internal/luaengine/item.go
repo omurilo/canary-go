@@ -229,6 +229,22 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		"clone": stubItemMethod,
 		"split": stubItemMethod,
 		"remove": itemRemove,
+		"addItem": func(L *lua.LState) int {
+			it := checkItem(L)
+			itemID, ok := e.resolveItemID(L, 2)
+			if !ok {
+				L.Push(lua.LNil)
+				return 1
+			}
+			count := uint16(luaOptInt(L, 3))
+			if count == 0 {
+				count = 1
+			}
+			newItem := &game.Item{ID: itemID, Count: count, Parent: it.item}
+			it.item.Contents = append(it.item.Contents, newItem)
+			e.pushItem(L, newItem)
+			return 1
+		},
 		"getTier": func(L *lua.LState) int {
 			it := checkItem(L)
 			L.Push(lua.LNumber(it.item.GetTier()))
