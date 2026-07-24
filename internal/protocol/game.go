@@ -203,9 +203,28 @@ func (g *GameProtocol) stopPingLoop() {
 // Player implements game.Session.
 func (g *GameProtocol) Player() *game.Player { return g.player }
 
+// storeSendOpcodes are the server->client opcodes the gamestore module emits;
+// used only for temporary debug logging of the store wire.
+var storeSendOpcodes = map[byte]string{
+	0xDF: "CoinBalance", 0xE0: "StoreError", 0xE1: "RequestPurchaseData",
+	0xEA: "OfferDescription", 0xF2: "CoinBalanceUpdating",
+	0xFB: "OpenStore", 0xFC: "StoreOffers", 0xFD: "TransactionHistory", 0xFE: "CompletePurchase",
+}
+
 // SendToClient implements game.Session.
 func (g *GameProtocol) SendToClient(w *netmsg.Writer) {
 	if g.conn != nil {
+		if b := w.Bytes(); g.deps != nil && g.deps.Log != nil && len(b) > 0 {
+			if name, ok := storeSendOpcodes[b[0]]; ok {
+				dump := b
+				if len(dump) > 64 {
+					dump = dump[:64]
+				}
+				g.deps.Log.Info("store packet -> client",
+					"opcode", fmt.Sprintf("0x%02X", b[0]), "name", name,
+					"len", len(b), "hex", fmt.Sprintf("%x", dump))
+			}
+		}
 		_ = g.conn.Send(w)
 	}
 }
@@ -413,7 +432,8 @@ func (g *GameProtocol) dispatchStore(op byte, r *netmsg.Reader) {
 		return
 	}
 	data := r.GetBytes(r.Remaining())
-	g.deps.Log.Info("store opcode received", "op", fmt.Sprintf("0x%02X", op), "payloadLen", len(data))
+	g.deps.Log.Info("store opcode <- client", "op", fmt.Sprintf("0x%02X", op),
+		"payloadLen", len(data), "hex", fmt.Sprintf("%x", data))
 	g.deps.Lua.DispatchStorePacket(g.player, op, data)
 }
 
