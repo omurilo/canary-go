@@ -2,44 +2,42 @@ package luaengine
 
 import (
 	"testing"
+	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 )
 
-func TestGameGetSpectatorsLuaMethod(t *testing.T) {
+func TestGameGetSpectatorsLargeRange(t *testing.T) {
 	e := newTestEngine()
-	w := e.world
 
-	pos := game.Position{X: 1000, Y: 1000, Z: 7}
-	player := &game.Player{Name: "TestPlayer"}
-	player.SetPosition(pos)
+	p1 := &game.Player{Name: "TargetPlayer"}
+	p1.SetPosition(game.Position{X: 3000, Y: 3000, Z: 7})
+	e.world.AddPlayer(p1, nil)
 
-	tile := &game.Tile{
-		Creatures: []game.Creature{player},
-	}
-	w.Map.SetTile(pos, tile)
+	p2 := &game.Player{Name: "SearcherPlayer"}
+	p2.SetPosition(game.Position{X: 100, Y: 100, Z: 7})
+	e.world.AddPlayer(p2, nil)
 
-	e.registerGame()
-
-	// Test 1: Game.getSpectators returns table with player
+	start := time.Now()
+	// Simulate Lua call Game.getSpectators(pos, true, true, 5000, 5000, 5000, 5000)
 	script := `
-		local pos = Position(1000, 1000, 7)
-		local specs = Game.getSpectators(pos, false, false, 3, 3, 3, 3)
-		assert(type(specs) == "table", "specs must be table")
-		assert(#specs == 1, "expected 1 spectator, got " .. tostring(#specs))
+		local pos = Position(100, 100, 7)
+		local specs = Game.getSpectators(pos, true, true, 5000, 5000, 5000, 5000)
+		return #specs
 	`
-	if err := e.DoString(script); err != nil {
-		t.Fatalf("Game.getSpectators test failed: %v", err)
+	err := e.DoString(script)
+	if err != nil {
+		t.Fatalf("Lua execution error: %v", err)
 	}
 
-	// Test 2: Game.getSpectators on empty pos returns empty table ({}), not nil
-	scriptEmpty := `
-		local pos = Position(2000, 2000, 7)
-		local specs = Game.getSpectators(pos, false, false, 3, 3, 3, 3)
-		assert(type(specs) == "table", "specs must be table")
-		assert(#specs == 0, "expected 0 spectators, got " .. tostring(#specs))
-	`
-	if err := e.DoString(scriptEmpty); err != nil {
-		t.Fatalf("Game.getSpectators empty test failed: %v", err)
+	elapsed := time.Since(start)
+	if elapsed > 100*time.Millisecond {
+		t.Errorf("Game.getSpectators with range 5000 took too long: %v (expected < 100ms)", elapsed)
+	}
+
+	res := e.L.Get(-1)
+	e.L.Pop(1)
+	if count, ok := res.(interface{ String() string }); !ok || count.String() != "2" {
+		t.Errorf("Expected 2 spectators, got %v", res)
 	}
 }

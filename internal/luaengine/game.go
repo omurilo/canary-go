@@ -6,6 +6,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/opentibiabr/canary-go/internal/otbm"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -157,6 +158,48 @@ func (e *Engine) gameGetSpectators(L *lua.LState) int {
 	}
 	maxY = centerPos.Y + maxRangeY
 
+	totalWidth := uint64(maxX - minX + 1)
+	totalHeight := uint64(maxY - minY + 1)
+	totalFloors := uint64(endZ - startZ + 1)
+	totalTiles := totalWidth * totalHeight * totalFloors
+
+	if totalTiles > 2500 {
+		var candidates []game.Creature
+		players := e.world.Players()
+		if onlyPlayers {
+			candidates = make([]game.Creature, 0, len(players))
+			for _, p := range players {
+				candidates = append(candidates, p)
+			}
+		} else {
+			creatures := e.world.Creatures()
+			candidates = make([]game.Creature, 0, len(players)+len(creatures))
+			for _, p := range players {
+				candidates = append(candidates, p)
+			}
+			for _, c := range creatures {
+				candidates = append(candidates, c)
+			}
+		}
+
+		for _, cr := range candidates {
+			if cr == nil {
+				continue
+			}
+			pos := cr.GetPosition()
+			if pos.Z >= startZ && pos.Z <= endZ &&
+				pos.X >= minX && pos.X <= maxX &&
+				pos.Y >= minY && pos.Y <= maxY {
+				e.pushCreature(L, cr)
+				table.Append(L.Get(-1))
+				L.Pop(1)
+			}
+		}
+
+		L.Push(table)
+		return 1
+	}
+
 	for z := startZ; z <= endZ; z++ {
 		for x := minX; x <= maxX; x++ {
 			for y := minY; y <= maxY; y++ {
@@ -209,8 +252,25 @@ func (e *Engine) gameGetPlayers(L *lua.LState) int {
 	L.Push(table)
 	return 1
 }
-func (e *Engine) gameLoadMap(L *lua.LState) int { return 0 }
-func (e *Engine) gameLoadMapChunk(L *lua.LState) int { return 0 }
+func (e *Engine) gameLoadMap(L *lua.LState) int {
+	if e == nil || e.world == nil || e.world.Map == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	path := L.CheckString(1)
+	_, err := otbm.Load(path, e.world.Items, e.world.Map)
+	if err != nil {
+		e.log.Warn("game.loadMap failed", "path", path, "err", err)
+		L.Push(lua.LFalse)
+		return 1
+	}
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func (e *Engine) gameLoadMapChunk(L *lua.LState) int {
+	return e.gameLoadMap(L)
+}
 func (e *Engine) gameGetExperienceForLevel(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameGetMonsterCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameGetPlayerCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
