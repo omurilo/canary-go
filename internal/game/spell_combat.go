@@ -132,7 +132,11 @@ func (e *CombatEngine) applySpellHit(c *combat.Combat, caster, target Creature, 
 		e.world.OnCombatHit(caster, target, amount, c.Params.ImpactEffect)
 	}
 
-	fmt.Printf("applySpellHit: caster=%s target=%s amount=%d isHeal=%t health_after=%d\n", caster.GetName(), target.GetName(), amount, isHeal, target.GetHealth())
+	casterName := "nil"
+	if caster != nil {
+		casterName = caster.GetName()
+	}
+	fmt.Printf("applySpellHit: caster=%s target=%s amount=%d isHeal=%t health_after=%d\n", casterName, target.GetName(), amount, isHeal, target.GetHealth())
 
 	// Refresh the target's own stat bars (HP/mana) if it is a player.
 	if p, ok := target.(*Player); ok && e.world.OnPlayerStatsChange != nil {
@@ -143,3 +147,67 @@ func (e *CombatEngine) applySpellHit(c *combat.Combat, caster, target Creature, 
 		e.handleDeath(target, caster)
 	}
 }
+
+// DoTargetCombatHealth applies a health combat effect (healing or damage) directly to target.
+func (e *CombatEngine) DoTargetCombatHealth(caster, target Creature, combatType combat.CombatType, min, max int32, effect uint16) {
+	if target == nil {
+		return
+	}
+	c := combat.NewCombat()
+	c.Params.CombatType = combatType
+	c.Params.ImpactEffect = effect
+
+	val := combat.RandomRange(int(min), int(max))
+
+	dmg := combat.CombatDamage{
+		PrimaryType:  combatType,
+		PrimaryValue: val,
+		Origin:       combat.OriginSpell,
+	}
+	e.applySpellHit(c, caster, target, dmg)
+}
+
+// DoTargetCombatMana applies a mana combat effect directly to target.
+func (e *CombatEngine) DoTargetCombatMana(caster, target Creature, min, max int32, effect uint16) {
+	if target == nil {
+		return
+	}
+	c := combat.NewCombat()
+	c.Params.CombatType = combat.CombatManaDrain
+	c.Params.ImpactEffect = effect
+
+	val := combat.RandomRange(int(min), int(max))
+
+	primaryType := combat.CombatManaDrain
+	if min > 0 || max > 0 {
+		primaryType = combat.CombatHealing
+	}
+
+	dmg := combat.CombatDamage{
+		PrimaryType:  primaryType,
+		PrimaryValue: val,
+		Origin:       combat.OriginSpell,
+	}
+	e.applySpellHit(c, caster, target, dmg)
+}
+
+// DoAreaCombatHealth applies a health combat effect over an area around pos.
+func (e *CombatEngine) DoAreaCombatHealth(caster Creature, combatType combat.CombatType, pos Position, area *combat.AreaCombat, min, max int32, effect uint16) {
+	c := combat.NewCombat()
+	c.Params.CombatType = combatType
+	c.Params.ImpactEffect = effect
+	c.Area = area
+
+	e.DoCombatArea(c, caster, pos)
+}
+
+// DoAreaCombatMana applies a mana combat effect over an area around pos.
+func (e *CombatEngine) DoAreaCombatMana(caster Creature, pos Position, area *combat.AreaCombat, min, max int32, effect uint16) {
+	c := combat.NewCombat()
+	c.Params.CombatType = combat.CombatManaDrain
+	c.Params.ImpactEffect = effect
+	c.Area = area
+
+	e.DoCombatArea(c, caster, pos)
+}
+

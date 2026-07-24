@@ -29,8 +29,8 @@ func randInt(n int) int {
 	return rand.Intn(n)
 }
 
-// randomRange gets a random value between min and max
-func randomRange(min, max int) int32 {
+// RandomRange gets a random value between min and max
+func RandomRange(min, max int) int32 {
 	lo, hi := min, max
 	if lo > hi {
 		lo, hi = hi, lo
@@ -100,7 +100,7 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 	}
 
 	// Apply PvP reduction
-	if caster.IsPlayer() && target.IsPlayer() && damage.PrimaryType != CombatHealing {
+	if caster != nil && target != nil && caster.IsPlayer() && target.IsPlayer() && damage.PrimaryType != CombatHealing {
 		damage.PrimaryValue = damage.PrimaryValue / 2
 	}
 
@@ -109,7 +109,7 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 		if c.Params.BlockedByShield {
 			defense := target.GetDefense()
 			if defense > 0 {
-				reduction := randomRange(int(defense/2), int(defense))
+				reduction := RandomRange(int(defense/2), int(defense))
 				damage.PrimaryValue -= reduction
 				if damage.PrimaryValue <= 0 {
 					damage.PrimaryValue = 0
@@ -120,7 +120,7 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 		if c.Params.BlockedByArmor && damage.PrimaryValue > 0 {
 			armor := target.GetArmor()
 			if armor > 3 {
-				reduction := randomRange(int(armor/2), int(armor-(armor%2+1)))
+				reduction := RandomRange(int(armor/2), int(armor-(armor%2+1)))
 				damage.PrimaryValue -= reduction
 			} else if armor > 0 {
 				damage.PrimaryValue--
@@ -170,7 +170,8 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 
 // DoCombatMana applies combat damage to mana
 func (c *Combat) DoCombatMana(caster Creature, target Creature, damage CombatDamage) bool {
-	if c.Params.Aggressive && !CanDoCombat(caster, target) {
+	isAggressive := c.Params.Aggressive && damage.PrimaryType != CombatHealing
+	if isAggressive && !CanDoCombat(caster, target) {
 		return false
 	}
 

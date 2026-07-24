@@ -119,6 +119,7 @@ var playerMethods = map[string]lua.LGFunction{
 	"getDeathPenalty":                playerGetdeathpenalty,
 	"getExperience":                  playerGetexperience,
 	"addExperience":                  playerAddexperience,
+	"addAchievementProgress":         playerAddAchievementProgress,
 	"removeExperience":               playerRemoveexperience,
 	"getLevel":                       playerGetlevel,
 	"getMagicShieldCapacityFlat":     playerGetmagicshieldcapacityflat,
@@ -478,6 +479,11 @@ func playerAddexperience(L *lua.LState) int {
 			p.AddExperience(uint64(exp))
 		}
 	})
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func playerAddAchievementProgress(L *lua.LState) int {
 	L.Push(lua.LTrue)
 	return 1
 }

@@ -18,6 +18,13 @@ func (e *Engine) registerCombat() {
 	methods := e.combatMethods()
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
 	e.setClassConstructor("Combat", combatCreate, methods)
+
+	e.L.SetGlobal("doTargetCombatHealth", e.L.NewFunction(e.luaDoTargetCombatHealth))
+	e.L.SetGlobal("doTargetCombatMana", e.L.NewFunction(e.luaDoTargetCombatMana))
+	e.L.SetGlobal("doAreaCombatHealth", e.L.NewFunction(e.luaDoAreaCombatHealth))
+	e.L.SetGlobal("doAreaCombatMana", e.L.NewFunction(e.luaDoAreaCombatMana))
+	e.L.SetGlobal("doTargetCombat", e.L.NewFunction(e.luaDoTargetCombatHealth))
+	e.L.SetGlobal("doAreaCombat", e.L.NewFunction(e.luaDoAreaCombatHealth))
 }
 
 // combatMatrixFromTable converts a Lua matrix (rows of {0/1/3,...}) into a flat
@@ -100,7 +107,7 @@ func luaToCombatType(v int) combat.CombatType {
 	case 11:
 		return combat.CombatDeath
 	default:
-		return combat.CombatUndefined
+		return combat.CombatType(v)
 	}
 }
 
@@ -333,3 +340,98 @@ func (e *Engine) combatExecute(L *lua.LState) int {
 	L.Push(lua.LTrue)
 	return 1
 }
+
+func toCreature(L *lua.LState, index int) game.Creature {
+	val := L.Get(index)
+	if ud, ok := val.(*lua.LUserData); ok {
+		if c, ok := ud.Value.(game.Creature); ok {
+			return c
+		}
+	}
+	return nil
+}
+
+func toCombatArea(L *lua.LState, index int) *combat.AreaCombat {
+	val := L.Get(index)
+	if ud, ok := val.(*lua.LUserData); ok {
+		if a, ok := ud.Value.(*combat.AreaCombat); ok {
+			return a
+		}
+	}
+	return nil
+}
+
+func (e *Engine) luaDoTargetCombatHealth(L *lua.LState) int {
+	caster := toCreature(L, 1)
+	target := toCreature(L, 2)
+	if target == nil || e.world == nil || e.world.Combat == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	combatType := luaToCombatType(L.CheckInt(3))
+	min := int32(L.CheckNumber(4))
+	max := int32(L.CheckNumber(5))
+	effect := uint16(L.OptNumber(6, 0))
+
+	e.world.Combat.DoTargetCombatHealth(caster, target, combatType, min, max, effect)
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func (e *Engine) luaDoTargetCombatMana(L *lua.LState) int {
+	caster := toCreature(L, 1)
+	target := toCreature(L, 2)
+	if target == nil || e.world == nil || e.world.Combat == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	min := int32(L.CheckNumber(3))
+	max := int32(L.CheckNumber(4))
+	effect := uint16(L.OptNumber(5, 0))
+
+	e.world.Combat.DoTargetCombatMana(caster, target, min, max, effect)
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func (e *Engine) luaDoAreaCombatHealth(L *lua.LState) int {
+	caster := toCreature(L, 1)
+	if e.world == nil || e.world.Combat == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	combatType := luaToCombatType(L.CheckInt(2))
+	pos, ok := parsePosition(L, 3)
+	if !ok && caster != nil {
+		pos = caster.GetPosition()
+	}
+	area := toCombatArea(L, 4)
+	min := int32(L.CheckNumber(5))
+	max := int32(L.CheckNumber(6))
+	effect := uint16(L.OptNumber(7, 0))
+
+	e.world.Combat.DoAreaCombatHealth(caster, combatType, pos, area, min, max, effect)
+	L.Push(lua.LTrue)
+	return 1
+}
+
+func (e *Engine) luaDoAreaCombatMana(L *lua.LState) int {
+	caster := toCreature(L, 1)
+	if e.world == nil || e.world.Combat == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	pos, ok := parsePosition(L, 2)
+	if !ok && caster != nil {
+		pos = caster.GetPosition()
+	}
+	area := toCombatArea(L, 3)
+	min := int32(L.CheckNumber(4))
+	max := int32(L.CheckNumber(5))
+	effect := uint16(L.OptNumber(6, 0))
+
+	e.world.Combat.DoAreaCombatMana(caster, pos, area, min, max, effect)
+	L.Push(lua.LTrue)
+	return 1
+}
+
