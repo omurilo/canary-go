@@ -302,6 +302,8 @@ func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 
 	if target.GetHealth() == 0 {
 		e.handleDeath(target, attacker)
+	} else if pl, ok := attacker.(*Player); ok {
+		e.applyCharmRune(pl, target)
 	}
 }
 
@@ -387,6 +389,8 @@ func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item, lau
 
 	if target.GetHealth() == 0 {
 		e.handleDeath(target, p)
+	} else {
+		e.applyCharmRune(p, target)
 	}
 }
 
@@ -461,6 +465,8 @@ func (e *CombatEngine) doWandHit(p *Player, target Creature, wand *Item) {
 
 	if target.GetHealth() == 0 {
 		e.handleDeath(target, p)
+	} else {
+		e.applyCharmRune(p, target)
 	}
 }
 
