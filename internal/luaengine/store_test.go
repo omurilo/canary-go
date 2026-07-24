@@ -20,7 +20,7 @@ import (
 // reads (leftover bytes or an underrun), the client drops the category tree —
 // which is the "only recently added shows" bug. This is the end-to-end guard.
 func TestOpenStorePacketOnWire(t *testing.T) {
-	repo := filepath.Join("..", "..", "..")
+	repo := filepath.Join("..", "..") // canary-go root — the datapack the server actually uses
 	core := filepath.Join(repo, "data")
 	gs := filepath.Join(core, "modules", "scripts", "gamestore", "gamestore.lua")
 	if _, err := os.Stat(gs); err != nil {
@@ -84,38 +84,48 @@ func TestOpenStorePacketOnWire(t *testing.T) {
 		t.Fatalf("no S_OpenStore (0xFB) packet emitted; sent %d packets", len(sess.sent))
 	}
 
-	// Decode exactly like otclient parseStore at protocol >= 1332.
+	// Decode exactly like otclient parseStore at protocol >= 1332, but STRICTLY:
+	// the client's InputMessage::getU8 throws on read-past-end (checkRead), so we
+	// assert enough bytes remain BEFORE each read. netmsg.Reader is lenient
+	// (returns 0 past end), which previously masked the underrun.
 	const clientVersion = 1525
 	r := netmsg.NewReader(pkt[1:]) // skip opcode
+	need := func(n int, what string) {
+		if r.Remaining() < n {
+			t.Fatalf("S_OpenStore underrun reading %s: need %d, have %d (client parseStore would throw 'eof reached')", what, n, r.Remaining())
+		}
+	}
+	need(2, "categoryCount")
 	categoryCount := int(r.GetU16())
 	for i := 0; i < categoryCount; i++ {
+		need(2, "category name len")
 		_ = r.GetString() // name
 		if clientVersion < 1291 {
 			_ = r.GetString() // description
 		}
+		need(1, "state")
 		_ = r.GetByte() // state (GameIngameStoreHighlights assumed on)
+		need(1, "iconCount")
 		iconCount := int(r.GetByte())
 		for j := 0; j < iconCount; j++ {
+			need(2, "icon len")
 			_ = r.GetString()
 		}
+		need(2, "parent len")
 		_ = r.GetString() // parent
 	}
 	if clientVersion >= 1332 {
+		need(2, "two trailing bytes (>=1332)")
 		_ = r.GetByte()
 		_ = r.GetByte()
 	}
 	leftover := r.Remaining()
 	t.Logf("S_OpenStore: total=%d bytes, categories=%d, leftover-after-parse=%d", len(pkt), categoryCount, leftover)
-	n := len(pkt)
-	if n > 96 {
-		n = 96
-	}
-	t.Logf("S_OpenStore hex prefix: %x", pkt[:n])
 	if categoryCount == 0 {
 		t.Fatalf("S_OpenStore carried 0 categories (store tree empty)")
 	}
 	if leftover != 0 {
-		t.Fatalf("S_OpenStore parse desync: %d leftover bytes (client would misparse/underrun)", leftover)
+		t.Fatalf("S_OpenStore parse desync: %d leftover bytes (client would misparse)", leftover)
 	}
 }
 
@@ -123,7 +133,7 @@ func TestOpenStorePacketOnWire(t *testing.T) {
 // many categories/offers ended up in GameStore.Categories, to diagnose an empty
 // store window.
 func TestGamestoreCatalogLoads(t *testing.T) {
-	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	root, err := filepath.Abs(filepath.Join("..", "..")) // canary-go root
 	if err != nil {
 		t.Fatal(err)
 	}
