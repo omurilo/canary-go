@@ -678,7 +678,7 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	// Player death: apply the penalty and hand off to the protocol layer for
 	// the temple respawn + client refresh.
 	if p, ok := victim.(*Player); ok {
-		p.ApplyDeathPenalty()
+		p.ApplyDeathPenaltyWith(e.blessDeathReduction(p, killer))
 		if e.world.OnPlayerDeath != nil {
 			e.world.OnPlayerDeath(p, killer)
 		}

@@ -49,9 +49,19 @@ func (p *Player) RemoveExperience(amount uint64) {
 // refills vitals, mirroring the skill-loss branch of Player::death (minus the
 // unmodelled per-vocation stat downgrade and skull/blessing effects). Players
 // at or below level 7, or with no vocation, take no experience loss (C++ guard).
-func (p *Player) ApplyDeathPenalty() {
+func (p *Player) ApplyDeathPenalty() { p.ApplyDeathPenaltyWith(0) }
+
+// ApplyDeathPenaltyWith is ApplyDeathPenalty with an experience/skill loss
+// reduction (0..1), used by the Bless charm (mirrors the deathLossPercent
+// reduction in Player::death).
+func (p *Player) ApplyDeathPenaltyWith(lossReduction float64) {
+	if lossReduction < 0 {
+		lossReduction = 0
+	} else if lossReduction > 1 {
+		lossReduction = 1
+	}
 	if p.SkillLoss && p.Level > 7 && p.Vocation != 0 {
-		lost := uint64(math.Ceil(float64(p.Experience) * p.GetLostPercent()))
+		lost := uint64(math.Ceil(float64(p.Experience) * p.GetLostPercent() * (1 - lossReduction)))
 		if lost > 0 {
 			p.RemoveExperience(lost)
 		}

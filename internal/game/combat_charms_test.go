@@ -217,3 +217,34 @@ func TestApplyCarnageOnDeath(t *testing.T) {
 		t.Fatalf("carnage splash = %d, want 150", got)
 	}
 }
+
+func TestBlessDeathReduction(t *testing.T) {
+	w := newCombatWorld()
+	w.Charms.Add(&charms.Charm{
+		ID: charms.Bless, Category: charms.CategoryMinor, Type: charms.TypePassive,
+		Chance: [3]float32{6, 9, 12},
+	})
+	killer := charmMonster(w, 1000) // race 21
+	e := NewCombatEngine(w)
+	p := &Player{Level: 100, Vocation: 1, SkillLoss: true, Experience: 10_000_000}
+
+	if r := e.blessDeathReduction(p, killer); r != 0 {
+		t.Fatalf("no-bless reduction = %v, want 0", r)
+	}
+	p.SetCharmTier(charms.Bless, 3) // tier 3 -> chance index 2 -> 12%
+	p.SetCharmRace(charms.Bless, 21)
+	p.UsedRunesBit |= uint32(charms.SetBit(0, charms.Bless))
+	if r := e.blessDeathReduction(p, killer); r != 0.12 {
+		t.Fatalf("bless reduction = %v, want 0.12", r)
+	}
+}
+
+func TestApplyDeathPenaltyWith_Reduces(t *testing.T) {
+	p1 := &Player{Level: 100, Vocation: 1, SkillLoss: true, Experience: 10_000_000}
+	p2 := &Player{Level: 100, Vocation: 1, SkillLoss: true, Experience: 10_000_000}
+	p1.ApplyDeathPenaltyWith(0)
+	p2.ApplyDeathPenaltyWith(0.5)
+	if p2.Experience <= p1.Experience {
+		t.Fatalf("bless did not reduce loss: full-loss exp %d, reduced exp %d", p1.Experience, p2.Experience)
+	}
+}

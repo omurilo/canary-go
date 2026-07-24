@@ -291,6 +291,29 @@ func (e *CombatEngine) applyCarnageOnDeath(victim *Monster, killer *Player) {
 	}
 }
 
+// blessDeathReduction returns the experience/skill-loss reduction (0..1) the
+// player's Bless charm grants when killed by the monster it is set on. Mirrors
+// the CHARM_BLESS branch of Player::death (chance[tier] / 100).
+func (e *CombatEngine) blessDeathReduction(p *Player, killer Creature) float64 {
+	if p == nil || e.world == nil || e.world.Charms == nil {
+		return 0
+	}
+	m, ok := killer.(*Monster)
+	if !ok || m.Type == nil || m.Type.RaceID == 0 {
+		return 0
+	}
+	c := e.world.Charms.Get(charms.Bless)
+	if c == nil || p.GetCharmRace(charms.Bless) != m.Type.RaceID {
+		return 0
+	}
+	return float64(c.Chance[charmChanceIndex(p.GetCharmTier(charms.Bless))]) / 100.0
+}
+
+// Unmodelled charms: Scavenge (skinning) and Gut (creature products) need a
+// skinning/products system the port lacks; Fatal Hold needs monster fleeing;
+// VoidInversion needs mana-drain damage typing. These charms can be unlocked
+// and assigned, but have no combat effect until those subsystems exist.
+
 // applyCharmDamage deals a one-off charm hit to the target and fires the health,
 // effect and death hooks, mirroring the tail of the melee/ranged hit handlers.
 func (e *CombatEngine) applyCharmDamage(attacker, target Creature, dmg int32, combatType combat.CombatType, effect uint16) {
