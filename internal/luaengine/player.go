@@ -1169,11 +1169,14 @@ func playerGetclient(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	// Return a client info table. Scripts read `.version` to branch old/new
-	// protocol (e.g. the gamestore module); report a modern protocol version so
-	// the current-client code paths are taken.
+	// Return a client info table. Scripts read `.version` to branch protocol
+	// behaviour (e.g. the gamestore module's openStore/parseRequestStoreOffers
+	// serialize different fields per version). This MUST match the version the
+	// client actually negotiated, or the client desyncs and drops packets — the
+	// game handshake enforces protocol 1525 (see protocol.ClientVersion), so
+	// report that. os=2 is the standard "new client" (CIPSOFT/OTClientV8) flag.
 	t := L.NewTable()
-	L.SetField(t, "version", lua.LNumber(1340))
+	L.SetField(t, "version", lua.LNumber(1525))
 	L.SetField(t, "os", lua.LNumber(2))
 	L.Push(t)
 	return 1

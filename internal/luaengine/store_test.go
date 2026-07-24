@@ -62,4 +62,50 @@ func TestGamestoreCatalogLoads(t *testing.T) {
 		t.Fatalf("catalog not usable by senders: %v", err)
 	}
 	e.LogStoreCatalogStatus()
+
+	// Drive the real openStore() through mock NetworkMessage/Player and decode
+	// the resulting byte stream exactly like the otclient parseStore() does. A
+	// 1525 client reads two trailing bytes after the category list; if openStore
+	// is short, the real client underruns and drops the whole category tree.
+	if err := e.DoString(`
+		-- Mock NetworkMessage that just tallies bytes written, matching the
+		-- wire sizes of each adder.
+		local total = 0
+		local fakeMsg = {}
+		fakeMsg.__index = fakeMsg
+		function fakeMsg:addByte(v) total = total + 1 end
+		function fakeMsg:addU16(v) total = total + 2 end
+		function fakeMsg:addU32(v) total = total + 4 end
+		function fakeMsg:addString(s) total = total + 2 + #tostring(s) end
+		function fakeMsg:sendToPlayer(p) self.sent = true end
+		_G.NetworkMessage = function() return setmetatable({}, fakeMsg) end
+
+		_G.Player = function()
+			return {
+				getClient = function() return { version = 1525, os = 2 } end,
+				getVocation = function() return { getId = function() return 1 end } end,
+				getId = function() return 1 end,
+			}
+		end
+		_G.sendStoreBalanceUpdating = function() end
+
+		if type(openStore) ~= "function" then error("openStore global not exposed") end
+		openStore(1)
+
+		-- Expected minimum: opcode(1) + count(2) + per category
+		-- [name str + state(1) + iconCount(1) + icons + parent str] + 2 trailing.
+		local cats = _G.GameStore.Categories
+		local expected = 1 + 2 + 2 -- opcode + u16 count + 2 trailing
+		for _, c in ipairs(cats) do
+			expected = expected + (2 + #c.name) + 1 + 1
+			for _, ic in ipairs(c.icons or {}) do expected = expected + 2 + #ic end
+			expected = expected + (c.parent and (2 + #c.parent) or 2)
+		end
+		if total ~= expected then
+			error(string.format("openStore packet size mismatch: got %d want %d (trailing bytes missing?)", total, expected))
+		end
+		print(string.format("STORE_OPEN_OK bytes=%d categories=%d", total, #cats))
+	`); err != nil {
+		t.Fatalf("openStore layout: %v", err)
+	}
 }
