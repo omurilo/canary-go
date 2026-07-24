@@ -477,6 +477,19 @@ func run(o runOpts, log *slog.Logger) error {
 	// then log the real count.
 	resolveMonsterLoot(creatureTypes, catalog, log)
 	log.Info("loaded monster types (lua)", "count", len(creatureTypes.Monsters))
+
+	// Daily boosted boss & monster: pick (date-seeded random) + persist to the
+	// DB once per day now that the monster/boss types are loaded. Same date =>
+	// same pick, shared via the DB with MyAAC and other sessions.
+	if bb, err := database.RotateBoostedBoss(ctx, creatureTypes); err == nil && bb != "" && bb != "default" {
+		world.BoostedBoss = bb
+		log.Info("boosted boss", "name", bb)
+	}
+	if bc, err := database.RotateBoostedCreature(ctx, creatureTypes); err == nil && bc != "" && bc != "default" {
+		world.BoostedCreature = bc
+		log.Info("boosted creature", "name", bc)
+	}
+
 	if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "npc"), log); err != nil {
 		log.Warn("loading npcs", "err", err)
 	}
