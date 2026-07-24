@@ -57,10 +57,30 @@ func (g *GameProtocol) sendDamageText(class byte, pos game.Position, value uint3
 	g.SendToClient(w)
 }
 
+// sendExpText mirrors the MESSAGE_EXPERIENCE branch of ProtocolGame::sendTextMessage
+// (0xB4, class 26, pos, uint64 value, color white, text string).
+func (g *GameProtocol) sendExpText(pos game.Position, value uint64, color byte, text string) {
+	w := netmsg.NewWriter()
+	w.AddByte(opTextMessage)
+	w.AddByte(26) // MESSAGE_EXPERIENCE
+	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
+	w.AddU64(value)
+	w.AddByte(color)
+	if text == "" {
+		if value == 1 {
+			text = "You gained 1 experience point."
+		} else {
+			text = fmt.Sprintf("You gained %d experience points.", value)
+		}
+	}
+	w.AddString(text)
+	g.SendToClient(w)
+}
+
 // SendExpMessage sends an experience gained message + animated text to the player client.
-func SendExpMessage(p *game.Player, exp uint32, text string) {
+func SendExpMessage(p *game.Player, exp uint64, text string) {
 	if gp, ok := p.Session.(*GameProtocol); ok {
-		gp.sendDamageText(26, p.GetPosition(), exp, textcolorWhite, text)
+		gp.sendExpText(p.GetPosition(), exp, textcolorWhite, text)
 	}
 }
 

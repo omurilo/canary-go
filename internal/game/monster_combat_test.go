@@ -132,7 +132,7 @@ func TestDeathAwardsExperienceToSummonMaster(t *testing.T) {
 	w.Map.SetTile(pos, &Tile{Ground: &Item{ID: 1}})
 
 	var textMsgPushed int
-	w.OnTextMessage = func(p *Player, class uint8, value uint32, text string) {
+	w.OnTextMessage = func(p *Player, class uint8, value uint64, text string) {
 		if class == 26 && value == 100 {
 			textMsgPushed++
 		}

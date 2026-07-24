@@ -249,31 +249,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 
 	// 4. Add to destination
 	if destContainer != nil {
-		var merged bool
-		if it != nil && it.Stackable {
-			for _, targetItem := range destContainer.Contents {
-				if targetItem != nil && targetItem.ID == moveItem.ID && targetItem.Count < 100 {
-					room := 100 - targetItem.Count
-					take := moveItem.Count
-					if take > room {
-						take = room
-					}
-					targetItem.Count += take
-					moveItem.Count -= take
-					if moveItem.Count == 0 {
-						merged = true
-						break
-					}
-				}
-			}
-		}
-		if !merged {
-			moveItem.Parent = destContainer
-			destContainer.Contents = append([]*game.Item{moveItem}, destContainer.Contents...)
-			if len(destContainer.Contents) > 0xFF {
-				destContainer.Contents = destContainer.Contents[:0xFF]
-			}
-		}
+		game.AddItemToContainer(g.deps.Items, destContainer, moveItem)
 		g.RefreshContainer(destContainer)
 		if fromContainer != nil && fromContainer != destContainer {
 			g.RefreshContainer(fromContainer)

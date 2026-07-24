@@ -374,6 +374,72 @@ func (p *Player) mergeIntoStack(it *Item, stackSize uint16) bool {
 	return try(p.Inventory[ConstSlotFirst : ConstSlotLast+1])
 }
 
+// AddItemToContainer adds an item to container, merging stackables into existing
+// matching stacks with headroom first, or appending as a new item if space permits,
+// or inserting into a child container if container is full.
+func AddItemToContainer(catalog *items.Catalog, container *Item, item *Item) bool {
+	if container == nil || item == nil {
+		return false
+	}
+
+	// 1. If stackable, try merging into existing matching stacks in this container or subcontainers
+	if isStackable(catalog, item.ID) {
+		stackSize := uint16(stackSizeOf(catalog, item.ID))
+		if stackSize < 1 {
+			stackSize = 100
+		}
+		var merge func(c *Item) bool
+		merge = func(c *Item) bool {
+			for _, existing := range c.Contents {
+				if existing == nil {
+					continue
+				}
+				if existing.ID == item.ID && existing.Count < stackSize {
+					room := stackSize - existing.Count
+					take := item.Count
+					if take > room {
+						take = room
+					}
+					existing.Count += take
+					item.Count -= take
+					if item.Count == 0 {
+						return true
+					}
+				}
+				if len(existing.Contents) > 0 && merge(existing) {
+					return true
+				}
+			}
+			return false
+		}
+		if merge(container) {
+			return true
+		}
+	}
+
+	// 2. If item still has count > 0, append to container if capacity allows
+	cap := container.ContainerCapacity(catalog)
+	if cap < 1 {
+		cap = 20
+	}
+	if int(cap) > len(container.Contents) {
+		item.Parent = container
+		container.Contents = append(container.Contents, item)
+		return true
+	}
+
+	// 3. Otherwise try child containers inside container
+	for _, child := range container.Contents {
+		if child != nil && child.IsContainer(catalog) {
+			if AddItemToContainer(catalog, child, item) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // addToContainerTree inserts it into the first container with a free slot,
 // descending into nested containers. Returns false when the whole tree is full.
 func addToContainerTree(catalog *items.Catalog, c *Item, it *Item) bool {

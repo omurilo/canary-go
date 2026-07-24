@@ -114,8 +114,7 @@ func (w *World) PlayerQuickLoot(playerID uint32, pos Position, itemID uint16, st
 			}
 
 			corpseContainer.Contents = append(corpseContainer.Contents[:i], corpseContainer.Contents[i+1:]...)
-			item.Parent = targetContainer
-			targetContainer.Contents = append(targetContainer.Contents, item)
+			AddItemToContainer(w.Items, targetContainer, item)
 
 			if p.Session != nil {
 				p.Session.RefreshContainer(targetContainer)

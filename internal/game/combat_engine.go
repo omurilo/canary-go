@@ -716,7 +716,7 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 					e.world.OnPlayerStatsChange(p)
 				}
 				if e.world.OnTextMessage != nil {
-					e.world.OnTextMessage(p, 26, uint32(finalExp), fmt.Sprintf("You gained %d experience points.", finalExp))
+					e.world.OnTextMessage(p, 26, finalExp, fmt.Sprintf("You gained %d experience points.", finalExp))
 				}
 			}
 			p.GetTaskHunter().OnKillMonster(raceID)
