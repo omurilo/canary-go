@@ -161,3 +161,25 @@ func TestDeathAwardsExperienceToSummonMaster(t *testing.T) {
 	}
 }
 
+func TestGetLevelPercent(t *testing.T) {
+	p := &Player{Level: 1, Experience: 50}
+	// Level 1: 0 exp -> Level 2: 100 exp. 50 exp = 50% = 5000/10000
+	if pct := p.GetLevelPercent(); pct != 5000 {
+		t.Errorf("GetLevelPercent() = %d, want 5000", pct)
+	}
+
+	p.Level = 100
+	p.Experience = ExpForLevel(100) // exact minimum for level 100
+	if pct := p.GetLevelPercent(); pct != 0 {
+		t.Errorf("GetLevelPercent() at exact min level exp = %d, want 0", pct)
+	}
+
+	// Mid-way to level 101
+	minExp := ExpForLevel(100)
+	nextExp := ExpForLevel(101)
+	p.Experience = minExp + (nextExp-minExp)/2
+	if pct := p.GetLevelPercent(); pct != 5000 {
+		t.Errorf("GetLevelPercent() halfway = %d, want 5000", pct)
+	}
+}
+

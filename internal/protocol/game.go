@@ -533,7 +533,7 @@ func (g *GameProtocol) addStats(w *netmsg.Writer) {
 	
 	w.AddU64(p.Experience)
 	w.AddU16(p.Level)
-	w.AddU16(0)   // level percent (0-10000)
+	w.AddU16(p.GetLevelPercent()) // level percent (0-10000)
 	w.AddU16(100) // base xp gain
 	w.AddU16(0)   // grinding xp boost
 	w.AddU16(0)   // xp boost percent

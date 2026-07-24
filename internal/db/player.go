@@ -71,6 +71,9 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	}
 
 	p.Capacity = capValue * 100
+	if minExp := game.ExpForLevel(uint64(p.Level)); p.Experience < minExp {
+		p.Experience = minExp
+	}
 	p.GetTaskHunter().Points = taskPoints
 	p.QuickLootFallbackToMain = quickLootFallback
 	p.Outfit = game.Outfit{

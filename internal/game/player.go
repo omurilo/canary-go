@@ -1220,6 +1220,26 @@ func (p *Player) GetMagLevelPercent() uint16 {
 	return uint16((float64(spent) / float64(req)) * 10000)
 }
 
+// GetLevelPercent returns the percentage progress to the next level (0 to 10000).
+func (p *Player) GetLevelPercent() uint16 {
+	if p.Level == 0 {
+		return 0
+	}
+	currExp := ExpForLevel(uint64(p.Level))
+	nextExp := ExpForLevel(uint64(p.Level) + 1)
+	if nextExp <= currExp {
+		return 0
+	}
+	if p.Experience <= currExp {
+		return 0
+	}
+	if p.Experience >= nextExp {
+		return 10000
+	}
+	ratio := float64(p.Experience-currExp) / float64(nextExp-currExp)
+	return uint16(ratio * 10000)
+}
+
 func skillNameOf(skill Skill) string {
 	switch skill {
 	case SkillFist:
