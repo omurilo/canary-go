@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"strings"
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/bosstiary"
@@ -243,9 +244,22 @@ func (g *GameProtocol) SendBosstiarySlots() {
 	currentBonus := bosstiary.CalculateLootBonus(points)
 	removePrice := bosstiary.RemoveBossPrice(g.player.GetRemoveTimes())
 
-	// Unlocked bosses = every boss the player has reached level >= 1 on.
+	// Today's boosted boss (resolved from its name). It gets its own "today"
+	// slot and is excluded from the regular unlocked list (mirrors C++).
+	boostedBossID := uint32(0)
+	if bb := g.deps.World.GetBoostedBoss(); bb != "" {
+		if mt := reg.Monsters[strings.ToLower(bb)]; mt != nil && mt.IsBoss() {
+			boostedBossID = uint32(mt.BosstiaryRaceID)
+		}
+	}
+
+	// Unlocked bosses = every boss the player has reached level >= 1 on,
+	// excluding the boosted boss (it occupies the today slot).
 	var unlocked []bossListEntry
 	for raceID, mt := range reg.BosstiaryMonsters() {
+		if uint32(raceID) == boostedBossID {
+			continue
+		}
 		if bosstiary.Level(mt.BosstiaryRace, g.player.GetBestiaryKillCount(raceID)) >= 1 {
 			unlocked = append(unlocked, bossListEntry{RaceID: raceID, Race: uint8(mt.BosstiaryRace)})
 		}
@@ -258,6 +272,24 @@ func (g *GameProtocol) SendBosstiarySlots() {
 		slotOneUnlocked:   len(unlocked) > 0,
 		slotTwoUnlocked:   points >= 1500,
 		slotTwoLockPoints: 1500,
+		todayUnlocked:     true, // config boostedBossSlot defaults true
+		boostedBossID:     boostedBossID,
+	}
+
+	// Today slot: the boosted boss with its fixed boosted bonuses (config
+	// defaults boostedBossLootBonus=250, bosstiaryKillMultiplier=1 +
+	// boostedBossKillBonus=3).
+	if boostedBossID != 0 {
+		if mt := reg.MonsterByBossRaceID(uint16(boostedBossID)); mt != nil {
+			view.todaySlot = bosstiarySlotView{
+				filled:    true,
+				bossID:    boostedBossID,
+				race:      uint8(mt.BosstiaryRace),
+				kills:     g.player.GetBestiaryKillCount(uint16(boostedBossID)),
+				lootBonus: 250,
+				killBonus: 4,
+			}
+		}
 	}
 
 	slotFor := func(bossID uint32) bosstiarySlotView {
