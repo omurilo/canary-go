@@ -83,6 +83,7 @@ const (
 	inBuyItem        = 0x7A
 	inSellItem       = 0x7B
 	inCloseShop      = 0x7C
+	inCloseChannel   = 0x97
 	// Inbound party opcodes (0xA3..0xA8). NOTE: 0xA3 collides with the OUTBOUND
 	// opCancelTarget const — these are a separate inbound namespace.
 	inInviteToParty        = 0xA3
@@ -727,6 +728,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseSellItem(r)
 	case inCloseShop:
 		g.parseCloseShop(r)
+	case inCloseChannel:
+		g.parseCloseChannel(r)
 	case inInviteToParty:
 		g.deps.World.PlayerInviteToParty(g.player.ID, r.GetU32())
 	case inJoinParty:

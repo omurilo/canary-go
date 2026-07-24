@@ -31,6 +31,18 @@ func (n *Npc) IsInteractingWithPlayer(playerID uint32) bool {
 	return ok
 }
 
+// InteractingPlayers returns a slice of player IDs currently interacting with this NPC.
+func (n *Npc) InteractingPlayers() []uint32 {
+	if len(n.interactions) == 0 {
+		return nil
+	}
+	ids := make([]uint32, 0, len(n.interactions))
+	for id := range n.interactions {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 func NewNpc(id uint32, name string, nType *creatures.NpcType) *Npc {
 	maxHealth := uint32(100)
 	speed := uint32(100)

@@ -179,27 +179,6 @@ func (e *Engine) registerAPI() {
 	e.registerCreatureEvent()
 	e.registerGlobalEventClass()
 
-	linkClasses := func(child, parent string) {
-		childMt, _ := L.GetTypeMetatable(child).(*lua.LTable)
-		parentMt, _ := L.GetTypeMetatable(parent).(*lua.LTable)
-		if childMt == nil || parentMt == nil {
-			return
-		}
-		
-		childIdx, _ := L.RawGet(childMt, lua.LString("__index")).(*lua.LTable)
-		parentIdx, _ := L.RawGet(parentMt, lua.LString("__index")).(*lua.LTable)
-		
-		if childIdx != nil && parentIdx != nil {
-			idxMt := L.NewTable()
-			L.SetField(idxMt, "__index", parentIdx)
-			L.SetMetatable(childIdx, idxMt)
-		}
-	}
-
-	linkClasses("Player", "Creature")
-	linkClasses("Monster", "Creature")
-	linkClasses("Npc", "Creature")
-
 	// Mock constructors for unused revscriptsys classes so scripts don't crash
 	mockClass := func(name string) {
 		mt := L.NewTypeMetatable(name)
@@ -362,6 +341,32 @@ func (e *Engine) registerAPI() {
 	setCreatureConstructor("Monster")
 	setCreatureConstructor("Npc")
 	setCreatureConstructor("Creature")
+
+	linkClasses := func(child, parent string) {
+		childMt, _ := L.GetTypeMetatable(child).(*lua.LTable)
+		parentMt, _ := L.GetTypeMetatable(parent).(*lua.LTable)
+		if childMt == nil || parentMt == nil {
+			return
+		}
+		
+		childIdx, _ := L.RawGet(childMt, lua.LString("__index")).(*lua.LTable)
+		parentIdx, _ := L.RawGet(parentMt, lua.LString("__index")).(*lua.LTable)
+		
+		if childIdx != nil && parentIdx != nil {
+			idxMt := L.GetMetatable(childIdx)
+			if idxMt == nil || idxMt == lua.LNil {
+				idxMt = L.NewTable()
+				L.SetMetatable(childIdx, idxMt)
+			}
+			if tbl, ok := idxMt.(*lua.LTable); ok {
+				L.SetField(tbl, "__index", parentIdx)
+			}
+		}
+	}
+
+	linkClasses("Player", "Creature")
+	linkClasses("Monster", "Creature")
+	linkClasses("Npc", "Creature")
 	ensureClassTable("MonsterType")
 	ensureClassTable("NpcType")
 	ensureClassTable("Spell")

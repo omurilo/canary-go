@@ -283,8 +283,34 @@ func run(o runOpts, log *slog.Logger) error {
 	}
 	world.DefaultSpawn = spawn
 	world.StartDecayingMap()
+
+	var lengine *luaengine.Engine
+
 	world.OnCreatureMove = func(c game.Creature, oldPos game.Position, newPos game.Position, oldTileIndex int) {
 		protocol.BroadcastCreatureMove(world, c, oldPos, newPos, oldTileIndex)
+		if lengine != nil {
+			if player, ok := c.(*game.Player); ok {
+				for _, cr := range world.Creatures() {
+					if npc, ok := cr.(*game.Npc); ok && npc.IsInteractingWithPlayer(player.ID) {
+						dist := player.GetPosition().MaxDistance(npc.GetPosition())
+						if dist < 0 || dist > 3 {
+							lengine.CallNpcCloseChannel(npc, player)
+							npc.RemovePlayerInteraction(player.ID)
+						}
+					}
+				}
+			} else if npc, ok := c.(*game.Npc); ok {
+				for _, playerID := range npc.InteractingPlayers() {
+					if player := world.PlayerByID(playerID); player != nil {
+						dist := player.GetPosition().MaxDistance(npc.GetPosition())
+						if dist < 0 || dist > 3 {
+							lengine.CallNpcCloseChannel(npc, player)
+							npc.RemovePlayerInteraction(player.ID)
+						}
+					}
+				}
+			}
+		}
 	}
 	world.OnCreatureAppear = func(c game.Creature) {
 		protocol.BroadcastCreatureAppear(world, c)
@@ -345,7 +371,7 @@ func run(o runOpts, log *slog.Logger) error {
 
 
 	// Lua engine.
-	lengine := luaengine.New(world, log)
+	lengine = luaengine.New(world, log)
 	defer lengine.Close()
 	lengine.SetGameFunc("getPlayerCount", func(L *lua.LState) int {
 		L.Push(lua.LNumber(world.OnlineCount()))

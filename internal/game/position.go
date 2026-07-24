@@ -59,9 +59,24 @@ func (p Position) InRangeOf(other Position) bool {
 	return abs(dx) <= 9 && abs(dy) <= 7
 }
 
+// MaxDistance returns the max Chebyshev distance (max(dx, dy)) to other on same floor.
+// If on different floors, returns -1.
+func (p Position) MaxDistance(other Position) int {
+	if p.Z != other.Z {
+		return -1
+	}
+	dx := abs(int(p.X) - int(other.X))
+	dy := abs(int(p.Y) - int(other.Y))
+	if dx > dy {
+		return dx
+	}
+	return dy
+}
+
 func abs(v int) int {
 	if v < 0 {
 		return -v
 	}
 	return v
 }
+

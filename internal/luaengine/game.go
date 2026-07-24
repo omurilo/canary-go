@@ -286,7 +286,13 @@ func (e *Engine) gameCreateMonster(L *lua.LState) int {
 
 	id := e.world.GenerateCreatureID()
 	var mType *creatures.MonsterType
-	if e.world.Monsters != nil {
+	if e.world.TypeRegistry != nil {
+		mType = e.world.TypeRegistry.Monsters[strings.ToLower(name)]
+		if mType == nil {
+			mType = e.world.TypeRegistry.Monsters[name]
+		}
+	}
+	if mType == nil && e.world.Monsters != nil {
 		mType = e.world.Monsters.Monsters[strings.ToLower(name)]
 		if mType == nil {
 			mType = e.world.Monsters.Monsters[name]
@@ -326,7 +332,13 @@ func (e *Engine) gameCreateNpc(L *lua.LState) int {
 
 	id := e.world.GenerateCreatureID()
 	var nType *creatures.NpcType
-	if e.world.Monsters != nil {
+	if e.world.TypeRegistry != nil {
+		nType = e.world.TypeRegistry.Npcs[strings.ToLower(name)]
+		if nType == nil {
+			nType = e.world.TypeRegistry.Npcs[name]
+		}
+	}
+	if nType == nil && e.world.Monsters != nil {
 		nType = e.world.Monsters.Npcs[strings.ToLower(name)]
 		if nType == nil {
 			nType = e.world.Monsters.Npcs[name]

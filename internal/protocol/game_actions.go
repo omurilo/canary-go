@@ -1224,6 +1224,24 @@ func (g *GameProtocol) parseCloseShop(r *netmsg.Reader) {
 	}
 }
 
+func (g *GameProtocol) parseCloseChannel(r *netmsg.Reader) {
+	if g.player == nil || g.deps == nil {
+		return
+	}
+	_ = r.GetU16() // channelId
+	if g.deps.World != nil {
+		for _, cr := range g.deps.World.Creatures() {
+			if npc, ok := cr.(*game.Npc); ok && npc.IsInteractingWithPlayer(g.player.ID) {
+				if g.deps.Lua != nil {
+					g.deps.Lua.CallNpcCloseChannel(npc, g.player)
+				}
+				npc.RemovePlayerInteraction(g.player.ID)
+			}
+		}
+	}
+}
+
+
 func (g *GameProtocol) parseFightModes(r *netmsg.Reader) {
 	fightMode := r.GetByte()  // 1 = offensive, 2 = balanced, 3 = defensive
 	chaseMode := r.GetByte()  // 0 = stand, 1 = chase
