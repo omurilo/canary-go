@@ -152,6 +152,7 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 
 	if finalDamage != 0 {
 		target.ChangeHealth(finalDamage)
+		target.NotifyStatsChange()
 	}
 
 	// Apply conditions
@@ -182,6 +183,7 @@ func (c *Combat) DoCombatMana(caster Creature, target Creature, damage CombatDam
 
 	if finalDamage != 0 {
 		target.ChangeMana(finalDamage)
+		target.NotifyStatsChange()
 	}
 
 	return true

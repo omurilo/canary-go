@@ -51,6 +51,9 @@ func TestPotionsAction(t *testing.T) {
 	if p.Mana <= 50 {
 		t.Errorf("player mana after drinking mana potion = %d, want > 50", p.Mana)
 	}
+	if manaPotion.Count != 0 {
+		t.Errorf("mana potion count after drinking = %d, want 0", manaPotion.Count)
+	}
 
 	// Test Health Potion (item ID 266)
 	healthPotion := &game.Item{ID: 266, Count: 1}

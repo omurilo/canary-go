@@ -181,9 +181,41 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 // stack is re-sent. `pos` is the item's source location as sent by the client
 // and `stackpos` is the map stack index (only used for map items).
 func (g *GameProtocol) reconcileUsedItem(item *game.Item, pos netmsg.Position, stackpos uint8) {
-	t := g.deps.Items.Get(item.ID)
-	consumed := item.Count == 0 && (t != nil && t.Stackable)
+	consumed := item.Count == 0
 	if pos.X == 0xFFFF {
+		if pos.Y == 0 && g.player != nil {
+			foundSlot := uint8(0)
+			for slot := uint8(1); slot <= 10; slot++ {
+				if g.player.Inventory[slot] == item {
+					foundSlot = slot
+					break
+				}
+			}
+			if foundSlot > 0 {
+				pos.Y = uint16(foundSlot)
+			} else {
+				foundCID := uint8(255)
+				foundContSlot := uint8(0)
+				for cid := uint8(0); cid < 16; cid++ {
+					if cont, ok := g.openContainerByCID(cid); ok {
+						for i, contItem := range cont.Contents {
+							if contItem == item {
+								foundCID = cid
+								foundContSlot = uint8(i)
+								break
+							}
+						}
+						if foundCID != 255 {
+							break
+						}
+					}
+				}
+				if foundCID != 255 {
+					pos.Y = uint16(0x40 + foundCID)
+					pos.Z = uint8(foundContSlot)
+				}
+			}
+		}
 		if pos.Y >= 0x40 { // inside a container
 			cid := uint8(pos.Y - 0x40)
 			slot := uint8(pos.Z)
@@ -505,7 +537,11 @@ func (g *GameProtocol) parseUseWithCreature(r *netmsg.Reader) {
 func (g *GameProtocol) getItemAt(pos netmsg.Position, itemID uint16, stackpos uint8) *game.Item {
 	var item *game.Item
 	if pos.X == 0xFFFF {
-		if pos.Y >= 0x40 {
+		if pos.Y == 0 {
+			if g.player != nil {
+				item = g.player.FindItemOfType(g.deps.Items, itemID, true, -1)
+			}
+		} else if pos.Y >= 0x40 {
 			cid := uint8(pos.Y - 0x40)
 			if cont, ok := g.openContainerByCID(cid); ok {
 				fromSlot := int(pos.Z)
@@ -524,6 +560,9 @@ func (g *GameProtocol) getItemAt(pos netmsg.Position, itemID uint16, stackpos ui
 		if tile != nil {
 			item = g.findTileItemByStackPos(tile, itemID, stackpos)
 		}
+	}
+	if item == nil && itemID != 0 && g.player != nil {
+		item = g.player.FindItemOfType(g.deps.Items, itemID, true, -1)
 	}
 	return item
 }

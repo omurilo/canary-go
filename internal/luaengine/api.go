@@ -466,6 +466,10 @@ func (e *Engine) registerAPI() {
 				}
 			}
 		}
+		if strings.HasPrefix(key, "remove") || key == "removepotioncharges" || key == "removechargesfrompotions" {
+			L.Push(lua.LTrue)
+			return 1
+		}
 		L.Push(lua.LFalse)
 		return 1
 	}))

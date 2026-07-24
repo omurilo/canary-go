@@ -112,6 +112,7 @@ type Creature interface {
 	HasCondition(conditionType ConditionType) bool
 	ChangeHealth(amount int32)
 	ChangeMana(amount int32)
+	NotifyStatsChange()
 	GetBaseSpeed() uint16
 	ChangeSpeed(delta int32)
 	GetArmor() int32
