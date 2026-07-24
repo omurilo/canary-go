@@ -58,10 +58,10 @@ type Charm struct {
 	Description string
 	Category    uint8
 	Type        uint8
-	DamageType  int     // COMBAT_* value from the datapack (creatures_definitions.hpp)
-	Percent     float64 // percent of the reference health/mana used as damage
-	Chance      [3]uint16
-	Points      [3]uint16 // charm-point (major) or minor-echo (minor) cost per tier
+	DamageType  int       // COMBAT_* value from the datapack (creatures_definitions.hpp)
+	Percent     float64   // percent of the reference health/mana used as damage
+	Chance      [3]float32 // trigger chance (or leech %) per tier; fractional for Vamp/Void
+	Points      [3]uint16  // charm-point (major) or minor-echo (minor) cost per tier
 	Effect      uint16
 	CastSound   uint16
 	ImpactSound uint16

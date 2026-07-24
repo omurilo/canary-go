@@ -17,12 +17,23 @@ func checkCharm(L *lua.LState) *charms.Charm {
 	return nil
 }
 
-// readTierArray reads up to 3 numbers from a Lua array into dst.
+// readTierArray reads up to 3 integer costs from a Lua array.
 func readTierArray(t *lua.LTable) [3]uint16 {
 	var out [3]uint16
 	for i := range uint8(3) {
 		if v := t.RawGetInt(int(i) + 1); v.Type() == lua.LTNumber {
 			out[i] = uint16(lua.LVAsNumber(v))
+		}
+	}
+	return out
+}
+
+// readChanceArray reads up to 3 (possibly fractional) chances from a Lua array.
+func readChanceArray(t *lua.LTable) [3]float32 {
+	var out [3]float32
+	for i := range uint8(3) {
+		if v := t.RawGetInt(int(i) + 1); v.Type() == lua.LTNumber {
+			out[i] = float32(lua.LVAsNumber(v))
 		}
 	}
 	return out
@@ -97,7 +108,7 @@ func (e *Engine) registerCharmType() {
 		"chance": func(L *lua.LState) int {
 			c := checkCharm(L)
 			if L.GetTop() >= 2 {
-				c.Chance = readTierArray(L.CheckTable(2))
+				c.Chance = readChanceArray(L.CheckTable(2))
 				return 0
 			}
 			return 0
@@ -171,7 +182,7 @@ func (e *Engine) registerCharmType() {
 				c.Percent = float64(lua.LVAsNumber(v))
 			}
 			if v := t.RawGetString("chance"); v.Type() == lua.LTTable {
-				c.Chance = readTierArray(v.(*lua.LTable))
+				c.Chance = readChanceArray(v.(*lua.LTable))
 			}
 			if v := t.RawGetString("points"); v.Type() == lua.LTTable {
 				c.Points = readTierArray(v.(*lua.LTable))

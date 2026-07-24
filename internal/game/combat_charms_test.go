@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/charms"
 	"github.com/opentibiabr/canary-go/internal/creatures"
+	"github.com/opentibiabr/canary-go/internal/game/combat"
 )
 
 func TestApplyCharmRune_OffensiveProc(t *testing.T) {
@@ -13,7 +14,7 @@ func TestApplyCharmRune_OffensiveProc(t *testing.T) {
 	w.Charms.Add(&charms.Charm{
 		ID: charms.Enflame, Name: "Enflame", Category: charms.CategoryMajor,
 		Type: charms.TypeOffensive, DamageType: 1, Percent: 5,
-		Chance: [3]uint16{100, 100, 100},
+		Chance: [3]float32{100, 100, 100},
 	})
 
 	mType := &creatures.MonsterType{Name: "Rat", RaceID: 21, MaxHealth: 1000}
@@ -32,7 +33,7 @@ func TestApplyCharmRune_OffensiveProc(t *testing.T) {
 	p.UsedRunesBit = uint32(charms.SetBit(0, charms.Enflame))
 
 	before := monster.GetHealth()
-	e.applyCharmRune(p, monster)
+	e.applyCharmRune(p, monster, 10)
 	if monster.GetHealth() >= before {
 		t.Fatalf("charm did not damage monster: health %d -> %d", before, monster.GetHealth())
 	}
@@ -46,7 +47,7 @@ func TestApplyCharmRune_NoAssignmentNoProc(t *testing.T) {
 	w := newCombatWorld()
 	w.Charms.Add(&charms.Charm{
 		ID: charms.Wound, Category: charms.CategoryMajor, Type: charms.TypeOffensive,
-		Percent: 5, Chance: [3]uint16{100, 100, 100},
+		Percent: 5, Chance: [3]float32{100, 100, 100},
 	})
 	mType := &creatures.MonsterType{Name: "Rat", RaceID: 21, MaxHealth: 1000}
 	monster := NewMonster(1, "Rat", mType)
@@ -59,8 +60,79 @@ func TestApplyCharmRune_NoAssignmentNoProc(t *testing.T) {
 	p.SetCharmTier(charms.Wound, 1)
 
 	before := monster.GetHealth()
-	e.applyCharmRune(p, monster)
+	e.applyCharmRune(p, monster, 10)
 	if monster.GetHealth() != before {
 		t.Fatalf("unassigned charm should not damage: %d -> %d", before, monster.GetHealth())
+	}
+}
+
+// charmMonster builds a rat (race 21) at full health for charm combat tests.
+func charmMonster(w *World, maxHP uint32) *Monster {
+	mType := &creatures.MonsterType{Name: "Rat", RaceID: 21, MaxHealth: maxHP}
+	m := NewMonster(1, "Rat", mType)
+	m.MaxHealth, m.Health = maxHP, maxHP
+	m.SetPosition(Position{X: 101, Y: 100, Z: 7})
+	w.AddCreature(m)
+	return m
+}
+
+// assignCharm unlocks (tier 1) and assigns a charm to race 21 for the player.
+func assignCharm(p *Player, id uint8) {
+	p.SetCharmTier(id, 1)
+	p.SetCharmRace(id, 21)
+	p.UsedRunesBit |= uint32(charms.SetBit(0, id))
+}
+
+func TestApplyCharmRune_Overpower(t *testing.T) {
+	w := newCombatWorld()
+	w.Charms.Add(&charms.Charm{
+		ID: charms.Overpower, Category: charms.CategoryMajor, Type: charms.TypeOffensive,
+		Percent: 5, Chance: [3]float32{100, 100, 100},
+	})
+	m := charmMonster(w, 1000)
+	e := NewCombatEngine(w)
+	p := &Player{Level: 50, MaxHealth: 10000, Health: 10000}
+	assignCharm(p, charms.Overpower)
+
+	before := m.GetHealth()
+	e.applyCharmRune(p, m, 0)
+	// min(8% of 1000 = 80, 5% of 10000 = 500) = 80.
+	if got := before - m.GetHealth(); got != 80 {
+		t.Fatalf("overpower damage = %d, want 80", got)
+	}
+}
+
+func TestApplyCharmRune_Cripple(t *testing.T) {
+	w := newCombatWorld()
+	w.Charms.Add(&charms.Charm{
+		ID: charms.Cripple, Category: charms.CategoryMinor, Type: charms.TypeOffensive,
+		Chance: [3]float32{100, 100, 100},
+	})
+	m := charmMonster(w, 1000)
+	m.Speed = 220
+	e := NewCombatEngine(w)
+	p := &Player{Level: 50}
+	assignCharm(p, charms.Cripple)
+
+	e.applyCharmRune(p, m, 10)
+	if !m.HasCondition(combat.ConditionParalyze) {
+		t.Fatal("cripple did not paralyze the monster")
+	}
+}
+
+func TestApplyCharmRune_VampLeech(t *testing.T) {
+	w := newCombatWorld()
+	w.Charms.Add(&charms.Charm{
+		ID: charms.Vamp, Category: charms.CategoryMinor, Type: charms.TypePassive,
+		Chance: [3]float32{2.4, 2.4, 2.4},
+	})
+	m := charmMonster(w, 1000)
+	e := NewCombatEngine(w)
+	p := &Player{Level: 50, MaxHealth: 10000, Health: 5000}
+	assignCharm(p, charms.Vamp)
+
+	e.applyCharmRune(p, m, 1000) // 2.4% of 1000 = 24 healed
+	if got := p.Health - 5000; got != 24 {
+		t.Fatalf("vamp heal = %d, want 24", got)
 	}
 }
