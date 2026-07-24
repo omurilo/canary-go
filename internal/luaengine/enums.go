@@ -22,6 +22,14 @@ func RegisterEnums(L *lua.LState) {
 		"CONST_SLOT_STORE_INBOX": 11,
 		"CONST_SLOT_LAST":        12,
 
+		// Account types
+		"ACCOUNT_TYPE_NORMAL":           1,
+		"ACCOUNT_TYPE_TUTOR":            2,
+		"ACCOUNT_TYPE_SENIORTUTOR":      3,
+		"ACCOUNT_TYPE_GAMEMASTER":       4,
+		"ACCOUNT_TYPE_COMMUNITYMANAGER": 5,
+		"ACCOUNT_TYPE_GOD":              6,
+
 		// Speak classes (talk types). NPC dialogue gates keyword processing on
 		// TALKTYPE_PRIVATE_PN (player→NPC), so these MUST exist as globals — a
 		// nil TALKTYPE_PRIVATE_PN silently kills all post-greeting interaction.
