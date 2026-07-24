@@ -35,7 +35,7 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	}
 	
 	// Execute Lua action first
-	action := actions.FindAction(item)
+	action := actions.FindAction(item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
 	if action != nil {
 		isEx := g.isExAction(item)
 		if isEx {
@@ -508,7 +508,7 @@ func (g *GameProtocol) parseUseItemWith(r *netmsg.Reader) {
 	toItem := g.getItemAt(toPos, toItemID, toStackPos)
 
 	// Execute Lua action
-	action := actions.FindAction(fromItem)
+	action := actions.FindAction(fromItem, game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z})
 	if action != nil {
 		isEx := g.isExAction(fromItem)
 		if isEx {
@@ -565,7 +565,7 @@ func (g *GameProtocol) parseUseWithCreature(r *netmsg.Reader) {
 	}
 
 	// Execute Lua action
-	action := actions.FindAction(fromItem)
+	action := actions.FindAction(fromItem, game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z})
 	if action != nil {
 		isEx := g.isExAction(fromItem)
 		if isEx {

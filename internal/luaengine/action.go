@@ -38,6 +38,14 @@ var actionMethods = map[string]lua.LGFunction{
 }
 
 func actionPosition(L *lua.LState) int {
+	a := checkAction(L)
+	top := L.GetTop()
+	for i := 2; i <= top; i++ {
+		if L.Get(i) == lua.LNil {
+			continue
+		}
+		a.Positions = append(a.Positions, checkPosition(L, i))
+	}
 	L.Push(L.Get(1))
 	return 1
 }

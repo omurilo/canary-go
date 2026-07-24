@@ -11,6 +11,7 @@ type Action struct {
 	ItemIDs     []uint16
 	ActionIDs   []uint16
 	UniqueIDs   []uint16
+	Positions   []game.Position
 	OnUse       *lua.LFunction
 	AllowFarUse bool
 }
@@ -36,6 +37,7 @@ var (
 	byItemID   = make(map[uint16]*Action)
 	byActionID = make(map[uint16]*Action)
 	byUniqueID = make(map[uint16]*Action)
+	byPosition = make(map[game.Position]*Action)
 )
 
 // Register stores the action in the maps.
@@ -49,10 +51,13 @@ func Register(a *Action) {
 	for _, id := range a.UniqueIDs {
 		byUniqueID[id] = a
 	}
+	for _, pos := range a.Positions {
+		byPosition[pos] = a
+	}
 }
 
 func Count() int {
-	return len(byItemID) + len(byActionID) + len(byUniqueID)
+	return len(byItemID) + len(byActionID) + len(byUniqueID) + len(byPosition)
 }
 
 // FindByItemID looks up an action by item ID.
@@ -74,8 +79,13 @@ func FindByUniqueID(id uint16) *Action {
 	return byUniqueID[id]
 }
 
-// FindAction looks up an action for an item, respecting UniqueID and ActionID.
-func FindAction(item *game.Item) *Action {
+// FindByPosition looks up an action by map position.
+func FindByPosition(pos game.Position) *Action {
+	return byPosition[pos]
+}
+
+// FindAction looks up an action for an item, respecting UniqueID, ActionID, and Position.
+func FindAction(item *game.Item, pos game.Position) *Action {
 	if item.Attr != nil {
 		if item.Attr.UniqueID != nil {
 			if a := FindByUniqueID(*item.Attr.UniqueID); a != nil {
@@ -88,12 +98,15 @@ func FindAction(item *game.Item) *Action {
 			}
 		}
 	}
+	if a := FindByPosition(pos); a != nil {
+		return a
+	}
 	return FindByItemID(item.ID)
 }
 
 // Execute looks up and executes an action for an item.
 func (e *ActionsEngine) ExecuteUse(player *game.Player, item *game.Item, fromPos game.Position, target interface{}, toPos game.Position, isHotkey bool) bool {
-	action := FindAction(item)
+	action := FindAction(item, fromPos)
 	if action == nil || action.OnUse == nil {
 		return false
 	}
