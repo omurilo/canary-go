@@ -2,6 +2,7 @@ package luaengine
 
 import (
 	"github.com/opentibiabr/canary-go/internal/charms"
+	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -39,6 +40,18 @@ func readChanceArray(t *lua.LTable) [3]float32 {
 	return out
 }
 
+// pushCharmResources sends the four charm resource balances (0xEE) to the
+// player's client so the charms UI reflects a balance change live, without
+// waiting for the window to be reopened.
+func (e *Engine) pushCharmResources(p *game.Player) {
+	if p == nil || p.Session == nil {
+		return
+	}
+	if s, ok := p.Session.(interface{ SendCharmResourcesBalance() }); ok {
+		s.SendCharmResourcesBalance()
+	}
+}
+
 // registerCharmPlayerMethods wires the Player charm talkaction bindings that
 // the datapack's data/scripts/talkactions/god/charms.lua relies on.
 func (e *Engine) registerCharmPlayerMethods() {
@@ -53,6 +66,7 @@ func (e *Engine) registerCharmPlayerMethods() {
 			return 0
 		}
 		p.AddMinorCharmEchoes(uint32(L.CheckInt(2)), false)
+		e.pushCharmResources(p)
 		return 0
 	}))
 	e.L.SetField(tbl, "getMinorCharmEchoes", e.L.NewFunction(func(L *lua.LState) int {
@@ -92,6 +106,7 @@ func (e *Engine) registerCharmPlayerMethods() {
 		p.MaxMinorCharmEchoes = 0
 		p.UsedRunesBit = 0
 		p.UnlockedRunesBit = 0
+		e.pushCharmResources(p)
 		return 0
 	}))
 	e.L.SetField(tbl, "unlockAllCharmRunes", e.L.NewFunction(func(L *lua.LState) int {

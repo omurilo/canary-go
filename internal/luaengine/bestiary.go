@@ -71,6 +71,7 @@ func (e *Engine) playerAddcharmpoints(L *lua.LState) int {
 		return 1
 	}
 	p.AddCharmPoints(uint32(L.CheckInt(2)))
+	e.pushCharmResources(p)
 	L.Push(lua.LTrue)
 	return 1
 }

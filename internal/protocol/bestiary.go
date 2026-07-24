@@ -323,6 +323,13 @@ func (g *GameProtocol) SendBestiaryCharms() {
 		g.deps.World.Charms == nil || g.deps.World.TypeRegistry == nil {
 		return
 	}
+	if g.deps != nil && g.deps.Log != nil {
+		g.deps.Log.Info("charms window sent",
+			"charmPoints", g.player.CharmPoints, "maxCharmPoints", g.player.MaxCharmPoints,
+			"minorEchoes", g.player.MinorCharmEchoes, "maxMinorEchoes", g.player.MaxMinorCharmEchoes,
+			"unlockedBits", g.player.UnlockedRunesBit, "usedBits", g.player.UsedRunesBit,
+			"resetCost", g.charmResetAllCost())
+	}
 	g.SendToClient(g.buildBestiaryCharms())
 	g.SendCharmResourcesBalance()
 }
@@ -375,6 +382,18 @@ func (g *GameProtocol) parseSendBuyCharmRune(r *netmsg.Reader) {
 		return
 	}
 	p := g.player
+
+	if g.deps.Log != nil {
+		cat, cost := uint8(0), uint16(0)
+		if c != nil {
+			cat = c.Category
+			cost = c.TierCost(p.GetCharmTier(charmID))
+		}
+		g.deps.Log.Info("charm buy request",
+			"action", action, "charmID", charmID, "raceID", raceID,
+			"category", cat, "tier", p.GetCharmTier(charmID), "tierCost", cost,
+			"charmPoints", p.CharmPoints, "minorEchoes", p.MinorCharmEchoes)
+	}
 
 	switch action {
 	case 0: // unlock or upgrade a tier
