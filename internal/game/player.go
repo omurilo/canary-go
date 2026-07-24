@@ -436,6 +436,26 @@ func (p *Player) SetStorageValue(key uint32, value int32) {
 	p.Storages[key] = value
 }
 
+// storageBestiaryKillCount is the base storage key for per-race kill counts
+// (bestiary AND bosstiary). The count for race N lives at base+N. Mirrors
+// STORAGEVALUE_BESTIARYKILLCOUNT (src/utils/const.hpp). Reusing the storage
+// system means kill counts persist via player_storage for free.
+const storageBestiaryKillCount = 61305000
+
+// GetBestiaryKillCount returns how many of race `raceid` the player has killed.
+func (p *Player) GetBestiaryKillCount(raceid uint16) uint32 {
+	if v := p.GetStorageValue(storageBestiaryKillCount + uint32(raceid)); v > 0 {
+		return uint32(v)
+	}
+	return 0
+}
+
+// AddBestiaryKillCount adds `amount` kills to race `raceid`'s count.
+func (p *Player) AddBestiaryKillCount(raceid uint16, amount uint32) {
+	old := p.GetBestiaryKillCount(raceid)
+	p.SetStorageValue(storageBestiaryKillCount+uint32(raceid), int32(old+amount))
+}
+
 func (p *Player) GetID() uint32     { return p.ID }
 func (p *Player) GetName() string   { return p.Name }
 func (p *Player) GetHealth() uint32 { return p.Health }
