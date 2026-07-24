@@ -255,7 +255,37 @@ func (e *Engine) containerMethods() map[string]lua.LGFunction {
 			L.Push(lua.LBool(remaining == 0))
 			return 1
 		},
-		"addItemEx":      stubContainerMethod,
+		"addItemEx": func(L *lua.LState) int {
+			// container:addItemEx(item, index?, flags?) moves an existing Item
+			// into this container. Returns RETURNVALUE_NOERROR (0) on success
+			// (C++ Cylinder::addItemEx). FLAG_NOLIMIT (bit 0) bypasses the
+			// capacity check — used by store delivery (addItemStoreInbox).
+			c := checkContainer(L)
+			ud, ok := L.Get(2).(*lua.LUserData)
+			if !ok {
+				L.Push(lua.LNumber(1)) // RETURNVALUE not ok
+				return 1
+			}
+			li, ok := ud.Value.(luaItem)
+			if !ok || li.item == nil {
+				L.Push(lua.LNumber(1))
+				return 1
+			}
+			flags := 0
+			if L.GetTop() >= 4 {
+				flags = luaOptInt(L, 4)
+			}
+			noLimit := flags&1 != 0
+			cat := e.itemCatalog()
+			if !noLimit && int(c.item.ContainerCapacity(cat)) <= len(c.item.Contents) {
+				L.Push(lua.LNumber(6)) // RETURNVALUE_CONTAINERNOTENOUGHROOM
+				return 1
+			}
+			li.item.Parent = c.item
+			c.item.Contents = append(c.item.Contents, li.item)
+			L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR
+			return 1
+		},
 		"getCorpseOwner": stubContainerMethod,
 		"registerReward": stubContainerMethod,
 		"removeAllItems": func(L *lua.LState) int {

@@ -47,6 +47,53 @@ func TestAddPlayerEventForwardsTargetAndArgs(t *testing.T) {
 	}
 }
 
+// TestStoreInboxDelivery verifies the "receber" path: getStoreInbox returns a
+// real Container and addItemEx (with FLAG_NOLIMIT) delivers a created item into
+// the player's StoreInbox — the mechanic the datapack's Player:addItemStoreInbox
+// uses to deliver in-game store purchases.
+func TestStoreInboxDelivery(t *testing.T) {
+	w := game.NewWorld()
+	w.TypeRegistry = creatures.NewTypeRegistry()
+	e := New(w, slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})))
+
+	player := &game.Player{Name: "Buyer", DBID: 42, Vocation: 1}
+	sess := &recordSession{p: player}
+	w.AddPlayer(player, sess)
+
+	e.mu.Lock()
+	up := e.L.NewUserData()
+	up.Value = player
+	e.L.SetMetatable(up, e.L.GetTypeMetatable("Player"))
+	e.L.SetGlobal("_p", up)
+	e.mu.Unlock()
+
+	if err := e.DoString(`
+		local inbox = _p:getStoreInbox()
+		if not inbox then error("getStoreInbox returned nil") end
+		local it = Game.createItem(3031, 5)
+		if not it then error("Game.createItem returned nil") end
+		it:setOwner(_p)
+		local ret = inbox:addItemEx(it, INDEX_WHEREEVER, FLAG_NOLIMIT)
+		if ret ~= 0 then error("addItemEx returned " .. tostring(ret)) end
+	`); err != nil {
+		t.Fatalf("delivery script: %v", err)
+	}
+
+	if player.StoreInbox == nil {
+		t.Fatal("StoreInbox not created")
+	}
+	if got := len(player.StoreInbox.Contents); got != 1 {
+		t.Fatalf("StoreInbox has %d items, want 1", got)
+	}
+	deliv := player.StoreInbox.Contents[0]
+	if deliv.ID != 3031 || deliv.Count != 5 {
+		t.Fatalf("delivered item = id %d x%d, want 3031 x5", deliv.ID, deliv.Count)
+	}
+	if deliv.Attr == nil || deliv.Attr.Owner == nil || *deliv.Attr.Owner != 42 {
+		t.Fatalf("delivered item owner not set to player GUID 42")
+	}
+}
+
 // TestOpenStorePacketOnWire drives the REAL gamestore onRecvbyte(C_OpenStore)
 // through the actual Go NetworkMessage/Player bindings and decodes the captured
 // S_OpenStore packet exactly as the otclient ProtocolGame::parseStore does. If

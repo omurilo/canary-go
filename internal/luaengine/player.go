@@ -45,6 +45,7 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetField(mt, "removeItem", e.L.NewFunction(e.playerRemoveitem))
 	e.L.SetField(mt, "getFreeBackpackSlots", e.L.NewFunction(e.playerGetfreebackpackslots))
 	// Container bindings (open-container state shared with the protocol layer).
+	e.L.SetField(mt, "getStoreInbox", e.L.NewFunction(e.playerGetstoreinbox))
 	e.L.SetField(mt, "getContainerId", e.L.NewFunction(e.playerGetcontainerid))
 	e.L.SetField(mt, "getContainerById", e.L.NewFunction(e.playerGetcontainerbyid))
 	e.L.SetField(mt, "getContainerIndex", e.L.NewFunction(e.playerGetcontainerindex))
@@ -343,7 +344,6 @@ var playerMethods = map[string]lua.LGFunction{
 	"getVipDays":                      playerGetvipdays,
 	"getVipTime":                      playerGetviptime,
 	"kv":                              playerKv,
-	"getStoreInbox":                   playerGetstoreinbox,
 	"hasAchievement":                  playerHasachievement,
 	"addAchievement":                  playerAddachievement,
 	"removeAchievement":               playerRemoveachievement,
@@ -1967,30 +1967,23 @@ func playerGetstoragevalue(L *lua.LState) int {
 	return 1
 }
 
-func playerGetstoreinbox(L *lua.LState) int {
+// storeInboxItemID is ITEM_STORE_INBOX (src/utils/utils_definitions.hpp): the
+// container in-game store purchases are delivered to.
+const storeInboxItemID = 23396
+
+// playerGetstoreinbox returns the player's Store Inbox as a real Container so
+// the datapack's Player:addItemStoreInbox can add purchased items to it
+// (inbox:addItemEx). The inbox is created lazily and held on the player.
+func (e *Engine) playerGetstoreinbox(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
 		L.Push(lua.LNil)
 		return 1
 	}
-	tbl := L.NewTable()
-	L.SetField(tbl, "getItems", L.NewFunction(func(L *lua.LState) int {
-		L.Push(L.NewTable())
-		return 1
-	}))
-	L.SetField(tbl, "getEmptySlots", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LNumber(30))
-		return 1
-	}))
-	L.SetField(tbl, "getItemCount", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LNumber(0))
-		return 1
-	}))
-	L.SetField(tbl, "getCapacity", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LNumber(30))
-		return 1
-	}))
-	L.Push(tbl)
+	if p.StoreInbox == nil {
+		p.StoreInbox = &game.Item{ID: storeInboxItemID}
+	}
+	e.pushContainer(L, p.StoreInbox)
 	return 1
 }
 

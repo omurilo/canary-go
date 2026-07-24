@@ -144,6 +144,11 @@ type Player struct {
 	ManagedContainers       map[uint8]uint16 // ObjectCategory -> loot container item id
 	ManagedObtainContainers map[uint8]uint16 // ObjectCategory -> obtain container item id
 
+	// StoreInbox is the player's Store Inbox container (item id ITEM_STORE_INBOX
+	// 23396) where in-game store purchases are delivered. Created lazily on first
+	// access (Player:getStoreInbox).
+	StoreInbox *Item
+
 	// Wheel of Destiny progression tree
 	Wheel *WheelOfDestiny
 
