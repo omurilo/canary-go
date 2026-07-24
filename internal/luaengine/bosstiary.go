@@ -101,9 +101,14 @@ func (e *Engine) playerGetbosspoints(L *lua.LState) int {
 // changed (new level/points). The 0x61 kill-tracker/entry-changed packet is
 // wired in phase 5; for now this is the single hook the kill path calls.
 func (e *Engine) sendBosstiaryEntryChanged(p *game.Player, bossRaceID uint16) {
-	// TODO(phase 5): send the S_BosstiaryEntryChanged (0x61) packet.
-	_ = p
-	_ = bossRaceID
+	if p == nil || p.Session == nil {
+		return
+	}
+	// Narrow interface assertion avoids a luaengine->protocol import cycle
+	// (same pattern as NotifyIconsChange).
+	if s, ok := p.Session.(interface{ SendBosstiaryEntryChanged(uint32) }); ok {
+		s.SendBosstiaryEntryChanged(uint32(bossRaceID))
+	}
 }
 
 // registerBosstiaryPlayerMethods overrides the stub bosstiary player bindings
