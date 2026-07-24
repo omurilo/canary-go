@@ -4,6 +4,9 @@ This directory contains individual technical specifications for migrating C++ Ca
 
 ## Specifications Index
 
+### 0. Overview
+* [**Gap Analysis — status geral C++ → Go**](gap-analysis.md) — o que já foi portado, o que falta, e prioridades.
+
 ### 1. Player Progression Systems (High Priority)
 * [Wheel of Destiny (Roda do Destino)](wheel-of-destiny.md)
 * [Exaltation Forge (Forja de Exaltação)](exaltation-forge.md)
