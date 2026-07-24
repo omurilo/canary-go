@@ -334,3 +334,18 @@ func TestRemoveTransferableAndTibiaCoins(t *testing.T) {
 		t.Fatalf("after spending 50: transferable=%d normal=%d, want 0/80", player.CoinTransferable, player.CoinBalance)
 	}
 }
+
+// TestMountGlobal verifies Mount(id):getClientId() is callable — the gamestore
+// senders use it for SHOW_MOUNT offers with no nil-check, so a missing Mount
+// global crashed the offers packet ("attempt to call a non-function object").
+func TestMountGlobal(t *testing.T) {
+	e := newTestEngine()
+	if err := e.DoString(`
+		local m = Mount(5)
+		if not m then error("Mount returned nil") end
+		local cid = m:getClientId()
+		if type(cid) ~= "number" then error("getClientId not a number") end
+	`); err != nil {
+		t.Fatalf("Mount global: %v", err)
+	}
+}

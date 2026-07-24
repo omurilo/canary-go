@@ -620,6 +620,11 @@ func (g *GameProtocol) getItemAt(pos netmsg.Position, itemID uint16, stackpos ui
 			slot := uint8(pos.Y)
 			if slot > 0 && slot <= 10 {
 				item = g.player.Inventory[slot]
+			} else if slot == 11 { // CONST_SLOT_STORE_INBOX
+				if g.player.StoreInbox == nil {
+					g.player.StoreInbox = &game.Item{ID: 23396}
+				}
+				item = g.player.StoreInbox
 			}
 		}
 	} else {

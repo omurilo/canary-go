@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/config"
+	"github.com/opentibiabr/canary-go/internal/mounts"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -541,6 +542,34 @@ func (e *Engine) registerAPI() {
 		noop := L.NewFunction(func(L *lua.LState) int { return 0 })
 		L.SetField(t, "add", noop)
 		L.SetField(t, "delete", noop)
+		L.Push(t)
+		return 1
+	}))
+
+	// Mount(id): returns a mount handle exposing getClientId/getId/getName.
+	// The gamestore senders call Mount(offer.id):getClientId() for SHOW_MOUNT
+	// offers with no nil-check (senders.lua sendShowStoreOffers), so always
+	// return a valid object — fall back to the raw id as the client id when the
+	// mount isn't in the registry.
+	L.SetGlobal("Mount", L.NewFunction(func(L *lua.LState) int {
+		id := uint16(L.CheckInt(1))
+		clientID, name := id, ""
+		if m, ok := mounts.GetByID(id); ok {
+			clientID, name = m.ClientID, m.Name
+		}
+		t := L.NewTable()
+		L.SetField(t, "getClientId", L.NewFunction(func(L *lua.LState) int {
+			L.Push(lua.LNumber(clientID))
+			return 1
+		}))
+		L.SetField(t, "getId", L.NewFunction(func(L *lua.LState) int {
+			L.Push(lua.LNumber(id))
+			return 1
+		}))
+		L.SetField(t, "getName", L.NewFunction(func(L *lua.LState) int {
+			L.Push(lua.LString(name))
+			return 1
+		}))
 		L.Push(t)
 		return 1
 	}))

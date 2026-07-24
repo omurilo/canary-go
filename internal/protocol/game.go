@@ -495,6 +495,14 @@ func (g *GameProtocol) enterWorld() {
 			w.AddByte(slot)
 		}
 	}
+	// Slot 11 (CONST_SLOT_STORE_INBOX): always present so the client shows the
+	// store inbox and can open it to retrieve in-game store purchases.
+	if p.StoreInbox == nil {
+		p.StoreInbox = &game.Item{ID: 23396} // ITEM_STORE_INBOX
+	}
+	w.AddByte(opInventoryItem)
+	w.AddByte(11)
+	g.addItem(w, p.StoreInbox)
 
 	g.addStats(w)
 	g.addSkills(w)
