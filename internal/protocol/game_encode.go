@@ -78,7 +78,7 @@ func (g *GameProtocol) addItem(w *netmsg.Writer, it *game.Item) {
 		w.AddByte(0x01)
 	}
 	if t.UpgradeClassification > 0 {
-		w.AddByte(0) // tier
+		w.AddByte(it.GetTier())
 	}
 	if t.Expire || t.ExpireStop || t.ClockExpire {
 		w.AddU32(0) // decay time

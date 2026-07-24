@@ -882,6 +882,9 @@ func BuildItemDescription(viewer *game.Player, item *game.Item, catalog *items.C
 	}
 
 	s.WriteString(fmt.Sprintf("You see %s %s", article, name))
+	if tier := item.GetTier(); tier > 0 {
+		s.WriteString(fmt.Sprintf(" (Tier %d)", tier))
+	}
 
 	// Display charges when requested
 	if itemType.ShowCharges {
