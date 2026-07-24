@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/opentibiabr/canary-go/internal/bosstiary"
 )
 
 type Outfit struct {
@@ -30,7 +32,15 @@ type MonsterType struct {
 	// monster.Bestiary.Stars). It drives task-hunting difficulty and prey grid
 	// staging. 0 means "not in the bestiary".
 	BestiaryStars uint8
-	Outfit        Outfit
+
+	// Bosstiary (Boss Cyclopedia). BosstiaryRaceID is the boss's cyclopedia race
+	// id (monster.bosstiary.bossRaceId), distinct from the bestiary RaceID.
+	// BosstiaryRace is the rarity class (Bane/Archfoe/Nemesis) that determines
+	// the kill thresholds and points. A zero BosstiaryRaceID means "not a boss".
+	BosstiaryRaceID uint16
+	BosstiaryRace   bosstiary.Rarity
+
+	Outfit Outfit
 
 	// Attacks holds the monster's attack blocks. Only melee is applied by the
 	// combat engine today; spell/distance attacks are captured verbatim as data
@@ -135,6 +145,41 @@ func NewTypeRegistry() *TypeRegistry {
 		Monsters: make(map[string]*MonsterType),
 		Npcs:     make(map[string]*NpcType),
 	}
+}
+
+// IsBoss reports whether this monster type is a bosstiary boss.
+func (m *MonsterType) IsBoss() bool {
+	return m != nil && m.BosstiaryRaceID != 0 && bosstiary.IsBoss(m.BosstiaryRace)
+}
+
+// MonsterByBossRaceID returns the boss monster type with the given bosstiary
+// race id (monster.bosstiary.bossRaceId), or nil. Mirrors
+// IOBosstiary::getMonsterTypeByBossRaceId.
+func (r *TypeRegistry) MonsterByBossRaceID(raceID uint16) *MonsterType {
+	if r == nil || raceID == 0 {
+		return nil
+	}
+	for _, m := range r.Monsters {
+		if m.BosstiaryRaceID == raceID {
+			return m
+		}
+	}
+	return nil
+}
+
+// BosstiaryMonsters returns all boss monster types keyed by bosstiary race id
+// (the boss list backing the Boss Cyclopedia).
+func (r *TypeRegistry) BosstiaryMonsters() map[uint16]*MonsterType {
+	out := make(map[uint16]*MonsterType)
+	if r == nil {
+		return out
+	}
+	for _, m := range r.Monsters {
+		if m.IsBoss() {
+			out[m.BosstiaryRaceID] = m
+		}
+	}
+	return out
 }
 
 type xmlMonster struct {

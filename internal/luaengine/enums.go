@@ -336,6 +336,11 @@ func RegisterEnums(L *lua.LState) {
 		"FORGE_INFLUENCED_MONSTER": 1,
 		"FORGE_FIENDISH_MONSTER":   2,
 
+		// Bosstiary rarities (monster.bosstiary.bossRace). Match bosstiary.Rarity.
+		"RARITY_BANE":    0,
+		"RARITY_ARCHFOE": 1,
+		"RARITY_NEMESIS": 2,
+
 		// Cylinder index / flags (src/items/cylinder.hpp, items_definitions.hpp).
 		// Used by addItemEx / internalAddItem (e.g. Player:addItemStoreInbox).
 		"INDEX_WHEREEVER":          -1,

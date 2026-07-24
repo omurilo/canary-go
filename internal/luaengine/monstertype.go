@@ -3,6 +3,7 @@ package luaengine
 import (
 	"strings"
 
+	"github.com/opentibiabr/canary-go/internal/bosstiary"
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -48,6 +49,16 @@ func (e *Engine) registerMonsterType() {
 			if bt := table.RawGetString("Bestiary"); bt.Type() == lua.LTTable {
 				if val := bt.(*lua.LTable).RawGetString("Stars"); val.Type() == lua.LTNumber {
 					m.BestiaryStars = uint8(lua.LVAsNumber(val))
+				}
+			}
+			// Bosstiary (Boss Cyclopedia): monster.bosstiary = { bossRaceId, bossRace }.
+			if bt := table.RawGetString("bosstiary"); bt.Type() == lua.LTTable {
+				bTbl := bt.(*lua.LTable)
+				if val := bTbl.RawGetString("bossRaceId"); val.Type() == lua.LTNumber {
+					m.BosstiaryRaceID = uint16(lua.LVAsNumber(val))
+				}
+				if val := bTbl.RawGetString("bossRace"); val.Type() == lua.LTNumber {
+					m.BosstiaryRace = bosstiary.Rarity(lua.LVAsNumber(val))
 				}
 			}
 			parseMonsterAttacks(m, table)
