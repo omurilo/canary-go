@@ -688,4 +688,4 @@ OTCRFeatures = {
 }
 motd = "Welcome to Canary-Go! A Go migration of the Canary server."
 rsaKeyFile = "key.pem"
-worldFile = "data-otservbr-global/world/otservbr.otbm"
+worldFile = "data-canary/world/otservbr.otbm"
