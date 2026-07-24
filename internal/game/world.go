@@ -1,10 +1,13 @@
 package game
 
 import (
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/opentibiabr/canary-go/internal/bosstiary"
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/items"
 )
@@ -569,4 +572,34 @@ func (w *World) GetBoostedBoss() string {
 		return bb
 	}
 	return "None"
+}
+
+// EnsureBoostedBoss picks the daily bosstiary boosted boss (a random Archfoe)
+// when none is configured, seeded by the calendar day so it is stable within a
+// day and rotates daily. Simplified IOBosstiary::loadBoostedBoss (no DB row /
+// outfit). Idempotent and safe for concurrent callers.
+func (w *World) EnsureBoostedBoss() {
+	w.mu.RLock()
+	bb, reg := w.BoostedBoss, w.TypeRegistry
+	w.mu.RUnlock()
+	if (bb != "" && bb != "default") || reg == nil {
+		return
+	}
+	var names []string
+	for _, mt := range reg.Monsters {
+		if mt.IsBoss() && mt.BosstiaryRace == bosstiary.RarityArchfoe {
+			names = append(names, mt.Name)
+		}
+	}
+	if len(names) == 0 {
+		return
+	}
+	sort.Strings(names)
+	day := int(time.Now().Unix() / 86400)
+	pick := names[day%len(names)]
+	w.mu.Lock()
+	if w.BoostedBoss == "" || w.BoostedBoss == "default" {
+		w.BoostedBoss = pick
+	}
+	w.mu.Unlock()
 }

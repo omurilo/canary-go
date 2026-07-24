@@ -246,8 +246,9 @@ func (g *GameProtocol) SendBosstiarySlots() {
 
 	// Today's boosted boss (resolved from its name). It gets its own "today"
 	// slot and is excluded from the regular unlocked list (mirrors C++).
+	g.deps.World.EnsureBoostedBoss()
 	boostedBossID := uint32(0)
-	if bb := g.deps.World.GetBoostedBoss(); bb != "" {
+	if bb := g.deps.World.GetBoostedBoss(); bb != "" && bb != "None" {
 		if mt := reg.Monsters[strings.ToLower(bb)]; mt != nil && mt.IsBoss() {
 			boostedBossID = uint32(mt.BosstiaryRaceID)
 		}
@@ -272,8 +273,10 @@ func (g *GameProtocol) SendBosstiarySlots() {
 		slotOneUnlocked:   len(unlocked) > 0,
 		slotTwoUnlocked:   points >= 1500,
 		slotTwoLockPoints: 1500,
-		todayUnlocked:     true, // config boostedBossSlot defaults true
-		boostedBossID:     boostedBossID,
+		// Only unlock the "today" slot when we actually have a boosted boss;
+		// sending unlocked with id 0 leaves the client with an empty phantom slot.
+		todayUnlocked: boostedBossID != 0,
+		boostedBossID: boostedBossID,
 	}
 
 	// Today slot: the boosted boss with its fixed boosted bonuses (config
