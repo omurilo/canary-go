@@ -33,6 +33,17 @@ type MonsterType struct {
 	// staging. 0 means "not in the bestiary".
 	BestiaryStars uint8
 
+	// Bestiary (Cyclopedia) entry data, from the monster.Bestiary block.
+	// BestiaryRace is a BESTY_RACE_* class; the *Unlock/ToKill kill thresholds
+	// stage the entry (getKillStatus); CharmsPoints is awarded on completion.
+	BestiaryClass        string
+	BestiaryRace         uint8
+	BestiaryFirstUnlock  uint32
+	BestiarySecondUnlock uint32
+	BestiaryToKill       uint32
+	BestiaryCharmsPoints uint16
+	BestiaryOccurrence   uint8
+
 	// Bosstiary (Boss Cyclopedia). BosstiaryRaceID is the boss's cyclopedia race
 	// id (monster.bosstiary.bossRaceId), distinct from the bestiary RaceID.
 	// BosstiaryRace is the rarity class (Bane/Archfoe/Nemesis) that determines

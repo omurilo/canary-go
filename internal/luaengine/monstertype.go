@@ -47,8 +47,30 @@ func (e *Engine) registerMonsterType() {
 				m.RaceID = uint16(lua.LVAsNumber(val))
 			}
 			if bt := table.RawGetString("Bestiary"); bt.Type() == lua.LTTable {
-				if val := bt.(*lua.LTable).RawGetString("Stars"); val.Type() == lua.LTNumber {
+				b := bt.(*lua.LTable)
+				if val := b.RawGetString("Stars"); val.Type() == lua.LTNumber {
 					m.BestiaryStars = uint8(lua.LVAsNumber(val))
+				}
+				if val := b.RawGetString("class"); val.Type() == lua.LTString {
+					m.BestiaryClass = val.String()
+				}
+				if val := b.RawGetString("race"); val.Type() == lua.LTNumber {
+					m.BestiaryRace = uint8(lua.LVAsNumber(val))
+				}
+				if val := b.RawGetString("FirstUnlock"); val.Type() == lua.LTNumber {
+					m.BestiaryFirstUnlock = uint32(lua.LVAsNumber(val))
+				}
+				if val := b.RawGetString("SecondUnlock"); val.Type() == lua.LTNumber {
+					m.BestiarySecondUnlock = uint32(lua.LVAsNumber(val))
+				}
+				if val := b.RawGetString("toKill"); val.Type() == lua.LTNumber {
+					m.BestiaryToKill = uint32(lua.LVAsNumber(val))
+				}
+				if val := b.RawGetString("CharmsPoints"); val.Type() == lua.LTNumber {
+					m.BestiaryCharmsPoints = uint16(lua.LVAsNumber(val))
+				}
+				if val := b.RawGetString("Occurrence"); val.Type() == lua.LTNumber {
+					m.BestiaryOccurrence = uint8(lua.LVAsNumber(val))
 				}
 			}
 			// Bosstiary (Boss Cyclopedia): monster.bosstiary = { bossRaceId, bossRace }.
