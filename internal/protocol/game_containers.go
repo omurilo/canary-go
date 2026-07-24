@@ -1,6 +1,9 @@
 package protocol
 
 import (
+	"strings"
+	"time"
+
 	"github.com/opentibiabr/canary-go/internal/actions"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
@@ -34,10 +37,32 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	// Execute Lua action first
 	action := actions.FindAction(item)
 	if action != nil {
+		isEx := g.isExAction(item)
+		if isEx {
+			if !g.player.CanDoPotionAction() {
+				g.sendCancelMessage("You are exhausted.")
+				return
+			}
+		} else {
+			if !g.player.CanDoAction() {
+				g.sendCancelMessage("You are exhausted.")
+				return
+			}
+		}
+
 		gamePos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
 		originalPos := g.player.Pos
 		beforeCount := item.Count
 		if g.deps.Lua.CallAction(action, g.player, item, gamePos, nil, gamePos, false) {
+			if isEx {
+				g.player.SetNextPotionAction(1000 * time.Millisecond)
+				g.player.SetNextAction(200 * time.Millisecond)
+				g.SendUseItemCooldown(1000)
+			} else {
+				g.player.SetNextAction(200 * time.Millisecond)
+				g.SendUseItemCooldown(200)
+			}
+
 			// If the script consumed/changed the item (e.g. food, runes calling
 			// item:remove), reflect it on the client.
 			if item.Count != beforeCount {
@@ -485,10 +510,31 @@ func (g *GameProtocol) parseUseItemWith(r *netmsg.Reader) {
 	// Execute Lua action
 	action := actions.FindAction(fromItem)
 	if action != nil {
+		isEx := g.isExAction(fromItem)
+		if isEx {
+			if !g.player.CanDoPotionAction() {
+				g.sendCancelMessage("You are exhausted.")
+				return
+			}
+		} else {
+			if !g.player.CanDoAction() {
+				g.sendCancelMessage("You are exhausted.")
+				return
+			}
+		}
+
 		fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
 		toGamePos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
 		beforeCount := fromItem.Count
 		if g.deps.Lua.CallAction(action, g.player, fromItem, fromGamePos, toItem, toGamePos, false) {
+			if isEx {
+				g.player.SetNextPotionAction(1000 * time.Millisecond)
+				g.player.SetNextAction(200 * time.Millisecond)
+				g.SendUseItemCooldown(1000)
+			} else {
+				g.player.SetNextAction(200 * time.Millisecond)
+				g.SendUseItemCooldown(200)
+			}
 			if fromItem.Count != beforeCount {
 				g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
 			}
@@ -521,10 +567,31 @@ func (g *GameProtocol) parseUseWithCreature(r *netmsg.Reader) {
 	// Execute Lua action
 	action := actions.FindAction(fromItem)
 	if action != nil {
+		isEx := g.isExAction(fromItem)
+		if isEx {
+			if !g.player.CanDoPotionAction() {
+				g.sendCancelMessage("You are exhausted.")
+				return
+			}
+		} else {
+			if !g.player.CanDoAction() {
+				g.sendCancelMessage("You are exhausted.")
+				return
+			}
+		}
+
 		fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
 		toGamePos := targetCreature.GetPosition()
 		beforeCount := fromItem.Count
 		if g.deps.Lua.CallAction(action, g.player, fromItem, fromGamePos, targetCreature, toGamePos, false) {
+			if isEx {
+				g.player.SetNextPotionAction(1000 * time.Millisecond)
+				g.player.SetNextAction(200 * time.Millisecond)
+				g.SendUseItemCooldown(1000)
+			} else {
+				g.player.SetNextAction(200 * time.Millisecond)
+				g.SendUseItemCooldown(200)
+			}
 			if fromItem.Count != beforeCount {
 				g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
 			}
@@ -565,5 +632,39 @@ func (g *GameProtocol) getItemAt(pos netmsg.Position, itemID uint16, stackpos ui
 		item = g.player.FindItemOfType(g.deps.Items, itemID, true, -1)
 	}
 	return item
+}
+
+func (g *GameProtocol) sendCancelMessage(text string) {
+	w := netmsg.NewWriter()
+	w.AddByte(opTextMessage)
+	w.AddByte(22) // MESSAGE_FAILURE / STATUS_SMALL
+	w.AddString(text)
+	g.SendToClient(w)
+}
+
+// SendUseItemCooldown sends an item use cooldown packet (0xA6) to the client.
+func (g *GameProtocol) SendUseItemCooldown(ms uint32) {
+	w := netmsg.NewWriter()
+	w.AddByte(0xA6)
+	w.AddU32(ms)
+	g.SendToClient(w)
+}
+
+func (g *GameProtocol) isExAction(item *game.Item) bool {
+	if item == nil {
+		return false
+	}
+	if g.deps != nil && g.deps.Items != nil {
+		if t := g.deps.Items.Get(item.ID); t != nil {
+			if strings.EqualFold(t.TypeName, "potion") || strings.EqualFold(t.TypeName, "rune") || strings.Contains(strings.ToLower(t.Name), "potion") {
+				return true
+			}
+		}
+	}
+	id := item.ID
+	if (id >= 236 && id <= 239) || id == 266 || id == 7618 || id == 7620 || (id >= 8472 && id <= 8473) || (id >= 23373 && id <= 23375) || id == 35563 {
+		return true
+	}
+	return false
 }
 

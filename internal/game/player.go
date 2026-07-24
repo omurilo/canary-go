@@ -212,6 +212,10 @@ type Player struct {
 	// action (forge, wheel, ...), mirroring Player::lastUIInteraction.
 	lastUIInteraction int64
 
+	// Action exhaustion timestamps (mirroring Player::nextPotionAction / nextAction).
+	NextPotionAction time.Time
+	NextAction       time.Time
+
 	// cooldowns tracks per-spell and per-group spell cooldowns, mirroring the
 	// CONDITION_SPELLCOOLDOWN / CONDITION_SPELLGROUPCOOLDOWN conditions applied
 	// by Spell::applyCooldownConditions (src/creatures/combat/spells.cpp:795).
@@ -1238,6 +1242,32 @@ func (p *Player) GetLevelPercent() uint16 {
 	}
 	ratio := float64(p.Experience-currExp) / float64(nextExp-currExp)
 	return uint16(ratio * 10000)
+}
+
+// CanDoPotionAction reports whether the potion action delay has elapsed.
+func (p *Player) CanDoPotionAction() bool {
+	return time.Now().After(p.NextPotionAction) || time.Now().Equal(p.NextPotionAction)
+}
+
+// SetNextPotionAction sets the timestamp until which potion actions are blocked.
+func (p *Player) SetNextPotionAction(delay time.Duration) {
+	t := time.Now().Add(delay)
+	if t.After(p.NextPotionAction) {
+		p.NextPotionAction = t
+	}
+}
+
+// CanDoAction reports whether the standard action delay has elapsed.
+func (p *Player) CanDoAction() bool {
+	return time.Now().After(p.NextAction) || time.Now().Equal(p.NextAction)
+}
+
+// SetNextAction sets the timestamp until which standard actions are blocked.
+func (p *Player) SetNextAction(delay time.Duration) {
+	t := time.Now().Add(delay)
+	if t.After(p.NextAction) {
+		p.NextAction = t
+	}
 }
 
 func skillNameOf(skill Skill) string {

@@ -92,30 +92,8 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 				if (it.SlotPosition == "ammo" || it.WeaponType == "ammunition" || it.WeaponType == "ammo") && toSlot == 10 { valid = true }
 
 				if !valid {
-					// Check if there is a container in the slot. If so, redirect to it.
-					if existing := g.player.Inventory[toSlot]; existing != nil {
-						if existingType := g.deps.Items.Get(existing.ID); existingType != nil && existingType.IsContainer() {
-							// Find open container ID
-							foundCid := -1
-							for cid, cont := range g.rangeContainers() {
-								if cont == existing {
-									foundCid = int(cid)
-									break
-								}
-							}
-							if foundCid != -1 {
-								// Redirect to open container
-								toPos = netmsg.Position{X: 0xFFFF, Y: uint16(0x40 + foundCid), Z: 0}
-							} else {
-								g.sendStatusText("You cannot dress this object there.")
-								g.revertMove(fromPos, toPos, spriteID)
-								return
-							}
-						} else {
-							g.sendStatusText("You cannot dress this object there.")
-							g.revertMove(fromPos, toPos, spriteID)
-							return
-						}
+					if existing := g.player.Inventory[toSlot]; existing != nil && existing.IsContainer(g.deps.Items) {
+						// Drop target is the container sitting in the equipment slot
 					} else {
 						g.sendStatusText("You cannot dress this object there.")
 						g.revertMove(fromPos, toPos, spriteID)
@@ -123,6 +101,65 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 					}
 				}
 			}
+		}
+	}
+
+	// 1.5 Determine target container (e.g. equipment container, child container in window, or container on tile)
+	var destContainer *game.Item
+	if toPos.X == 0xFFFF {
+		if toPos.Y < 0x40 {
+			toSlot := uint8(toPos.Y)
+			if toSlot > 0 && toSlot <= 10 {
+				if existing := g.player.Inventory[toSlot]; existing != nil && existing.IsContainer(g.deps.Items) {
+					valid := false
+					if it != nil {
+						if it.SlotPosition == "head" && toSlot == 1 { valid = true }
+						if it.SlotPosition == "necklace" && toSlot == 2 { valid = true }
+						if it.SlotPosition == "backpack" && toSlot == 3 { valid = true }
+						if it.SlotPosition == "body" && toSlot == 4 { valid = true }
+						if (toSlot == 5 || toSlot == 6) && (it.SlotPosition == "two-handed" || it.SlotPosition == "right-hand" || it.SlotPosition == "left-hand" || it.WeaponType != "" || it.IsQuiver) { valid = true }
+						if it.SlotPosition == "legs" && toSlot == 7 { valid = true }
+						if it.SlotPosition == "feet" && toSlot == 8 { valid = true }
+						if it.SlotPosition == "ring" && toSlot == 9 { valid = true }
+						if (it.SlotPosition == "ammo" || it.WeaponType == "ammunition" || it.WeaponType == "ammo") && toSlot == 10 { valid = true }
+					}
+					if !valid {
+						destContainer = existing
+					}
+				}
+			}
+		} else {
+			cid := uint8(toPos.Y - 0x40)
+			if openCont, ok := g.openContainerByCID(cid); ok {
+				slotIdx := int(toPos.Z)
+				if slotIdx >= 0 && slotIdx < len(openCont.Contents) {
+					targetItem := openCont.Contents[slotIdx]
+					if targetItem != nil && targetItem.IsContainer(g.deps.Items) && targetItem != item {
+						destContainer = targetItem
+					} else {
+						destContainer = openCont
+					}
+				} else {
+					destContainer = openCont
+				}
+			}
+		}
+	} else {
+		pos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
+		tile := g.deps.World.Map.GetTile(pos)
+		if tile != nil && len(tile.Items) > 0 {
+			topItem := tile.Items[len(tile.Items)-1]
+			if topItem != nil && topItem.IsContainer(g.deps.Items) && topItem != item {
+				destContainer = topItem
+			}
+		}
+	}
+
+	if destContainer != nil {
+		if item.IsContainer(g.deps.Items) && isChildOf(item, destContainer) {
+			g.sendStatusText("You cannot put an object inside itself.")
+			g.revertMove(fromPos, toPos, spriteID)
+			return
 		}
 	}
 
@@ -140,12 +177,11 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 
 	// Swapping logic
 	var swapItem *game.Item
-	if toPos.X == 0xFFFF && toPos.Y < 0x40 {
+	if destContainer == nil && toPos.X == 0xFFFF && toPos.Y < 0x40 {
 		toSlot := uint8(toPos.Y)
 		if toSlot > 0 && toSlot <= 10 {
 			if existing := g.player.Inventory[toSlot]; existing != nil {
 				swapItem = existing
-				// If swapping, we must move the full stack, or at least we treat moveItem as taking the slot.
 			}
 		}
 	}
@@ -212,7 +248,37 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	}
 
 	// 4. Add to destination
-	if toPos.X != 0xFFFF {
+	if destContainer != nil {
+		var merged bool
+		if it != nil && it.Stackable {
+			for _, targetItem := range destContainer.Contents {
+				if targetItem != nil && targetItem.ID == moveItem.ID && targetItem.Count < 100 {
+					room := 100 - targetItem.Count
+					take := moveItem.Count
+					if take > room {
+						take = room
+					}
+					targetItem.Count += take
+					moveItem.Count -= take
+					if moveItem.Count == 0 {
+						merged = true
+						break
+					}
+				}
+			}
+		}
+		if !merged {
+			moveItem.Parent = destContainer
+			destContainer.Contents = append([]*game.Item{moveItem}, destContainer.Contents...)
+			if len(destContainer.Contents) > 0xFF {
+				destContainer.Contents = destContainer.Contents[:0xFF]
+			}
+		}
+		g.RefreshContainer(destContainer)
+		if fromContainer != nil && fromContainer != destContainer {
+			g.RefreshContainer(fromContainer)
+		}
+	} else if toPos.X != 0xFFFF {
 		pos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
 		moveItem.Parent = nil
 		
@@ -242,6 +308,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 				g.deps.World.Map.SetTile(pos, &game.Tile{Items: []*game.Item{moveItem}})
 			}
 			g.broadcastAddTileItem(pos, moveItem)
+		}
+		if fromContainer != nil {
+			g.RefreshContainer(fromContainer)
 		}
 	} else {
 		if toPos.Y >= 0x40 {
@@ -277,6 +346,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 					}
 					g.sendAddContainerItem(cid, 0, moveItem)
 				}
+				g.RefreshContainer(toContainer)
 			}
 		} else {
 			toSlot := uint8(toPos.Y)
@@ -306,6 +376,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 					g.sendInventoryItem(toSlot, moveItem)
 				}
 			}
+		}
+		if fromContainer != nil {
+			g.RefreshContainer(fromContainer)
 		}
 	}
 
@@ -549,4 +622,21 @@ func (g *GameProtocol) getPlayerTotalWeight() uint32 {
 		weight += g.getItemWeight(item)
 	}
 	return weight
+}
+
+func isChildOf(parent, child *game.Item) bool {
+	if parent == nil || child == nil {
+		return false
+	}
+	if parent == child {
+		return true
+	}
+	for _, item := range parent.Contents {
+		if item != nil {
+			if isChildOf(item, child) {
+				return true
+			}
+		}
+	}
+	return false
 }
