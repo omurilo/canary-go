@@ -496,6 +496,9 @@ func (e *Engine) registerAPI() {
 	e.registerVariant()
 	e.registerCondition()
 	e.registerDB()
+	// registerCharmType runs after the mockClass block so its real Charm type
+	// and Game.createBestiaryCharm override the mocks.
+	e.registerCharmType()
 
 	// addPlayerEvent global fallback function if modules.lua isn't loaded yet.
 	// Mirrors data/modules/lib/modules.lua: addPlayerEvent(callable, delay,

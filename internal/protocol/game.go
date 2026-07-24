@@ -837,6 +837,9 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case 0xE3:
 		// C_BestiarySendMonsterData: one monster's detail.
 		g.parseBestiaryMonsterData(r)
+	case 0xE4:
+		// C_BuyCharmRune: unlock/upgrade, assign, clear, or reset charms.
+		g.parseSendBuyCharmRune(r)
 	case 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xE8, 0xE9, 0xEF:
 		// In-game store packets (C_OpenStore/RequestStoreOffers/BuyStoreOffer/
 		// transaction history, plus GetOfferDescription/StoreEvent/TransferCoins).

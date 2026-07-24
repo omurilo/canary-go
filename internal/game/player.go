@@ -186,6 +186,10 @@ type Player struct {
 	CharmExpansion      bool
 	UsedRunesBit        uint32
 	UnlockedRunesBit    uint32
+	// Charms holds per-charm state (tier + assigned monster race) indexed by
+	// charm id 0..24. Mirrors C++ Player::charmsArray. Persisted as the
+	// player_charms.charms blob.
+	Charms [numCharms]CharmInfo
 
 	// Exaltation Forge resources
 	// Forge (Exaltation Forge). ForgeDusts is the dust resource amount;
@@ -541,8 +545,80 @@ func (p *Player) AddBosstiaryKill(raceID uint16, race bosstiary.Rarity, amount u
 	return false
 }
 
+// numCharms is the number of charm-rune ids (CHARM_WOUND..CHARM_OVERFLUX = 0..24).
+const numCharms = 25
+
+// CharmInfo is the player's per-charm state. Mirrors C++ struct CharmInfo.
+type CharmInfo struct {
+	RaceID uint16 // assigned monster race (0 = unassigned)
+	Tier   uint8  // unlock tier (0 = not unlocked)
+}
+
+// GetCharmTier returns the unlock tier of a charm (0 if id out of range).
+func (p *Player) GetCharmTier(charmID uint8) uint8 {
+	if int(charmID) >= len(p.Charms) {
+		return 0
+	}
+	return p.Charms[charmID].Tier
+}
+
+// SetCharmTier sets the unlock tier of a charm.
+func (p *Player) SetCharmTier(charmID uint8, tier uint8) {
+	if int(charmID) < len(p.Charms) {
+		p.Charms[charmID].Tier = tier
+	}
+}
+
+// GetCharmRace returns the monster race a charm is assigned to (0 = none).
+// Mirrors Player::parseRacebyCharm (get).
+func (p *Player) GetCharmRace(charmID uint8) uint16 {
+	if int(charmID) >= len(p.Charms) {
+		return 0
+	}
+	return p.Charms[charmID].RaceID
+}
+
+// SetCharmRace assigns a charm to a monster race (0 = unassign).
+// Mirrors Player::parseRacebyCharm (set).
+func (p *Player) SetCharmRace(charmID uint8, raceID uint16) {
+	if int(charmID) < len(p.Charms) {
+		p.Charms[charmID].RaceID = raceID
+	}
+}
+
+// GetMinorCharmEchoes returns the player's spendable minor charm echoes.
+func (p *Player) GetMinorCharmEchoes() uint32 { return p.MinorCharmEchoes }
+
+// AddMinorCharmEchoes adds (or, when negative, spends) minor charm echoes,
+// bumping the lifetime max when adding. Mirrors IOBestiary::addMinorCharmEchoes.
+func (p *Player) AddMinorCharmEchoes(amount uint32, negative bool) {
+	if negative {
+		if amount > p.MinorCharmEchoes {
+			p.MinorCharmEchoes = 0
+		} else {
+			p.MinorCharmEchoes -= amount
+		}
+		return
+	}
+	p.MinorCharmEchoes += amount
+	p.MaxMinorCharmEchoes += amount
+}
+
+// SetMinorCharmEchoes sets the spendable minor charm echoes.
+func (p *Player) SetMinorCharmEchoes(amount uint32) { p.MinorCharmEchoes = amount }
+
 // GetCharmPoints returns the player's spendable charm points.
 func (p *Player) GetCharmPoints() uint32 { return p.CharmPoints }
+
+// SpendCharmPoints deducts spendable charm points without touching the max.
+// Mirrors IOBestiary::addCharmPoints(negative=true).
+func (p *Player) SpendCharmPoints(amount uint32) {
+	if amount > p.CharmPoints {
+		p.CharmPoints = 0
+	} else {
+		p.CharmPoints -= amount
+	}
+}
 
 // AddCharmPoints adds spendable charm points (and bumps the lifetime max).
 func (p *Player) AddCharmPoints(amount uint32) {

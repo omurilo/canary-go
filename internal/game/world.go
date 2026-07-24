@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/bosstiary"
+	"github.com/opentibiabr/canary-go/internal/charms"
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/items"
 )
@@ -32,6 +33,7 @@ type World struct {
 
 	Items *items.Catalog
 	Monsters *creatures.TypeRegistry
+	Charms *charms.Registry
 	Decay *DecayManager
 
 	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldTileIndex int)
@@ -122,6 +124,7 @@ func NewWorld() *World {
 		byName:       make(map[string]*Player),
 		creatures:    make(map[uint32]Creature),
 		TypeRegistry: creatures.NewTypeRegistry(),
+		Charms:       charms.NewRegistry(),
 		Fiendish:     NewFiendishManager(3),
 	}
 	w.Combat = NewCombatEngine(w)
