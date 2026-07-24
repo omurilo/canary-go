@@ -827,6 +827,15 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case 0xB0:
 		// C_BosstiarySlot: set/remove a boss in a prowess slot.
 		g.parseBosstiarySlot(r)
+	case 0xE1:
+		// C_BestiarySendRaces: open the bestiary -> class list.
+		g.SendBestiaryRaces()
+	case 0xE2:
+		// C_BestiarySendCreatures: monsters within a class.
+		g.parseBestiarySendCreatures(r)
+	case 0xE3:
+		// C_BestiarySendMonsterData: one monster's detail.
+		g.parseBestiaryMonsterData(r)
 	case 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xE8, 0xE9, 0xEF:
 		// In-game store packets (C_OpenStore/RequestStoreOffers/BuyStoreOffer/
 		// transaction history, plus GetOfferDescription/StoreEvent/TransferCoins).

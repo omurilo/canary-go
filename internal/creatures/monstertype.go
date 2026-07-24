@@ -178,6 +178,20 @@ func (r *TypeRegistry) MonsterByBossRaceID(raceID uint16) *MonsterType {
 	return nil
 }
 
+// MonsterByRaceID returns the monster type with the given bestiary race id, or
+// nil.
+func (r *TypeRegistry) MonsterByRaceID(raceID uint16) *MonsterType {
+	if r == nil || raceID == 0 {
+		return nil
+	}
+	for _, m := range r.Monsters {
+		if m.RaceID == raceID {
+			return m
+		}
+	}
+	return nil
+}
+
 // BosstiaryMonsters returns all boss monster types keyed by bosstiary race id
 // (the boss list backing the Boss Cyclopedia).
 func (r *TypeRegistry) BosstiaryMonsters() map[uint16]*MonsterType {
