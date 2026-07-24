@@ -821,6 +821,9 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		// C_SendBosstiarySlots: open the prowess-slots view -> rules + slots.
 		g.SendBosstiaryData()
 		g.SendBosstiarySlots()
+	case 0xB0:
+		// C_BosstiarySlot: set/remove a boss in a prowess slot.
+		g.parseBosstiarySlot(r)
 	case 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xE8, 0xE9, 0xEF:
 		// In-game store packets (C_OpenStore/RequestStoreOffers/BuyStoreOffer/
 		// transaction history, plus GetOfferDescription/StoreEvent/TransferCoins).

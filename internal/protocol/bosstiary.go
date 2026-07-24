@@ -165,6 +165,43 @@ func buildBosstiarySlots(v bosstiarySlotsView) *netmsg.Writer {
 	return w
 }
 
+// parseBosstiarySlot handles recv 0xB0: set or remove a boss in a prowess slot.
+// Payload: u8 slotId, u32 selectedBossId (0 = remove). Removing a slotted boss
+// costs RemoveBossPrice gold (first removal free) and bumps the removal counter.
+// Mirrors Game::playerBosstiarySlot.
+func (g *GameProtocol) parseBosstiarySlot(r *netmsg.Reader) {
+	slotID := r.GetByte()
+	selectedBossID := r.GetU32()
+	if g.player == nil {
+		return
+	}
+	if g.player.IsUIExhausted(250) {
+		g.sendCancelMessage("You are exhausted.")
+		return
+	}
+	g.player.UpdateUIExhausted()
+
+	current := g.player.GetSlotBossId(slotID)
+	if selectedBossID == 0 && current != 0 {
+		// (Boosted-boss removal is free in C++, but we don't model a boosted boss
+		// yet, so the removal always charges.)
+		price := uint64(bosstiary.RemoveBossPrice(g.player.GetRemoveTimes()))
+		if price > 0 {
+			if g.player.GetMoney()+g.player.BankBalance < price {
+				g.sendCancelMessage("You do not have enough money.")
+				return
+			}
+			g.player.RemoveMoney(price, true)
+		}
+		g.player.AddRemoveTime()
+	}
+	g.player.SetSlotBossId(slotID, selectedBossID)
+
+	// Refresh the slots view.
+	g.SendBosstiaryData()
+	g.SendBosstiarySlots()
+}
+
 // SendBosstiarySlots gathers the player's prowess-slot state and sends 0x62.
 func (g *GameProtocol) SendBosstiarySlots() {
 	if g.player == nil || g.deps == nil || g.deps.World == nil || g.deps.World.TypeRegistry == nil {
