@@ -828,8 +828,9 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		// C_BosstiarySlot: set/remove a boss in a prowess slot.
 		g.parseBosstiarySlot(r)
 	case 0xE1:
-		// C_BestiarySendRaces: open the bestiary -> class list.
+		// C_BestiarySendRaces: open the bestiary -> class list + charms window.
 		g.SendBestiaryRaces()
+		g.SendBestiaryCharms()
 	case 0xE2:
 		// C_BestiarySendCreatures: monsters within a class.
 		g.parseBestiarySendCreatures(r)

@@ -222,6 +222,32 @@ func (g *GameProtocol) SendBestiaryRaces() {
 	g.SendToClient(w)
 }
 
+// SendBestiaryCharms sends the charms window (0xD8). The charm-definition list
+// is not modelled yet, so this sends a valid empty list (reset cost, 0 charms,
+// available slots, no assignable monsters) — enough for the bestiary window to
+// open with an empty Charms tab. Mirrors the >= 1410 layout of
+// ProtocolGame::sendBestiaryCharms. Full charm defs/assignment is a follow-up.
+func (g *GameProtocol) SendBestiaryCharms() {
+	if g.player == nil {
+		return
+	}
+	level := uint64(g.player.Level)
+	resetCost := uint64(100000)
+	if level > 100 {
+		resetCost += level * 11000
+	}
+	if g.player.CharmExpansion {
+		resetCost = resetCost * 75 / 100
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xD8)
+	w.AddU64(resetCost)
+	w.AddByte(0) // charm count (charm definitions not modelled yet)
+	w.AddByte(2) // available charm slots (non-premium default)
+	w.AddU16(0)  // finished monsters available for assignment
+	g.SendToClient(w)
+}
+
 // SendBestiaryEntryChanged tells the client a bestiary monster entry changed
 // (new unlock stage) so it refreshes it. Mirrors
 // ProtocolGame::sendBestiaryEntryChanged (0xD9 + u16 raceid).
