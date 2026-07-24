@@ -63,6 +63,8 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 			if row.pid < len(p.Inventory) {
 				p.Inventory[row.pid] = row.item
 			}
+		} else if row.pid == 11 { // CONST_SLOT_STORE_INBOX
+			p.StoreInbox = row.item
 		} else {
 			if parent, ok := itemsBySID[row.pid]; ok {
 				row.item.Parent = parent
@@ -134,6 +136,14 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 			if err := saveItem(p.Inventory[slot], slot); err != nil {
 				return err
 			}
+		}
+	}
+
+	// Store Inbox lives at slot 11 (CONST_SLOT_STORE_INBOX); persist it and its
+	// contents (in-game store purchases) like any equipment container.
+	if p.StoreInbox != nil {
+		if err := saveItem(p.StoreInbox, 11); err != nil {
+			return err
 		}
 	}
 
