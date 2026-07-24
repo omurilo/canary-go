@@ -817,6 +817,10 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		// C_SendBosstiary: open the Boss Cyclopedia -> send rules + boss list.
 		g.SendBosstiaryData()
 		g.SendBosstiaryInfo()
+	case 0xAF:
+		// C_SendBosstiarySlots: open the prowess-slots view -> rules + slots.
+		g.SendBosstiaryData()
+		g.SendBosstiarySlots()
 	case 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xE8, 0xE9, 0xEF:
 		// In-game store packets (C_OpenStore/RequestStoreOffers/BuyStoreOffer/
 		// transaction history, plus GetOfferDescription/StoreEvent/TransferCoins).

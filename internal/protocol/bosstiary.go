@@ -72,6 +72,171 @@ func buildBosstiaryInfo(entries []bossListEntry) *netmsg.Writer {
 	return w
 }
 
+// bosstiarySlotView is one filled prowess slot's display data.
+type bosstiarySlotView struct {
+	filled      bool
+	bossID      uint32
+	race        uint8
+	kills       uint32
+	lootBonus   uint16
+	killBonus   uint8
+	removePrice uint32
+	inactive    bool
+}
+
+// bosstiarySlotsView is everything the 0x62 slots packet needs.
+type bosstiarySlotsView struct {
+	playerPoints        uint32
+	pointsNextBonus     uint32
+	currentBonus        uint16
+	slotOneUnlocked     bool
+	slotOne             bosstiarySlotView
+	slotTwoUnlocked     bool
+	slotTwoLockPoints   uint32 // shown as the u32 when slot two is still locked
+	slotTwo             bosstiarySlotView
+	todayUnlocked       bool
+	boostedBossID       uint32
+	todaySlot           bosstiarySlotView
+	unlocked            []bossListEntry // bosses selectable into a slot (raceId, race)
+}
+
+func writeBosstiarySlot(w *netmsg.Writer, s bosstiarySlotView) {
+	w.AddByte(s.race)
+	w.AddU32(s.kills)
+	w.AddU16(s.lootBonus)
+	w.AddByte(s.killBonus)
+	w.AddByte(s.race) // race repeated (client reads it twice)
+	if s.inactive {
+		w.AddU32(0)
+	} else {
+		w.AddU32(s.removePrice)
+	}
+	if s.inactive {
+		w.AddByte(1)
+	} else {
+		w.AddByte(0)
+	}
+}
+
+// buildBosstiarySlots builds the 0x62 prowess-slots packet. Layout matches
+// otclient parseBosstiarySlots.
+func buildBosstiarySlots(v bosstiarySlotsView) *netmsg.Writer {
+	w := netmsg.NewWriter()
+	w.AddByte(0x62)
+	w.AddU32(v.playerPoints)
+	w.AddU32(v.pointsNextBonus)
+	w.AddU16(v.currentBonus)
+	w.AddU16(v.currentBonus + 1)
+
+	w.AddByte(boolByte(v.slotOneUnlocked))
+	if v.slotOneUnlocked {
+		w.AddU32(v.slotOne.bossID)
+	} else {
+		w.AddU32(0)
+	}
+	if v.slotOneUnlocked && v.slotOne.filled {
+		writeBosstiarySlot(w, v.slotOne)
+	}
+
+	w.AddByte(boolByte(v.slotTwoUnlocked))
+	if v.slotTwoUnlocked {
+		w.AddU32(v.slotTwo.bossID)
+	} else {
+		w.AddU32(v.slotTwoLockPoints)
+	}
+	if v.slotTwoUnlocked && v.slotTwo.filled {
+		writeBosstiarySlot(w, v.slotTwo)
+	}
+
+	w.AddByte(boolByte(v.todayUnlocked))
+	w.AddU32(v.boostedBossID)
+	if v.todayUnlocked && v.boostedBossID != 0 {
+		writeBosstiarySlot(w, v.todaySlot)
+	}
+
+	w.AddByte(boolByte(len(v.unlocked) != 0))
+	if len(v.unlocked) != 0 {
+		w.AddU16(uint16(len(v.unlocked)))
+		for _, e := range v.unlocked {
+			w.AddU32(uint32(e.RaceID))
+			w.AddByte(e.Race)
+		}
+	}
+	return w
+}
+
+// SendBosstiarySlots gathers the player's prowess-slot state and sends 0x62.
+func (g *GameProtocol) SendBosstiarySlots() {
+	if g.player == nil || g.deps == nil || g.deps.World == nil || g.deps.World.TypeRegistry == nil {
+		return
+	}
+	reg := g.deps.World.TypeRegistry
+	points := g.player.GetBossPoints()
+	currentBonus := bosstiary.CalculateLootBonus(points)
+	removePrice := bosstiary.RemoveBossPrice(g.player.GetRemoveTimes())
+
+	// Unlocked bosses = every boss the player has reached level >= 1 on.
+	var unlocked []bossListEntry
+	for raceID, mt := range reg.BosstiaryMonsters() {
+		if bosstiary.Level(mt.BosstiaryRace, g.player.GetBestiaryKillCount(raceID)) >= 1 {
+			unlocked = append(unlocked, bossListEntry{RaceID: raceID, Race: uint8(mt.BosstiaryRace)})
+		}
+	}
+
+	view := bosstiarySlotsView{
+		playerPoints:      points,
+		pointsNextBonus:   bosstiary.CalculateBossPoints(currentBonus + 1),
+		currentBonus:      currentBonus,
+		slotOneUnlocked:   len(unlocked) > 0,
+		slotTwoUnlocked:   points >= 1500,
+		slotTwoLockPoints: 1500,
+	}
+
+	slotFor := func(bossID uint32) bosstiarySlotView {
+		mt := reg.MonsterByBossRaceID(uint16(bossID))
+		if mt == nil {
+			return bosstiarySlotView{}
+		}
+		kills := g.player.GetBestiaryKillCount(uint16(bossID))
+		level := bosstiary.Level(mt.BosstiaryRace, kills)
+		bonus := currentBonus
+		if level == 3 {
+			bonus += 25 // mastery gives +25% loot bonus on the slotted boss
+		}
+		return bosstiarySlotView{
+			filled: true, bossID: bossID, race: uint8(mt.BosstiaryRace),
+			kills: kills, lootBonus: bonus, removePrice: removePrice,
+		}
+	}
+
+	usedFromUnlocked := 0
+	if view.slotOneUnlocked && g.player.GetSlotBossId(1) != 0 {
+		view.slotOne = slotFor(g.player.GetSlotBossId(1))
+		usedFromUnlocked++
+	}
+	if view.slotTwoUnlocked && g.player.GetSlotBossId(2) != 0 {
+		view.slotTwo = slotFor(g.player.GetSlotBossId(2))
+		usedFromUnlocked++
+	}
+
+	// The selectable list excludes bosses already placed in a slot.
+	slotted := map[uint16]bool{
+		uint16(g.player.GetSlotBossId(1)): g.player.GetSlotBossId(1) != 0,
+		uint16(g.player.GetSlotBossId(2)): g.player.GetSlotBossId(2) != 0,
+	}
+	filtered := unlocked[:0]
+	for _, e := range unlocked {
+		if slotted[e.RaceID] {
+			continue
+		}
+		filtered = append(filtered, e)
+	}
+	view.unlocked = filtered
+	_ = usedFromUnlocked
+
+	g.SendToClient(buildBosstiarySlots(view))
+}
+
 // buildBosstiaryData builds the 0x61 Boss Cyclopedia rules packet.
 func buildBosstiaryData() *netmsg.Writer {
 	w := netmsg.NewWriter()

@@ -75,3 +75,58 @@ func TestBosstiaryInfoPacket(t *testing.T) {
 		t.Fatalf("leftover %d bytes", r.Remaining())
 	}
 }
+
+// TestBosstiarySlotsPacket decodes 0x62 exactly as otclient parseBosstiarySlots.
+func TestBosstiarySlotsPacket(t *testing.T) {
+	v := bosstiarySlotsView{
+		playerPoints:      300,
+		pointsNextBonus:   750,
+		currentBonus:      55,
+		slotOneUnlocked:   true,
+		slotOne:           bosstiarySlotView{filled: true, bossID: 900, race: 1, kills: 60, lootBonus: 80, killBonus: 0, removePrice: 0, inactive: false},
+		slotTwoUnlocked:   false,
+		slotTwoLockPoints: 1500,
+		todayUnlocked:     false,
+		boostedBossID:     0,
+		unlocked:          []bossListEntry{{RaceID: 46, Race: 0}},
+	}
+	b := buildBosstiarySlots(v).Bytes()
+	if b[0] != 0x62 {
+		t.Fatalf("opcode 0x%02X want 0x62", b[0])
+	}
+	r := netmsg.NewReader(b[1:])
+	if r.GetU32() != 300 || r.GetU32() != 750 || r.GetU16() != 55 || r.GetU16() != 56 {
+		t.Fatal("header points/bonus mismatch")
+	}
+	if r.GetByte() != 1 { // slotOneUnlocked
+		t.Fatal("slotOneUnlocked != 1")
+	}
+	if r.GetU32() != 900 { // bossIdSlotOne
+		t.Fatal("bossIdSlotOne != 900")
+	}
+	// slot one bytes: race, kills, lootBonus, killBonus, raceRepeat, removePrice, inactive
+	if r.GetByte() != 1 || r.GetU32() != 60 || r.GetU16() != 80 || r.GetByte() != 0 || r.GetByte() != 1 || r.GetU32() != 0 || r.GetByte() != 0 {
+		t.Fatal("slot one bytes mismatch")
+	}
+	if r.GetByte() != 0 { // slotTwoUnlocked
+		t.Fatal("slotTwoUnlocked != 0")
+	}
+	if r.GetU32() != 1500 { // lock points shown
+		t.Fatal("slotTwo lock points != 1500")
+	}
+	if r.GetByte() != 0 || r.GetU32() != 0 { // today slot: locked, id 0
+		t.Fatal("today slot mismatch")
+	}
+	if r.GetByte() != 1 { // has unlocked list
+		t.Fatal("hasUnlocked != 1")
+	}
+	if r.GetU16() != 1 {
+		t.Fatal("unlocked count != 1")
+	}
+	if r.GetU32() != 46 || r.GetByte() != 0 {
+		t.Fatal("unlocked entry mismatch")
+	}
+	if r.Remaining() != 0 {
+		t.Fatalf("leftover %d bytes", r.Remaining())
+	}
+}
