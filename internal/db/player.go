@@ -144,6 +144,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	_ = d.LoadPlayerWheel(ctx, p)
 	_ = d.LoadPlayerPrey(ctx, p)
 	_ = d.LoadPlayerTaskHunter(ctx, p)
+	_ = d.LoadPlayerBosstiary(ctx, p)
 
 	return p, nil
 }
@@ -273,6 +274,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	// Save Wheel of Destiny, Prey and Task Hunting slots.
 	_ = d.SavePlayerWheel(ctx, p)
 	_ = d.SavePlayerPrey(ctx, p)
+	_ = d.SavePlayerBosstiary(ctx, p)
 	_ = d.SavePlayerTaskHunter(ctx, p)
 	_ = d.SaveAccountCoins(ctx, p)
 

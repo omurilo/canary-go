@@ -167,6 +167,13 @@ type Player struct {
 	// reaching boss unlock levels and spent implicitly via the loot bonus.
 	BossPoints uint32
 
+	// Bosstiary prowess slots: the boss race ids selected in slot one/two, and
+	// how many times the player has removed a slotted boss (drives the removal
+	// price). Persisted in player_bosstiary. BossRemoveTimes defaults to 1.
+	BossSlotOne     uint32
+	BossSlotTwo     uint32
+	BossRemoveTimes uint8
+
 	// Exaltation Forge resources
 	// Forge (Exaltation Forge). ForgeDusts is the dust resource amount;
 	// ForgeDustLevel is the stored-dust limit (schema forge_dust_level,
@@ -469,6 +476,39 @@ func (p *Player) SetBossPoints(amount uint32) { p.BossPoints = amount }
 
 // AddBossPoints adds to the player's bosstiary points.
 func (p *Player) AddBossPoints(amount uint32) { p.BossPoints += amount }
+
+// GetSlotBossId returns the boss race id selected in bosstiary slot 1 or 2
+// (0 = empty). Mirrors Player::getSlotBossId.
+func (p *Player) GetSlotBossId(slot uint8) uint32 {
+	switch slot {
+	case 1:
+		return p.BossSlotOne
+	case 2:
+		return p.BossSlotTwo
+	}
+	return 0
+}
+
+// SetSlotBossId sets the boss in slot 1 or 2. Mirrors Player::setSlotBossId.
+func (p *Player) SetSlotBossId(slot uint8, bossID uint32) {
+	switch slot {
+	case 1:
+		p.BossSlotOne = bossID
+	case 2:
+		p.BossSlotTwo = bossID
+	}
+}
+
+// GetRemoveTimes returns how many times the player has removed a slotted boss.
+func (p *Player) GetRemoveTimes() uint8 {
+	if p.BossRemoveTimes == 0 {
+		return 1
+	}
+	return p.BossRemoveTimes
+}
+
+// AddRemoveTime increments the slot-boss removal counter (Player::addRemoveTime).
+func (p *Player) AddRemoveTime() { p.BossRemoveTimes = p.GetRemoveTimes() + 1 }
 
 func (p *Player) GetID() uint32     { return p.ID }
 func (p *Player) GetName() string   { return p.Name }
