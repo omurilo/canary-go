@@ -42,13 +42,26 @@ func main() {
 		schemaPath = flag.String("schema", "schema/mysql.sql", "path to the MySQL schema (canary-go extras)")
 		scriptsDir = flag.String("scripts", "scripts", "directory of Lua scripts to load at startup")
 		appearances = flag.String("appearances", "../data/items/appearances.dat", "path to appearances.dat (item metadata)")
-		mapFile    = flag.String("map", "", "path to an OTBM map file (empty = synthetic spawn field)")
-		migrate    = flag.Bool("migrate", true, "apply the schema on startup (idempotent)")
-		seed       = flag.Bool("seed", false, "seed a test account (god/god, char 'Gm Test')")
+		mapFile     = flag.String("map", "", "path to an OTBM map file (empty = synthetic spawn field)")
+		migrate     = flag.Bool("migrate", true, "apply the schema on startup (idempotent)")
+		seed        = flag.Bool("seed", false, "seed a test account (god/god, char 'Gm Test')")
+		logLevelStr = flag.String("loglevel", "info", "log level (debug, info, warn, error)")
 	)
 	flag.Parse()
 
-	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	var level slog.Level
+	switch strings.ToLower(*logLevelStr) {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn", "warning":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+
+	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 	slog.SetDefault(log)
 
 	opts := runOpts{
