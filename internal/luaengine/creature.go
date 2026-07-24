@@ -884,9 +884,10 @@ func (e *Engine) creatureTeleportto(L *lua.LState) int {
 		return 1
 	}
 
-	c.SetPosition(pos)
 	if e.world != nil {
-		game.GlobalDispatcher.AddEvent(0, func() { e.world.TeleportCreature(c, pos) })
+		e.world.TeleportCreature(c, pos)
+	} else {
+		c.SetPosition(pos)
 	}
 	L.Push(lua.LTrue)
 	return 1

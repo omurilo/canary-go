@@ -83,6 +83,22 @@ func TestPushCreatureTalkActionAndClosestFreePosition(t *testing.T) {
 	if newPos.X == 101 && newPos.Y == 100 {
 		t.Errorf("Rat position did not change: %v", newPos)
 	}
+
+	// Verify the map actually moved the creature
+	tile := e.world.Map.GetTile(newPos)
+	if tile == nil {
+		t.Fatalf("Tile at %v is nil", newPos)
+	}
+	found := false
+	for _, cr := range tile.Creatures {
+		if cr == rat {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Rat not found in tile.Creatures at %v", newPos)
+	}
 }
 
 func TestGameCreateMonsterAndNpcWithOutfit(t *testing.T) {
