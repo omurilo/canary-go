@@ -22,10 +22,15 @@ func (e *Engine) tileCreate(L *lua.LState) int {
 		z := L.CheckInt(4)
 		pos = game.Position{X: uint16(x), Y: uint16(y), Z: uint8(z)}
 	} else if L.GetTop() >= 2 {
-		pos = checkPosition(L, 2)
+		var ok bool
+		pos, ok = parsePosition(L, 2)
+		if !ok {
+			L.Push(lua.LNil)
+			return 1
+		}
 	} else {
-		L.ArgError(2, "Position or X, Y, Z expected")
-		return 0
+		L.Push(lua.LNil)
+		return 1
 	}
 
 	tile := e.world.Map.GetTile(pos)

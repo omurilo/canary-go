@@ -294,7 +294,10 @@ func run(o runOpts, log *slog.Logger) error {
 					if npc, ok := cr.(*game.Npc); ok && npc.IsInteractingWithPlayer(player.ID) {
 						dist := player.GetPosition().MaxDistance(npc.GetPosition())
 						if dist < 0 || dist > 3 {
-							lengine.CallNpcCloseChannel(npc, player)
+							targetNpc, targetPlayer := npc, player
+							game.GlobalDispatcher.AddEvent(0, func() {
+								lengine.CallNpcCloseChannel(targetNpc, targetPlayer)
+							})
 							npc.RemovePlayerInteraction(player.ID)
 						}
 					}
@@ -304,7 +307,10 @@ func run(o runOpts, log *slog.Logger) error {
 					if player := world.PlayerByID(playerID); player != nil {
 						dist := player.GetPosition().MaxDistance(npc.GetPosition())
 						if dist < 0 || dist > 3 {
-							lengine.CallNpcCloseChannel(npc, player)
+							targetNpc, targetPlayer := npc, player
+							game.GlobalDispatcher.AddEvent(0, func() {
+								lengine.CallNpcCloseChannel(targetNpc, targetPlayer)
+							})
 							npc.RemovePlayerInteraction(player.ID)
 						}
 					}
@@ -387,7 +393,10 @@ func run(o runOpts, log *slog.Logger) error {
 			spectators := world.SpectatorCreatures(speaker.GetPosition())
 			for _, spec := range spectators {
 				if npc, ok := spec.(*game.Npc); ok {
-					lengine.CallNpcOnCreatureSay(npc, player, talkType, text)
+					targetNpc, targetPlayer, tType, txt := npc, player, talkType, text
+					game.GlobalDispatcher.AddEvent(0, func() {
+						lengine.CallNpcOnCreatureSay(targetNpc, targetPlayer, tType, txt)
+					})
 				}
 			}
 		}
