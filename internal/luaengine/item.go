@@ -568,6 +568,41 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			L.Push(lua.LBool(true))
 			return 1
 		},
+		"setOwner": func(L *lua.LState) int {
+			// item:setOwner(creature|guid) — binds the item to a character (C++
+			// Item::setOwner via getGUID()). Used by store delivery to mark
+			// non-movable purchases. Accepts a Player/Creature userdata or a
+			// numeric GUID.
+			it := checkItem(L)
+			var guid uint32
+			switch v := L.Get(2).(type) {
+			case *lua.LUserData:
+				if p, ok := v.Value.(*game.Player); ok {
+					guid = p.DBID
+				} else if c, ok := v.Value.(game.Creature); ok {
+					guid = c.GetID()
+				}
+			case lua.LNumber:
+				guid = uint32(v)
+			}
+			if guid != 0 {
+				if it.item.Attr == nil {
+					it.item.Attr = &game.ItemAttributes{}
+				}
+				it.item.Attr.Owner = &guid
+			}
+			L.Push(lua.LBool(true))
+			return 1
+		},
+		"getOwner": func(L *lua.LState) int {
+			it := checkItem(L)
+			if it.item.Attr != nil && it.item.Attr.Owner != nil {
+				L.Push(lua.LNumber(*it.item.Attr.Owner))
+			} else {
+				L.Push(lua.LNumber(0))
+			}
+			return 1
+		},
 		"removeAttribute": func(L *lua.LState) int {
 			it := checkItem(L)
 			attrId := L.CheckInt(2)

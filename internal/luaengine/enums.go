@@ -335,6 +335,20 @@ func RegisterEnums(L *lua.LState) {
 		"FORGE_NORMAL_MONSTER":     0,
 		"FORGE_INFLUENCED_MONSTER": 1,
 		"FORGE_FIENDISH_MONSTER":   2,
+
+		// Cylinder index / flags (src/items/cylinder.hpp, items_definitions.hpp).
+		// Used by addItemEx / internalAddItem (e.g. Player:addItemStoreInbox).
+		"INDEX_WHEREEVER":          -1,
+		"FLAG_NOLIMIT":             1,
+		"FLAG_IGNOREBLOCKITEM":     2,
+		"FLAG_IGNOREBLOCKCREATURE": 4,
+		"FLAG_CHILDISOWNER":        8,
+		"FLAG_PATHFINDING":         16,
+		"FLAG_IGNOREFIELDDAMAGE":   32,
+		"FLAG_IGNORENOTMOVABLE":    64,
+		"FLAG_IGNOREAUTOSTACK":     128,
+		"FLAG_DROPONMAP":           256,
+		"FLAG_LOOTPOUCH":           512,
 	}
 
 	for k, v := range enums {

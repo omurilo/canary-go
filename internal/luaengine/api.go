@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/opentibiabr/canary-go/internal/config"
 	lua "github.com/yuin/gopher-lua"
@@ -523,6 +524,25 @@ func (e *Engine) registerAPI() {
 		}
 		L.Call(n, 0) // fn, delay, target, args... => n arguments to addEvent
 		return 0
+	}))
+
+	// systemTime(): milliseconds since epoch (C++ OTSYS_TIME). Used e.g. by
+	// Player:addItemStoreInbox to stamp ITEM_ATTRIBUTE_STORE.
+	L.SetGlobal("systemTime", L.NewFunction(func(L *lua.LState) int {
+		L.Push(lua.LNumber(time.Now().UnixMilli()))
+		return 1
+	}))
+
+	// BatchUpdate(player): batches container UI refreshes in C++. We update
+	// containers eagerly via addItemEx, so a no-op stub (add/delete) is
+	// functionally equivalent and lets store delivery (addItemStoreInbox) run.
+	L.SetGlobal("BatchUpdate", L.NewFunction(func(L *lua.LState) int {
+		t := L.NewTable()
+		noop := L.NewFunction(func(L *lua.LState) int { return 0 })
+		L.SetField(t, "add", noop)
+		L.SetField(t, "delete", noop)
+		L.Push(t)
+		return 1
 	}))
 
 	// DailyReward table fallback

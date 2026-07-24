@@ -84,6 +84,15 @@ func (e *Engine) registerItemType() {
 			}
 			return 1
 		},
+		"getStackSize": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil && it.item.StackSize > 0 {
+				L.Push(lua.LNumber(it.item.StackSize))
+			} else {
+				L.Push(lua.LNumber(100)) // Tibia default stack size
+			}
+			return 1
+		},
 		"isRune": func(L *lua.LState) int {
 			it := checkItemType(L, 1)
 			if it.item != nil {
