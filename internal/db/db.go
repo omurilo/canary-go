@@ -80,3 +80,21 @@ func (d *DB) ApplySchemaIfPresent(ctx context.Context, cfg *config.Config, path 
 	}
 	return d.ApplySchema(ctx, cfg, path)
 }
+
+func (d *DB) GetBoostedCreature(ctx context.Context) (string, error) {
+	var name string
+	err := d.SQL.QueryRowContext(ctx, "SELECT boostname FROM boosted_creature WHERE boostname != 'default' AND boostname != '' ORDER BY date DESC LIMIT 1").Scan(&name)
+	if err != nil {
+		_ = d.SQL.QueryRowContext(ctx, "SELECT boostname FROM boosted_creature LIMIT 1").Scan(&name)
+	}
+	return name, nil
+}
+
+func (d *DB) GetBoostedBoss(ctx context.Context) (string, error) {
+	var name string
+	err := d.SQL.QueryRowContext(ctx, "SELECT boostname FROM boosted_boss WHERE boostname != 'default' AND boostname != '' ORDER BY date DESC LIMIT 1").Scan(&name)
+	if err != nil {
+		_ = d.SQL.QueryRowContext(ctx, "SELECT boostname FROM boosted_boss LIMIT 1").Scan(&name)
+	}
+	return name, nil
+}

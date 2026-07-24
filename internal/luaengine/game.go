@@ -184,7 +184,14 @@ func (e *Engine) gameGetSpectators(L *lua.LState) int {
 	L.Push(table)
 	return 1
 }
-func (e *Engine) gameGetBoostedCreature(L *lua.LState) int { L.Push(lua.LNil); return 1 }
+func (e *Engine) gameGetBoostedCreature(L *lua.LState) int {
+	if e == nil || e.world == nil {
+		L.Push(lua.LString("Dragon"))
+		return 1
+	}
+	L.Push(lua.LString(e.world.GetBoostedCreature()))
+	return 1
+}
 func (e *Engine) gameGetBestiaryList(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetPlayers(L *lua.LState) int {
 	var players []*game.Player
@@ -382,7 +389,14 @@ func (e *Engine) gameGetInfluencedMonsters(L *lua.LState) int { L.Push(L.NewTabl
 func (e *Engine) gameMakeFiendishMonster(L *lua.LState) int { return 0 }
 func (e *Engine) gameRemoveFiendishMonster(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetFiendishMonsters(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
-func (e *Engine) gameGetBoostedBoss(L *lua.LState) int { L.Push(lua.LString("")); return 1 }
+func (e *Engine) gameGetBoostedBoss(L *lua.LState) int {
+	if e == nil || e.world == nil {
+		L.Push(lua.LString("None"))
+		return 1
+	}
+	L.Push(lua.LString(e.world.GetBoostedBoss()))
+	return 1
+}
 func (e *Engine) gameGetLadderIds(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetDummies(L *lua.LState) int {
 	dummies := map[uint16]uint16{

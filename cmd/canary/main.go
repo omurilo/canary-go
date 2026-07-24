@@ -142,6 +142,13 @@ func run(o runOpts, log *slog.Logger) error {
 	world := game.NewWorld()
 	world.Items = catalog
 
+	if bc, err := database.GetBoostedCreature(ctx); err == nil && bc != "" && bc != "default" {
+		world.BoostedCreature = bc
+	}
+	if bb, err := database.GetBoostedBoss(ctx); err == nil && bb != "" && bb != "default" {
+		world.BoostedBoss = bb
+	}
+
 	creatureTypes := creatures.NewTypeRegistry()
 	world.TypeRegistry = creatureTypes
 	if cfg.DataPack != "" {

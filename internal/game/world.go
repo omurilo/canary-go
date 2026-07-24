@@ -20,6 +20,8 @@ type World struct {
 	DefaultSpawn   Position
 	WorldType      uint8 // 1 = WORLD_TYPE_NO_PVP, 2 = WORLD_TYPE_PVP, 3 = WORLD_TYPE_PVP_ENFORCED
 	AutoBank       bool
+	BoostedCreature string
+	BoostedBoss     string
 	players        map[uint32]*Player
 	byName         map[string]*Player
 	creatures      map[uint32]Creature
@@ -524,4 +526,41 @@ func (w *World) TransformItem(pos Position, item *Item, newID uint16) {
 	if stackPos != 255 && w.OnItemDecay != nil {
 		w.OnItemDecay(pos, stackPos, oldItem, item)
 	}
+}
+
+func (w *World) GetBoostedCreature() string {
+	w.mu.RLock()
+	bc := w.BoostedCreature
+	w.mu.RUnlock()
+	if bc != "" && bc != "default" {
+		return bc
+	}
+	if w.Monsters != nil {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		if w.BoostedCreature != "" && w.BoostedCreature != "default" {
+			return w.BoostedCreature
+		}
+		if m, ok := w.Monsters.Monsters["dragon"]; ok {
+			w.BoostedCreature = m.Name
+			return w.BoostedCreature
+		}
+		for _, m := range w.Monsters.Monsters {
+			if m.Name != "" {
+				w.BoostedCreature = m.Name
+				return w.BoostedCreature
+			}
+		}
+	}
+	return "Dragon"
+}
+
+func (w *World) GetBoostedBoss() string {
+	w.mu.RLock()
+	bb := w.BoostedBoss
+	w.mu.RUnlock()
+	if bb != "" && bb != "default" {
+		return bb
+	}
+	return "None"
 }

@@ -84,6 +84,11 @@ func TestMonsterTypeByNameAndAddItem(t *testing.T) {
 		local container = Container(1988)
 		local item = container:addItem(2160, 10)
 		assert(item ~= nil, "container:addItem must return item")
+
+		local bc = Game.getBoostedCreature()
+		assert(type(bc) == "string" and #bc > 0, "Game.getBoostedCreature must return non-empty string")
+		local bb = Game.getBoostedBoss()
+		assert(type(bb) == "string" and #bb > 0, "Game.getBoostedBoss must return non-empty string")
 	`)
 	if err != nil {
 		t.Fatalf("TestMonsterTypeByNameAndAddItem failed: %v", err)
