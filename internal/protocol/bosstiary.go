@@ -334,6 +334,14 @@ func (g *GameProtocol) SendBosstiarySlots() {
 	view.unlocked = filtered
 	_ = usedFromUnlocked
 
+	if g.deps.Log != nil {
+		g.deps.Log.Info("bosstiary slots",
+			"points", points, "currentBonus", currentBonus,
+			"unlockedCount", len(unlocked), "slotOneUnlocked", view.slotOneUnlocked,
+			"slotTwoUnlocked", view.slotTwoUnlocked, "boostedBossID", boostedBossID,
+			"totalBosses", len(reg.BosstiaryMonsters()))
+	}
+
 	g.SendToClient(buildBosstiarySlots(view))
 }
 

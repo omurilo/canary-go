@@ -209,6 +209,7 @@ func (g *GameProtocol) Player() *game.Player { return g.player }
 // NPC screen" bug (byte after opcode: 0x00 = open with buttons, 0x01 = close).
 var storeSendOpcodes = map[byte]string{
 	0x1C: "NpcDialog",
+	0x61: "BosstiaryData", 0x62: "BosstiarySlots", 0x73: "BosstiaryInfo", 0xBD: "BosstiaryCooldown", 0xE6: "BosstiaryEntryChanged",
 	0xDF: "CoinBalance", 0xE0: "StoreError", 0xE1: "RequestPurchaseData",
 	0xEA: "OfferDescription", 0xF2: "CoinBalanceUpdating",
 	0xFB: "OpenStore", 0xFC: "StoreOffers", 0xFD: "TransactionHistory", 0xFE: "CompletePurchase",
