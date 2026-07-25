@@ -678,18 +678,26 @@ func playerAddofflinetrainingtries(L *lua.LState) int {
 func playerAddoutfit(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LBool(false))
+		return 1
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	lookType := uint16(L.CheckInt(2))
+	addons := uint8(L.OptInt(3, 0))
+	p.AddOutfit(lookType, addons)
+	L.Push(lua.LBool(true))
 	return 1
 }
 
 func playerAddoutfitaddon(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LBool(false))
+		return 1
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	lookType := uint16(L.CheckInt(2))
+	addon := uint8(L.CheckInt(3))
+	p.AddOutfit(lookType, addon)
+	L.Push(lua.LBool(true))
 	return 1
 }
 
@@ -2260,10 +2268,24 @@ func playerHasmount(L *lua.LState) int {
 func playerHasoutfit(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LBool(false))
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	lookType := uint16(L.CheckInt(2))
+	addon := uint8(L.OptInt(3, 0))
+	
+	if !p.HasOutfit(lookType) {
+		L.Push(lua.LBool(false))
+		return 1
+	}
+	
+	if addon > 0 {
+		currentAddons := p.GetOutfitAddons(lookType)
+		L.Push(lua.LBool((currentAddons & addon) == addon))
+		return 1
+	}
+	
+	L.Push(lua.LBool(true))
 	return 1
 }
 
@@ -2958,18 +2980,34 @@ func playerRemoveofflinetrainingtime(L *lua.LState) int {
 func playerRemoveoutfit(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LBool(false))
+		return 1
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	lookType := uint16(L.CheckInt(2))
+	removed := p.RemoveOutfit(lookType)
+	L.Push(lua.LBool(removed))
 	return 1
 }
 
 func playerRemoveoutfitaddon(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LBool(false))
+		return 1
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	lookType := uint16(L.CheckInt(2))
+	addon := uint8(L.CheckInt(3))
+	currentAddons := p.GetOutfitAddons(lookType)
+	newAddons := currentAddons &^ addon
+	if currentAddons == newAddons {
+		L.Push(lua.LBool(false))
+		return 1
+	}
+	p.RemoveOutfit(lookType)
+	if newAddons > 0 {
+		p.AddOutfit(lookType, newAddons)
+	}
+	L.Push(lua.LBool(true))
 	return 1
 }
 
@@ -3286,8 +3324,7 @@ func playerSendoutfitwindow(L *lua.LState) int {
 			s.SendOutfitWindow()
 		}
 	}
-	L.Push(lua.LTrue)
-	return 1
+	return 0
 }
 
 func playerSendprivatemessage(L *lua.LState) int {

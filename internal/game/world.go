@@ -30,6 +30,7 @@ type World struct {
 	byName         map[string]*Player
 	creatures      map[uint32]Creature
 	nextCreatureID atomic.Uint32
+	guilds         map[uint32]*Guild
 
 	Items *items.Catalog
 	Monsters *creatures.TypeRegistry
@@ -127,6 +128,7 @@ func NewWorld() *World {
 		players:      make(map[uint32]*Player),
 		byName:       make(map[string]*Player),
 		creatures:    make(map[uint32]Creature),
+		guilds:       make(map[uint32]*Guild),
 		TypeRegistry: creatures.NewTypeRegistry(),
 		Charms:       charms.NewRegistry(),
 		Fiendish:     NewFiendishManager(3),

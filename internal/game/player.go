@@ -127,9 +127,11 @@ type Player struct {
 	// script from this value.
 	RegenTicks int32
 
-	Outfit Outfit
+	Outfit  Outfit
+	Outfits []OutfitEntry
+
 	LastMount uint16
-	Mounts map[uint16]bool
+	Mounts    map[uint16]bool
 
 	LightLevel uint8
 	LightColor uint8

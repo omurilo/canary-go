@@ -134,6 +134,20 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 			}
 		}
 	}
+
+	// Load player outfits
+	p.Outfits = []game.OutfitEntry{}
+	oRows, err := d.SQL.QueryContext(ctx, "SELECT looktype, addons FROM player_outfits WHERE player_id = ?", p.DBID)
+	if err == nil {
+		defer oRows.Close()
+		for oRows.Next() {
+			var lookType uint16
+			var addons uint8
+			if err := oRows.Scan(&lookType, &addons); err == nil {
+				p.Outfits = append(p.Outfits, game.OutfitEntry{LookType: lookType, Addons: addons})
+			}
+		}
+	}
 	// Load player guild membership
 	gQuery := `SELECT g.name, r.name, m.nick
 	           FROM guild_membership m
@@ -319,6 +333,14 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		_, _ = d.SQL.ExecContext(ctx, "DELETE FROM player_mounts WHERE player_id = ?", p.DBID)
 		for mid := range p.Mounts {
 			_, _ = d.SQL.ExecContext(ctx, "INSERT INTO player_mounts (player_id, mount_id) VALUES (?, ?)", p.DBID, mid)
+		}
+	}
+
+	// Save player outfits
+	if p.Outfits != nil {
+		_, _ = d.SQL.ExecContext(ctx, "DELETE FROM player_outfits WHERE player_id = ?", p.DBID)
+		for _, outfit := range p.Outfits {
+			_, _ = d.SQL.ExecContext(ctx, "INSERT INTO player_outfits (player_id, looktype, addons) VALUES (?, ?, ?)", p.DBID, outfit.LookType, outfit.Addons)
 		}
 	}
 

@@ -197,6 +197,7 @@ func (e *Engine) registerAPI() {
 	e.registerGame()
 	e.registerCreatureType()
 	e.registerPlayerType()
+	e.registerGuildType()
 	e.registerMonster()
 	e.registerNpc()
 	e.registerPosition()
