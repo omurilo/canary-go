@@ -842,3 +842,18 @@ func (e *Engine) itemTransform(L *lua.LState) int {
 	L.Push(lua.LBool(true))
 	return 1
 }
+
+func checkItemAt(L *lua.LState, index int) luaItem {
+	ud := L.CheckUserData(index)
+	if v, ok := ud.Value.(luaItem); ok {
+		return v
+	}
+	if v, ok := ud.Value.(*game.Item); ok {
+		return luaItem{item: v}
+	}
+	if v, ok := ud.Value.(luaContainer); ok {
+		return luaItem{item: v.item, pos: v.pos}
+	}
+	L.ArgError(index, "Item expected")
+	return luaItem{}
+}

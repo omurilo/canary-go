@@ -182,7 +182,7 @@ func (e *Engine) playerAdditemex(L *lua.LState) int {
 		L.Push(lua.LNumber(1)) // RETURNVALUE_NOTPOSSIBLE
 		return 1
 	}
-	it := checkItem(L)
+	it := checkItemAt(L, 2)
 	if it.item == nil {
 		L.Push(lua.LNumber(1))
 		return 1

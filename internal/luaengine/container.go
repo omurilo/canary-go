@@ -173,7 +173,7 @@ func (e *Engine) containerMethods() map[string]lua.LGFunction {
 		},
 		"hasItem": func(L *lua.LState) int {
 			c := checkContainer(L)
-			target := checkItem(L)
+			target := checkItemAt(L, 2)
 			found := false
 			containerContents(c.item.Contents, true, func(it *game.Item) {
 				if it == target.item {
