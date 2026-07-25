@@ -240,6 +240,7 @@ var playerMethods = map[string]lua.LGFunction{
 	"removeTransferableCoins":         playerRemovetransferablecoins,
 	"removeTransferableAndTibiaCoins": playerRemovetransferableandtibiacoins,
 	"sendBlessStatus":                 playerSendblessstatus,
+	"sendBlessingsDialog":             playerSendblessingsdialog,
 	"hasBlessing":                     playerHasblessing,
 	"addBlessing":                     playerAddblessing,
 	"removeBlessing":                  playerRemoveblessing,

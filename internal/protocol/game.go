@@ -799,9 +799,9 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case 0xD2:
 		g.SendOutfitWindow()
 	case 0xD3:
-		g.parseSetOutfit(r)
+		g.parseBuyBlessing(r) // Buy blessing request  
 	case 0xD4:
-		g.parseToggleMount(r)
+		g.parseSetOutfit(r) // Moved from 0xD3
 	case 0xE5:
 		g.parseCyclopediaCharacterInfo(r)
 	case 0xBF:
