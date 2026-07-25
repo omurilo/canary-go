@@ -209,6 +209,8 @@ func run(o runOpts, log *slog.Logger) error {
 
 	var spawn game.Position
 	var loadedMap bool
+	var monsterSpawnFile string
+	var npcSpawnFile string
 	if mapFilePath != "" {
 		if catalog == nil {
 			return fmt.Errorf("map loading requires a valid appearances.dat (item metadata)")
@@ -243,26 +245,13 @@ func run(o runOpts, log *slog.Logger) error {
 			mapDir := filepath.Dir(mapFilePath)
 			mapBase := strings.TrimSuffix(mapFilePath, filepath.Ext(mapFilePath))
 
-			monsterFile := mapBase + "-monster.xml"
+			monsterSpawnFile = mapBase + "-monster.xml"
 			if res.SpawnMonFile != "" {
-				monsterFile = filepath.Join(mapDir, res.SpawnMonFile)
+				monsterSpawnFile = filepath.Join(mapDir, res.SpawnMonFile)
 			}
-			if spawnsData, err := spawns.LoadSpawnFile(monsterFile); err == nil {
-				spawnEngine.LoadSpawns(spawnsData)
-				log.Info("loaded monster spawns", "file", monsterFile)
-			} else {
-				log.Warn("monster spawn file not loaded", "file", monsterFile, "err", err)
-			}
-
-			npcFile := mapBase + "-npc.xml"
+			npcSpawnFile = mapBase + "-npc.xml"
 			if res.SpawnNPCFile != "" {
-				npcFile = filepath.Join(mapDir, res.SpawnNPCFile)
-			}
-			if spawnsData, err := spawns.LoadSpawnFile(npcFile); err == nil {
-				spawnEngine.LoadSpawns(spawnsData)
-				log.Info("loaded npc spawns", "file", npcFile)
-			} else {
-				log.Warn("npc spawn file not loaded", "file", npcFile, "err", err)
+				npcSpawnFile = filepath.Join(mapDir, res.SpawnNPCFile)
 			}
 
 			for _, t := range res.Towns {
@@ -367,11 +356,20 @@ func run(o runOpts, log *slog.Logger) error {
 		protocol.SendExpMessage(p, value, text)
 	}
 	world.OnPlayerDeath = func(p *game.Player, killer game.Creature) {
+		if events.GlobalEngine != nil {
+			events.GlobalEngine.ExecuteOnDeath(p, killer)
+		}
 		protocol.HandlePlayerDeath(world, p, killer)
 		// Persist the penalty immediately so a crash/relog can't revert it.
 		if err := database.SavePlayer(context.Background(), p); err != nil {
 			log.Warn("save on death failed", "player", p.Name, "err", err)
 		}
+	}
+	world.OnGainExperience = func(p *game.Player, source game.Creature, exp uint64, rawExp uint64) uint64 {
+		if events.GlobalEngine != nil {
+			return events.GlobalEngine.ExecuteOnGainExperience(p, source, exp, rawExp)
+		}
+		return exp
 	}
 	world.OnShieldUpdate = func(viewer, target *game.Player) {
 		protocol.SendPartyShield(viewer, target)
@@ -497,6 +495,27 @@ func run(o runOpts, log *slog.Logger) error {
 
 	if err := loadScripts(lengine, filepath.Join(cfg.DataPack, "npc"), log); err != nil {
 		log.Warn("loading npcs", "err", err)
+	}
+
+	// Now that Lua scripts have populated the monster and npc type registries,
+	// load the spawns into the spawn engine to generate the initial map creatures.
+	if loadedMap && mapFilePath != "" {
+		if monsterSpawnFile != "" {
+			if spawnsData, err := spawns.LoadSpawnFile(monsterSpawnFile); err == nil {
+				spawnEngine.LoadSpawns(spawnsData)
+				log.Info("loaded monster spawns", "file", monsterSpawnFile)
+			} else {
+				log.Warn("monster spawn file not loaded", "file", monsterSpawnFile, "err", err)
+			}
+		}
+		if npcSpawnFile != "" {
+			if spawnsData, err := spawns.LoadSpawnFile(npcSpawnFile); err == nil {
+				spawnEngine.LoadSpawns(spawnsData)
+				log.Info("loaded npc spawns", "file", npcSpawnFile)
+			} else {
+				log.Warn("npc spawn file not loaded", "file", npcSpawnFile, "err", err)
+			}
+		}
 	}
 
 	lengine.RunStartupGlobalEvents()

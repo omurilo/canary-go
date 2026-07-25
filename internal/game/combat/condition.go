@@ -1,6 +1,7 @@
 package combat
 
 import (
+	"math/rand"
 	"time"
 )
 
@@ -277,7 +278,7 @@ func (c *ConditionSpeedStruct) uniformRandom(min, max int32) int32 {
 	if min >= max {
 		return min
 	}
-	return max
+	return min + rand.Int31n(max-min+1)
 }
 
 func (c *ConditionSpeedStruct) StartCondition(creature Creature) bool {

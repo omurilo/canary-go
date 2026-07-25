@@ -313,7 +313,7 @@ toggleTravelsFree = false
 buyAolCommandFee = 0
 buyBlessCommandFee = 0
 teleportPlayerToVocationRoom = true
-toggleReceiveReward = false
+toggleReceiveReward = true
 randomMonsterSpawn = false
 lootPouchMaxLimit = 2000
 quickLootMaxCorpses = 30
@@ -336,7 +336,7 @@ teleportSummons = false
 -- NOTE: true will allow the /reload command to be used
 -- NOTE: Using this script might cause unwanted changes
 -- This script forces a reload in the entire server, this means that everything that is stored in memory might stop to work properly and/or completely, this script should be used in test environments only
-allowReload = false
+allowReload = true
 
 -- Stamina in Trainers
 staminaTrainer = false
@@ -348,7 +348,7 @@ staminaOrangeDelay = 1
 staminaGreenDelay = 5
 staminaPzGain = 1
 -- Max players allowed on a dummy.
-maxAllowedOnADummy = 1
+maxAllowedOnADummy = 5
 
 -- Save interval per time
 -- NOTE: toggleSaveInterval: true = enable the save interval, false = disable the save interval
@@ -358,9 +358,9 @@ maxAllowedOnADummy = 1
 -- NOTE: saveIntervalTime: time based on what was set in "saveIntervalType"
 toggleSaveAsync = false
 toggleSaveInterval = true
-saveIntervalType = "hour"
+saveIntervalType = "minute"
 toggleSaveIntervalCleanMap = true
-saveIntervalTime = 1
+saveIntervalTime = 30
 
 -- Imbuement
 toggleImbuementShrineStorage = false
@@ -371,8 +371,8 @@ toggleImbuementNonAggressiveFightOnly = false
 -- NOTE: Only quests that are in the "freequests.lua" script table will work
 -- toggleFreeQuest = enable/disable the system
 -- freeQuestStage = if you add more quests to the table, change this value to run freeQuest again
-toggleFreeQuest = false
-freeQuestStage = 1
+toggleFreeQuest = true
+freeQuestStage = 3
 
 -- Deaths
 -- NOTE: Leave deathLosePercent as -1 if you want to use the default
@@ -688,4 +688,4 @@ OTCRFeatures = {
 }
 motd = "Welcome to Canary-Go! A Go migration of the Canary server."
 rsaKeyFile = "key.pem"
-worldFile = "data-canary/world/otservbr.otbm"
+worldFile = "data-otservbr-global/world/otservbr.otbm"

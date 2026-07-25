@@ -12,9 +12,10 @@ import (
 // LoadPlayer loads a character by name into a game.Player. The town temple is
 // used when the stored position is (0,0,0).
 func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) {
-	const q = `SELECT p.id, p.account_id, a.type as account_type, a.coins, a.coins_transferable, p.group_id, p.name, p.level, p.vocation, p.sex,
+	const q = `SELECT p.id, p.account_id, a.type as account_type, a.coins, a.coins_transferable, a.tournament_coins, p.group_id, p.name, p.level, p.vocation, p.sex,
 	                  p.health, p.healthmax, p.mana, p.manamax, p.experience,
 	                  p.maglevel, p.manaspent, p.soul, p.cap, p.balance,
+	                  p.skull, p.skulltime, p.conditions,
 	                  p.looktype, p.lookhead, p.lookbody, p.looklegs, p.lookfeet,
 	                  p.lookaddons,
 	                  p.posx, p.posy, p.posz, p.town_id,
@@ -44,9 +45,10 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	var taskPoints uint32
 	var quickLootFallback bool
 	err := d.SQL.QueryRowContext(ctx, q, name).Scan(
-		&p.DBID, &p.AccountID, &p.AccountType, &p.CoinBalance, &p.CoinTransferable, &p.GroupID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
+		&p.DBID, &p.AccountID, &p.AccountType, &p.CoinBalance, &p.CoinTransferable, &p.TournamentBalance, &p.GroupID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
 		&p.Health, &p.MaxHealth, &p.Mana, &p.MaxMana, &p.Experience,
 		&p.MagLevel, &p.ManaSpent, &p.Soul, &capValue, &p.BankBalance,
+		&p.Skull, &p.SkullTime, &p.ConditionsBlob,
 		&lookType, &lookHead, &lookBody, &lookLegs, &lookFeet, &lookAddons,
 		&posx, &posy, &posz, &townID,
 		&p.Skills[game.SkillFist], &p.SkillTries[game.SkillFist],
@@ -146,8 +148,53 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	_ = d.LoadPlayerTaskHunter(ctx, p)
 	_ = d.LoadPlayerBosstiary(ctx, p)
 	_ = d.LoadPlayerCharms(ctx, p)
+	_ = d.LoadPlayerSpells(ctx, p)
+	_ = d.LoadPlayerVIP(ctx, p)
 
 	return p, nil
+}
+
+// LoadPlayerSpells loads the instant spells a player has learned from the DB.
+func (d *DB) LoadPlayerSpells(ctx context.Context, p *game.Player) error {
+	const q = `SELECT name FROM player_spells WHERE player_id = ?`
+	rows, err := d.SQL.QueryContext(ctx, q, p.DBID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var spellName string
+		if err := rows.Scan(&spellName); err == nil {
+			p.LearnSpell(spellName)
+		}
+	}
+	return nil
+}
+
+// SavePlayerSpells persists the instant spells a player has learned to the DB.
+func (d *DB) SavePlayerSpells(ctx context.Context, p *game.Player) error {
+	spells := p.GetLearnedSpells()
+	if len(spells) == 0 {
+		return nil
+	}
+
+	tx, err := d.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM player_spells WHERE player_id = ?", p.DBID); err != nil {
+		return err
+	}
+
+	for spellName := range spells {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO player_spells (player_id, name) VALUES (?, ?)", p.DBID, spellName); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // LoadPlayerWheel loads Wheel of Destiny points from player_wheeldata table.
@@ -223,6 +270,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	              forge_dusts=?, forge_dust_level=?,
 	              task_points=?, quickloot_fallback=?, prey_wildcard=?,
 	              boss_points=?,
+	              skull=?, skulltime=?, conditions=?,
 	              blessings1=?, blessings2=?, blessings3=?, blessings4=?,
 	              blessings5=?, blessings6=?, blessings7=?, blessings8=?
 	           WHERE id=?`
@@ -245,6 +293,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		p.ForgeDusts, p.GetForgeDustLevel(),
 		p.GetTaskHunter().Points, p.QuickLootFallbackToMain, p.PreyCards,
 		p.BossPoints,
+		p.Skull, p.SkullTime, p.ConditionsBlob,
 		p.Blessings[0], p.Blessings[1], p.Blessings[2], p.Blessings[3],
 		p.Blessings[4], p.Blessings[5], p.Blessings[6], p.Blessings[7],
 		p.DBID,
@@ -279,20 +328,132 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	_ = d.SavePlayerCharms(ctx, p)
 	_ = d.SavePlayerTaskHunter(ctx, p)
 	_ = d.SaveAccountCoins(ctx, p)
+	_ = d.SavePlayerSpells(ctx, p)
+	_ = d.SavePlayerVIP(ctx, p)
 
 	return d.SavePlayerItems(ctx, p)
 }
 
-// SaveAccountCoins persists the account's Tibia Coin balances (store purchases
-// and transfers debit them in memory; this writes them back to the accounts
-// row so they survive relog).
+// SaveAccountCoins persists the account's Tibia Coin balances and tournament coins.
 func (d *DB) SaveAccountCoins(ctx context.Context, p *game.Player) error {
 	if p.AccountID == 0 {
 		return nil
 	}
-	const q = `UPDATE accounts SET coins=?, coins_transferable=? WHERE id=?`
-	_, err := d.SQL.ExecContext(ctx, q, p.CoinBalance, p.CoinTransferable, p.AccountID)
+	const q = `UPDATE accounts SET coins=?, coins_transferable=?, tournament_coins=? WHERE id=?`
+	_, err := d.SQL.ExecContext(ctx, q, p.CoinBalance, p.CoinTransferable, p.TournamentBalance, p.AccountID)
 	return err
+}
+
+// LoadPlayerVIP loads the account's VIP list, groups, and assignments.
+func (d *DB) LoadPlayerVIP(ctx context.Context, p *game.Player) error {
+	if p.AccountID == 0 {
+		return nil
+	}
+
+	// 1. Load VIP Groups
+	qGroups := `SELECT id, name, customizable FROM account_vipgroups WHERE account_id = ?`
+	groupRows, err := d.SQL.QueryContext(ctx, qGroups, p.AccountID)
+	if err == nil {
+		defer groupRows.Close()
+		for groupRows.Next() {
+			var g game.VIPGroup
+			if err := groupRows.Scan(&g.ID, &g.Name, &g.Customizable); err == nil {
+				p.VIPGroups = append(p.VIPGroups, g)
+			}
+		}
+	}
+
+	// 2. Load VIP List entries
+	qList := `SELECT vl.player_id, p.name, vl.description, vl.icon, vl.notify 
+	          FROM account_viplist vl
+	          JOIN players p ON vl.player_id = p.id
+	          WHERE vl.account_id = ?`
+	listRows, err := d.SQL.QueryContext(ctx, qList, p.AccountID)
+	if err != nil {
+		return err
+	}
+	defer listRows.Close()
+
+	entriesMap := make(map[uint32]*game.VIPEntry)
+	for listRows.Next() {
+		var e game.VIPEntry
+		var notifyInt uint8
+		if err := listRows.Scan(&e.PlayerID, &e.PlayerName, &e.Description, &e.Icon, &notifyInt); err == nil {
+			e.Notify = (notifyInt > 0)
+			p.VIPList = append(p.VIPList, e)
+			entriesMap[e.PlayerID] = &p.VIPList[len(p.VIPList)-1]
+		}
+	}
+
+	// 3. Load Group Assignments
+	qGroupList := `SELECT player_id, vipgroup_id FROM account_vipgrouplist WHERE account_id = ?`
+	glistRows, err := d.SQL.QueryContext(ctx, qGroupList, p.AccountID)
+	if err == nil {
+		defer glistRows.Close()
+		for glistRows.Next() {
+			var pid, gid uint32
+			if err := glistRows.Scan(&pid, &gid); err == nil {
+				if entry, ok := entriesMap[pid]; ok {
+					entry.Groups = append(entry.Groups, gid)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// SavePlayerVIP persists the account's VIP list, groups, and assignments.
+func (d *DB) SavePlayerVIP(ctx context.Context, p *game.Player) error {
+	if p.AccountID == 0 {
+		return nil
+	}
+
+	tx, err := d.SQL.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Wipe existing data for this account (account_vipgrouplist is wiped via cascade or we can do it explicitly)
+	if _, err := tx.ExecContext(ctx, "DELETE FROM account_vipgrouplist WHERE account_id = ?", p.AccountID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM account_viplist WHERE account_id = ?", p.AccountID); err != nil {
+		return err
+	}
+	// Note: We don't delete groups because they have IDs that might be referenced,
+	// but in a full sync we could UPSERT. To match C++ behavior safely without UPSERT,
+	// we will UPSERT groups.
+	for _, g := range p.VIPGroups {
+		q := `INSERT INTO account_vipgroups (id, account_id, name, customizable) VALUES (?, ?, ?, ?)
+		      ON DUPLICATE KEY UPDATE name = VALUES(name), customizable = VALUES(customizable)`
+		if _, err := tx.ExecContext(ctx, q, g.ID, p.AccountID, g.Name, g.Customizable); err != nil {
+			return err
+		}
+	}
+
+	// Insert VIP entries
+	for _, e := range p.VIPList {
+		notifyInt := 0
+		if e.Notify {
+			notifyInt = 1
+		}
+		qList := `INSERT INTO account_viplist (account_id, player_id, description, icon, notify) VALUES (?, ?, ?, ?, ?)`
+		if _, err := tx.ExecContext(ctx, qList, p.AccountID, e.PlayerID, e.Description, e.Icon, notifyInt); err != nil {
+			return err
+		}
+
+		// Insert group assignments
+		for _, gid := range e.Groups {
+			qGroupList := `INSERT INTO account_vipgrouplist (account_id, player_id, vipgroup_id) VALUES (?, ?, ?)`
+			if _, err := tx.ExecContext(ctx, qGroupList, p.AccountID, e.PlayerID, gid); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit()
 }
 
 // TownTemple returns the temple position of a town.

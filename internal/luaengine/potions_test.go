@@ -38,7 +38,7 @@ func TestPotionsAction(t *testing.T) {
 
 	// Test Great Mana Potion (item ID 238)
 	manaPotion := &game.Item{ID: 238, Count: 1}
-	act := actions.FindAction(manaPotion)
+	act := actions.FindAction(manaPotion, game.Position{})
 	if act == nil {
 		t.Fatalf("no action registered for item 238")
 	}
@@ -57,7 +57,7 @@ func TestPotionsAction(t *testing.T) {
 
 	// Test Health Potion (item ID 266)
 	healthPotion := &game.Item{ID: 266, Count: 1}
-	actHealth := actions.FindAction(healthPotion)
+	actHealth := actions.FindAction(healthPotion, game.Position{})
 	if actHealth == nil {
 		t.Fatalf("no action registered for item 266")
 	}

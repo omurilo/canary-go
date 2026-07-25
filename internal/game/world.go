@@ -60,6 +60,7 @@ type World struct {
 	// and refreshes the client (the model-side penalty is applied before this
 	// callback runs).
 	OnPlayerDeath func(p *Player, killer Creature)
+	OnGainExperience func(p *Player, source Creature, exp uint64, rawExp uint64) uint64
 
 	// OnShieldUpdate asks the protocol layer to send `viewer` a party-shield
 	// packet (0x91) for `target`, using viewer.PartyShield(target).
@@ -73,6 +74,9 @@ type World struct {
 	OnMagicEffect    func(pos Position, effect uint16)
 	OnDistanceEffect func(from, to Position, effect uint16)
 	OnCreatureSay    func(speaker Creature, talkType byte, text string)
+	OnCastSpell      func(name string, caster Creature, target Creature) bool
+	OnTargetTile     func(funcName string, caster Creature, pos Position)
+	OnTargetCreature func(funcName string, caster Creature, target Creature)
 	OnChangeSpeed    func(c Creature)
 	OnIconsUpdate    func(p *Player)
 	// OnBosstiaryEntryChanged fires when a player's boss reaches a new unlock
@@ -450,6 +454,7 @@ func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 	if destTile == nil || !destTile.WalkableFor(p, w.Items, w.WorldType) {
 		return p.Pos, false
 	}
+	dest = w.resolveFloorChangeDest(dest, destTile)
 	w.mu.Lock()
 	p.IsTraining = false
 	oldPos := p.Pos
@@ -497,6 +502,7 @@ func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 	if c.GetCreatureType() != 0 && destTile.IsProtectionZone() {
 		return c.GetPosition(), false
 	}
+	dest = w.resolveFloorChangeDest(dest, destTile)
 	w.mu.Lock()
 	if player, ok := c.(*Player); ok {
 		player.IsTraining = false
@@ -513,6 +519,65 @@ func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 	}
 	
 	return dest, true
+}
+
+func (w *World) resolveFloorChangeDest(dest Position, destTile *Tile) Position {
+	if destTile == nil {
+		return dest
+	}
+	floorChange := ""
+	if destTile.Ground != nil {
+		if ct := w.Items.Get(destTile.Ground.ID); ct != nil && ct.FloorChange != "" {
+			floorChange = ct.FloorChange
+		}
+	}
+	if floorChange == "" {
+		for _, it := range destTile.Items {
+			if ct := w.Items.Get(it.ID); ct != nil && ct.FloorChange != "" {
+				floorChange = ct.FloorChange
+				break
+			}
+		}
+	}
+
+	if floorChange != "" {
+		dx, dy, dz := dest.X, dest.Y, dest.Z
+		hasFC := func(t *Tile, expected string) bool {
+			if t == nil { return false }
+			if t.Ground != nil {
+				if ct := w.Items.Get(t.Ground.ID); ct != nil && ct.FloorChange == expected { return true }
+			}
+			for _, it := range t.Items {
+				if ct := w.Items.Get(it.ID); ct != nil && ct.FloorChange == expected { return true }
+			}
+			return false
+		}
+		if floorChange == "down" {
+			dz++
+			if hasFC(w.Map.GetTile(Position{X: dx, Y: dy - 1, Z: dz}), "southalt") {
+				dy -= 2
+			} else if hasFC(w.Map.GetTile(Position{X: dx - 1, Y: dy, Z: dz}), "eastalt") {
+				dx -= 2
+			} else if downTile := w.Map.GetTile(Position{X: dx, Y: dy, Z: dz}); downTile != nil {
+				if hasFC(downTile, "north") { dy++ }
+				if hasFC(downTile, "south") { dy-- }
+				if hasFC(downTile, "southalt") { dy -= 2 }
+				if hasFC(downTile, "east") { dx-- }
+				if hasFC(downTile, "eastalt") { dx -= 2 }
+				if hasFC(downTile, "west") { dx++ }
+			}
+		} else {
+			dz--
+			if floorChange == "north" { dy-- }
+			if floorChange == "south" { dy++ }
+			if floorChange == "southalt" { dy += 2 }
+			if floorChange == "east" { dx++ }
+			if floorChange == "eastalt" { dx += 2 }
+			if floorChange == "west" { dx-- }
+		}
+		return Position{X: dx, Y: dy, Z: dz}
+	}
+	return dest
 }
 
 // TransformItem changes an item's ID and notifies the clients.

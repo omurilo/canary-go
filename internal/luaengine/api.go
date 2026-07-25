@@ -123,6 +123,42 @@ func (e *Engine) registerAPI() {
 	L.SetField(logger, "error", L.NewFunction(logFunc("error")))
 	L.SetGlobal("logger", logger)
 
+	L.SetGlobal("SERVER_NAME", lua.LString("Canary"))
+
+	// Inject a custom loader to map "data.*" to "data-otservbr-global/*"
+	pkg := L.GetGlobal("package")
+	if tbl, ok := pkg.(*lua.LTable); ok {
+		loaders := L.GetField(tbl, "loaders")
+		if loadersTbl, ok := loaders.(*lua.LTable); ok {
+			customLoader := L.NewFunction(func(L *lua.LState) int {
+				mod := L.CheckString(1)
+				if strings.HasPrefix(mod, "data.") {
+					// Replace "data." with "data-otservbr-global/"
+					path := strings.Replace(mod, ".", "/", -1)
+					path = strings.Replace(path, "data/", "data-otservbr-global/", 1)
+					path += ".lua"
+
+					data, err := os.ReadFile(path)
+					if err != nil {
+						L.Push(lua.LString("no file '" + path + "'"))
+						return 1
+					}
+					fn, err := L.Load(strings.NewReader(preprocessLuaSource(string(data))), path)
+					if err != nil {
+						L.Push(lua.LString("error loading module '" + mod + "' from file '" + path + "':\n\t" + err.Error()))
+						return 1
+					}
+					L.Push(fn)
+					return 1
+				}
+				L.Push(lua.LString(""))
+				return 1
+			})
+			// Insert at index 2 (after preload loader)
+			loadersTbl.Insert(2, customLoader)
+		}
+	}
+
 	// Item and fluid enums used across Lua scripts
 	L.SetGlobal("HIRELING_LAMP", lua.LNumber(29432))
 	L.SetGlobal("ITEM_STORE_COIN", lua.LNumber(22118))
@@ -180,6 +216,7 @@ func (e *Engine) registerAPI() {
 	e.registerTown()
 	e.registerCreatureEvent()
 	e.registerGlobalEventClass()
+	e.registerVocation()
 
 	// Mock constructors for unused revscriptsys classes so scripts don't crash
 	mockClass := func(name string) {
@@ -251,7 +288,6 @@ func (e *Engine) registerAPI() {
 	mockClass("ItemClassification")
 	mockClass("Teleport")
 	mockClass("EventCallback")
-	mockClass("Vocation")
 	mockClass("GemAtelier")
 	mockClass("Guild")
 	mockClass("Group")

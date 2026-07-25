@@ -679,6 +679,51 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	// the temple respawn + client refresh.
 	if p, ok := victim.(*Player); ok {
 		p.ApplyDeathPenaltyWith(e.blessDeathReduction(p, killer))
+		
+		// Drop loot
+		var hasAoL bool
+		necklace := p.Inventory[ConstSlotNecklace]
+		if necklace != nil && necklace.ID == 2173 {
+			hasAoL = true
+			p.Inventory[ConstSlotNecklace] = nil // consume Amulet of Loss
+		}
+		
+		blessCount := 0
+		for _, b := range p.Blessings {
+			if b > 0 { blessCount++ }
+		}
+
+		if !hasAoL && blessCount < 5 {
+			corpse := &Item{ID: 3058} // Dead human male
+			if p.Sex == 0 { // Female
+				corpse.ID = 3065
+			}
+			
+			// Backpack always drops in Tibia (if no AoL/Bless)
+			if bp := p.Inventory[ConstSlotBackpack]; bp != nil {
+				corpse.Contents = append(corpse.Contents, bp)
+				p.Inventory[ConstSlotBackpack] = nil
+			}
+			// Other items have 10% chance
+			for i := ConstSlotHead; i <= ConstSlotAmmo; i++ {
+				if i == ConstSlotBackpack {
+					continue
+				}
+				if it := p.Inventory[i]; it != nil {
+					if rand.Float32() < 0.10 {
+						corpse.Contents = append(corpse.Contents, it)
+						p.Inventory[i] = nil
+					}
+				}
+			}
+
+			if len(corpse.Contents) > 0 {
+				if e.world.AddItem(p.Pos, corpse) && e.world.OnItemAppear != nil {
+					e.world.OnItemAppear(p.Pos, corpse)
+				}
+			}
+		}
+
 		if e.world.OnPlayerDeath != nil {
 			e.world.OnPlayerDeath(p, killer)
 		}
@@ -731,6 +776,9 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 			}
 			if exp := m.Experience(); exp > 0 {
 				finalExp := exp
+				if e.world.OnGainExperience != nil {
+					finalExp = e.world.OnGainExperience(p, victim, exp, exp)
+				}
 				if bonus, ok := p.GetPrey().GetPreyBonus(raceID, PreyBonus_XPBonus); ok {
 					finalExp = uint64(float64(exp) * float64(100+bonus) / 100.0)
 				}
@@ -840,6 +888,13 @@ func (e *CombatEngine) doMonsterAttack(m *Monster, target Creature) {
 }
 
 func (e *CombatEngine) executeMonsterSpell(m *Monster, target Creature, s creatures.MonsterAttack) {
+	if e.world.OnCastSpell != nil {
+		if e.world.OnCastSpell(s.Name, m, target) {
+			// Lua spell executed successfully. All damage, conditions and effects are handled there.
+			return
+		}
+	}
+
 	if s.ShootEffect != 0 && e.world.OnDistanceEffect != nil {
 		e.world.OnDistanceEffect(m.GetPosition(), target.GetPosition(), s.ShootEffect)
 	}

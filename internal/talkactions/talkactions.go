@@ -13,6 +13,8 @@ type TalkAction struct {
 	// (e.g. "god", "gm", "normal"). Recorded on registration; access
 	// enforcement is not wired in this slice yet.
 	GroupType string
+	AccountType uint8
+	Access bool
 	OnSayFunc lua.LValue
 }
 

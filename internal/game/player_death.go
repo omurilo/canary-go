@@ -61,9 +61,29 @@ func (p *Player) ApplyDeathPenaltyWith(lossReduction float64) {
 		lossReduction = 1
 	}
 	if p.SkillLoss && p.Level > 7 && p.Vocation != 0 {
-		lost := uint64(math.Ceil(float64(p.Experience) * p.GetLostPercent() * (1 - lossReduction)))
+		lostPercent := p.GetLostPercent() * (1 - lossReduction)
+		
+		lost := uint64(math.Ceil(float64(p.Experience) * lostPercent))
 		if lost > 0 {
 			p.RemoveExperience(lost)
+		}
+		
+		// Magic level loss (ManaSpent)
+		lostMana := uint64(math.Ceil(float64(p.ManaSpent) * lostPercent))
+		if lostMana >= p.ManaSpent {
+			p.ManaSpent = 0
+		} else {
+			p.ManaSpent -= lostMana
+		}
+		
+		// Skill loss (SkillTries)
+		for i := range p.SkillTries {
+			lostTries := uint64(math.Ceil(float64(p.SkillTries[i]) * lostPercent))
+			if lostTries >= p.SkillTries[i] {
+				p.SkillTries[i] = 0
+			} else {
+				p.SkillTries[i] -= lostTries
+			}
 		}
 	}
 	// Strip every active condition (C++ removes persistent + removableOnDeath;

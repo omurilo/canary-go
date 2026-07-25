@@ -86,7 +86,7 @@ func (g *GameProtocol) handleCommand(text string) bool {
 	p := g.player
 
 	// Staff commands require gamemaster group level
-	if !hasTalkActionPermission(p, "gamemaster") {
+	if !hasGroupPermission(p, "gamemaster") {
 		g.sendStatusText("You cannot execute this command.")
 		return true
 	}

@@ -3,8 +3,6 @@ package game
 import (
 	"math/rand"
 	"time"
-
-	"github.com/opentibiabr/canary-go/internal/items"
 )
 
 // AIEngine handles AI logic for creatures.
@@ -85,7 +83,7 @@ func (e *AIEngine) updateAI() {
 		// Move towards target or wander
 		if c.GetTarget() != nil {
 			// Pathfinding towards target
-			path := findPath(e.world.Map, e.world.Items, c.GetPosition(), c.GetTarget().GetPosition())
+			path := FindPath(e.world.Map, e.world.Items, c.GetPosition(), c.GetTarget().GetPosition(), 100)
 			if len(path) > 0 {
 				nextPos := path[0]
 				e.world.TryMoveCreature(c, getDirectionTo(c.GetPosition(), nextPos))
@@ -123,81 +121,3 @@ func getDirectionTo(from, to Position) Direction {
 	return DirNorth
 }
 
-// Basic A* Pathfinding (very simple implementation)
-type node struct {
-	pos Position
-	g, h, f int
-	parent *node
-}
-
-func findPath(m *Map, catalog *items.Catalog, start, end Position) []Position {
-	if start == end {
-		return nil
-	}
-
-	openList := []*node{{pos: start, g: 0, h: chebyshevDistance(start, end)}}
-	closedList := make(map[Position]bool)
-	openList[0].f = openList[0].g + openList[0].h
-
-	for len(openList) > 0 && len(closedList) < 100 { // Max 100 nodes to prevent lag
-		var curr *node
-		var currIdx int
-		for i, n := range openList {
-			if curr == nil || n.f < curr.f {
-				curr = n
-				currIdx = i
-			}
-		}
-
-		openList = append(openList[:currIdx], openList[currIdx+1:]...)
-		closedList[curr.pos] = true
-
-		if curr.pos == end || chebyshevDistance(curr.pos, end) == 1 {
-			// Found path
-			var path []Position
-			for curr != nil && curr.pos != start {
-				path = append([]Position{curr.pos}, path...)
-				curr = curr.parent
-			}
-			return path
-		}
-
-		dirs := []Direction{DirNorth, DirEast, DirSouth, DirWest, DirNE, DirNW, DirSE, DirSW}
-		for _, d := range dirs {
-			nextPos := curr.pos.Offset(d)
-			if closedList[nextPos] {
-				continue
-			}
-
-			// Check if walkable (basic check)
-			tile := m.GetTile(nextPos)
-			if tile == nil || !tile.Walkable(catalog) {
-				// We can't walk there
-				if nextPos != end { // If it's the target, we don't need to walk ON it
-					continue
-				}
-			}
-
-			g := curr.g + 1
-			h := chebyshevDistance(nextPos, end)
-			f := g + h
-
-			var inOpen *node
-			for _, n := range openList {
-				if n.pos == nextPos {
-					inOpen = n
-					break
-				}
-			}
-
-			if inOpen == nil {
-				openList = append(openList, &node{pos: nextPos, g: g, h: h, f: f, parent: curr})
-			} else if g < inOpen.g {
-				inOpen.g = g
-				inOpen.f = f
-				inOpen.parent = curr
-			}
-		}
-	}
-	return nil
-}

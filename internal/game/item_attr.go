@@ -114,6 +114,21 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 			}
 			a.UniqueID = &v
 
+		case attrTeleDest:
+			x, err := ps.ReadUint16()
+			if err != nil {
+				return nil, subType, err
+			}
+			y, err := ps.ReadUint16()
+			if err != nil {
+				return nil, subType, err
+			}
+			z, err := ps.ReadUint8()
+			if err != nil {
+				return nil, subType, err
+			}
+			a.TeleDest = &Position{X: x, Y: y, Z: z}
+
 		case attrText:
 			v, err := ps.ReadString()
 			if err != nil {
@@ -279,20 +294,7 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 			if err := ps.Skip(4); err != nil {
 				return nil, subType, err
 			}
-		case attrTeleDest: // x(u16) y(u16) z(u8)
-			tx, err := ps.ReadUint16()
-			if err != nil {
-				return nil, subType, err
-			}
-			ty, err := ps.ReadUint16()
-			if err != nil {
-				return nil, subType, err
-			}
-			tz, err := ps.ReadUint8()
-			if err != nil {
-				return nil, subType, err
-			}
-			a.TeleDest = &Position{X: tx, Y: ty, Z: tz}
+
 		case attrItem: // uint16
 			if err := ps.Skip(2); err != nil {
 				return nil, subType, err
@@ -370,6 +372,12 @@ func (a *ItemAttributes) Encode(subType uint16) []byte {
 	if a.UniqueID != nil {
 		w.WriteUint8(attrUniqueID)
 		w.WriteUint16(*a.UniqueID)
+	}
+	if a.TeleDest != nil {
+		w.WriteUint8(attrTeleDest)
+		w.WriteUint16(a.TeleDest.X)
+		w.WriteUint16(a.TeleDest.Y)
+		w.WriteUint8(a.TeleDest.Z)
 	}
 	if a.Text != nil {
 		w.WriteUint8(attrText)

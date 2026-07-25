@@ -99,6 +99,19 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 		target.RemoveCondition(c.Params.DispelType)
 	}
 
+	// Apply Critical Hit
+	if caster != nil && damage.PrimaryType != CombatHealing && damage.PrimaryValue > 0 {
+		if casterPlayer, ok := caster.(Player); ok {
+			critChance := casterPlayer.GetCriticalChance()
+			if critChance > 0 && randInt(100) < int(critChance) {
+				critDmg := casterPlayer.GetCriticalDamage()
+				if critDmg > 0 {
+					damage.PrimaryValue += int32((float64(damage.PrimaryValue) * float64(critDmg)) / 100.0)
+				}
+			}
+		}
+	}
+
 	// Apply PvP reduction
 	if caster != nil && target != nil && caster.IsPlayer() && target.IsPlayer() && damage.PrimaryType != CombatHealing {
 		damage.PrimaryValue = damage.PrimaryValue / 2
@@ -143,6 +156,28 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 		}
 	}
 
+	// Apply Absorb and Reflect
+	var reflectDamage int32
+	if target != nil && damage.PrimaryType != CombatHealing && damage.PrimaryValue > 0 {
+		if targetPlayer, ok := target.(Player); ok {
+			absorbPct := targetPlayer.GetAbsorbPercent()
+			if absorbPct > 0 {
+				absorbed := int32((float64(damage.PrimaryValue) * float64(absorbPct)) / 100.0)
+				damage.PrimaryValue -= absorbed
+				if damage.PrimaryValue <= 0 {
+					damage.PrimaryValue = 0
+				}
+			}
+
+			if caster != nil {
+				reflectPct := targetPlayer.GetReflectPercent()
+				if reflectPct > 0 {
+					reflectDamage = int32((float64(damage.PrimaryValue) * float64(reflectPct)) / 100.0)
+				}
+			}
+		}
+	}
+
 	finalDamage := damage.PrimaryValue
 
 	// If it's damage
@@ -153,6 +188,39 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 	if finalDamage != 0 {
 		target.ChangeHealth(finalDamage)
 		target.NotifyStatsChange()
+
+		// Apply Leech
+		if caster != nil && damage.PrimaryType != CombatHealing && finalDamage < 0 {
+			actualDamage := -finalDamage
+			if casterPlayer, ok := caster.(Player); ok {
+				// Life Leech
+				if llChance := casterPlayer.GetLifeLeechChance(); llChance > 0 && randInt(100) < int(llChance) {
+					if llAmt := casterPlayer.GetLifeLeechAmount(); llAmt > 0 {
+						heal := int32((float64(actualDamage) * float64(llAmt)) / 100.0)
+						if heal > 0 {
+							casterPlayer.ChangeHealth(heal)
+							casterPlayer.NotifyStatsChange()
+						}
+					}
+				}
+				// Mana Leech
+				if mlChance := casterPlayer.GetManaLeechChance(); mlChance > 0 && randInt(100) < int(mlChance) {
+					if mlAmt := casterPlayer.GetManaLeechAmount(); mlAmt > 0 {
+						manaHeal := int32((float64(actualDamage) * float64(mlAmt)) / 100.0)
+						if manaHeal > 0 {
+							casterPlayer.ChangeMana(manaHeal)
+							casterPlayer.NotifyStatsChange()
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Apply Reflect Damage
+	if reflectDamage > 0 && caster != nil {
+		caster.ChangeHealth(-reflectDamage)
+		caster.NotifyStatsChange()
 	}
 
 	// Apply conditions

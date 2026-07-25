@@ -20,26 +20,26 @@ func TestStaffCommandPermissions(t *testing.T) {
 	}
 
 	// Normal player must fail permission check for staff groups
-	if hasTalkActionPermission(normalPlayer, "gamemaster") {
+	if hasGroupPermission(normalPlayer, "gamemaster") {
 		t.Error("normal player should not have gamemaster permission")
 	}
-	if hasTalkActionPermission(normalPlayer, "god") {
+	if hasGroupPermission(normalPlayer, "god") {
 		t.Error("normal player should not have god permission")
 	}
-	if hasTalkActionPermission(normalPlayer, "tutor") {
+	if hasGroupPermission(normalPlayer, "tutor") {
 		t.Error("normal player should not have tutor permission")
 	}
 
 	// Normal player has permission for normal group
-	if !hasTalkActionPermission(normalPlayer, "normal") {
+	if !hasGroupPermission(normalPlayer, "normal") {
 		t.Error("normal player should have normal permission")
 	}
 
 	// God player has full permissions
-	if !hasTalkActionPermission(godPlayer, "gamemaster") {
+	if !hasGroupPermission(godPlayer, "gamemaster") {
 		t.Error("god player should have gamemaster permission")
 	}
-	if !hasTalkActionPermission(godPlayer, "god") {
+	if !hasGroupPermission(godPlayer, "god") {
 		t.Error("god player should have god permission")
 	}
 

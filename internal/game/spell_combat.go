@@ -1,8 +1,6 @@
 package game
 
 import (
-	"fmt"
-
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 )
 
@@ -30,6 +28,9 @@ func (e *CombatEngine) DoCombatTarget(c *combat.Combat, caster, target Creature)
 	}
 	if c.Params.DistanceEffect != 0 && caster != nil && e.world.OnDistanceEffect != nil {
 		e.world.OnDistanceEffect(caster.GetPosition(), target.GetPosition(), c.Params.DistanceEffect)
+	}
+	if c.CallbackTargetCreature != "" && e.world.OnTargetCreature != nil {
+		e.world.OnTargetCreature(c.CallbackTargetCreature, caster, target)
 	}
 	dmg := e.rollSpellDamage(c, caster)
 	e.applySpellHit(c, caster, target, dmg)
@@ -76,7 +77,13 @@ func (e *CombatEngine) DoCombatArea(c *combat.Combat, caster Creature, pos Posit
 				continue
 			}
 			seen[tgt.GetID()] = true
+			if c.CallbackTargetCreature != "" && e.world.OnTargetCreature != nil {
+				e.world.OnTargetCreature(c.CallbackTargetCreature, caster, tgt)
+			}
 			e.applySpellHit(c, caster, tgt, dmg)
+		}
+		if c.CallbackTargetTile != "" && e.world.OnTargetTile != nil {
+			e.world.OnTargetTile(c.CallbackTargetTile, caster, p)
 		}
 	}
 }
@@ -132,11 +139,6 @@ func (e *CombatEngine) applySpellHit(c *combat.Combat, caster, target Creature, 
 		e.world.OnCombatHit(caster, target, amount, c.Params.ImpactEffect)
 	}
 
-	casterName := "nil"
-	if caster != nil {
-		casterName = caster.GetName()
-	}
-	fmt.Printf("applySpellHit: caster=%s target=%s amount=%d isHeal=%t health_after=%d\n", casterName, target.GetName(), amount, isHeal, target.GetHealth())
 
 	// Refresh the target's own stat bars (HP/mana) if it is a player.
 	if p, ok := target.(*Player); ok && e.world.OnPlayerStatsChange != nil {

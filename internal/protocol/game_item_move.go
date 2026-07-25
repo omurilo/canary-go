@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -60,11 +61,15 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	// Map item protection: non-pickupable items on the map can only be moved
 	// by god-level accounts (AccountType >= 5). This prevents normal players
 	// from dragging map decorations, walls, etc.
-	if fromPos.X != 0xFFFF && it != nil && !it.Pickupable {
-		if g.player.AccountType < 5 {
-			g.sendStatusText("You cannot move this object.")
-			g.revertMove(fromPos, toPos, spriteID)
-			return
+	// Similarly, items placed on the map with an ActionID or UniqueID cannot
+	// be moved by regular players, as they are part of map mechanics/quests.
+	if fromPos.X != 0xFFFF {
+		if (it != nil && !it.Pickupable) || (item.Attr != nil && (item.Attr.ActionID != nil || item.Attr.UniqueID != nil)) {
+			if g.player.AccountType < 5 {
+				g.sendStatusText("You cannot move this object.")
+				g.revertMove(fromPos, toPos, spriteID)
+				return
+			}
 		}
 	}
 
@@ -83,9 +88,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 				valid := false
 				if it.SlotPosition == "head" && toSlot == 1 { valid = true }
 				if it.SlotPosition == "necklace" && toSlot == 2 { valid = true }
-				if it.SlotPosition == "backpack" && toSlot == 3 { valid = true }
-				if it.SlotPosition == "body" && toSlot == 4 { valid = true }
-				if (toSlot == 5 || toSlot == 6) && (it.SlotPosition == "two-handed" || it.SlotPosition == "right-hand" || it.SlotPosition == "left-hand" || it.WeaponType != "" || it.IsQuiver) { valid = true }
+				if (it.SlotPosition == "backpack" || it.Group == items.GroupContainer) && toSlot == 3 { valid = true }
+				if it.SlotPosition == "armor" && toSlot == 4 { valid = true }
+				if (toSlot == 5 || toSlot == 6) && (it.SlotPosition == "hand" || it.SlotPosition == "two-handed" || it.SlotPosition == "right-hand" || it.SlotPosition == "left-hand" || it.WeaponType != "" || it.IsQuiver) { valid = true }
 				if it.SlotPosition == "legs" && toSlot == 7 { valid = true }
 				if it.SlotPosition == "feet" && toSlot == 8 { valid = true }
 				if it.SlotPosition == "ring" && toSlot == 9 { valid = true }
@@ -115,9 +120,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 					if it != nil {
 						if it.SlotPosition == "head" && toSlot == 1 { valid = true }
 						if it.SlotPosition == "necklace" && toSlot == 2 { valid = true }
-						if it.SlotPosition == "backpack" && toSlot == 3 { valid = true }
-						if it.SlotPosition == "body" && toSlot == 4 { valid = true }
-						if (toSlot == 5 || toSlot == 6) && (it.SlotPosition == "two-handed" || it.SlotPosition == "right-hand" || it.SlotPosition == "left-hand" || it.WeaponType != "" || it.IsQuiver) { valid = true }
+						if (it.SlotPosition == "backpack" || it.Group == items.GroupContainer) && toSlot == 3 { valid = true }
+						if it.SlotPosition == "armor" && toSlot == 4 { valid = true }
+						if (toSlot == 5 || toSlot == 6) && (it.SlotPosition == "hand" || it.SlotPosition == "two-handed" || it.SlotPosition == "right-hand" || it.SlotPosition == "left-hand" || it.WeaponType != "" || it.IsQuiver) { valid = true }
 						if it.SlotPosition == "legs" && toSlot == 7 { valid = true }
 						if it.SlotPosition == "feet" && toSlot == 8 { valid = true }
 						if it.SlotPosition == "ring" && toSlot == 9 { valid = true }

@@ -2,62 +2,18 @@ package db
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 )
 
-// LoadPlayerItems loads the items for a given player and populates the Inventory and Contents.
+// LoadPlayerItems loads the items for a given player and populates the Inventory, StoreInbox, Depot, Inbox, and RewardChest.
 func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
-	const q = `SELECT pid, sid, itemtype, count, attributes 
-	           FROM player_items WHERE player_id = ? ORDER BY sid ASC`
-
-	rows, err := d.SQL.QueryContext(ctx, q, p.DBID)
+	// 1. Load Inventory and StoreInbox from player_items
+	itemsBySID, loadedRows, err := d.loadItemsFromTable(ctx, p.DBID, "player_items")
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-
-	itemsBySID := make(map[int]*game.Item)
-	type itemRow struct {
-		pid  int
-		item *game.Item
-	}
-	var loadedRows []itemRow
-
-	for rows.Next() {
-		var pid, sid int
-		var itemtype, count uint16
-		var attrs []byte
-		if err := rows.Scan(&pid, &sid, &itemtype, &count, &attrs); err != nil {
-			return err
-		}
-
-		item := &game.Item{
-			ID:         itemtype,
-			Count:      count,
-			Attributes: attrs,
-		}
-		// Decode the OTBR attribute blob. Mirrors C++ IOLoginDataLoad::loadItems:
-		// Item::CreateItem(type, count) seeds the subtype from the count column,
-		// then Item::unserializeAttr overrides it via ATTR_COUNT if present
-		// (src/io/functions/iologindata_load_player.cpp:47-49). On a decode error
-		// we keep the raw blob so it round-trips verbatim on save.
-		if attr, subType, err := game.DecodeItemAttributes(attrs, count); err != nil {
-			slog.Default().Warn("failed to decode item attributes; preserving raw blob",
-				"player_id", p.DBID, "itemtype", itemtype, "err", err)
-		} else {
-			item.Attr = attr
-			item.Count = subType
-		}
-		itemsBySID[sid] = item
-		loadedRows = append(loadedRows, itemRow{pid: pid, item: item})
-	}
-
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
 	for _, row := range loadedRows {
 		if row.pid >= 1 && row.pid <= 10 {
 			if row.pid < len(p.Inventory) {
@@ -73,6 +29,90 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 		}
 	}
 
+	// 2. Load Depot
+	if p.DepotLockers == nil {
+		p.DepotLockers = make(map[uint16]*game.Item)
+	}
+	depotItemsBySID, depotRows, err := d.loadItemsFromTable(ctx, p.DBID, "player_depotitems")
+	if err != nil {
+		return err
+	}
+	for _, row := range depotRows {
+		if row.pid >= 0 && row.pid < 100 {
+			depotID := uint16(row.pid)
+			locker, ok := p.DepotLockers[depotID]
+			if !ok {
+				locker = &game.Item{ID: 2594} // Default depot locker ID
+				p.DepotLockers[depotID] = locker
+			}
+			row.item.Parent = locker
+			locker.Contents = append(locker.Contents, row.item)
+		} else {
+			if parent, ok := depotItemsBySID[row.pid]; ok {
+				row.item.Parent = parent
+				parent.Contents = append(parent.Contents, row.item)
+			}
+		}
+	}
+
+	// 3. Load Inbox
+	if p.Inbox == nil {
+		p.Inbox = &game.Item{ID: 14404} // ITEM_INBOX
+	}
+	inboxItemsBySID, inboxRows, err := d.loadItemsFromTable(ctx, p.DBID, "player_inboxitems")
+	if err != nil {
+		return err
+	}
+	for _, row := range inboxRows {
+		if row.pid == 0 {
+			row.item.Parent = p.Inbox
+			p.Inbox.Contents = append(p.Inbox.Contents, row.item)
+		} else {
+			if parent, ok := inboxItemsBySID[row.pid]; ok {
+				row.item.Parent = parent
+				parent.Contents = append(parent.Contents, row.item)
+			}
+		}
+	}
+
+	// 4. Load Reward Chest
+	if p.RewardChest == nil {
+		p.RewardChest = &game.Item{ID: 21557} // ITEM_REWARD_CHEST
+	}
+	rewardItemsBySID, rewardRows, err := d.loadItemsFromTable(ctx, p.DBID, "player_rewards")
+	if err != nil {
+		return err
+	}
+	for _, row := range rewardRows {
+		if row.pid == 0 {
+			row.item.Parent = p.RewardChest
+			p.RewardChest.Contents = append(p.RewardChest.Contents, row.item)
+		} else {
+			if parent, ok := rewardItemsBySID[row.pid]; ok {
+				row.item.Parent = parent
+				parent.Contents = append(parent.Contents, row.item)
+			}
+		}
+	}
+
+	// 5. Load Stash
+	if p.Stash == nil {
+		p.Stash = make(map[uint16]uint32)
+	}
+	stashQuery := `SELECT item_id, item_count FROM player_stash WHERE player_id = ?`
+	stashRows, err := d.SQL.QueryContext(ctx, stashQuery, p.DBID)
+	if err != nil {
+		return err
+	}
+	defer stashRows.Close()
+	for stashRows.Next() {
+		var itemID uint16
+		var count uint32
+		if err := stashRows.Scan(&itemID, &count); err == nil {
+			p.Stash[itemID] = count
+		}
+	}
+
 	return nil
 }
 
@@ -84,66 +124,117 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM player_items WHERE player_id = ?`, p.DBID); err != nil {
-		return err
-	}
-
-	stmt, err := tx.PrepareContext(ctx, `INSERT INTO player_items (player_id, pid, sid, itemtype, count, attributes) VALUES (?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	sidCounter := 100
-
-	var saveItem func(item *game.Item, pid int) error
-	saveItem = func(item *game.Item, pid int) error {
-		if item == nil {
-			return nil
-		}
-		sid := sidCounter
-		sidCounter++
-
-		// Re-serialize attributes. When the blob decoded cleanly, Attr is
-		// authoritative and we encode from it (mirroring C++
-		// IOLoginDataSave::saveItems -> Item::serializeAttr,
-		// src/io/functions/iologindata_save_player.cpp:90-91); otherwise we write
-		// back the preserved raw blob verbatim. The count column stores the
-		// subtype (item.Count), matching C++ which writes getSubType().
-		attrs := make([]byte, 0)
-		if item.Attr != nil {
-			if b := item.Attr.Encode(item.Count); len(b) > 0 {
-				attrs = b
-			}
-		} else if len(item.Attributes) > 0 {
-			attrs = item.Attributes
-		}
-
-		if _, err := stmt.ExecContext(ctx, p.DBID, pid, sid, item.ID, item.Count, attrs); err != nil {
+	// Helper to save a tree of items to a table
+	saveTree := func(tableName string, rootItems []itemRow) error {
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s WHERE player_id = ?", tableName), p.DBID); err != nil {
 			return err
 		}
+		stmt, err := tx.PrepareContext(ctx, fmt.Sprintf("INSERT INTO %s (player_id, pid, sid, itemtype, count, attributes) VALUES (?, ?, ?, ?, ?, ?)", tableName))
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
 
-		for _, child := range item.Contents {
-			if err := saveItem(child, sid); err != nil {
+		sidCounter := 100
+		var saveItem func(item *game.Item, pid int) error
+		saveItem = func(item *game.Item, pid int) error {
+			if item == nil {
+				return nil
+			}
+			sid := sidCounter
+			sidCounter++
+
+			attrs := make([]byte, 0)
+			if item.Attr != nil {
+				if b := item.Attr.Encode(item.Count); len(b) > 0 {
+					attrs = b
+				}
+			} else if len(item.Attributes) > 0 {
+				attrs = item.Attributes
+			}
+
+			if _, err := stmt.ExecContext(ctx, p.DBID, pid, sid, item.ID, item.Count, attrs); err != nil {
 				return err
+			}
+
+			for _, child := range item.Contents {
+				if err := saveItem(child, sid); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		for _, root := range rootItems {
+			if root.item != nil {
+				if err := saveItem(root.item, root.pid); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
 	}
 
+	// 1. Save Inventory
+	var invRoots []itemRow
 	for slot := 1; slot <= 10; slot++ {
 		if p.Inventory[slot] != nil {
-			if err := saveItem(p.Inventory[slot], slot); err != nil {
-				return err
+			invRoots = append(invRoots, itemRow{pid: slot, item: p.Inventory[slot]})
+		}
+	}
+	if p.StoreInbox != nil {
+		invRoots = append(invRoots, itemRow{pid: 11, item: p.StoreInbox})
+	}
+	if err := saveTree("player_items", invRoots); err != nil {
+		return err
+	}
+
+	// 2. Save Depot
+	var depotRoots []itemRow
+	if p.DepotLockers != nil {
+		for depotID, locker := range p.DepotLockers {
+			if locker != nil {
+				for _, item := range locker.Contents {
+					depotRoots = append(depotRoots, itemRow{pid: int(depotID), item: item})
+				}
 			}
 		}
 	}
+	if err := saveTree("player_depotitems", depotRoots); err != nil {
+		return err
+	}
 
-	// Store Inbox lives at slot 11 (CONST_SLOT_STORE_INBOX); persist it and its
-	// contents (in-game store purchases) like any equipment container.
-	if p.StoreInbox != nil {
-		if err := saveItem(p.StoreInbox, 11); err != nil {
-			return err
+	// 3. Save Inbox
+	var inboxRoots []itemRow
+	if p.Inbox != nil {
+		for _, item := range p.Inbox.Contents {
+			inboxRoots = append(inboxRoots, itemRow{pid: 0, item: item})
+		}
+	}
+	if err := saveTree("player_inboxitems", inboxRoots); err != nil {
+		return err
+	}
+
+	// 4. Save Reward Chest
+	var rewardRoots []itemRow
+	if p.RewardChest != nil {
+		for _, item := range p.RewardChest.Contents {
+			rewardRoots = append(rewardRoots, itemRow{pid: 0, item: item})
+		}
+	}
+	if err := saveTree("player_rewards", rewardRoots); err != nil {
+		return err
+	}
+
+	// 5. Save Stash
+	if _, err := tx.ExecContext(ctx, "DELETE FROM player_stash WHERE player_id = ?", p.DBID); err != nil {
+		return err
+	}
+	if p.Stash != nil {
+		for itemID, count := range p.Stash {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO player_stash (player_id, item_id, item_count) VALUES (?, ?, ?)", p.DBID, itemID, count); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -146,10 +146,32 @@ type Player struct {
 	ManagedContainers       map[uint8]uint16 // ObjectCategory -> loot container item id
 	ManagedObtainContainers map[uint8]uint16 // ObjectCategory -> obtain container item id
 
+	// Advanced Combat Stats
+	CriticalChance  uint16
+	CriticalDamage  uint16
+	LifeLeechChance uint16
+	LifeLeechAmount uint16
+	ManaLeechChance uint16
+	ManaLeechAmount uint16
+	ReflectPercent  uint16
+	AbsorbPercent   uint16
+
 	// StoreInbox is the player's Store Inbox container (item id ITEM_STORE_INBOX
 	// 23396) where in-game store purchases are delivered. Created lazily on first
 	// access (Player:getStoreInbox).
 	StoreInbox *Item
+
+	// Inbox is the player's standard Inbox container.
+	Inbox *Item
+
+	// RewardChest is the player's reward chest container.
+	RewardChest *Item
+
+	// DepotLockers holds the player's depots by depot ID.
+	DepotLockers map[uint16]*Item
+
+	// Stash holds the player's supply stash items (ItemID -> Count).
+	Stash map[uint16]uint32
 
 	// Wheel of Destiny progression tree
 	Wheel *WheelOfDestiny
@@ -162,8 +184,13 @@ type Player struct {
 
 	// Store / Tibia Coins (account-level: accounts.coins / coins_transferable).
 	// CoinBalance is the total; CoinTransferable is the transferable subset.
-	CoinBalance      uint32
-	CoinTransferable uint32
+	CoinBalance       uint32
+	CoinTransferable  uint32
+	TournamentBalance uint32
+
+	// VIP List and Groups (account-level)
+	VIPList   []VIPEntry
+	VIPGroups []VIPGroup
 
 	// BossPoints is the bosstiary points total (players.boss_points), earned by
 	// reaching boss unlock levels and spent implicitly via the loot bonus.
@@ -221,6 +248,8 @@ type Player struct {
 	IsTraining           bool
 	SkillLoss            bool
 	Skull                uint8
+	SkullTime            int64
+	ConditionsBlob       []byte
 	Blessings            [8]uint8
 	OfflineTrainingTime  int32
 	OfflineTrainingSkill int8
@@ -298,6 +327,18 @@ func (p *Player) LearnSpell(name string) {
 		p.learnedSpells = make(map[string]bool)
 	}
 	p.learnedSpells[strings.ToLower(name)] = true
+}
+
+// GetLearnedSpells returns a copy of the learned spells map.
+func (p *Player) GetLearnedSpells() map[string]bool {
+	if p.learnedSpells == nil {
+		return nil
+	}
+	res := make(map[string]bool, len(p.learnedSpells))
+	for k, v := range p.learnedSpells {
+		res[k] = v
+	}
+	return res
 }
 
 // GamemasterOutfit sets a default outfit if none was loaded.
@@ -716,8 +757,8 @@ func ExpForLevel(level uint64) uint64 {
 // AddExperience grants raw experience and applies any resulting level-ups,
 // mirroring the core of Player::addExperience (src/creatures/players/player.cpp:3560).
 // Basic only: no party sharing, stamina, VIP or bonus multipliers (left as
-// TODOs for the vocations/party agents). On level-up, health/mana are refilled
-// to max like the C++ path.
+// TODOs for the party agents). On level-up, health/mana/cap are increased based
+// on the vocation, and then health/mana are refilled to max like the C++ path.
 func (p *Player) AddExperience(exp uint64) {
 	if exp == 0 {
 		return
@@ -744,9 +785,15 @@ func (p *Player) AddExperience(exp uint64) {
 	}
 
 	if p.Level != prevLevel {
-		// TODO(vocations): apply per-vocation HP/mana/cap gains. Without a
-		// vocation registry we just refill to the current max, matching the C++
-		// "health = healthMax" refill after a level change.
+		levelsGained := p.Level - prevLevel
+		
+		// Apply vocation stats if vocation is valid
+		if voc := vocations.GetVocation(uint32(p.Vocation)); voc != nil {
+			p.MaxHealth += voc.GainHP * uint32(levelsGained)
+			p.MaxMana += voc.GainMana * uint32(levelsGained)
+			p.Capacity += (voc.GainCap * 100) * uint32(levelsGained)
+		}
+
 		p.Health = p.MaxHealth
 		p.Mana = p.MaxMana
 	}
@@ -761,6 +808,15 @@ func (p *Player) SetTarget(target Creature) {
 		p.TargetID = 0
 	}
 }
+
+func (p *Player) GetCriticalChance() uint16 { return p.CriticalChance }
+func (p *Player) GetCriticalDamage() uint16 { return p.CriticalDamage }
+func (p *Player) GetLifeLeechChance() uint16 { return p.LifeLeechChance }
+func (p *Player) GetLifeLeechAmount() uint16 { return p.LifeLeechAmount }
+func (p *Player) GetManaLeechChance() uint16 { return p.ManaLeechChance }
+func (p *Player) GetManaLeechAmount() uint16 { return p.ManaLeechAmount }
+func (p *Player) GetReflectPercent() uint16 { return p.ReflectPercent }
+func (p *Player) GetAbsorbPercent() uint16 { return p.AbsorbPercent }
 func (p *Player) SetAttackTarget(id uint32)           { p.TargetID = id }
 func (p *Player) ChangeTargetDistance(distance int32) {}
 func (p *Player) GetPosition() Position               { return p.Pos }
@@ -1611,4 +1667,21 @@ func (p *Player) RemoveMount(mountID uint16) {
 	if p.Mounts != nil {
 		delete(p.Mounts, mountID)
 	}
+}
+
+// VIPEntry represents a single player added to the VIP list.
+type VIPEntry struct {
+	PlayerID    uint32 // DBID of the target player
+	PlayerName  string // Name of the target player
+	Description string
+	Icon        uint8
+	Notify      bool
+	Groups      []uint32 // IDs of the VIP groups this entry belongs to
+}
+
+// VIPGroup represents a custom or default group in the VIP list.
+type VIPGroup struct {
+	ID           uint32
+	Name         string
+	Customizable bool
 }

@@ -21,6 +21,9 @@ type VocationSkill struct {
 type Vocation struct {
 	ID             uint32          `xml:"id,attr"`
 	Name           string          `xml:"name,attr"`
+	GainHP         uint32          `xml:"gainhp,attr"`
+	GainMana       uint32          `xml:"gainmana,attr"`
+	GainCap        uint32          `xml:"gaincap,attr"`
 	GainHPTicks    int             `xml:"gainhpticks,attr"`
 	GainHPAmount   int             `xml:"gainhpamount,attr"`
 	GainManaTicks  int             `xml:"gainmanaticks,attr"`

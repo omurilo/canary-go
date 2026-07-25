@@ -78,9 +78,10 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 		}
 	}
 
-	// Self: shift the visible map in the walk direction.
-	g.SendCreatureMove(oldPos, oldStack, newPos)
-	g.sendMapShift(dir, newPos)
+	if oldPos.Z == newPos.Z {
+		g.SendCreatureMove(oldPos, oldStack, newPos)
+		g.sendMapShift(dir, newPos)
+	}
 
 	// Trigger StepIn events
 	if tile := g.deps.World.Map.GetTile(newPos); tile != nil {
@@ -514,7 +515,7 @@ const (
 func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 	talkType := r.GetByte()
 	switch talkType {
-	case talkTypePrivateTo, talkTypePrivateRedTo:
+	case talkTypePrivateTo, talkTypePrivateRedTo, talkTypePrivatePN:
 		_ = r.GetString() // receiver name
 	case talkTypeChannelY, talkTypeChannelR1:
 		_ = r.GetU16()    // channel ID
@@ -557,12 +558,34 @@ func requiredGroupLevel(groupType string) uint8 {
 	}
 }
 
-func hasTalkActionPermission(p *game.Player, groupType string) bool {
-	req := requiredGroupLevel(groupType)
-	if req <= 1 {
-		return true
+func hasTalkActionPermission(p *game.Player, ta *talkactions.TalkAction) bool {
+	// If Access is strictly true, require god/admin access (AccountType >= 5 or GroupID >= 4)
+	if ta.Access {
+		if p.AccountType < 5 && p.GroupID < 4 {
+			return false
+		}
 	}
-	if p.AccountType >= 5 || p.GroupID >= 5 {
+	
+	// Check explicitly set AccountType requirement
+	if ta.AccountType > 0 {
+		if p.AccountType < ta.AccountType {
+			return false
+		}
+	}
+
+	// Check GroupType requirement
+	if ta.GroupType != "" {
+		if !hasGroupPermission(p, ta.GroupType) {
+			return false
+		}
+	}
+	
+	return true
+}
+
+func hasGroupPermission(p *game.Player, group string) bool {
+	req := requiredGroupLevel(group)
+	if req <= 1 {
 		return true
 	}
 	playerLevel := p.AccountType
@@ -578,7 +601,7 @@ func (g *GameProtocol) tryTalkAction(talkType byte, text string) bool {
 		return false
 	}
 	
-	if !hasTalkActionPermission(g.player, ta.GroupType) {
+	if !hasTalkActionPermission(g.player, ta) {
 		g.sendStatusText("You cannot execute this command.")
 		return true
 	}
@@ -622,7 +645,13 @@ func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text st
 		}
 	}
 	for _, n := range g.deps.World.SpectatingNpcs(speaker.Pos) {
-		g.deps.Lua.CallNpcOnCreatureSay(n, speaker, talkType, text)
+		tType := talkType
+		// TALKTYPE_SAY (1) should be treated as TALKTYPE_PRIVATE_PN (12) for interacting NPCs,
+		// allowing players to continue dialogue in the default channel.
+		if tType == 1 && n.IsInteractingWithPlayer(speaker.ID) {
+			tType = talkTypePrivatePN
+		}
+		g.deps.Lua.CallNpcOnCreatureSay(n, speaker, tType, text)
 	}
 }
 

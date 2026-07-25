@@ -127,6 +127,14 @@ type Player interface {
 	GetLevel() uint32
 	GetMagicLevel() uint32
 	IsSecureMode() bool
+	GetCriticalChance() uint16
+	GetCriticalDamage() uint16
+	GetLifeLeechChance() uint16
+	GetLifeLeechAmount() uint16
+	GetManaLeechChance() uint16
+	GetManaLeechAmount() uint16
+	GetReflectPercent() uint16
+	GetAbsorbPercent() uint16
 }
 
 type Tile interface {

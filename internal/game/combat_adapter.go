@@ -174,3 +174,36 @@ func (a combatAdapter) IsPlayer() bool {
 	return ok
 }
 
+
+func (a combatAdapter) GetCriticalChance() uint16 {
+	if p, ok := a.c.(*Player); ok { return p.GetCriticalChance() }
+	return 0
+}
+func (a combatAdapter) GetCriticalDamage() uint16 {
+	if p, ok := a.c.(*Player); ok { return p.GetCriticalDamage() }
+	return 0
+}
+func (a combatAdapter) GetLifeLeechChance() uint16 {
+	if p, ok := a.c.(*Player); ok { return p.GetLifeLeechChance() }
+	return 0
+}
+func (a combatAdapter) GetLifeLeechAmount() uint16 {
+	if p, ok := a.c.(*Player); ok { return p.GetLifeLeechAmount() }
+	return 0
+}
+func (a combatAdapter) GetManaLeechChance() uint16 {
+	if p, ok := a.c.(*Player); ok { return p.GetManaLeechChance() }
+	return 0
+}
+func (a combatAdapter) GetManaLeechAmount() uint16 {
+	if p, ok := a.c.(*Player); ok { return p.GetManaLeechAmount() }
+	return 0
+}
+func (a combatAdapter) GetReflectPercent() uint16 {
+	if p, ok := a.c.(*Player); ok { return p.GetReflectPercent() }
+	return 0
+}
+func (a combatAdapter) GetAbsorbPercent() uint16 {
+	if p, ok := a.c.(*Player); ok { return p.GetAbsorbPercent() }
+	return 0
+}

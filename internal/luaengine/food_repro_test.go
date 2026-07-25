@@ -35,7 +35,7 @@ func TestFoodActionRepro(t *testing.T) {
 		t.Fatalf("load foods.lua: %v", err)
 	}
 
-	act := actions.FindAction(&game.Item{ID: 3577})
+	act := actions.FindAction(&game.Item{ID: 3577}, game.Position{})
 	if act == nil {
 		t.Fatalf("no action registered for food id 3577 — FindAction returned nil")
 	}

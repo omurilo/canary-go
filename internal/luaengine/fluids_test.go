@@ -38,7 +38,7 @@ func TestFluidsAction(t *testing.T) {
 
 	// 1. Test mana fluid (type 10 = FLUID_MANA in fluids.lua)
 	vialMana := &game.Item{ID: 2874, Count: 10}
-	act := actions.FindAction(vialMana)
+	act := actions.FindAction(vialMana, game.Position{})
 	if act == nil {
 		t.Fatalf("no action registered for vial 2874")
 	}

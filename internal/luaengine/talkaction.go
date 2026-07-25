@@ -42,8 +42,8 @@ var talkActionMethods = map[string]lua.LGFunction{
 	"groupType":      talkActionGroupType,
 	"onSay":          talkActionOnSay,
 	"setDescription": talkActionNoOp,
-	"accountType":    talkActionNoOp,
-	"access":         talkActionNoOp,
+	"accountType":    talkActionAccountType,
+	"access":         talkActionAccess,
 	"checkParam":     talkActionNoOp,
 	"register":       talkActionRegister,
 }
@@ -90,6 +90,20 @@ func talkActionSeparator(L *lua.LState) int {
 func talkActionGroupType(L *lua.LState) int {
 	t := checkTalkAction(L)
 	t.GroupType = L.CheckString(2)
+	L.Push(L.Get(1))
+	return 1
+}
+
+func talkActionAccountType(L *lua.LState) int {
+	t := checkTalkAction(L)
+	t.AccountType = uint8(L.CheckNumber(2))
+	L.Push(L.Get(1))
+	return 1
+}
+
+func talkActionAccess(L *lua.LState) int {
+	t := checkTalkAction(L)
+	t.Access = L.CheckBool(2)
 	L.Push(L.Get(1))
 	return 1
 }

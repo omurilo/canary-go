@@ -318,7 +318,7 @@ func spellRegister(L *lua.LState) int {
 // variant, mirroring InstantSpell::executeCastSpell (spells.cpp:1322). It does
 // NOT run the cast checks or spend mana/cooldowns — the protocol layer does that
 // before calling this. Returns the boolean the Lua function returned.
-func (e *Engine) RunSpell(sp *spells.Spell, caster *game.Player, vtype LuaVariantType, targetID uint32, pos game.Position) bool {
+func (e *Engine) RunSpell(sp *spells.Spell, caster game.Creature, vtype LuaVariantType, targetID uint32, pos game.Position) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -334,7 +334,13 @@ func (e *Engine) RunSpell(sp *spells.Spell, caster *game.Player, vtype LuaVarian
 
 	casterUD := L.NewUserData()
 	casterUD.Value = caster
-	L.SetMetatable(casterUD, L.GetTypeMetatable("Player"))
+	if _, ok := caster.(*game.Player); ok {
+		L.SetMetatable(casterUD, L.GetTypeMetatable("Player"))
+	} else if _, ok := caster.(*game.Monster); ok {
+		L.SetMetatable(casterUD, L.GetTypeMetatable("Monster"))
+	} else {
+		L.SetMetatable(casterUD, L.GetTypeMetatable("Creature"))
+	}
 
 	v := &luaVariant{vtype: vtype, number: targetID, pos: pos, instantName: sp.Name}
 	varUD := L.NewUserData()

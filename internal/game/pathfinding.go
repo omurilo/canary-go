@@ -1,46 +1,68 @@
 package game
 
-import "math"
+import (
+	"container/heap"
+	"math"
+
+	"github.com/opentibiabr/canary-go/internal/items"
+)
+
+type pathNode struct {
+	pos    Position
+	g, h   int
+	parent *pathNode
+	index  int
+}
+
+type priorityQueue []*pathNode
+
+func (pq priorityQueue) Len() int { return len(pq) }
+
+func (pq priorityQueue) Less(i, j int) bool {
+	return (pq[i].g + pq[i].h) < (pq[j].g + pq[j].h)
+}
+
+func (pq priorityQueue) Swap(i, j int) {
+	pq[i], pq[j] = pq[j], pq[i]
+	pq[i].index = i
+	pq[j].index = j
+}
+
+func (pq *priorityQueue) Push(x any) {
+	n := len(*pq)
+	item := x.(*pathNode)
+	item.index = n
+	*pq = append(*pq, item)
+}
+
+func (pq *priorityQueue) Pop() any {
+	old := *pq
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil  // avoid memory leak
+	item.index = -1 // for safety
+	*pq = old[0 : n-1]
+	return item
+}
 
 type Pathfinder interface {
 	FindNextStep(start, goal Position) Position
 }
 
-// SimplePathfinder implements a basic target-chasing logic
-// It moves 1 step diagonally or straight towards the goal
-type SimplePathfinder struct{}
-
-func (p *SimplePathfinder) FindNextStep(start, goal Position) Position {
-	next := start
-	if next.X < goal.X {
-		next.X++
-	} else if next.X > goal.X {
-		next.X--
-	}
-
-	if next.Y < goal.Y {
-		next.Y++
-	} else if next.Y > goal.Y {
-		next.Y--
-	}
-	// In a real pathfinder, we would check for obstacles here.
-	return next
-}
-
-// AStarPathfinder is a stub for real A* pathfinding.
-// Currently acts similar to SimplePathfinder but can be expanded with map checks.
 type AStarPathfinder struct {
-	// Map instance would go here
+	M       *Map
+	Catalog *items.Catalog
 }
 
 func (a *AStarPathfinder) FindNextStep(start, goal Position) Position {
-	// Dummy A* implementation, falls back to direct chasing for now.
-	// Implementing full A* requires a grid/map implementation to check for unwalkable tiles.
+	path := FindPath(a.M, a.Catalog, start, goal, 200)
+	if len(path) > 0 {
+		return path[0]
+	}
+	// Fallback to simple pathfinder logic if path not found
 	next := start
-	
 	dx := goal.X - start.X
 	dy := goal.Y - start.Y
-
 	if math.Abs(float64(dx)) > math.Abs(float64(dy)) {
 		if dx > 0 {
 			next.X++
@@ -54,6 +76,85 @@ func (a *AStarPathfinder) FindNextStep(start, goal Position) Position {
 			next.Y--
 		}
 	}
-	
 	return next
+}
+
+func chebyshevDist(p1, p2 Position) int {
+	dx := int(p1.X) - int(p2.X)
+	if dx < 0 {
+		dx = -dx
+	}
+	dy := int(p1.Y) - int(p2.Y)
+	if dy < 0 {
+		dy = -dy
+	}
+	if dx > dy {
+		return dx
+	}
+	return dy
+}
+
+func FindPath(m *Map, catalog *items.Catalog, start, end Position, maxNodes int) []Position {
+	if start == end {
+		return nil
+	}
+	
+	pq := make(priorityQueue, 0)
+	heap.Init(&pq)
+	
+	startNode := &pathNode{pos: start, g: 0, h: chebyshevDist(start, end)}
+	heap.Push(&pq, startNode)
+	
+	closedList := make(map[Position]bool)
+	openMap := make(map[Position]*pathNode)
+	openMap[start] = startNode
+	
+	nodesEvaluated := 0
+	
+	for pq.Len() > 0 && nodesEvaluated < maxNodes {
+		curr := heap.Pop(&pq).(*pathNode)
+		delete(openMap, curr.pos)
+		closedList[curr.pos] = true
+		nodesEvaluated++
+		
+		if curr.pos == end || chebyshevDist(curr.pos, end) == 1 {
+			var path []Position
+			for curr != nil && curr.pos != start {
+				path = append([]Position{curr.pos}, path...)
+				curr = curr.parent
+			}
+			return path
+		}
+		
+		dirs := []Direction{DirNorth, DirEast, DirSouth, DirWest, DirNE, DirNW, DirSE, DirSW}
+		for _, d := range dirs {
+			nextPos := curr.pos.Offset(d)
+			if closedList[nextPos] {
+				continue
+			}
+			
+			tile := m.GetTile(nextPos)
+			if tile == nil || !tile.Walkable(catalog) {
+				if nextPos != end {
+					continue
+				}
+			}
+			
+			g := curr.g + 1
+			h := chebyshevDist(nextPos, end)
+			
+			if inOpen, ok := openMap[nextPos]; ok {
+				if g < inOpen.g {
+					inOpen.g = g
+					inOpen.parent = curr
+					heap.Fix(&pq, inOpen.index)
+				}
+			} else {
+				newNode := &pathNode{pos: nextPos, g: g, h: h, parent: curr}
+				heap.Push(&pq, newNode)
+				openMap[nextPos] = newNode
+			}
+		}
+	}
+	return nil
 }

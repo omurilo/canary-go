@@ -187,21 +187,63 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		},
 		"moveTo": func(L *lua.LState) int {
 			it := checkItem(L)
-			dest := checkPosition(L, 2)
-			
-			// Remove from old pos if we had one (we might not track it properly in luaItem yet,
-			// but if it's on map, we should remove it. Since luaItem pos might be empty, 
-			// it's partially stubbed for now. Ideally, we search map or use proper entity ID).
-			if it.pos.X != 0 || it.pos.Y != 0 {
-				e.world.Map.RemoveItemPtr(it.pos, it.item)
+			if L.GetTop() < 2 {
+				L.Push(lua.LFalse)
+				return 1
 			}
-			
-			ok := e.world.AddItem(dest, it.item)
-			if ok {
-				it.pos = dest
+
+			// Try as Item (Container) first
+			ud := L.CheckUserData(2)
+			if destItem, ok := ud.Value.(*luaItem); ok {
+				if it.pos.X != 0 || it.pos.Y != 0 {
+					e.world.Map.RemoveItemPtr(it.pos, it.item)
+					it.pos = game.Position{}
+				} else {
+					// We need to detach it from the player's inventory if it's there
+					for _, p := range e.world.Players() {
+						p.WalkInventory(func(inventoryItem *game.Item) {
+							if inventoryItem == it.item {
+								// In a full ECS, we'd remove it from the slot properly.
+								// For now, if we are moving it, we could remove it from parent
+								if it.item.Parent != nil {
+									for i, child := range it.item.Parent.Contents {
+										if child == it.item {
+											it.item.Parent.Contents = append(it.item.Parent.Contents[:i], it.item.Parent.Contents[i+1:]...)
+											break
+										}
+									}
+								} else {
+									// It's in a slot, we'd need to clear the slot
+									for i, slotItem := range p.Inventory {
+										if slotItem == it.item {
+											p.Inventory[i] = nil
+										}
+									}
+								}
+							}
+						})
+					}
+				}
+				destItem.item.Contents = append(destItem.item.Contents, it.item)
+				it.item.Parent = destItem.item
+				L.Push(lua.LTrue)
+				return 1
 			}
-			
-			L.Push(lua.LBool(ok))
+
+			// Otherwise, it must be a Position
+			if dest, ok := ud.Value.(game.Position); ok {
+				if it.pos.X != 0 || it.pos.Y != 0 {
+					e.world.Map.RemoveItemPtr(it.pos, it.item)
+				}
+				ok := e.world.AddItem(dest, it.item)
+				if ok {
+					it.pos = dest
+				}
+				L.Push(lua.LBool(ok))
+				return 1
+			}
+
+			L.Push(lua.LFalse)
 			return 1
 		},
 		"getPosition": func(L *lua.LState) int {

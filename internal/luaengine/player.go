@@ -520,7 +520,18 @@ func playerAddforgedusts(L *lua.LState) int {
 }
 
 func playerAdditem(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	id := uint16(L.CheckInt(2))
+	count := uint8(L.OptInt(3, 1))
+
+	p.AddItem(id, uint64(count))
+	// AddItem currently does not return the created item.
+	// Scripts relying on the returned item will get nil, which is safe for most basic usage.
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -2081,56 +2092,7 @@ func playerGetvocation(L *lua.LState) int {
 			AttackSpeed: 2000, BaseSpeed: 220,
 		}
 	}
-
-	ud := L.NewTable()
-	mt := L.NewTable()
-
-	num := func(name string, v int) {
-		L.SetField(ud, name, L.NewFunction(func(L *lua.LState) int {
-			L.Push(lua.LNumber(v))
-			return 1
-		}))
-	}
-	L.SetField(ud, "getId", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LNumber(voc.ID))
-		return 1
-	}))
-	L.SetField(ud, "getBaseId", L.NewFunction(func(L *lua.LState) int {
-		baseID := voc.ID
-		if baseID > 4 {
-			baseID = ((baseID - 1) % 4) + 1
-		}
-		L.Push(lua.LNumber(baseID))
-		return 1
-	}))
-	L.SetField(ud, "getClientId", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LNumber(voc.ID))
-		return 1
-	}))
-	L.SetField(ud, "getName", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LString(voc.Name))
-		return 1
-	}))
-	num("getAttackSpeed", voc.AttackSpeed)
-	num("getBaseAttackSpeed", voc.AttackSpeed)
-	num("getBaseSpeed", voc.BaseSpeed)
-	// Health/mana regeneration rates consumed by Player.feed.
-	num("getHealthGainAmount", voc.GainHPAmount)
-	num("getHealthGainTicks", voc.GainHPTicks)
-	num("getManaGainAmount", voc.GainManaAmount)
-	num("getManaGainTicks", voc.GainManaTicks)
-
-	L.SetField(ud, "getPromotion", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LNil)
-		return 1
-	}))
-	L.SetField(ud, "getDemotion", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LNil)
-		return 1
-	}))
-
-	L.SetMetatable(ud, mt)
-	L.Push(ud)
+	pushVocation(L, voc)
 	return 1
 }
 

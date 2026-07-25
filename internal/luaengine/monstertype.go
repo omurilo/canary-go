@@ -86,6 +86,7 @@ func (e *Engine) registerMonsterType() {
 			parseMonsterAttacks(m, table)
 			parseMonsterLoot(m, table)
 			parseMonsterFlags(m, table)
+			parseMonsterElements(m, table)
 			if outfitTable := table.RawGetString("outfit"); outfitTable.Type() == lua.LTTable {
 				tb := outfitTable.(*lua.LTable)
 				if val := tb.RawGetString("lookType"); val.Type() == lua.LTNumber {
@@ -290,6 +291,49 @@ func parseMonsterAttacks(m *creatures.MonsterType, table *lua.LTable) {
 		if val := at.RawGetString("range"); val.Type() == lua.LTNumber {
 			atk.Range = int(lua.LVAsNumber(val))
 		}
+		if val := at.RawGetString("radius"); val.Type() == lua.LTNumber {
+			atk.Radius = int(lua.LVAsNumber(val))
+		}
+		if val := at.RawGetString("length"); val.Type() == lua.LTNumber {
+			atk.Length = int(lua.LVAsNumber(val))
+		}
+		if val := at.RawGetString("spread"); val.Type() == lua.LTNumber {
+			atk.Spread = int(lua.LVAsNumber(val))
+		}
+		if val := at.RawGetString("shootEffect"); val.Type() == lua.LTNumber {
+			atk.ShootEffect = uint16(lua.LVAsNumber(val))
+		}
+		if val := at.RawGetString("effect"); val.Type() == lua.LTNumber {
+			atk.Effect = uint16(lua.LVAsNumber(val))
+		}
+		if val := at.RawGetString("type"); val.Type() == lua.LTNumber {
+			// Convert to internal CombatType string name to match logic
+			cType := luaToCombatType(int(lua.LVAsNumber(val)))
+			switch cType {
+			case 1: atk.CombatType = "physical"
+			case 8: atk.CombatType = "fire"
+			case 4: atk.CombatType = "earth"
+			case 2: atk.CombatType = "energy"
+			case 128: atk.CombatType = "ice"
+			case 64: atk.CombatType = "death"
+			case 256: atk.CombatType = "holy"
+			case 1024: atk.CombatType = "lifedrain"
+			case 512: atk.CombatType = "manadrain"
+			case 32: atk.CombatType = "healing"
+			}
+		}
+		if val := at.RawGetString("condition"); val.Type() == lua.LTString {
+			atk.ConditionType = val.String()
+		}
+		if val := at.RawGetString("speedChange"); val.Type() == lua.LTNumber {
+			atk.SpeedChange = int(lua.LVAsNumber(val))
+		}
+		if val := at.RawGetString("duration"); val.Type() == lua.LTNumber {
+			atk.Duration = int(lua.LVAsNumber(val))
+		}
+		if val := at.RawGetString("target"); val.Type() == lua.LTBool {
+			atk.NeedTarget = lua.LVAsBool(val)
+		}
 		m.Attacks = append(m.Attacks, atk)
 	})
 }
@@ -397,4 +441,36 @@ func pushMonsterType(L *lua.LState, m *creatures.MonsterType) {
 	ud.Value = m
 	L.SetMetatable(ud, L.GetTypeMetatable(luaMonsterTypeName))
 	L.Push(ud)
+}
+
+// parseMonsterElements reads monster.elements list.
+// E.g. { type = COMBAT_EARTHDAMAGE, percent = 20 }
+func parseMonsterElements(m *creatures.MonsterType, table *lua.LTable) {
+	elements, ok := table.RawGetString("elements").(*lua.LTable)
+	if !ok {
+		return
+	}
+	if m.Elements == nil {
+		m.Elements = make(map[uint32]int16)
+	}
+	elements.ForEach(func(_, v lua.LValue) {
+		et, ok := v.(*lua.LTable)
+		if !ok {
+			return
+		}
+		var hasType bool
+		var cType uint32
+		var percent int16
+		if val := et.RawGetString("type"); val.Type() == lua.LTNumber {
+			cType = uint32(lua.LVAsNumber(val))
+			hasType = true
+		}
+		if val := et.RawGetString("percent"); val.Type() == lua.LTNumber {
+			percent = int16(lua.LVAsNumber(val))
+		}
+		if hasType {
+			actualType := uint32(luaToCombatType(int(cType)))
+			m.Elements[actualType] = percent
+		}
+	})
 }

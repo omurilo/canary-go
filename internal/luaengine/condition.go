@@ -31,6 +31,18 @@ func (e *Engine) registerCondition() {
 	mt := e.L.NewTypeMetatable(luaConditionTypeName)
 	e.setClassConstructor("Condition", conditionConstructor, conditionMethods)
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), conditionMethods))
+
+	// Global aliases for legacy scripts
+	e.L.SetGlobal("createConditionObject", e.L.NewFunction(conditionConstructor))
+	e.L.SetGlobal("setConditionParam", e.L.NewFunction(func(L *lua.LState) int {
+		return conditionMethods["setParameter"](L)
+	}))
+	e.L.SetGlobal("setConditionFormula", e.L.NewFunction(func(L *lua.LState) int {
+		return conditionMethods["setFormula"](L)
+	}))
+	e.L.SetGlobal("addOutfitCondition", e.L.NewFunction(func(L *lua.LState) int {
+		return conditionMethods["setOutfit"](L)
+	}))
 }
 
 func conditionConstructor(L *lua.LState) int {

@@ -210,8 +210,18 @@ func (g *GameProtocol) parseToggleMount(r *netmsg.Reader) {
 		if p.Outfit.LookMount == 0 {
 			if p.LastMount != 0 {
 				p.Outfit.LookMount = p.LastMount
+			} else if len(p.Mounts) > 0 {
+				// Pick the first available mount if they have no LastMount
+				for mID, has := range p.Mounts {
+					if has {
+						p.Outfit.LookMount = mID
+						break
+					}
+				}
 			} else {
-				p.Outfit.LookMount = 388 // Default mount client id (Widow Queen)
+				// Player has no mounts, send cancel message
+				g.sendStatusText("You don't have any mounts.")
+				return
 			}
 		}
 	} else {

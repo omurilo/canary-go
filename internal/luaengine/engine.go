@@ -14,6 +14,7 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/db"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/spells"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -55,6 +56,78 @@ func New(world *game.World, log *slog.Logger) *Engine {
 	e.overrideFileLoaders()
 	e.registerScheduler()
 	e.registerLuaCompat()
+
+	if world != nil {
+		world.OnCastSpell = func(name string, caster game.Creature, target game.Creature) bool {
+			sp := spells.FindByName(name)
+			if sp == nil {
+				return false
+			}
+			targetID := uint32(0)
+			pos := game.Position{}
+			vtype := VariantPosition
+			if target != nil {
+				targetID = target.GetID()
+				pos = target.GetPosition()
+				vtype = VariantNumber
+			} else if caster != nil {
+				pos = caster.GetPosition()
+				vtype = VariantPosition
+			}
+			return e.RunSpell(sp, caster, vtype, targetID, pos)
+		}
+		world.OnTargetTile = func(funcName string, caster game.Creature, pos game.Position) {
+			fn := e.L.GetGlobal(funcName)
+			if fn.Type() != lua.LTFunction {
+				return
+			}
+			casterUD := e.L.NewUserData()
+			casterUD.Value = caster
+			if p, ok := caster.(*game.Player); ok && p != nil {
+				e.L.SetMetatable(casterUD, e.L.GetTypeMetatable("Player"))
+			} else if m, ok := caster.(*game.Monster); ok && m != nil {
+				e.L.SetMetatable(casterUD, e.L.GetTypeMetatable("Monster"))
+			} else {
+				e.L.SetMetatable(casterUD, e.L.GetTypeMetatable("Creature"))
+			}
+			posUD := e.L.NewUserData()
+			posUD.Value = pos
+			e.L.SetMetatable(posUD, e.L.GetTypeMetatable("Position"))
+
+			if err := e.L.CallByParam(lua.P{Fn: fn, NRet: 0, Protect: true}, casterUD, posUD); err != nil {
+				e.log.Error("OnTargetTile error", "func", funcName, "err", err)
+			}
+		}
+		world.OnTargetCreature = func(funcName string, caster game.Creature, target game.Creature) {
+			fn := e.L.GetGlobal(funcName)
+			if fn.Type() != lua.LTFunction {
+				return
+			}
+			casterUD := e.L.NewUserData()
+			casterUD.Value = caster
+			if p, ok := caster.(*game.Player); ok && p != nil {
+				e.L.SetMetatable(casterUD, e.L.GetTypeMetatable("Player"))
+			} else if m, ok := caster.(*game.Monster); ok && m != nil {
+				e.L.SetMetatable(casterUD, e.L.GetTypeMetatable("Monster"))
+			} else {
+				e.L.SetMetatable(casterUD, e.L.GetTypeMetatable("Creature"))
+			}
+			targetUD := e.L.NewUserData()
+			targetUD.Value = target
+			if p, ok := target.(*game.Player); ok && p != nil {
+				e.L.SetMetatable(targetUD, e.L.GetTypeMetatable("Player"))
+			} else if m, ok := target.(*game.Monster); ok && m != nil {
+				e.L.SetMetatable(targetUD, e.L.GetTypeMetatable("Monster"))
+			} else {
+				e.L.SetMetatable(targetUD, e.L.GetTypeMetatable("Creature"))
+			}
+
+			if err := e.L.CallByParam(lua.P{Fn: fn, NRet: 0, Protect: true}, casterUD, targetUD); err != nil {
+				e.log.Error("OnTargetCreature error", "func", funcName, "err", err)
+			}
+		}
+	}
+
 	return e
 }
 

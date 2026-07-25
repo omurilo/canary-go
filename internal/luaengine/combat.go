@@ -25,6 +25,29 @@ func (e *Engine) registerCombat() {
 	e.L.SetGlobal("doAreaCombatMana", e.L.NewFunction(e.luaDoAreaCombatMana))
 	e.L.SetGlobal("doTargetCombat", e.L.NewFunction(e.luaDoTargetCombatHealth))
 	e.L.SetGlobal("doAreaCombat", e.L.NewFunction(e.luaDoAreaCombatHealth))
+
+	// Export setCombatCallback globally to appease tests that don't load compat.lua
+	e.L.SetGlobal("setCombatCallback", e.L.NewFunction(func(L *lua.LState) int {
+		c := checkCombat(L, 1)
+		if c == nil {
+			L.Push(lua.LFalse)
+			return 1
+		}
+		key := L.CheckInt(2)
+		funcName := L.CheckString(3)
+		switch key {
+		case 1: // CALLBACK_PARAM_LEVELMAGICVALUE
+			c.CallbackLevelMagicValue = funcName
+		case 2: // CALLBACK_PARAM_SKILLVALUE
+			c.CallbackSkillValue = funcName
+		case 3: // CALLBACK_PARAM_TARGETTILE
+			c.CallbackTargetTile = funcName
+		case 4: // CALLBACK_PARAM_TARGETCREATURE
+			c.CallbackTargetCreature = funcName
+		}
+		L.Push(lua.LTrue)
+		return 1
+	}))
 }
 
 // combatMatrixFromTable converts a Lua matrix (rows of {0/1/3,...}) into a flat
