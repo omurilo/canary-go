@@ -10,6 +10,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/bosstiary"
 	"github.com/opentibiabr/canary-go/internal/charms"
 	"github.com/opentibiabr/canary-go/internal/creatures"
+	"github.com/opentibiabr/canary-go/internal/game/imbuements"
 	"github.com/opentibiabr/canary-go/internal/items"
 )
 
@@ -35,6 +36,7 @@ type World struct {
 	Items *items.Catalog
 	Monsters *creatures.TypeRegistry
 	Charms *charms.Registry
+	Imbuements *imbuements.Registry
 	Decay *DecayManager
 
 	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldTileIndex int)
@@ -131,6 +133,7 @@ func NewWorld() *World {
 		guilds:       make(map[uint32]*Guild),
 		TypeRegistry: creatures.NewTypeRegistry(),
 		Charms:       charms.NewRegistry(),
+		Imbuements:   imbuements.NewRegistry(),
 		Fiendish:     NewFiendishManager(3),
 	}
 	w.Combat = NewCombatEngine(w)

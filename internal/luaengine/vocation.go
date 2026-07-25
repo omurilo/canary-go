@@ -39,6 +39,8 @@ var vocationMethods = map[string]lua.LGFunction{
 	"getAttackSpeed":         vocationGetAttackSpeed,
 	"getBaseAttackSpeed":     vocationGetAttackSpeed,
 	"getBaseSpeed":           vocationGetBaseSpeed,
+	"getSoulMax":             vocationGetSoulMax,
+	"getSoulGainTicks":       vocationGetSoulGainTicks,
 	"getDemotion":            vocationGetDemotion,
 	"getPromotion":           vocationGetPromotion,
 }
@@ -164,6 +166,20 @@ func vocationGetAttackSpeed(L *lua.LState) int {
 func vocationGetBaseSpeed(L *lua.LState) int {
 	v := checkVocation(L)
 	L.Push(lua.LNumber(v.BaseSpeed))
+	return 1
+}
+
+// Vocation:getSoulMax()
+func vocationGetSoulMax(L *lua.LState) int {
+	v := checkVocation(L)
+	L.Push(lua.LNumber(v.SoulMax))
+	return 1
+}
+
+// Vocation:getSoulGainTicks()
+func vocationGetSoulGainTicks(L *lua.LState) int {
+	v := checkVocation(L)
+	L.Push(lua.LNumber(v.GainSoulTicks))
 	return 1
 }
 

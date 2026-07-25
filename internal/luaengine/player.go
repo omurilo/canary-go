@@ -2764,11 +2764,20 @@ func playerGetbosscooldown(L *lua.LState) int {
 
 func playerOpenimbuementwindow(L *lua.LState) int {
 	p := checkPlayer(L)
-	if p == nil {
+	if p == nil || p.Session == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
-	return 1
+
+	action := game.ImbuementActionOpen
+	if L.GetTop() >= 2 {
+		action = game.ImbuementAction(luaOptInt(L, 2))
+	}
+
+	if session, ok := p.Session.(interface{ SendImbuementWindow(game.ImbuementAction, *game.Item) }); ok {
+		session.SendImbuementWindow(action, nil)
+	}
+
+	return 0
 }
 
 func playerOpenmarket(L *lua.LState) int {

@@ -430,6 +430,14 @@ func (g *GameProtocol) sendCoinBalance() {
 
 // dispatchStore forwards a store packet's payload (bytes after the opcode) to
 // the gamestore Lua module.
+func (g *GameProtocol) dispatchDailyReward(op byte, r *netmsg.Reader) {
+	if g.player == nil || g.deps == nil || g.deps.Lua == nil {
+		return
+	}
+	data := r.GetBytes(r.Remaining())
+	g.deps.Lua.DispatchDailyRewardPacket(g.player, op, data)
+}
+
 func (g *GameProtocol) dispatchStore(op byte, r *netmsg.Reader) {
 	if g.player == nil || g.deps == nil || g.deps.Lua == nil {
 		return
@@ -806,6 +814,14 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseBuyBlessing(r) // Buy blessing request  
 	case 0xD4:
 		g.parseSetOutfit(r) // Moved from 0xD3
+	case 0xD8, 0xD9, 0xDA:
+		g.dispatchDailyReward(op, r)
+	case 0xD5:
+		g.parseImbuementApply(r)
+	case 0xD6:
+		g.parseImbuementClear(r)
+	case 0xD7:
+		g.parseCloseImbuementWindow(r)
 	case 0xE5:
 		g.parseCyclopediaCharacterInfo(r)
 	case 0xBF:
@@ -816,10 +832,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parsePreyAction(r)
 	case 0xE7:
 		g.parseWheelGemAction(r)
-	case 0xEC:
+	case 0xB2:
 		g.parseImbuementAction(r)
-	case 0xED:
-		g.parseImbuementOpen(r)
 	case 0xBA:
 		g.parseTaskHuntingAction(r)
 	case 0xAE:

@@ -15,6 +15,15 @@ type luaItemType struct {
 func (e *Engine) registerItemType() {
 	mt := e.L.NewTypeMetatable(itemTypeClassName)
 	methods := map[string]lua.LGFunction{
+		"getArticle": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil && it.item.Article != "" {
+				L.Push(lua.LString(it.item.Article))
+			} else {
+				L.Push(lua.LString(""))
+			}
+			return 1
+		},
 		"getName": func(L *lua.LState) int {
 			it := checkItemType(L, 1)
 			if it.item != nil && it.item.Name != "" {
@@ -35,8 +44,12 @@ func (e *Engine) registerItemType() {
 			return 1
 		},
 		"getWeight": func(L *lua.LState) int {
-			_ = checkItemType(L, 1)
-			L.Push(lua.LNumber(0))
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LNumber(it.item.GetWeight()))
+			} else {
+				L.Push(lua.LNumber(0))
+			}
 			return 1
 		},
 		"isStackable": func(L *lua.LState) int {

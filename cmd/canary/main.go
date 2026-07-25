@@ -24,6 +24,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/db"
 	"github.com/opentibiabr/canary-go/internal/events"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/game/imbuements"
 	"github.com/opentibiabr/canary-go/internal/game/spawns"
 	"github.com/opentibiabr/canary-go/internal/game/vocations"
 	"github.com/opentibiabr/canary-go/internal/items"
@@ -147,6 +148,14 @@ func run(o runOpts, log *slog.Logger) error {
 	}
 	if bb, err := database.GetBoostedBoss(ctx); err == nil && bb != "" && bb != "default" {
 		world.BoostedBoss = bb
+	}
+
+	imbPath := filepath.Join(filepath.Dir(filepath.Dir(o.appearances)), "XML", "imbuements.xml")
+	if imbReg, err := imbuements.LoadRegistry(imbPath); err != nil {
+		log.Warn("imbuements not loaded", "path", imbPath, "err", err)
+	} else {
+		world.Imbuements = imbReg
+		log.Info("imbuements loaded", "imbuements", len(imbReg.GetAllImbuements()))
 	}
 
 	creatureTypes := creatures.NewTypeRegistry()
@@ -439,6 +448,24 @@ func run(o runOpts, log *slog.Logger) error {
 					log.Warn("loading core bootstrap", "file", p, "err", err)
 				}
 			}
+		}
+		// Load core module scripts that are required by action scripts (e.g.
+		// daily_reward module defines the DailyReward global used by the shrine
+		// action). These must be loaded BEFORE the core scripts directory.
+		modulesDir := filepath.Join(coreData, "modules", "scripts")
+		if entries, err := os.ReadDir(modulesDir); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() && entry.Name() != "gamestore" {
+					modFile := filepath.Join(modulesDir, entry.Name(), entry.Name()+".lua")
+					if _, statErr := os.Stat(modFile); statErr == nil {
+						if err := lengine.DoFile(modFile); err != nil {
+							log.Warn("loading module script", "module", entry.Name(), "err", err)
+						}
+					}
+				}
+			}
+		} else {
+			log.Warn("modules scripts dir not found", "dir", modulesDir)
 		}
 		for _, sub := range []string{"lib", "libs", "npclib", "scripts"} {
 			d := filepath.Join(coreData, sub)

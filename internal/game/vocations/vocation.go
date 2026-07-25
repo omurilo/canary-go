@@ -31,6 +31,8 @@ type Vocation struct {
 	AttackSpeed    int             `xml:"attackspeed,attr"`
 	ManaMultiplier float64         `xml:"manamultiplier,attr"`
 	BaseSpeed      int             `xml:"basespeed,attr"`
+	SoulMax        uint8           `xml:"soulmax,attr"`
+	GainSoulTicks  uint32          `xml:"gainsoulticks,attr"`
 	Formula        VocationFormula `xml:"formula"`
 	Skills         []VocationSkill `xml:"skill"`
 }

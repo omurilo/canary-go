@@ -301,6 +301,10 @@ type Player struct {
 	ChaseMode  bool  // true = follow, false = stand
 	SecureMode bool  // true = secure, false = unmarked attack allowed
 
+	// ImbuingItem is the item currently being imbued, set when the player opens
+	// the imbuement window with a selected item (C++ Player::m_imbuingItem).
+	ImbuingItem *Item
+
 	World   *World
 	Session Session
 	KVStore map[string]any

@@ -2,6 +2,15 @@ package game
 
 import "time"
 
+// ImbuementAction mirrors C++ enum class ImbuementAction : uint8_t
+type ImbuementAction uint8
+
+const (
+	ImbuementActionOpen     ImbuementAction = 0
+	ImbuementActionPickItem ImbuementAction = 1
+	ImbuementActionScroll   ImbuementAction = 2
+)
+
 // Imbuement types
 const (
 	ImbuementNone         uint8 = 0
