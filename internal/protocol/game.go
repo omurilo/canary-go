@@ -795,7 +795,9 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case 0xCD:
 		g.parseInspectionObject(r)
 	case 0xCE:
-		g.parseInspectPlayer(r)
+		g.parseVIPAdd(r)
+	case 0xCF:
+		g.parseVIPRemove(r)
 	case 0xD2:
 		g.SendOutfitWindow()
 	case 0xD3:

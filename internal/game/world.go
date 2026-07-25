@@ -293,11 +293,23 @@ func (w *World) RemovePlayer(id uint32) {
 	w.mu.Unlock()
 }
 
-// PlayerByID returns an online player or nil.
+// PlayerByID returns an online player or nil (by creature ID).
 func (w *World) PlayerByID(id uint32) *Player {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	return w.players[id]
+}
+
+// PlayerByDBID returns an online player or nil (by DB ID).
+func (w *World) PlayerByDBID(dbID uint32) *Player {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	for _, p := range w.players {
+		if p != nil && p.DBID == dbID {
+			return p
+		}
+	}
+	return nil
 }
 
 // CreatureByID returns a creature or nil.
