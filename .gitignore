@@ -1,3 +1,4 @@
 bin
-*.otbm
+data-otservbr-global/world/otservbr.otbm
 *:Zone.Identifier
+canary

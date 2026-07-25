@@ -23,7 +23,7 @@ services:
     volumes:
       - db-volume:/var/lib/mysql
       # Canonical Canary schema so MyAAC/login-server find every table.
-      - ../schema/mysql.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ../schema/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     # networks: [canary-net]
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
@@ -49,7 +49,6 @@ services:
     volumes:
       - ../config.lua:/app/config.lua:ro
       - ../data:/app/data:ro
-      - ../data-canary:/app/data-canary:ro
       - ../data-otservbr-global:/app/data-otservbr-global:ro
     depends_on:
       db:
@@ -84,8 +83,7 @@ services:
     volumes:
       - ../ip.txt:/var/www/html/install/ip.txt
       - ../config.lua:/canary/config.lua
-      - ../data:/canary/data:ro
-      - ../data-canary:/canary/data-canary:ro
+      - ../data:/canary/data
       - ../data-otservbr-global:/canary/data-otservbr-global:ro
 
     depends_on:
