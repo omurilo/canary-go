@@ -150,6 +150,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	_ = d.LoadPlayerCharms(ctx, p)
 	_ = d.LoadPlayerSpells(ctx, p)
 	_ = d.LoadPlayerVIP(ctx, p)
+	_ = d.LoadPlayerDepot(ctx, p)
 
 	return p, nil
 }
@@ -330,6 +331,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	_ = d.SaveAccountCoins(ctx, p)
 	_ = d.SavePlayerSpells(ctx, p)
 	_ = d.SavePlayerVIP(ctx, p)
+	_ = d.SavePlayerDepot(ctx, p)
 
 	return d.SavePlayerItems(ctx, p)
 }

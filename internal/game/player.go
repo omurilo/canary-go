@@ -170,6 +170,9 @@ type Player struct {
 	// DepotLockers holds the player's depots by depot ID.
 	DepotLockers map[uint16]*Item
 
+	// DepotManager manages all depot lockers across all towns
+	DepotManager *PlayerDepotManager
+
 	// Stash holds the player's supply stash items (ItemID -> Count).
 	Stash map[uint16]uint32
 
