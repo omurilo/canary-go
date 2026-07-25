@@ -28,10 +28,10 @@ func (g *GameProtocol) SendVIPList() {
 		w.AddU32(entry.PlayerID)
 		w.AddString(entry.PlayerName)
 		w.AddByte(entry.Icon)
-		w.AddByte(boolToByte(entry.Notify))
+		w.AddByte(boolByte(entry.Notify))
 
 		online := g.playerOnlineInVIP(entry.PlayerID)
-		w.AddByte(boolToByte(online))
+		w.AddByte(boolByte(online))
 
 		w.AddU16(uint16(len(entry.Groups)))
 		for _, gid := range entry.Groups {

@@ -790,7 +790,7 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseLootContainer(r)
 	case 0x91:
 		g.parseQuickLootBlackWhitelist(r)
-	case 0xB3, 0xD0: // Telemetry / client checks (quest log / bestiary / resource balance)
+	case 0xB3: // Telemetry / client checks (quest log / bestiary / resource balance)
 		// Handled gracefully without error
 	case 0xCD:
 		g.parseInspectionObject(r)
@@ -798,6 +798,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseVIPAdd(r)
 	case 0xCF:
 		g.parseVIPRemove(r)
+	case 0xD0:
+		g.parseOpenRewardChest(r)
 	case 0xD2:
 		g.SendOutfitWindow()
 	case 0xD3:
