@@ -25,7 +25,7 @@ func (e *Engine) registerGuildType() {
 
 	e.L.SetGlobal("Guild", e.L.NewFunction(func(L *lua.LState) int {
 		id := uint32(L.CheckInt(1))
-		guild := e.deps.World.GetGuild(id)
+		guild := e.world.GetGuild(id)
 		if guild == nil {
 			L.Push(lua.LNil)
 			return 1

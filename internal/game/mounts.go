@@ -18,7 +18,7 @@ func (p *Player) AddMount(mountID uint16) bool {
 	p.Mounts[mountID] = true
 	
 	tmpMountID := mountID - 1
-	storageKey := uint32(StorageMountsRangeStart + (tmpMountID / 31))
+	storageKey := StorageMountsRangeStart + uint32(tmpMountID / 31)
 	
 	value := p.GetStorageValue(storageKey)
 	if value == -1 {
@@ -38,7 +38,7 @@ func (p *Player) RemoveMount(mountID uint16) bool {
 	delete(p.Mounts, mountID)
 	
 	tmpMountID := mountID - 1
-	storageKey := uint32(StorageMountsRangeStart + (tmpMountID / 31))
+	storageKey := StorageMountsRangeStart + uint32(tmpMountID / 31)
 	
 	value := p.GetStorageValue(storageKey)
 	if value == -1 {
@@ -61,7 +61,7 @@ func (p *Player) HasMount(mountID uint16) bool {
 	}
 	
 	tmpMountID := mountID - 1
-	storageKey := uint32(StorageMountsRangeStart + (tmpMountID / 31))
+	storageKey := StorageMountsRangeStart + uint32(tmpMountID / 31)
 	value := p.GetStorageValue(storageKey)
 	if value == -1 {
 		return false

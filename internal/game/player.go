@@ -1661,25 +1661,6 @@ func (p *Player) CanFightBoss(boss string, now int64) bool {
 	return now >= p.GetBossCooldown(boss)
 }
 
-func (p *Player) AddMount(mountID uint16) {
-	if p.Mounts == nil {
-		p.Mounts = make(map[uint16]bool)
-	}
-	p.Mounts[mountID] = true
-}
-
-func (p *Player) HasMount(mountID uint16) bool {
-	if p.Mounts == nil {
-		return false
-	}
-	return p.Mounts[mountID]
-}
-
-func (p *Player) RemoveMount(mountID uint16) {
-	if p.Mounts != nil {
-		delete(p.Mounts, mountID)
-	}
-}
 
 // VIPEntry represents a single player added to the VIP list.
 type VIPEntry struct {
