@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"strings"
+
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/game/imbuements"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
@@ -129,7 +131,8 @@ func (g *GameProtocol) addAvailableImbuementsInfo(w *netmsg.Writer, item *game.I
 		}
 
 		if itemTiers != nil {
-			maxTier, ok := itemTiers[cat.Name]
+			lookupKey := normalizeImbuementCatName(cat.Name)
+			maxTier, ok := itemTiers[lookupKey]
 			if !ok {
 				continue
 			}
@@ -226,4 +229,14 @@ func (g *GameProtocol) applyImbuement(slot uint8, imbuementID uint16) {
 func (g *GameProtocol) clearImbuementSlot(slot uint8) {
 	g.player.ImbuingItem = nil
 	g.player.SendTextMessage(0x13, "Imbuement cleared.")
+}
+
+func normalizeImbuementCatName(name string) string {
+	key := strings.ToLower(name)
+	key = strings.ReplaceAll(key, "(", "")
+	key = strings.ReplaceAll(key, ")", "")
+	if strings.HasPrefix(key, "skillboost ") && strings.HasSuffix(key, " fighting") {
+		key = strings.TrimSuffix(key, " fighting")
+	}
+	return strings.TrimSpace(key)
 }
