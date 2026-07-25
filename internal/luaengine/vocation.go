@@ -10,7 +10,15 @@ import (
 func (e *Engine) registerVocation() {
 	mt := e.L.NewTypeMetatable("Vocation")
 	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), vocationMethods))
-	e.L.SetGlobal("Vocation", mt)
+	e.setClassConstructor("Vocation", func(L *lua.LState) int {
+		var id uint32
+		if L.GetTop() >= 1 && L.Get(1).Type() == lua.LTNumber {
+			id = uint32(L.CheckNumber(1))
+		}
+		voc := vocations.GetVocation(id)
+		pushVocation(L, voc)
+		return 1
+	}, nil)
 }
 
 var vocationMethods = map[string]lua.LGFunction{

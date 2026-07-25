@@ -3674,6 +3674,14 @@ func playerSetskilllevel(L *lua.LState) int {
 		return 1
 	}
 	p.Skills[skill] = uint16(luaOptInt(L, 3))
+	if L.GetTop() >= 4 {
+		p.SkillTries[skill] = uint64(luaOptInt(L, 4))
+	}
+	game.GlobalDispatcher.AddEvent(0, func() {
+		if p.Session != nil {
+			p.Session.SendSkills()
+		}
+	})
 	L.Push(lua.LTrue)
 	return 1
 }

@@ -1344,15 +1344,22 @@ func (p *Player) AddSkillTries(skill Skill, tries uint64) {
 			break
 		}
 
-		base := uint64(50)
-		multiplier := 1.1
-		switch skill {
-		case SkillDistance:
-			multiplier = 1.2
-		case SkillShielding:
-			multiplier = 1.1
-		default:
-			multiplier = 1.1
+		voc := vocations.GetVocation(uint32(p.Vocation))
+		multiplier := 1.1 // fallback
+		if voc != nil {
+			for _, s := range voc.Skills {
+				if s.ID == int(skill) {
+					multiplier = s.Multiplier
+					break
+				}
+			}
+		}
+
+		var base uint64 = 50
+		if skill == SkillShielding {
+			base = 100
+		} else if skill == SkillFishing {
+			base = 20
 		}
 
 		var req uint64
