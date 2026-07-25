@@ -83,8 +83,8 @@ services:
     volumes:
       - ../ip.txt:/var/www/html/install/ip.txt
       - ../config.lua:/canary/config.lua
-      - ../data:/canary/data
-      - ../data-otservbr-global:/canary/data-otservbr-global:ro
+      - ../data/items/items.xml:/canary/data/items/items.xml
+      - ../data-otservbr-global:/canary/data
 
     depends_on:
       db:

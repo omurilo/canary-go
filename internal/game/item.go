@@ -1,8 +1,10 @@
 package game
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/opentibiabr/canary-go/internal/io/propstream"
 	"github.com/opentibiabr/canary-go/internal/items"
 )
 
@@ -42,6 +44,16 @@ type Item struct {
 	Pagination bool
 	Parent     *Item
 	Actor      bool
+
+	// Imbuements maps slot index to the applied imbuement on this item instance.
+	// The map is nil when no imbuements have ever been set on this item.
+	Imbuements map[uint8]ImbuementInfo
+}
+
+// ImbuementInfo holds an applied imbuement's identity and remaining duration.
+type ImbuementInfo struct {
+	ID       uint16
+	Duration uint32
 }
 
 // ContainerCapacity returns the container's slot capacity, preferring the
@@ -116,6 +128,195 @@ func (i *Item) GetTier() uint8 {
 		return 0
 	}
 	return *i.Attr.Tier
+}
+
+func (i *Item) GetImbuementInfo(slot uint8) (ImbuementInfo, bool) {
+	if i == nil || i.Imbuements == nil {
+		return ImbuementInfo{}, false
+	}
+	info, ok := i.Imbuements[slot]
+	if !ok || info.Duration == 0 || info.ID == 0 {
+		return ImbuementInfo{}, false
+	}
+	return info, true
+}
+
+func (i *Item) SetImbuement(slot uint8, id uint16, duration uint32) {
+	if i == nil {
+		return
+	}
+	if i.Imbuements == nil {
+		i.Imbuements = make(map[uint8]ImbuementInfo)
+	}
+	i.Imbuements[slot] = ImbuementInfo{ID: id, Duration: duration}
+}
+
+func (i *Item) ClearImbuement(slot uint8) {
+	if i == nil || i.Imbuements == nil {
+		return
+	}
+	delete(i.Imbuements, slot)
+}
+
+func (i *Item) HasImbuements() bool {
+	if i == nil || i.Imbuements == nil {
+		return false
+	}
+	for _, info := range i.Imbuements {
+		if info.Duration > 0 && info.ID > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+const (
+	attrCustomTag        = 41 // ATTR_CUSTOM
+	imbuementCustomKeyBase = 500 // ITEM_IMBUEMENT_SLOT
+)
+
+// EncodeImbuementBlob encodes the item's imbuements into an ATTR_CUSTOM
+// attribute blob suitable for appending to the item's attribute stream.
+// Returns nil when imbuements is empty.
+func EncodeImbuementBlob(imbMap map[uint8]ImbuementInfo) []byte {
+	if len(imbMap) == 0 {
+		return nil
+	}
+	w := propstream.NewPropWriteStream()
+	w.WriteUint8(attrCustomTag)
+	w.WriteUint64(uint64(len(imbMap)))
+	for slot, info := range imbMap {
+		key := fmt.Sprintf("%d", imbuementCustomKeyBase+int(slot))
+		w.WriteString(key)
+		w.WriteUint8(2) // type: int64
+		packed := int64(info.Duration)<<8 | int64(info.ID)
+		w.WriteInt64(packed)
+	}
+	return w.GetStream()
+}
+
+// DecodeImbuementBlob scans a raw item attribute blob for ATTR_CUSTOM sections
+// containing imbuement entries (key == "500"+slot). Returns the decoded map.
+// Uses a simple byte scan to find ATTR_CUSTOM (0x29) markers.
+func DecodeImbuementBlob(blob []byte) map[uint8]ImbuementInfo {
+	result := make(map[uint8]ImbuementInfo)
+	if len(blob) == 0 {
+		return nil
+	}
+	r := propstream.NewPropStream(blob)
+	for r.Size() > 0 {
+		tag, err := r.ReadUint8()
+		if err != nil {
+			break
+		}
+		if tag == 0 {
+			break
+		}
+		if tag != attrCustomTag {
+			if !skipAttrTag(r, tag) {
+				break
+			}
+			continue
+		}
+		count, err := r.ReadUint64()
+		if err != nil {
+			break
+		}
+		for i := uint64(0); i < count; i++ {
+			key, err := r.ReadString()
+			if err != nil {
+				break
+			}
+			valType, err := r.ReadUint8()
+			if err != nil {
+				break
+			}
+			switch valType {
+			case 1: // string
+				if _, err := r.ReadString(); err != nil {
+					return nil
+				}
+			case 2: // int64
+				packed, err := r.ReadInt64()
+				if err != nil {
+					return nil
+				}
+				slot, ok := isImbuementKey(key)
+				if !ok {
+					continue
+				}
+				id := uint16(uint64(packed) & 0xFF)
+				duration := uint32(uint64(packed) >> 8)
+				if id > 0 && duration > 0 {
+					result[slot] = ImbuementInfo{ID: id, Duration: duration}
+				}
+			default:
+				r.Skip(8)
+			}
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+func skipAttrTag(r *propstream.PropStream, tag uint8) bool {
+	switch tag {
+	case attrStore: // u32
+		_, err := r.ReadUint32()
+		return err == nil
+	case attrActionID: // u16
+		_, err := r.ReadUint16()
+		return err == nil
+	case attrUniqueID: // u16
+		_, err := r.ReadUint16()
+		return err == nil
+	case attrText, attrDesc, attrTeleDest, attrSpecial, attrStoreInboxCategory: // string
+		_, err := r.ReadString()
+		return err == nil
+	case attrDepotID: // u16
+		_, err := r.ReadUint16()
+		return err == nil
+	case attrRuneCharges, attrCount: // u16
+		_, err := r.ReadUint16()
+		return err == nil
+	case attrDuration: // u32
+		_, err := r.ReadUint32()
+		return err == nil
+	case attrAmount: // u16
+		_, err := r.ReadUint16()
+		return err == nil
+	case attrOwner: // u32
+		_, err := r.ReadUint32()
+		return err == nil
+	case attrQuickLootContainer: // u32
+		_, err := r.ReadUint32()
+		return err == nil
+	case attrObtainContainer: // u32
+		_, err := r.ReadUint32()
+		return err == nil
+	default:
+		return false
+	}
+}
+
+func isImbuementKey(key string) (uint8, bool) {
+	if len(key) < 3 {
+		return 0, false
+	}
+	// key should be numeric, base 500 + slot
+	n := 0
+	for _, c := range key {
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+		n = n*10 + int(c-'0')
+	}
+	if n < imbuementCustomKeyBase {
+		return 0, false
+	}
+	return uint8(n - imbuementCustomKeyBase), true
 }
 
 // SetTier sets the forge tier of the item.

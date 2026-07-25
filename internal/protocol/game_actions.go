@@ -945,6 +945,34 @@ func BuildItemDescription(viewer *game.Player, item *game.Item, catalog *items.C
 		}
 	}
 
+	// Imbuements
+	imbReg := viewer.GetWorld().Imbuements
+	if imbSlots, ok := itemType.Stats["imbuementslot"]; ok && imbSlots > 0 {
+		s.WriteString("\nImbuements: (")
+		for slot := uint8(0); slot < uint8(imbSlots); slot++ {
+			if slot > 0 {
+				s.WriteString(", ")
+			}
+			info, found := item.GetImbuementInfo(slot)
+			if !found {
+				s.WriteString("Empty Slot")
+				continue
+			}
+			imb := imbReg.GetImbuement(info.ID)
+			if imb == nil {
+				continue
+			}
+			baseImb := imbReg.GetBaseByID(imb.BaseID)
+			if baseImb == nil {
+				continue
+			}
+			minutes := info.Duration / 60
+			hours := minutes / 60
+			s.WriteString(fmt.Sprintf("%s %s %02d:%02dh", baseImb.Name, imb.Name, hours, minutes%60))
+		}
+		s.WriteString(").")
+	}
+
 	// Weight statistics
 	weight := item.GetWeight(catalog)
 	if weight > 0 {

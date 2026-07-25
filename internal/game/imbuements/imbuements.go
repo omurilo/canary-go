@@ -37,6 +37,7 @@ type Imbuement struct {
 	IconID      uint16
 	Premium     bool
 	Description string
+	SubGroup    string
 	EffectType  string
 	EffectValue int32
 	Items       []ImbuementItem
@@ -110,6 +111,7 @@ type xmlImbuementEl struct {
 	Name       string          `xml:"name,attr"`
 	Base       uint16          `xml:"base,attr"`
 	Category   uint8           `xml:"category,attr"`
+	SubGroup   string          `xml:"subgroup,attr"`
 	IconID     uint16          `xml:"iconid,attr"`
 	Premium    uint8           `xml:"premium,attr"`
 	Storage    uint32          `xml:"storage,attr"`
@@ -193,6 +195,7 @@ func LoadRegistry(path string) (*Registry, error) {
 			Name:        imb.Name,
 			BaseID:      imb.Base,
 			CategoryID:  imb.Category,
+			SubGroup:    imb.SubGroup,
 			IconID:      imb.IconID,
 			Premium:     imb.Premium != 0,
 			Description: desc,

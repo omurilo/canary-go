@@ -152,6 +152,9 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 			} else if len(item.Attributes) > 0 {
 				attrs = item.Attributes
 			}
+			if imbBlob := game.EncodeImbuementBlob(item.Imbuements); len(imbBlob) > 0 {
+				attrs = append(attrs, imbBlob...)
+			}
 
 			if _, err := stmt.ExecContext(ctx, p.DBID, pid, sid, item.ID, item.Count, attrs); err != nil {
 				return err
