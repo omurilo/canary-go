@@ -817,7 +817,9 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case 0xE7:
 		g.parseWheelGemAction(r)
 	case 0xEC:
-		g.parseWheelOfDestiny(r)
+		g.parseImbuementAction(r)
+	case 0xED:
+		g.parseImbuementOpen(r)
 	case 0xBA:
 		g.parseTaskHuntingAction(r)
 	case 0xAE:
