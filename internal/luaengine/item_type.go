@@ -131,6 +131,49 @@ func (e *Engine) registerItemType() {
 			L.Push(lua.LFalse)
 			return 1
 		},
+		"getWeaponType": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := 0 // WEAPON_NONE
+			if it.item != nil {
+				switch it.item.WeaponType {
+				case "sword": val = 1
+				case "club": val = 2
+				case "axe": val = 3
+				case "shield": val = 4
+				case "distance": val = 5
+				case "wand": val = 6
+				case "ammunition": val = 7
+				}
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getAmmoType": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := 0 // AMMO_NONE
+			if it.item != nil {
+				switch it.item.AmmoType {
+				case "bolt": val = 1
+				case "arrow": val = 2
+				case "spear": val = 3
+				case "throwingstar": val = 4
+				case "throwingknife": val = 5
+				case "stone": val = 6
+				case "snowball": val = 7
+				}
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"isQuiver": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.IsQuiver))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
 	}
 
 	e.L.SetFuncs(mt, methods)
