@@ -197,6 +197,15 @@ type Player struct {
 	VIPList   []VIPEntry
 	VIPGroups []VIPGroup
 
+	// Achievements (B7) — map of achievement ID → unlock timestamp (unix).
+	Achievements map[uint16]int64
+	// Titles are string labels unlocked alongside achievements.
+	Titles []string
+
+	// Familiars (B15) — unlocked familiars for this player.
+	Familiars      []Familiar
+	ActiveFamiliar uint16 // lookType of active familiar (0 = none)
+
 	// BossPoints is the bosstiary points total (players.boss_points), earned by
 	// reaching boss unlock levels and spent implicitly via the loot bonus.
 	BossPoints uint32

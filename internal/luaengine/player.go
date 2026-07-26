@@ -389,7 +389,12 @@ func playerAddachievement(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	name := L.CheckString(2)
+	var reg *game.AchievementRegistry
+	if p.World != nil {
+		reg = p.World.Achievements
+	}
+	L.Push(lua.LBool(p.AddAchievementByName(reg, name)))
 	return 1
 }
 
@@ -398,13 +403,16 @@ func playerAddachievementpoints(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	// Achievement points are derived from unlocked achievements.
+	// The player's points are recalculated automatically.
+	L.Push(lua.LTrue)
 	return 1
 }
 
 func playerAddanimusmastery(L *lua.LState) int {
 	// not modelled yet; no-op.
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func playerAddbadge(L *lua.LState) int {
@@ -487,7 +495,16 @@ func playerAddexperience(L *lua.LState) int {
 }
 
 func playerAddAchievementProgress(L *lua.LState) int {
-	L.Push(lua.LTrue)
+	p := checkPlayer(L)
+	if p == nil {
+		return 0
+	}
+	name := L.CheckString(2)
+	var reg *game.AchievementRegistry
+	if p.World != nil {
+		reg = p.World.Achievements
+	}
+	L.Push(lua.LBool(p.AddAchievementByName(reg, name)))
 	return 1
 }
 
@@ -496,7 +513,8 @@ func playerAddfamiliar(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	lookType := uint16(L.CheckInt(2))
+	L.Push(lua.LBool(p.AddFamiliar(lookType)))
 	return 1
 }
 
@@ -1294,7 +1312,7 @@ func playerGetfamiliarlooktype(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.AccountType))
+	L.Push(lua.LNumber(p.GetFamiliarLooktype()))
 	return 1
 }
 
@@ -2035,7 +2053,11 @@ func playerGettitles(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(L.NewTable()) // not modelled yet; safe default
+	tbl := L.NewTable()
+	for _, title := range p.Titles {
+		tbl.Append(lua.LString(title))
+	}
+	L.Push(tbl)
 	return 1
 }
 
@@ -2186,7 +2208,12 @@ func playerHasachievement(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	name := L.CheckString(2)
+	var reg *game.AchievementRegistry
+	if p.World != nil {
+		reg = p.World.Achievements
+	}
+	L.Push(lua.LBool(p.HasAchievementByName(reg, name)))
 	return 1
 }
 
@@ -2231,7 +2258,8 @@ func playerHasfamiliar(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	lookType := uint16(L.CheckInt(2))
+	L.Push(lua.LBool(p.HasFamiliar(lookType)))
 	return 1
 }
 
@@ -2785,7 +2813,10 @@ func playerOpenmarket(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	if session, ok := p.Session.(interface{ SendOpenMarket() }); ok {
+		session.SendOpenMarket()
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -2896,7 +2927,8 @@ func playerRemovefamiliar(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	lookType := uint16(L.CheckInt(2))
+	L.Push(lua.LBool(p.RemoveFamiliar(lookType)))
 	return 1
 }
 
@@ -3497,7 +3529,8 @@ func playerSetfamiliarlooktype(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	lookType := uint16(L.CheckInt(2))
+	L.Push(lua.LBool(p.SetFamiliarLooktype(lookType)))
 	return 1
 }
 

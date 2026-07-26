@@ -37,6 +37,9 @@ type World struct {
 	Monsters *creatures.TypeRegistry
 	Charms *charms.Registry
 	Imbuements *imbuements.Registry
+	Achievements *AchievementRegistry
+	Houses       map[uint32]*House
+	Market       *Market
 	Decay *DecayManager
 
 	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldTileIndex int)

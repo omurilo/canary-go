@@ -502,12 +502,119 @@ func (e *Engine) gameGetDummies(L *lua.LState) int {
 }
 func (e *Engine) gameGetTalkActions(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetEventCallbacks(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
-func (e *Engine) gameRegisterAchievement(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetAchievementInfoById(L *lua.LState) int { L.Push(lua.LNil); return 1 }
-func (e *Engine) gameGetAchievementInfoByName(L *lua.LState) int { L.Push(lua.LNil); return 1 }
-func (e *Engine) gameGetSecretAchievements(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
-func (e *Engine) gameGetPublicAchievements(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
-func (e *Engine) gameGetAchievements(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameRegisterAchievement(L *lua.LState) int {
+	name := L.CheckString(1)
+	description := L.CheckString(2)
+	secret := L.OptBool(3, false)
+	points := uint8(L.OptInt(4, 1))
+	if e.world == nil {
+		return 0
+	}
+	reg := e.world.Achievements
+	if reg == nil {
+		return 0
+	}
+	id := reg.Register(name, description, secret, points)
+	L.Push(lua.LNumber(id))
+	return 1
+}
+
+func (e *Engine) gameGetAchievementInfoById(L *lua.LState) int {
+	if e.world == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	id := uint16(L.CheckInt(1))
+	a := e.world.Achievements.GetByID(id)
+	if a == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	tbl := L.NewTable()
+	tbl.RawSetString("id", lua.LNumber(a.ID))
+	tbl.RawSetString("name", lua.LString(a.Name))
+	tbl.RawSetString("description", lua.LString(a.Description))
+	tbl.RawSetString("secret", lua.LBool(a.Secret))
+	tbl.RawSetString("points", lua.LNumber(a.Points))
+	L.Push(tbl)
+	return 1
+}
+
+func (e *Engine) gameGetAchievementInfoByName(L *lua.LState) int {
+	if e.world == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	name := L.CheckString(1)
+	a := e.world.Achievements.GetByName(name)
+	if a == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	tbl := L.NewTable()
+	tbl.RawSetString("id", lua.LNumber(a.ID))
+	tbl.RawSetString("name", lua.LString(a.Name))
+	tbl.RawSetString("description", lua.LString(a.Description))
+	tbl.RawSetString("secret", lua.LBool(a.Secret))
+	tbl.RawSetString("points", lua.LNumber(a.Points))
+	L.Push(tbl)
+	return 1
+}
+
+func (e *Engine) gameGetSecretAchievements(L *lua.LState) int {
+	tbl := L.NewTable()
+	if e.world == nil || e.world.Achievements == nil {
+		L.Push(tbl)
+		return 1
+	}
+	for _, a := range e.world.Achievements.SecretAchievements() {
+		item := L.NewTable()
+		item.RawSetString("id", lua.LNumber(a.ID))
+		item.RawSetString("name", lua.LString(a.Name))
+		item.RawSetString("description", lua.LString(a.Description))
+		item.RawSetString("points", lua.LNumber(a.Points))
+		tbl.Append(item)
+	}
+	L.Push(tbl)
+	return 1
+}
+
+func (e *Engine) gameGetPublicAchievements(L *lua.LState) int {
+	tbl := L.NewTable()
+	if e.world == nil || e.world.Achievements == nil {
+		L.Push(tbl)
+		return 1
+	}
+	for _, a := range e.world.Achievements.PublicAchievements() {
+		item := L.NewTable()
+		item.RawSetString("id", lua.LNumber(a.ID))
+		item.RawSetString("name", lua.LString(a.Name))
+		item.RawSetString("description", lua.LString(a.Description))
+		item.RawSetString("points", lua.LNumber(a.Points))
+		tbl.Append(item)
+	}
+	L.Push(tbl)
+	return 1
+}
+
+func (e *Engine) gameGetAchievements(L *lua.LState) int {
+	tbl := L.NewTable()
+	if e.world == nil || e.world.Achievements == nil {
+		L.Push(tbl)
+		return 1
+	}
+	for _, a := range e.world.Achievements.AllAchievements() {
+		item := L.NewTable()
+		item.RawSetString("id", lua.LNumber(a.ID))
+		item.RawSetString("name", lua.LString(a.Name))
+		item.RawSetString("description", lua.LString(a.Description))
+		item.RawSetString("secret", lua.LBool(a.Secret))
+		item.RawSetString("points", lua.LNumber(a.Points))
+		tbl.Append(item)
+	}
+	L.Push(tbl)
+	return 1
+}
 func (e *Engine) gameGetSoulCoreItems(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetMonstersByRace(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetMonstersByBestiaryStars(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
