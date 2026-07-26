@@ -1648,7 +1648,44 @@ func (p *Player) UsePreyCards(amount uint32) bool {
 }
 
 func (p *Player) GetItemCount(id uint16) uint32 {
-	return 0
+	if p == nil {
+		return 0
+	}
+	var count uint32
+	// Scan inventory slots
+	for _, item := range p.Inventory {
+		if item != nil {
+			count += p.countItemInTree(item, id)
+		}
+	}
+	// Scan store inbox
+	if p.StoreInbox != nil {
+		count += p.countItemInTree(p.StoreInbox, id)
+	}
+	// Scan inbox
+	if p.Inbox != nil {
+		count += p.countItemInTree(p.Inbox, id)
+	}
+	return count
+}
+
+// countItemInTree recursively counts items matching the given ID in a container tree.
+func (p *Player) countItemInTree(item *Item, id uint16) uint32 {
+	if item == nil {
+		return 0
+	}
+	var count uint32
+	if item.ID == id {
+		if item.Count > 0 {
+			count += uint32(item.Count)
+		} else {
+			count++
+		}
+	}
+	for _, child := range item.Contents {
+		count += p.countItemInTree(child, id)
+	}
+	return count
 }
 
 func (p *Player) GetOpenContainers() map[uint8]OpenContainer {

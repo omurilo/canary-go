@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"runtime/debug"
+	"fmt"
 	"strings"
 	"log/slog"
 	"time"
@@ -141,6 +143,9 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	if item.ID == game.ItemMarket {
 		g.SendOpenMarket()
 		return
+	}
+	if item.ID == 21557 {
+		slog.Default().Info("parseUseItem CALLED FOR REWARD CHEST", "pos", pos, "index", index)
 	}
 
 	if t.IsContainer() {
@@ -339,6 +344,9 @@ func (g *GameProtocol) openContainerWithPos(item *game.Item, pos game.Position, 
 // the original protocol.
 func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool) {
 	slog.Default().Info("DEBUG: sendContainer CALLED", "cid", cid, "itemId", item.ID)
+	if item.ID == 21557 {
+		slog.Default().Info(fmt.Sprintf("STACK TRACE FOR 21557: \n%s", string(debug.Stack())))
+	}
 	t := g.deps.Items.Get(item.ID)
 	name := "Container"
 	movable := byte(0)

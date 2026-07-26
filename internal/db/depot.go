@@ -111,6 +111,10 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 			count = 1
 		}
 
+		if attrs == nil {
+			attrs = []byte{}
+		}
+
 		_, err := tx.ExecContext(ctx, insertQuery,
 			p.DBID, parentSID, sid, item.ID, count, attrs)
 		if err != nil {

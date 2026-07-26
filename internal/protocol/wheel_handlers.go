@@ -262,9 +262,46 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	// Send resource balance updates expected by Wheel UI
 	g.sendResourceBalance(0x00, g.player.BankBalance)
 	g.sendResourceBalance(0x01, uint64(g.player.GetMoney()))
-	g.sendResourceBalance(0x51, uint64(wheel.LesserFragments))   // RESOURCE_LESSER_GEMS
-	g.sendResourceBalance(0x52, uint64(wheel.RegularFragments))  // RESOURCE_REGULAR_GEMS
-	g.sendResourceBalance(0x53, uint64(wheel.GreaterFragments))  // RESOURCE_GREATER_GEMS
+	lesser, reg, greater := g.countInventoryGems()
+		g.sendResourceBalance(0x51, uint64(lesser))    // RESOURCE_LESSER_GEMS
+	g.sendResourceBalance(0x52, uint64(reg))       // RESOURCE_REGULAR_GEMS
+	g.sendResourceBalance(0x53, uint64(greater))   // RESOURCE_GREATER_GEMS
 	g.sendResourceBalance(0x54, uint64(wheel.LesserFragments))   // RESOURCE_LESSER_FRAGMENT
 	g.sendResourceBalance(0x55, uint64(wheel.GreaterFragments))  // RESOURCE_GREATER_FRAGMENT
+}
+
+// countInventoryGems scans the player's inventory for gem items and returns counts.
+func (g *GameProtocol) countInventoryGems() (lesser, regular, greater uint32) {
+	if g.player == nil || g.deps.Items == nil {
+		return 0, 0, 0
+	}
+	catalog := g.deps.Items
+	lesserNames := []string{
+		"lesser guardian gem", "lesser marksman gem", "lesser sage gem",
+		"lesser mystic gem", "lesser spiritualist gem",
+	}
+	regularNames := []string{
+		"guardian gem", "marksman gem", "sage gem",
+		"mystic gem", "spiritualist gem",
+	}
+	greaterNames := []string{
+		"greater guardian gem", "greater marksman gem", "greater sage gem",
+		"greater mystic gem", "greater spiritualist gem",
+	}
+	for _, name := range lesserNames {
+		if id, ok := catalog.IDByName(name); ok {
+			lesser += uint32(g.player.GetItemCount(id))
+		}
+	}
+	for _, name := range regularNames {
+		if id, ok := catalog.IDByName(name); ok {
+			regular += uint32(g.player.GetItemCount(id))
+		}
+	}
+	for _, name := range greaterNames {
+		if id, ok := catalog.IDByName(name); ok {
+			greater += uint32(g.player.GetItemCount(id))
+		}
+	}
+	return
 }
