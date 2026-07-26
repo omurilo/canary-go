@@ -290,6 +290,9 @@ func (g *GameProtocol) OnDisconnect(c *network.Connection) {
 		c.Logger().Warn("save on disconnect failed", "err", err)
 	}
 	g.deps.World.RemovePlayer(g.player.ID)
+		if err := g.deps.DB.RemovePlayerOnline(ctx, g.player.DBID); err != nil {
+			c.Logger().Debug("remove player_online", "err", err)
+		}
 	g.broadcastRemove(g.player)
 	c.Logger().Info("player logged out", "name", g.player.Name, "online", g.deps.World.OnlineCount())
 	g.player = nil
@@ -383,6 +386,9 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	}
 
 	if !g.deps.World.AddPlayer(player, g) {
+		if err := g.deps.DB.AddPlayerOnline(ctx, player.DBID, player.Name); err != nil {
+			c.Logger().Debug("add player_online", "err", err)
+		}
 		g.disconnect("You are already logged in.")
 		return
 	}

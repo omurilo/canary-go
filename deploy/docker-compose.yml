@@ -85,7 +85,7 @@ services:
       - ../config.lua:/canary/config.lua
       - ../data/items:/canary/data/items
       - ../data/XML:/canary/data/XML
-      - ../data-otservbr-global:/canary/data:ro
+      - ../data-otservbr-global:/canary/data
 
     depends_on:
       db:

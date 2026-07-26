@@ -98,3 +98,15 @@ func (d *DB) GetBoostedBoss(ctx context.Context) (string, error) {
 	}
 	return name, nil
 }
+
+// AddPlayerOnline registers a player as online in the players_online table.
+func (d *DB) AddPlayerOnline(ctx context.Context, playerID uint32, playerName string) error {
+	_, err := d.SQL.ExecContext(ctx, "INSERT IGNORE INTO players_online (player_id, player_name) VALUES (?, ?)", playerID, playerName)
+	return err
+}
+
+// RemovePlayerOnline removes a player from the players_online table.
+func (d *DB) RemovePlayerOnline(ctx context.Context, playerID uint32) error {
+	_, err := d.SQL.ExecContext(ctx, "DELETE FROM players_online WHERE player_id = ?", playerID)
+	return err
+}
