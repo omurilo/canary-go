@@ -24,8 +24,8 @@ const (
 	ItemDepotLocker = 2589
 
 	// Item IDs for depot chests (boxes inside lockers)
-	ItemDepotChestFirst = 2590
-	ItemDepotChestLast  = 2606
+	// Note: In Tibia, depot chests are all ID 3502, not a range
+	ItemDepotChest = 3502
 )
 
 // DepotLocker represents a town-specific depot locker container. It's a special
@@ -54,7 +54,7 @@ func (it *Item) IsDepotLocker() bool {
 
 // IsDepotChest returns true if this item is a depot chest (box).
 func (it *Item) IsDepotChest() bool {
-	return it != nil && it.ID >= ItemDepotChestFirst && it.ID <= ItemDepotChestLast
+	return it != nil && it.ID == ItemDepotChest
 }
 
 // GetOrCreateDepotChest returns the depot chest at the given index (0-16),
@@ -72,9 +72,8 @@ func (dl *DepotLocker) GetOrCreateDepotChest(index int) *Item {
 
 	// Create the chest if it doesn't exist
 	if dl.Contents[index] == nil {
-		chestID := uint16(ItemDepotChestFirst + index)
 		dl.Contents[index] = &Item{
-			ID:       chestID,
+			ID:       ItemDepotChest, // All depot chests use the same ID (3502)
 			Contents: make([]*Item, 0),
 		}
 	}

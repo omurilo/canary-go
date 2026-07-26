@@ -120,6 +120,12 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		return
 	}
 
+	// Special handling for depot lockers (item IDs 3497-3500)
+	if item.ID >= 3497 && item.ID <= 3500 {
+		g.handleDepotLocker(item, pos, index)
+		return
+	}
+
 	if t.IsContainer() {
 		if cid := g.player.GetContainerID(item); cid != -1 {
 			g.player.CloseContainer(uint8(cid))
