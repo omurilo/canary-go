@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"database/sql"
 	"errors"
 
@@ -267,6 +268,15 @@ func (d *DB) SavePlayerWheel(ctx context.Context, p *game.Player) error {
 		ws.WriteUint16(pts)
 	}
 	blob := ws.GetStream()
+
+	// Append JSON gem data after slot points
+	if gemJSON, err := json.Marshal(game.WheelGemPersistData{
+		ActiveGems:   p.Wheel.ActiveGems,
+		RevealedGems: p.Wheel.RevealedGems,
+	}); err == nil && len(gemJSON) > 2 {
+		blob = append(blob, gemJSON...)
+	}
+
 	const q = `INSERT INTO player_wheeldata (player_id, slot) VALUES (?, ?)
 	           ON DUPLICATE KEY UPDATE slot = VALUES(slot)`
 	_, err := d.SQL.ExecContext(ctx, q, p.DBID, blob)

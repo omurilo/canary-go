@@ -1,6 +1,8 @@
 package game
 
-import "sync"
+import (
+	"sync"
+)
 
 // WheelOfDestiny ports the Tibia 13.x Wheel of Destiny. The slot layout, the
 // per-slot / per-vocation stat table, the point budget, the save validation
@@ -200,12 +202,19 @@ type WheelBonusData struct {
 	Instants map[string]bool // unlocked wheel instants (inert until spells land)
 }
 
+// WheelGemPersistData holds serializable gem data for DB persistence.
+type WheelGemPersistData struct {
+	ActiveGems   [4]*PlayerWheelGem
+	RevealedGems []PlayerWheelGem
+}
 // WheelOfDestiny models the character progression tree.
 type WheelOfDestiny struct {
 	mu           sync.RWMutex
 	BonusPoints  uint16            // extra points from quests/scrolls (gated ≥ level 51 in C++)
 	ActivePreset uint8             // current preset (0-2)
 	SlotPoints   map[uint16]uint16 // slot id (1..36) -> allocated points
+	// GemData serialized gem persistence for DB save/load.
+	GemData WheelGemPersistData
 
 	// Gem Atelier — ActiveGems are placed in the 4 wheel slots (indexed by affinity).
 	ActiveGems   [4]*PlayerWheelGem // nil = empty slot
@@ -702,6 +711,3 @@ func purpleInstant(cip uint8) string {
 }
 
 // addRevelationBonus adds points to a revelation bonus (stub).
-func (w *WheelOfDestiny) addRevelationBonus(affinity WheelGemAffinity, points uint16) {
-	// TODO: implement revelation bonus system
-}

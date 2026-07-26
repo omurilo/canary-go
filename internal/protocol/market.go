@@ -58,9 +58,15 @@ func (g *GameProtocol) SendOpenMarket() {
 
 	g.SendToClient(w)
 
-	// C++ also sends updateCoinBalance and sendResourcesBalance after market enter.
-	g.sendCoinBalance()
+	// C++ sends sendResourcesBalance immediately.
 	g.sendResourcesBalance()
+	
+	// C++ queues updateCoinBalance to the dispatcher, so it executes on the next tick.
+	// This delay is critical because the Tibia client clears/initializes the Market UI on 0xF6.
+	// If 0xDF (Coins) arrives in the same frame or too quickly, it gets erased by the UI init.
+	time.AfterFunc(50*time.Millisecond, func() {
+		g.sendCoinBalance()
+	})
 }
 
 // collectDepotItems aggregates items from all depot chests by (itemId, tier).
@@ -392,14 +398,18 @@ func (g *GameProtocol) parseMarketCreateOffer(r *netmsg.Reader) {
 	}
 	offer.ID = dbID
 
-	// DB succeeded — now update in-memory state.
+	// DB succeeded — now update in-memory state and persist money/coins.
 	if game.MarketAction(offerType) == game.MarketActionBuy {
 		totalCost := price * uint64(amount)
 		fee := totalCost * marketFeePercent / 100
 		g.player.BankBalance -= totalCost + fee
+		
+		// Note: SavePlayer will save BankBalance on logout, but ideally we'd update immediately here.
 	} else {
 		if itemId == game.ItemStoreCoin {
 			g.player.CoinTransferable -= uint32(amount)
+			// Coins are in `accounts` table, not `players` table. We MUST update DB immediately.
+			_, _ = g.deps.DB.SQL.Exec("UPDATE `accounts` SET `coins_transferable` = ? WHERE `id` = ?", g.player.CoinTransferable, g.player.AccountID)
 		} else {
 			g.removeItemsFromDepot(itemId, amount, tier)
 		}
