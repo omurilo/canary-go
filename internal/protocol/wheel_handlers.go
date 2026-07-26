@@ -249,30 +249,46 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	w.AddByte(0) // monk quest bonus flag (u8 = 1 byte)
 	w.AddU16(0)  // monk quest bonus amount (u16 = 2 bytes)
 
-	// Gems section — send real gem data from the Wheel
-	// Gems section — active (4 slots) + revealed
+	// Gems section — C++ addGems format
 	if g.player.WheelGemManager == nil {
 		g.player.WheelGemManager = &game.WheelGemCollection{}
 	}
 	revealedGems := g.player.WheelGemManager.RevealedGems
 	activeGems := g.player.WheelGemManager.ActiveGems
-	activeCount := 0
-	for _, g := range activeGems {
-		if g != nil {
-			activeCount++
-		}
-	}
-	w.AddByte(byte(activeCount))
-	w.AddU16(uint16(len(revealedGems)))
+
+	// Active gems: count(u8), then gemIndex(u16) for each
+	var activeIndexes []uint16
 	for aff := 0; aff < 4; aff++ {
 		gem := activeGems[aff]
 		if gem == nil {
 			continue
 		}
-		w.AddU16(uint16(aff))
+		for i, rg := range revealedGems {
+			if rg.UUID == gem.UUID {
+				activeIndexes = append(activeIndexes, uint16(i))
+				break
+			}
+		}
+	}
+	w.AddByte(byte(len(activeIndexes)))
+	for _, idx := range activeIndexes {
+		w.AddU16(idx)
+	}
+
+	// Revealed gems: count(u16), then per: index(u16), locked(u8), affinity(u8), quality(u8), mod1(u8), [mod2(u8)], [supreme(u8)]
+	w.AddU16(uint16(len(revealedGems)))
+	for i, gem := range revealedGems {
+		w.AddU16(uint16(i))
+		if gem.Locked { w.AddByte(1) } else { w.AddByte(0) }
 		w.AddByte(uint8(gem.Affinity))
 		w.AddByte(uint8(gem.Quality))
-		if gem.Locked { w.AddByte(1) } else { w.AddByte(0) }
+		w.AddByte(uint8(gem.BasicModifier1))
+		if gem.Quality >= game.GemQualityRegular && gem.BasicModifier2 != nil {
+			w.AddByte(uint8(*gem.BasicModifier2))
+		}
+		if gem.Quality >= game.GemQualityGreater && gem.SupremeModifier != nil {
+			w.AddByte(uint8(*gem.SupremeModifier))
+		}
 	}
 
 	// Grade modifiers section — basic (46 entries) + supreme (23)

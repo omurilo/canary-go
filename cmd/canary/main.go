@@ -636,14 +636,19 @@ func run(o runOpts, log *slog.Logger) error {
 	}()
 
 	// Services.
-	loginSvc := network.NewService("login", fmt.Sprintf(":%d", cfg.LoginPort),
-		cfg.ServerName, protocol.NewLoginFactory(deps), log)
-	gameSvc := network.NewService("game", fmt.Sprintf(":%d", cfg.GamePort),
-		cfg.ServerName, protocol.NewGameFactory(deps), log)
+		loginSvc := network.NewService("login", fmt.Sprintf(":%d", cfg.LoginPort),
+			cfg.ServerName, protocol.NewLoginFactory(deps), log)
+		gameSvc := network.NewService("game", fmt.Sprintf(":%d", cfg.GamePort),
+			cfg.ServerName, protocol.NewGameFactory(deps), log)
 
-	errCh := make(chan error, 2)
-	go func() { errCh <- loginSvc.Start(ctx) }()
-	go func() { errCh <- gameSvc.Start(ctx) }()
+		errCh := make(chan error, 3)
+		go func() { errCh <- loginSvc.Start(ctx) }()
+		go func() { errCh <- gameSvc.Start(ctx) }()
+		if cfg.StatusPort != cfg.LoginPort {
+			statusSvc := network.NewService("status", fmt.Sprintf(":%d", cfg.StatusPort),
+				cfg.ServerName, protocol.NewStatusFactory(deps), log)
+			go func() { errCh <- statusSvc.Start(ctx) }()
+		}
 
 	log.Info("canary-go is running", "login", cfg.LoginPort, "game", cfg.GamePort)
 

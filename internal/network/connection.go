@@ -49,6 +49,8 @@ type Connection struct {
 	// Data is a per-connection scratch pointer protocols use to stash session
 	// state (e.g. the logged-in player).
 	Data any
+	// RawFirstPacket tells serve() to skip the 2-byte header on the first read.
+	RawFirstPacket bool
 }
 
 // Codec exposes the transport codec so protocols can flip encryption state.
@@ -84,6 +86,14 @@ func (c *Connection) Send(w *netmsg.Writer) error {
 }
 
 // Close shuts the connection down (idempotent).
+// WriteRaw sends bytes directly without encryption (used by status protocol).
+func (c *Connection) WriteRaw(data []byte) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	_, err := c.conn.Write(data)
+	return err
+}
+
 func (c *Connection) Close() {
 	c.closeOne.Do(func() {
 		_ = c.conn.Close()
@@ -149,6 +159,17 @@ func (c *Connection) serve() {
 	r := bufio.NewReader(c.conn)
 	c.consumeProxyIdentification(r)
 	c.proto.OnConnect(c)
+
+	// Raw first-packet: skip the 2-byte Tibia header for HTTP/status
+	if c.RawFirstPacket {
+		c.RawFirstPacket = false
+		raw := make([]byte, 4096)
+		n, _ := r.Read(raw)
+		if n > 0 {
+			c.gotFirst = true
+			c.proto.OnFirstPacket(c, raw[:n])
+		}
+	}
 
 	header := make([]byte, headerLength)
 	for {

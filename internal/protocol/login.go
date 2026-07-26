@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"strings"
 	"fmt"
 	"time"
 
@@ -30,12 +31,61 @@ func NewLoginFactory(deps *Deps) network.ProtocolFactory {
 	return func() network.Protocol { return &LoginProtocol{deps: deps} }
 }
 
-func (p *LoginProtocol) OnConnect(c *network.Connection)                  {}
+func (p *LoginProtocol) OnConnect(c *network.Connection) { c.RawFirstPacket = true }
+
+// sendStatusString sends XML server status (used for HTTP requests on the login port).
+func (p *LoginProtocol) sendStatusString(c *network.Connection) {
+	uptime := uint64(time.Since(serverStartTime).Seconds())
+	serverName := "Canary-Go"
+	mapName := ""
+	ownerName := ""
+	ownerEmail := ""
+	maxPlayers := uint32(2000)
+	onlineCount := uint32(0)
+	var expRate, skillRate, lootRate, magicRate, spawnRate float64 = 1, 1, 1, 1, 1
+
+	if p.deps != nil {
+		cfg := p.deps.Cfg
+		if cfg != nil {
+			serverName = cfg.ServerName
+			maxPlayers = 2000
+		}
+		if p.deps.World != nil {
+			onlineCount = uint32(p.deps.World.OnlineCount())
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString("HTTP/1.1 200 OK\r\n")
+	b.WriteString("Content-Type: text/xml\r\n")
+	b.WriteString("Connection: close\r\n")
+	b.WriteString("\r\n")
+	b.WriteString("<?xml version=\"1.0\"?>\n")
+	b.WriteString("<tsqp version=\"1.0\">\n")
+	fmt.Fprintf(&b, "\t<serverinfo uptime=\"%d\" ip=\"\" servername=\"%s\" port=\"%d\" location=\"\" url=\"\" server=\"%s\" version=\"1.0\" client=\"13.15\"/>\n",
+		uptime, serverName, p.deps.Cfg.LoginPort, serverName)
+	fmt.Fprintf(&b, "\t<owner name=\"%s\" email=\"%s\"/>\n", ownerName, ownerEmail)
+	fmt.Fprintf(&b, "\t<players online=\"%d\" unique=\"%d\" max=\"%d\" peak=\"0\"/>\n",
+		onlineCount, onlineCount, maxPlayers)
+	fmt.Fprintf(&b, "\t<monsters total=\"%d\"/>\n\t<npcs total=\"%d\"/>\n", 0, 0)
+	fmt.Fprintf(&b, "\t<rates experience=\"%.2f\" skill=\"%.2f\" loot=\"%.2f\" magic=\"%.2f\" spawn=\"%.2f\"/>\n",
+		expRate, skillRate, lootRate, magicRate, spawnRate)
+	fmt.Fprintf(&b, "\t<map name=\"%s\" author=\"\"/>\n", mapName)
+	b.WriteString("</tsqp>\n")
+	c.WriteRaw([]byte(b.String()))
+}
+
 func (p *LoginProtocol) OnDisconnect(c *network.Connection)               {}
 func (p *LoginProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {}
 
 // OnFirstPacket parses the login request, authenticates and replies.
 func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
+	// If the first byte is an ASCII letter, it's an HTTP request → send status XML.
+	if len(body) > 0 && body[0] >= 'A' && body[0] <= 'Z' {
+		p.sendStatusString(c)
+		c.Close()
+		return
+	}
 	body = transport.StripFirstPacketChecksum(body)
 	r := netmsg.NewReader(body)
 
