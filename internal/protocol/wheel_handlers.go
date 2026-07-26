@@ -2,8 +2,10 @@ package protocol
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -118,28 +120,60 @@ func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
 // Wire format (C++): [u8 action][u16 param][u8 pos]
 //   action 0=Destroy, 1=Reveal, 2=SwitchDomain, 3=ToggleLock, 4=ImproveGrade
 func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
-	if r.Remaining() < 4 {
+	if r.Remaining() < 1 {
 		return
 	}
 	action := r.GetByte()
-	param := r.GetU16()
-	pos := r.GetByte()
+	var param uint16
+	var pos uint8
+	if r.Remaining() >= 2 {
+		param = r.GetU16()
+	}
+	if r.Remaining() >= 1 {
+		pos = r.GetByte()
+	}
 	wheel := g.player.GetWheel()
+	slog.Default().Info("parseWheelGemAction", "action", action, "param", param, "pos", pos, "gems", len(wheel.Gems))
 
 	switch action {
 	case 0: // Destroy gem
 		if int(param) < len(wheel.Gems) {
 			wheel.Gems = append(wheel.Gems[:param], wheel.Gems[param+1:]...)
 		}
-	case 1: // Reveal gem
-		wheel.Gems = append(wheel.Gems, game.WheelGem{
-			Slot:     uint16(len(wheel.Gems) + 1),
-			Domain:   0,
-			Grade:    0,
-			Locked:   false,
-			Revealed: true,
-		})
-		_ = param
+	case 1: // Reveal gem — param is quality (0=lesser,1=regular,2=greater)
+		// Look up a gem item ID from the player's inventory by quality name.
+		catalog := g.deps.Items
+		var gemItemIDs []uint16
+		switch param {
+		case 0: // lesser
+			gemItemIDs = findItemIDs(catalog, "lesser guardian gem", "lesser marksman gem",
+				"lesser sage gem", "lesser mystic gem", "lesser spiritualist gem")
+		case 1: // regular
+			gemItemIDs = findItemIDs(catalog, "guardian gem", "marksman gem",
+				"sage gem", "mystic gem", "spiritualist gem")
+		case 2: // greater
+			gemItemIDs = findItemIDs(catalog, "greater guardian gem", "greater marksman gem",
+				"greater sage gem", "greater mystic gem", "greater spiritualist gem")
+		}
+		removed := false
+		for _, id := range gemItemIDs {
+			if g.player.GetItemCount(id) > 0 {
+				if g.player.RemoveItemOfType(g.deps.Items, id, 1, -1, false) {
+					removed = true
+					break
+				}
+			}
+		}
+		if removed {
+			wheel.Gems = append(wheel.Gems, game.WheelGem{
+				Slot:     uint16(len(wheel.Gems) + 1),
+				Domain:   0,
+				Grade:    0,
+				Locked:   false,
+				Revealed: true,
+			})
+			wheel.RevealedGems++
+		}
 	case 2: // SwitchDomain
 		if int(param) < len(wheel.Gems) {
 			wheel.Gems[param].Domain = (wheel.Gems[param].Domain + 1) % 4
@@ -304,4 +338,18 @@ func (g *GameProtocol) countInventoryGems() (lesser, regular, greater, lesserFra
 		greaterFrags += uint32(g.player.GetItemCount(id))
 	}
 	return
+}
+
+// findItemIDs looks up item IDs by name in the catalog.
+func findItemIDs(catalog *items.Catalog, names ...string) []uint16 {
+	var ids []uint16
+	if catalog == nil {
+		return ids
+	}
+	for _, name := range names {
+		if id, ok := catalog.IDByName(name); ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }

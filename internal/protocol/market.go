@@ -77,15 +77,7 @@ func (g *GameProtocol) collectDepotItems() []depotEntry {
 		}
 		g.aggregateContainerItems(chest, agg)
 	}
-		// Add Tibia Coins from the account balance as virtual depot items.
-	if g.player.CoinTransferable > 0 {
-		coinKey := (uint32(game.ItemStoreCoin) << 8) | 0
-		if existing, ok := agg[coinKey]; ok {
-			agg[coinKey] = existing + uint16(g.player.CoinTransferable)
-		} else {
-			agg[coinKey] = uint16(g.player.CoinTransferable)
-		}
-	}
+
 	if len(agg) == 0 {
 		return nil
 	}

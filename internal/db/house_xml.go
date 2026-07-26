@@ -9,20 +9,19 @@ import (
 	"github.com/opentibiabr/canary-go/internal/game"
 )
 
-// houseXML is the XML structure for the houses file.
-type houseXML struct {
-	XMLName xml.Name   `xml:"houses"`
-	Houses  []houseXML `xml:"house"`
-	ID      int        `xml:"houseid,attr"`
-	Name    string     `xml:"name,attr"`
-	EntryX  int        `xml:"entryx,attr"`
-	EntryY  int        `xml:"entryy,attr"`
-	EntryZ  int        `xml:"entryz,attr"`
-	Rent    int        `xml:"rent,attr"`
-	TownID  int        `xml:"townid,attr"`
-	Size    int        `xml:"size,attr"`
-	Beds    int        `xml:"beds,attr"`
-	Guild   bool       `xml:"guildhall,attr"`
+// houseEntry is one <house> element in the houses XML.
+type houseEntry struct {
+	XMLName xml.Name `xml:"house"`
+	ID      int      `xml:"houseid,attr"`
+	Name    string   `xml:"name,attr"`
+	EntryX  int      `xml:"entryx,attr"`
+	EntryY  int      `xml:"entryy,attr"`
+	EntryZ  int      `xml:"entryz,attr"`
+	Rent    int      `xml:"rent,attr"`
+	TownID  int      `xml:"townid,attr"`
+	Size    int      `xml:"size,attr"`
+	Beds    int      `xml:"beds,attr"`
+	Guild   bool     `xml:"guildhall,attr"`
 }
 
 // ParseHouseFile parses an OTBR-style houses XML and returns a slice of houses.
@@ -33,8 +32,8 @@ func (d *DB) ParseHouseFile(path string) ([]game.House, error) {
 	}
 
 	var doc struct {
-		XMLName xml.Name   `xml:"houses"`
-		Houses  []houseXML `xml:"house"`
+		XMLName xml.Name     `xml:"houses"`
+		Houses  []houseEntry `xml:"house"`
 	}
 	if err := xml.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("parse house file %q: %w", path, err)
