@@ -503,10 +503,27 @@ func (e *Engine) gameGetDummies(L *lua.LState) int {
 func (e *Engine) gameGetTalkActions(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetEventCallbacks(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameRegisterAchievement(L *lua.LState) int {
-	name := L.CheckString(1)
-	description := L.CheckString(2)
-	secret := L.OptBool(3, false)
-	points := uint8(L.OptInt(4, 1))
+	// Lua scripts call with (name, description, secret, points) OR
+	// (id, name, description, secret, grade, points). Auto-assigns the ID.
+	var name, description string
+	secret := false
+	points := uint8(1)
+
+	if L.GetTop() >= 6 {
+		// Full format: (id, name, description, secret, grade, points) — skip id at 1
+		name = L.CheckString(2)
+		description = L.CheckString(3)
+		secret = L.OptBool(4, false)
+		points = uint8(L.OptInt(6, 1))
+	} else if L.GetTop() >= 4 {
+		// Full format: (id, name, description, secret, grade, points) — skip id at 1
+		name = L.CheckString(2)
+		description = L.CheckString(3)
+		secret = L.OptBool(4, false)
+		points = uint8(L.OptInt(6, 1))
+	} else {
+		return 0
+	}
 	if e.world == nil {
 		return 0
 	}

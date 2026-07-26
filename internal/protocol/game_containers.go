@@ -336,8 +336,9 @@ func (g *GameProtocol) openContainerWithPos(item *game.Item, pos game.Position, 
 }
 
 // sendContainer sends the container window (0x6E), mirroring the modern layout of
-// ProtocolGame::sendContainer for a normal (non store-inbox) container.
+// the original protocol.
 func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool) {
+	slog.Default().Info("DEBUG: sendContainer CALLED", "cid", cid, "itemId", item.ID)
 	t := g.deps.Items.Get(item.ID)
 	name := "Container"
 	movable := byte(0)
