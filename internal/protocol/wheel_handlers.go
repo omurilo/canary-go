@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/items"
@@ -72,15 +71,14 @@ func (g *GameProtocol) applyWheelSave(r *netmsg.Reader) {
 	for aff := 0; aff < 4 && r.Remaining() >= 1; aff++ {
 		hasGem := r.GetByte()
 		if hasGem == 0 {
-			wheel.ActiveGems[aff] = nil
+			g.player.WheelGemManager.ActiveGems[aff] = nil
 			continue
 		}
 		if r.Remaining() >= 2 {
 			gemIdx := r.GetU16()
-			if int(gemIdx) < len(wheel.RevealedGems) {
-				gem := wheel.RevealedGems[gemIdx]
-				gem.Affinity = game.WheelGemAffinity(aff)
-				wheel.ActiveGems[aff] = &gem
+			if int(gemIdx) < len(g.player.WheelGemManager.RevealedGems) {
+				g.player.WheelGemManager.RevealedGems[gemIdx].Affinity = game.WheelGemAffinity(aff)
+				g.player.WheelGemManager.ActiveGems[aff] = &g.player.WheelGemManager.RevealedGems[gemIdx]
 			}
 		}
 	}
@@ -134,12 +132,13 @@ func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
 }
 
 // parseWheelGemAction handles opcode 0xE7 (Wheel of Destiny Gem actions / enhance mod grade).
-// parseWheelGemAction handles opcode 0xE7 (Wheel of Destiny Gem actions / enhance mod grade).
 // Wire format (C++): [u8 action][u16 param][u8 pos]
-//   action 0=Destroy, 1=Reveal, 2=SwitchDomain, 3=ToggleLock, 4=ImproveGrade
 func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 	if r.Remaining() < 1 {
 		return
+	}
+	if g.player.WheelGemManager == nil {
+		g.player.WheelGemManager = &game.WheelGemCollection{}
 	}
 	action := r.GetByte()
 	var param uint16
@@ -150,13 +149,13 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 	if r.Remaining() >= 1 {
 		pos = r.GetByte()
 	}
-	wheel := g.player.GetWheel()
-	slog.Default().Info("parseWheelGemAction", "action", action, "param", param, "pos", pos, "gems", len(wheel.RevealedGems) + wheel.GetActiveGemCount())
+	_ = pos
 
 	switch action {
 	case 0: // Destroy gem
-		wheel.DestroyGem(param)
-	case 1: // Reveal gem — use param as quality (0=lesser,1=regular,2=greater)
+		g.player.WheelGemManager.DestroyGem(param)
+
+	case 1: // Reveal gem — consume item from inventory by quality
 		catalog := g.deps.Items
 		var gemNames []string
 		var gemQuality game.WheelGemQuality
@@ -189,14 +188,17 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 		}
 		if removed {
 			gem := game.NewRevealedGem(gemQuality)
-			wheel.RevealedGems = append(wheel.RevealedGems, gem)
+			g.player.WheelGemManager.RevealedGems = append(g.player.WheelGemManager.RevealedGems, gem)
 		}
+
 	case 2: // SwitchDomain
-		wheel.SwitchGemDomain(param)
+		g.player.WheelGemManager.SwitchGemDomain(param)
+
 	case 3: // ToggleLock
-		wheel.ToggleGemLock(param)
+		g.player.WheelGemManager.ToggleGemLock(param)
+
 	case 4: // ImproveGrade / Enhance
-		// improveGrade not fully implemented
+		// not fully implemented
 	}
 	g.SendWheelOfDestiny()
 }
@@ -249,8 +251,11 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 
 	// Gems section — send real gem data from the Wheel
 	// Gems section — active (4 slots) + revealed
-	activeGems := wheel.ActiveGems
-	revealedGems := wheel.RevealedGems
+	if g.player.WheelGemManager == nil {
+		g.player.WheelGemManager = &game.WheelGemCollection{}
+	}
+	revealedGems := g.player.WheelGemManager.RevealedGems
+	activeGems := g.player.WheelGemManager.ActiveGems
 	activeCount := 0
 	for _, g := range activeGems {
 		if g != nil {

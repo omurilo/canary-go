@@ -77,9 +77,8 @@ func (g *GameProtocol) SendOpenMarket() {
 	// C++ sends sendResourcesBalance immediately.
 	g.sendResourcesBalance()
 	
-	// C++ queues updateCoinBalance to the dispatcher, so it executes on the next tick.
-	// This delay is critical because the Tibia client clears/initializes the Market UI on 0xF6.
-	// If 0xDF (Coins) arrives in the same frame or too quickly, it gets erased by the UI init.
+	// We restore the 50ms delay because combining 0xF2 and 0xDF into a single packet
+	// can trigger the UI update race condition if it arrives too close to 0xF6.
 	time.AfterFunc(50*time.Millisecond, func() {
 		g.sendCoinBalance()
 	})

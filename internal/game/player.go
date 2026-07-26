@@ -187,6 +187,9 @@ type Player struct {
 	// Wheel of Destiny progression tree
 	Wheel *WheelOfDestiny
 
+	// WheelGemManager holds the player gem Atelier data (separate from Wheel).
+	WheelGemManager *WheelGemCollection
+
 	// Prey & Task Hunting systems. PreyCards is the wildcard/prey-card resource
 	// (schema players.prey_wildcard) spent on bonus rerolls and list selection.
 	Prey       *PlayerPrey

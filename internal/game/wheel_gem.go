@@ -97,3 +97,46 @@ func NewRevealedGem(quality WheelGemQuality) PlayerWheelGem {
 	}
 	return gem
 }
+
+// WheelGemCollection holds gem data separate from WheelOfDestiny.
+type WheelGemCollection struct {
+	ActiveGems   [4]*PlayerWheelGem
+	RevealedGems []PlayerWheelGem
+}
+
+func (gc *WheelGemCollection) GetActiveGemCount() int {
+	count := 0
+	for _, g := range gc.ActiveGems {
+		if g != nil {
+			count++
+		}
+	}
+	return count
+}
+
+func (gc *WheelGemCollection) DestroyGem(index uint16) {
+	if int(index) >= len(gc.RevealedGems) {
+		return
+	}
+	for i, g := range gc.ActiveGems {
+		if g != nil && g.UUID == gc.RevealedGems[index].UUID {
+			gc.ActiveGems[i] = nil
+			break
+		}
+	}
+	gc.RevealedGems = append(gc.RevealedGems[:index], gc.RevealedGems[index+1:]...)
+}
+
+func (gc *WheelGemCollection) SwitchGemDomain(index uint16) {
+	if int(index) >= len(gc.RevealedGems) {
+		return
+	}
+	gc.RevealedGems[index].Affinity = WheelGemAffinity((gc.RevealedGems[index].Affinity + 1) % 4)
+}
+
+func (gc *WheelGemCollection) ToggleGemLock(index uint16) {
+	if int(index) >= len(gc.RevealedGems) {
+		return
+	}
+	gc.RevealedGems[index].Locked = !gc.RevealedGems[index].Locked
+}

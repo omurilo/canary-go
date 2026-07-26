@@ -413,10 +413,6 @@ func (g *GameProtocol) disconnect(msg string) {
 	g.conn.Close()
 }
 
-// sendCoinBalance pushes the account's Tibia Coin balance, mirroring
-// ProtocolGame::sendCoinBalance: 0xF2 (updating flag) then 0xDF with the normal
-// and transferable coin totals (plus a reserved auction total on modern
-// protocol).
 func (g *GameProtocol) sendCoinBalance() {
 	if g.player == nil {
 		return
@@ -424,17 +420,20 @@ func (g *GameProtocol) sendCoinBalance() {
 
 	w := netmsg.NewWriter()
 	
-	// updating flag (0xF2 0x01)
+	// 0xF2: Coin Balance Updating (show spinner)
 	w.AddByte(0xF2)
 	w.AddByte(0x01)
 
-	// values (0xDF 0x01 + data)
+	// 0xDF: Coin Balance (hide spinner and update UI)
 	w.AddByte(0xDF)
 	w.AddByte(0x01)
-	w.AddU32(g.player.CoinBalance)      // normal coins
-	w.AddU32(g.player.CoinTransferable) // transferable coins
-	w.AddU32(g.player.CoinBalance)      // reserved auction coins (modern protocol)
-	
+
+	// Total must be >= Transferable, otherwise the client disables the Sell UI.
+	total := g.player.CoinBalance + g.player.CoinTransferable
+	w.AddU32(total)
+	w.AddU32(g.player.CoinTransferable)
+	w.AddU32(total) // reserved auction coins
+
 	g.SendToClient(w)
 }
 

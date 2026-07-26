@@ -270,10 +270,12 @@ func (d *DB) SavePlayerWheel(ctx context.Context, p *game.Player) error {
 	blob := ws.GetStream()
 
 	// Append JSON gem data after slot points
-	if gemJSON, err := json.Marshal(game.WheelGemPersistData{
-		ActiveGems:   p.Wheel.ActiveGems,
-		RevealedGems: p.Wheel.RevealedGems,
-	}); err == nil && len(gemJSON) > 2 {
+	gemPersist := game.WheelGemPersistData{}
+	if p.Wheel != nil {
+		gemPersist.ActiveGems = p.WheelGemManager.ActiveGems
+		gemPersist.RevealedGems = p.WheelGemManager.RevealedGems
+	}
+	if gemJSON, err := json.Marshal(gemPersist); err == nil && len(gemJSON) > 2 {
 		blob = append(blob, gemJSON...)
 	}
 
