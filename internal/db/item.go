@@ -124,15 +124,8 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 	traverse(p.Inbox)
 	traverse(p.RewardChest)
 
-	for cid, openCont := range p.GetOpenContainers() {
-		if openCont.Container != nil {
-			if openCont.Container.Attr == nil {
-				openCont.Container.Attr = &game.ItemAttributes{}
-			}
-			c := cid
-			openCont.Container.Attr.OpenContainer = &c
-		}
-	}
+	// Persistence of open containers is disabled to avoid ghost container issues.
+	// The traverse logic above will naturally clear the OpenContainer tag from all items in the database.
 
 	// Helper to save a tree of items to a table
 	saveTree := func(tableName string, rootItems []itemRow) error {
