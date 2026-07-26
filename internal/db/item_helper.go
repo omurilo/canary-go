@@ -15,7 +15,7 @@ type itemRow struct {
 }
 
 func (d *DB) loadItemsFromTable(ctx context.Context, playerID uint32, tableName string) (map[int]*game.Item, []itemRow, error) {
-	q := fmt.Sprintf(`SELECT pid, sid, itemtype, count, attributes FROM %s WHERE player_id = ? ORDER BY sid ASC`, tableName)
+	q := fmt.Sprintf(`SELECT pid, sid, itemtype, count, attributes FROM %s WHERE player_id = ? ORDER BY sid DESC`, tableName)
 	rows, err := d.SQL.QueryContext(ctx, q, playerID)
 	if err != nil {
 		return nil, nil, err

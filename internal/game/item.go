@@ -420,6 +420,7 @@ type ItemAttributes struct {
 	Tier           *uint8  // ATTR_TIER (40)      uint8
 	Amount         *uint16 // ATTR_AMOUNT (39)    uint16
 	Owner          *uint32 // ATTR_OWNER (43)     uint32
+	OpenContainer  *uint8  // ATTR_OPENCONTAINER (36) uint8
 	// QuickLootContainer / ObtainContainer are bitmasks of the ObjectCategory
 	// values this container is the managed loot / obtain container for
 	// (ATTR_QUICKLOOTCONTAINER 38 / ATTR_OBTAINCONTAINER 44, u32). They persist

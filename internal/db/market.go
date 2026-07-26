@@ -25,6 +25,7 @@ func (d *DB) LoadMarketOffers(ctx context.Context, m *game.Market) error {
 			continue
 		}
 		offer.Anonymous = anonymous > 0
+			offer.Action = game.MarketAction(sale)
 		m.AddOffer(&offer)
 	}
 	return nil
@@ -80,6 +81,7 @@ func (d *DB) GetPlayerMarketOffers(ctx context.Context, playerID uint32) ([]game
 			continue
 		}
 		offer.Anonymous = anonymous > 0
+			offer.Action = game.MarketAction(sale)
 		offers = append(offers, offer)
 	}
 	return offers, nil

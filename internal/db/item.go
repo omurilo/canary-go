@@ -24,36 +24,11 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 		} else {
 			if parent, ok := itemsBySID[row.pid]; ok {
 				row.item.Parent = parent
-				parent.Contents = append(parent.Contents, row.item)
+				parent.Contents = append([]*game.Item{row.item}, parent.Contents...)
 			}
 		}
 	}
 
-	// 2. Load Depot
-	if p.DepotLockers == nil {
-		p.DepotLockers = make(map[uint16]*game.Item)
-	}
-	depotItemsBySID, depotRows, err := d.loadItemsFromTable(ctx, p.DBID, "player_depotitems")
-	if err != nil {
-		return err
-	}
-	for _, row := range depotRows {
-		if row.pid >= 0 && row.pid < 100 {
-			depotID := uint16(row.pid)
-			locker, ok := p.DepotLockers[depotID]
-			if !ok {
-				locker = &game.Item{ID: 2594} // Default depot locker ID
-				p.DepotLockers[depotID] = locker
-			}
-			row.item.Parent = locker
-			locker.Contents = append(locker.Contents, row.item)
-		} else {
-			if parent, ok := depotItemsBySID[row.pid]; ok {
-				row.item.Parent = parent
-				parent.Contents = append(parent.Contents, row.item)
-			}
-		}
-	}
 
 	// 3. Load Inbox
 	if p.Inbox == nil {
@@ -66,11 +41,11 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 	for _, row := range inboxRows {
 		if row.pid == 0 {
 			row.item.Parent = p.Inbox
-			p.Inbox.Contents = append(p.Inbox.Contents, row.item)
+			p.Inbox.Contents = append([]*game.Item{row.item}, p.Inbox.Contents...)
 		} else {
 			if parent, ok := inboxItemsBySID[row.pid]; ok {
 				row.item.Parent = parent
-				parent.Contents = append(parent.Contents, row.item)
+				parent.Contents = append([]*game.Item{row.item}, parent.Contents...)
 			}
 		}
 	}
@@ -86,11 +61,11 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 	for _, row := range rewardRows {
 		if row.pid == 0 {
 			row.item.Parent = p.RewardChest
-			p.RewardChest.Contents = append(p.RewardChest.Contents, row.item)
+			p.RewardChest.Contents = append([]*game.Item{row.item}, p.RewardChest.Contents...)
 		} else {
 			if parent, ok := rewardItemsBySID[row.pid]; ok {
 				row.item.Parent = parent
-				parent.Contents = append(parent.Contents, row.item)
+				parent.Contents = append([]*game.Item{row.item}, parent.Contents...)
 			}
 		}
 	}
@@ -123,6 +98,39 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 		return err
 	}
 	defer tx.Rollback()
+
+	// Prepare open containers state
+	var traverse func(item *game.Item)
+	traverse = func(item *game.Item) {
+		if item == nil {
+			return
+		}
+		if item.Attr != nil {
+			item.Attr.OpenContainer = nil
+		}
+		for _, child := range item.Contents {
+			traverse(child)
+		}
+	}
+	for _, item := range p.Inventory {
+		traverse(item)
+	}
+	traverse(p.StoreInbox)
+	if p.DepotManager != nil {
+		for _, locker := range p.DepotManager.Lockers {
+			traverse(locker)
+		}
+	}
+
+	for cid, openCont := range p.GetOpenContainers() {
+		if openCont.Container != nil {
+			if openCont.Container.Attr == nil {
+				openCont.Container.Attr = &game.ItemAttributes{}
+			}
+			c := cid
+			openCont.Container.Attr.OpenContainer = &c
+		}
+	}
 
 	// Helper to save a tree of items to a table
 	saveTree := func(tableName string, rootItems []itemRow) error {
@@ -192,20 +200,6 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 		return err
 	}
 
-	// 2. Save Depot
-	var depotRoots []itemRow
-	if p.DepotLockers != nil {
-		for depotID, locker := range p.DepotLockers {
-			if locker != nil {
-				for _, item := range locker.Contents {
-					depotRoots = append(depotRoots, itemRow{pid: int(depotID), item: item})
-				}
-			}
-		}
-	}
-	if err := saveTree("player_depotitems", depotRoots); err != nil {
-		return err
-	}
 
 	// 3. Save Inbox
 	var inboxRoots []itemRow

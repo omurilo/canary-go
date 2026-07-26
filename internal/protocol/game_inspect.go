@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
@@ -30,21 +31,39 @@ func (g *GameProtocol) parseInspectPlayer(r *netmsg.Reader) {
 
 func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 	if g.player == nil {
+		slog.Default().Info("parseCyclopediaCharacterInfo: player nil")
 		return
 	}
 	characterID := r.GetU32()
 	characterInfoType := r.GetByte()
+	slog.Default().Info("parseCyclopediaCharacterInfo", "charID", characterID, "infoType", characterInfoType)
 	if characterID == 0 {
 		characterID = g.player.ID
 	}
-	target := g.findPlayerByID(characterID)
-	if target == nil {
-		target = g.player
+	if characterID != g.player.ID {
+		// Character not found / tournament characters not supported.
+		g.sendCyclopediaNoData(characterInfoType, 2)
+		return
 	}
 
-	if characterInfoType == cyclopediaCharacterInfoInspection {
-		g.sendCyclopediaCharacterInspection(target)
+	switch characterInfoType {
+	case cyclopediaCharacterInfoInspection: // 9
+		g.sendCyclopediaCharacterInspection(g.player)
+	default:
+		// Not yet implemented — send "no data" so the client renders empty.
+		g.sendCyclopediaNoData(characterInfoType, 1)
 	}
+}
+
+// sendCyclopediaNoData sends a "not available" response for a cyclopedia tab, mirroring
+// C++ ProtocolGame::sendCyclopediaCharacterNoData: [0xDA][u8 type][u8 errorCode].
+// errorCode: 0=success, 1=not available, 2=character not found
+func (g *GameProtocol) sendCyclopediaNoData(infoType uint8, errorCode uint8) {
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(infoType)
+	w.AddByte(errorCode)
+	g.SendToClient(w)
 }
 
 func (g *GameProtocol) parseInspectionObject(r *netmsg.Reader) {
@@ -111,6 +130,7 @@ func (g *GameProtocol) sendCyclopediaCharacterInspection(target *game.Player) {
 	if target == nil {
 		return
 	}
+	slog.Default().Info("sendCyclopediaCharacterInspection", "target", target.Name, "deps.Items", g.deps.Items)
 	w := netmsg.NewWriter()
 	w.AddByte(0xDA)
 	w.AddByte(cyclopediaCharacterInfoInspection) // 9
@@ -127,6 +147,7 @@ func (g *GameProtocol) sendCyclopediaCharacterInspection(target *game.Player) {
 	}
 
 	w.AddByte(byte(len(invItems)))
+	slog.Default().Info("sendCyclopediaCharacterInspection: items", "count", len(invItems))
 	for i, item := range invItems {
 		w.AddByte(invSlots[i])
 		name := "Item"

@@ -9,6 +9,7 @@ const (
 	ItemMarket     = 12903
 	ItemStoreInbox = 23396
 	ItemStash      = 28750
+	ItemStoreCoin  = 24712
 )
 
 // PlayerDepotManager manages all depot lockers and chests for a player.
@@ -56,20 +57,9 @@ func (dm *PlayerDepotManager) GetDepotLocker(depotId uint16) *Item {
 
 	locker := &Item{ID: ItemLocker, Contents: make([]*Item, 0)}
 
-	market := &Item{ID: ItemMarket}
-	locker.Contents = append(locker.Contents, market)
-
-	if dm.player.Inbox == nil {
-		dm.player.Inbox = &Item{ID: ItemInbox, Contents: make([]*Item, 0)}
-	}
-	locker.Contents = append(locker.Contents, dm.player.Inbox)
-
-	stash := &Item{ID: ItemStash}
-	locker.Contents = append(locker.Contents, stash)
-
 	// Depot Box container that holds the 17 nested boxes
 	depotChestContainer := &Item{ID: ItemDepot, Contents: make([]*Item, 0)}
-	for i := uint16(17); i > 0; i-- {
+	for i := uint16(1); i <= 17; i++ {
 		chest := dm.GetDepotChest(i, true)
 		depotChestContainer.Contents = append(depotChestContainer.Contents, chest)
 		if chest.Parent == nil {
@@ -77,6 +67,17 @@ func (dm *PlayerDepotManager) GetDepotLocker(depotId uint16) *Item {
 		}
 	}
 	locker.Contents = append(locker.Contents, depotChestContainer)
+
+	stash := &Item{ID: ItemStash}
+	locker.Contents = append(locker.Contents, stash)
+
+	if dm.player.Inbox == nil {
+		dm.player.Inbox = &Item{ID: ItemInbox, Contents: make([]*Item, 0)}
+	}
+	locker.Contents = append(locker.Contents, dm.player.Inbox)
+
+	market := &Item{ID: ItemMarket}
+	locker.Contents = append(locker.Contents, market)
 
 	dm.Lockers[depotId] = locker
 	return locker

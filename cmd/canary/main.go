@@ -164,11 +164,18 @@ func run(o runOpts, log *slog.Logger) error {
 	if bc, err := database.GetBoostedCreature(ctx); err == nil && bc != "" && bc != "default" {
 		world.BoostedCreature = bc
 	}
-	if bb, err := database.GetBoostedBoss(ctx); err == nil && bb != "" && bb != "default" {
-		world.BoostedBoss = bb
-	}
+		if bb, err := database.GetBoostedBoss(ctx); err == nil && bb != "" && bb != "default" {
+			world.BoostedBoss = bb
+		}
 
-	imbPath := filepath.Join(filepath.Dir(filepath.Dir(o.appearances)), "XML", "imbuements.xml")
+		// Market table and pre-load existing offers.
+		if err := database.EnsureMarketTable(ctx); err != nil {
+			log.Warn("ensure market table", "err", err)
+		} else if err := database.LoadMarketOffers(ctx, world.Market); err != nil {
+			log.Warn("load market offers", "err", err)
+		}
+
+		imbPath := filepath.Join(filepath.Dir(filepath.Dir(o.appearances)), "XML", "imbuements.xml")
 	if imbReg, err := imbuements.LoadRegistry(imbPath); err != nil {
 		log.Warn("imbuements not loaded", "path", imbPath, "err", err)
 	} else {
@@ -531,6 +538,7 @@ func run(o runOpts, log *slog.Logger) error {
 	// same pick, shared via the DB with MyAAC and other sessions.
 	if bb, err := database.RotateBoostedBoss(ctx, creatureTypes); err == nil && bb != "" && bb != "default" {
 		world.BoostedBoss = bb
+
 		log.Info("boosted boss", "name", bb)
 	}
 	if bc, err := database.RotateBoostedCreature(ctx, creatureTypes); err == nil && bc != "" && bc != "default" {

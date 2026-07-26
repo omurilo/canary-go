@@ -56,6 +56,7 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetField(mt, "say", e.L.NewFunction(e.playerSay))
 	e.L.SetField(mt, "setTown", e.L.NewFunction(e.playerSettown))
 	e.L.SetField(mt, "getTown", e.L.NewFunction(e.playerGettown))
+	e.L.SetField(mt, "applyImbuementScroll", e.L.NewFunction(e.playerApplyscrollimbuement))
 	e.L.SetField(mt, "__index", mt)
 	e.registerBosstiaryPlayerMethods()
 	e.registerBestiaryPlayerMethods()
@@ -249,7 +250,6 @@ var playerMethods = map[string]lua.LGFunction{
 	"learnSpell":                      playerLearnspell,
 	"forgetSpell":                     playerForgetspell,
 	"hasLearnedSpell":                 playerHaslearnedspell,
-	"applyImbuementScroll":            playerApplyimbuementscroll,
 	"openImbuementWindow":             playerOpenimbuementwindow,
 	"closeImbuementWindow":            playerCloseimbuementwindow,
 	"clearAllImbuements":              playerClearallimbuements,
@@ -820,15 +820,6 @@ func playerAddtransferablecoins(L *lua.LState) int {
 }
 
 func playerAddweaponexperience(L *lua.LState) int {
-	p := checkPlayer(L)
-	if p == nil {
-		return 0
-	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
-	return 1
-}
-
-func playerApplyimbuementscroll(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
 		return 0

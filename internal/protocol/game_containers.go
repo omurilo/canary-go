@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"strings"
+	"log/slog"
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/actions"
@@ -685,3 +686,43 @@ func (g *GameProtocol) isExAction(item *game.Item) bool {
 	return false
 }
 
+
+// restoreOpenContainers recursively scans the player's inventory and depot
+// to restore any containers that were left open by the client (attrOpenContainer).
+func (g *GameProtocol) restoreOpenContainers() {
+	if g.player == nil {
+		return
+	}
+
+	var traverse func(item *game.Item)
+	traverse = func(item *game.Item) {
+		if item == nil {
+			return
+		}
+		if item.Attr != nil && item.Attr.OpenContainer != nil {
+			cid := *item.Attr.OpenContainer
+			
+			slog.Default().Info("Restoring open container", "cid", cid, "itemId", item.ID)
+			
+			g.player.OpenContainerAtWithPos(cid, item, game.Position{}, false)
+			g.sendContainer(cid, item, item.Parent != nil)
+			// Clear it so it gets wiped from the DB on next save, preventing it from
+			// becoming a ghost if the client loses sync.
+			item.Attr.OpenContainer = nil
+		}
+		// Also traverse inside this container
+		for _, child := range item.Contents {
+			traverse(child)
+		}
+	}
+
+	for _, item := range g.player.Inventory {
+		traverse(item)
+	}
+	traverse(g.player.StoreInbox)
+	if g.player.DepotManager != nil {
+		for _, locker := range g.player.DepotManager.Lockers {
+			traverse(locker)
+		}
+	}
+}

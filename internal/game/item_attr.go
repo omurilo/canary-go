@@ -304,9 +304,11 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 				return nil, subType, err
 			}
 		case attrOpenContainer: // uint8
-			if err := ps.Skip(1); err != nil {
+			v, err := ps.ReadUint8()
+			if err != nil {
 				return nil, subType, err
 			}
+			a.OpenContainer = &v
 		case attrQuickLootContainer: // uint32 category bitmask
 			v, err := ps.ReadUint32()
 			if err != nil {
@@ -476,6 +478,10 @@ func (a *ItemAttributes) Encode(subType uint16) []byte {
 	if a.Tier != nil {
 		w.WriteUint8(attrTier)
 		w.WriteUint8(*a.Tier)
+	}
+	if a.OpenContainer != nil {
+		w.WriteUint8(attrOpenContainer)
+		w.WriteUint8(*a.OpenContainer)
 	}
 	if a.Amount != nil {
 		w.WriteUint8(attrAmount)

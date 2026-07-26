@@ -104,6 +104,9 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	if err := d.LoadPlayerItems(ctx, p); err != nil {
 		return nil, err
 	}
+	if err := d.LoadPlayerDepot(ctx, p); err != nil {
+		return nil, err
+	}
 	// Rebuild quick-loot managed containers from the per-container bitmask
 	// attributes now that the inventory is loaded.
 	p.RebuildManagedContainers()
@@ -356,11 +359,13 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	_ = d.SaveAccountCoins(ctx, p)
 	_ = d.SavePlayerSpells(ctx, p)
 	_ = d.SavePlayerVIP(ctx, p)
-	_ = d.SavePlayerDepot(ctx, p)
 	_ = d.SavePlayerAchievements(ctx, p)
 	_ = d.SavePlayerTitles(ctx, p)
 	_ = d.SavePlayerFamiliars(ctx, p)
 
+	if err := d.SavePlayerDepot(ctx, p); err != nil {
+		return err
+	}
 	return d.SavePlayerItems(ctx, p)
 }
 

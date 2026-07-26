@@ -63,9 +63,6 @@ func Count() int {
 // FindByItemID looks up an action by item ID.
 func FindByItemID(id uint16) *Action {
 	a := byItemID[id]
-	if a == nil {
-		fmt.Printf("FindByItemID: %d -> nil\n", id)
-	}
 	return a
 }
 

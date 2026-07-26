@@ -1638,6 +1638,14 @@ func (p *Player) UsePreyCards(amount uint32) bool {
 	return true
 }
 
+func (p *Player) GetItemCount(id uint16) uint32 {
+	return 0
+}
+
+func (p *Player) GetOpenContainers() map[uint8]OpenContainer {
+	return p.openContainers
+}
+
 func (p *Player) GetTaskHuntingPoints() uint32 {
 	return p.GetTaskHunter().Points
 }

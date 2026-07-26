@@ -534,8 +534,10 @@ func (g *GameProtocol) enterWorld() {
 	w.AddByte(0)
 
 	g.addBasicData(w)
-
 	g.SendToClient(w)
+
+	// Restore any containers that were left open by the client in its local config.
+	g.restoreOpenContainers()
 
 	// Send initial condition/protection zone icons
 	g.SendIcons()

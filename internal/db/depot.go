@@ -32,7 +32,7 @@ func (d *DB) LoadPlayerDepot(ctx context.Context, p *game.Player) error {
 		
 		parent := itemsBySID[row.pid]
 		if parent != nil {
-			parent.Contents = append(parent.Contents, row.item)
+			parent.Contents = append([]*game.Item{row.item}, parent.Contents...)
 			row.item.Parent = parent
 		}
 	}
@@ -43,7 +43,10 @@ func (d *DB) LoadPlayerDepot(ctx context.Context, p *game.Player) error {
 			// pid is the depotId (1-17)
 			chest := p.DepotManager.GetDepotChest(uint16(row.pid), true)
 			if chest != nil {
-				chest.Contents = append(chest.Contents, row.item)
+				if chest.Contents == nil {
+					chest.Contents = make([]*game.Item, 0)
+				}
+				chest.Contents = append([]*game.Item{row.item}, chest.Contents...)
 				row.item.Parent = chest
 			}
 		}
