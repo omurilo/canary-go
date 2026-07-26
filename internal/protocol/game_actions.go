@@ -515,7 +515,7 @@ const (
 func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 	talkType := r.GetByte()
 	switch talkType {
-	case talkTypePrivateTo, talkTypePrivateRedTo, talkTypePrivatePN:
+	case talkTypePrivateTo, talkTypePrivateRedTo:
 		_ = r.GetString() // receiver name
 	case talkTypeChannelY, talkTypeChannelR1:
 		_ = r.GetU16()    // channel ID
