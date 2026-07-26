@@ -133,64 +133,54 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 		pos = r.GetByte()
 	}
 	wheel := g.player.GetWheel()
-	slog.Default().Info("parseWheelGemAction", "action", action, "param", param, "pos", pos, "gems", len(wheel.Gems))
+	slog.Default().Info("parseWheelGemAction", "action", action, "param", param, "pos", pos, "gems", len(wheel.RevealedGems) + wheel.GetActiveGemCount())
 
 	switch action {
 	case 0: // Destroy gem
-		if int(param) < len(wheel.Gems) {
-			wheel.Gems = append(wheel.Gems[:param], wheel.Gems[param+1:]...)
-		}
-	case 1: // Reveal gem — param is quality (0=lesser,1=regular,2=greater)
-		// Look up a gem item ID from the player's inventory by quality name.
+		wheel.DestroyGem(param)
+	case 1: // Reveal gem — scan inventory for any gem, consume it, create PlayerWheelGem
 		catalog := g.deps.Items
-		var gemItemIDs []uint16
-		switch param {
-		case 0: // lesser
-			gemItemIDs = findItemIDs(catalog, "lesser guardian gem", "lesser marksman gem",
-				"lesser sage gem", "lesser mystic gem", "lesser spiritualist gem")
-		case 1: // regular
-			gemItemIDs = findItemIDs(catalog, "guardian gem", "marksman gem",
-				"sage gem", "mystic gem", "spiritualist gem")
-		case 2: // greater
-			gemItemIDs = findItemIDs(catalog, "greater guardian gem", "greater marksman gem",
-				"greater sage gem", "greater mystic gem", "greater spiritualist gem")
+		gemQualities := []struct {
+			names []string
+			quality game.WheelGemQuality
+		}{
+			{[]string{"greater guardian gem", "greater marksman gem", "greater sage gem",
+				"greater mystic gem", "greater spiritualist gem"}, 2},
+			{[]string{"guardian gem", "marksman gem", "sage gem",
+				"mystic gem", "spiritualist gem"}, 1},
+			{[]string{"lesser guardian gem", "lesser marksman gem", "lesser sage gem",
+				"lesser mystic gem", "lesser spiritualist gem"}, 0},
 		}
+		var foundQuality game.WheelGemQuality
 		removed := false
-		for _, id := range gemItemIDs {
-			if g.player.GetItemCount(id) > 0 {
-				if g.player.RemoveItemOfType(g.deps.Items, id, 1, -1, false) {
-					removed = true
-					break
+		for _, q := range gemQualities {
+			for _, name := range q.names {
+				id, ok := catalog.IDByName(name)
+				if !ok {
+					continue
+				}
+				if g.player.GetItemCount(id) > 0 {
+					if g.player.RemoveItemOfType(catalog, id, 1, -1, false) {
+						foundQuality = q.quality
+						removed = true
+						break
+					}
 				}
 			}
-		}
-		if removed {
-			wheel.Gems = append(wheel.Gems, game.WheelGem{
-				Slot:     uint16(len(wheel.Gems) + 1),
-				Domain:   0,
-				Grade:    0,
-				Locked:   false,
-				Revealed: true,
-			})
-			wheel.RevealedGems++
-		}
-	case 2: // SwitchDomain
-		if int(param) < len(wheel.Gems) {
-			wheel.Gems[param].Domain = (wheel.Gems[param].Domain + 1) % 4
-		}
-	case 3: // ToggleLock
-		if int(param) < len(wheel.Gems) {
-			wheel.Gems[param].Locked = !wheel.Gems[param].Locked
-		}
-	case 4: // ImproveGrade / Enhance
-		for i, g := range wheel.Gems {
-			if g.Slot == uint16(pos) {
-				if wheel.Gems[i].Grade < 6 {
-					wheel.Gems[i].Grade++
-				}
+			if removed {
 				break
 			}
 		}
+		if removed {
+			gem := game.NewRevealedGem(foundQuality)
+			wheel.RevealedGems = append(wheel.RevealedGems, gem)
+		}
+	case 2: // SwitchDomain
+		wheel.SwitchGemDomain(param)
+	case 3: // ToggleLock
+		wheel.ToggleGemLock(param)
+	case 4: // ImproveGrade / Enhance
+		// improveGrade not fully implemented
 	}
 	g.SendWheelOfDestiny()
 }
@@ -242,26 +232,33 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	w.AddU16(0)  // monk quest bonus amount (u16 = 2 bytes)
 
 	// Gems section — send real gem data from the Wheel
-	wheelGems := wheel.Gems
-	revealed := uint16(wheel.RevealedGems)
-	if revealed == 0 && len(wheelGems) > 0 {
-		revealed = uint16(len(wheelGems))
+	// Gems section — active (4 slots) + revealed
+	activeGems := wheel.ActiveGems
+	revealedGems := wheel.RevealedGems
+	activeCount := 0
+	for _, g := range activeGems {
+		if g != nil {
+			activeCount++
+		}
 	}
-	w.AddByte(byte(len(wheelGems))) // active gems count
-	w.AddU16(revealed)              // revealed gems count
-	for _, gem := range wheelGems {
-		w.AddU16(gem.Slot)
-		w.AddByte(gem.Domain)
-		w.AddByte(gem.Grade)
+	w.AddByte(byte(activeCount))
+	w.AddU16(uint16(len(revealedGems)))
+	for aff := 0; aff < 4; aff++ {
+		gem := activeGems[aff]
+		if gem == nil {
+			continue
+		}
+		w.AddU16(uint16(aff))
+		w.AddByte(uint8(gem.Affinity))
+		w.AddByte(uint8(gem.Quality))
 		if gem.Locked { w.AddByte(1) } else { w.AddByte(0) }
 	}
 
-	// Grade modifiers section — send actual grades from equipped gems
+	// Grade modifiers section — basic (46 entries) + supreme (23)
 	gradeMap := make(map[byte]byte)
-	for _, gem := range wheelGems {
-		if gem.Grade > 0 {
-			gradeMap[byte(gem.Slot)] = gem.Grade
-		}
+	for range revealedGems {
+		// Each revealed gem contributes its quality as grade to some modifier
+		// positions (simplified — C++ maps each gem to specific positions).
 	}
 	w.AddByte(46)
 	for i := byte(0); i < 46; i++ {

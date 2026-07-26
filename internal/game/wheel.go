@@ -200,15 +200,6 @@ type WheelBonusData struct {
 	Instants map[string]bool // unlocked wheel instants (inert until spells land)
 }
 
-// WheelGem tracks a single gem in a wheel slot.
-type WheelGem struct {
-	Slot        uint16 // 1..36
-	Domain      uint8  // 0=combat, 1=defense, 2=healing, 3=support
-	Grade       uint8  // 0..6
-	Locked      bool
-	Revealed    bool
-}
-
 // WheelOfDestiny models the character progression tree.
 type WheelOfDestiny struct {
 	mu           sync.RWMutex
@@ -216,17 +207,70 @@ type WheelOfDestiny struct {
 	ActivePreset uint8             // current preset (0-2)
 	SlotPoints   map[uint16]uint16 // slot id (1..36) -> allocated points
 
-	Gems         []WheelGem  // gems installed in slots
-	RevealedGems int         // total revealed gem count
+	// Gem Atelier — ActiveGems are placed in the 4 wheel slots (indexed by affinity).
+	ActiveGems   [4]*PlayerWheelGem // nil = empty slot
+	RevealedGems []PlayerWheelGem   // all revealed gems
 
 	// Fragment resources for gem enhance.
-	LesserFragments   uint16
-	RegularFragments  uint16
-	GreaterFragments  uint16
+	LesserFragments  uint16
+	RegularFragments uint16
+	GreaterFragments uint16
 
 	cip   uint8          // cached CIP vocation, drives the per-vocation bonuses
 	bonus WheelBonusData // cached, recomputed lazily
 	dirty bool
+}
+
+// GetActiveGemCount returns the number of non-nil active gem slots.
+func (w *WheelOfDestiny) GetActiveGemCount() int {
+	count := 0
+	for _, g := range w.ActiveGems {
+		if g != nil {
+			count++
+		}
+	}
+	return count
+}
+
+// DestroyGem removes a revealed gem by index.
+func (w *WheelOfDestiny) DestroyGem(index uint16) {
+	if int(index) >= len(w.RevealedGems) {
+		return
+	}
+	// Also remove from active slots if present
+	for i, g := range w.ActiveGems {
+		if g != nil && g.UUID == w.RevealedGems[index].UUID {
+			w.ActiveGems[i] = nil
+			break
+		}
+	}
+	w.RevealedGems = append(w.RevealedGems[:index], w.RevealedGems[index+1:]...)
+}
+
+// SwitchGemDomain cycles the affinity of a revealed gem.
+func (w *WheelOfDestiny) SwitchGemDomain(index uint16) {
+	if int(index) >= len(w.RevealedGems) {
+		return
+	}
+	w.RevealedGems[index].Affinity = WheelGemAffinity((w.RevealedGems[index].Affinity + 1) % 4)
+}
+
+// ToggleGemLock toggles the lock state of a revealed gem.
+func (w *WheelOfDestiny) ToggleGemLock(index uint16) {
+	if int(index) >= len(w.RevealedGems) {
+		return
+	}
+	w.RevealedGems[index].Locked = !w.RevealedGems[index].Locked
+}
+
+// GetRevealedGemIndexByUUID returns the index of a revealed gem by UUID.
+func (w *WheelOfDestiny) GetRevealedGemIndexByUUID(uuid string) int {
+	for i, g := range w.RevealedGems {
+		if g.UUID == uuid {
+			return i
+		}
+	}
+	return -1
 }
 
 // NewWheelOfDestiny returns an empty wheel.
@@ -655,4 +699,9 @@ func purpleInstant(cip uint8) string {
 	default:
 		return "Sanctuary"
 	}
+}
+
+// addRevelationBonus adds points to a revelation bonus (stub).
+func (w *WheelOfDestiny) addRevelationBonus(affinity WheelGemAffinity, points uint16) {
+	// TODO: implement revelation bonus system
 }
