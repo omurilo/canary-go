@@ -49,7 +49,10 @@ Este documento mapeia **o que ainda precisa ser migrado**, organizado por priori
 
 ---
 
-## O Que Falta: Matriz de Migração
+## O Que Ainda Pode Ser Melhorado (além dos 20 B-Systems)
+
+> **Nota:** Todos os 20 B-Systems de progressão estão 100% implementados.
+> Os itens abaixo são melhorias contínuas no core do servidor (engine, combate, condições, Lua API).
 
 ### **PRIORIDADE A: Core Loop (maior impacto gameplay)**
 
