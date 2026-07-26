@@ -171,6 +171,9 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	_ = d.LoadPlayerAchievements(ctx, p)
 	_ = d.LoadPlayerTitles(ctx, p)
 	_ = d.LoadPlayerFamiliars(ctx, p)
+	_ = d.LoadPlayerHazard(ctx, p)
+	_ = d.LoadPlayerConcoctions(ctx, p)
+	_ = d.LoadPlayerAnimusMastery(ctx, p)
 
 	return p, nil
 }
@@ -362,6 +365,9 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	_ = d.SavePlayerAchievements(ctx, p)
 	_ = d.SavePlayerTitles(ctx, p)
 	_ = d.SavePlayerFamiliars(ctx, p)
+	_ = d.SavePlayerHazard(ctx, p)
+	_ = d.SavePlayerConcoctions(ctx, p)
+	_ = d.SavePlayerAnimusMastery(ctx, p)
 
 	if err := d.SavePlayerDepot(ctx, p); err != nil {
 		return err

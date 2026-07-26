@@ -212,6 +212,15 @@ type Player struct {
 	Familiars      []Familiar
 	ActiveFamiliar uint16 // lookType of active familiar (0 = none)
 
+	// Hazard (B17) — current hazard system points.
+	HazardPoints uint32
+
+	// Concoctions (B18) — active concoctions stored as KV.
+	Concoctions map[string]int64 // concoction_name -> expiry timestamp
+
+	// Animus Mastery (B16) — unlocked animus masteries (blob from DB).
+	AnimusMastery []byte
+
 	// BossPoints is the bosstiary points total (players.boss_points), earned by
 	// reaching boss unlock levels and spent implicitly via the loot bonus.
 	BossPoints uint32

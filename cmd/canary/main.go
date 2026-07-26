@@ -180,6 +180,16 @@ func run(o runOpts, log *slog.Logger) error {
 			log.Warn("ensure familiars table", "err", err)
 		}
 
+		// Hazard system table.
+		if err := database.EnsureHazardTable(ctx); err != nil {
+			log.Warn("ensure hazard table", "err", err)
+		}
+
+		// Concoctions system table.
+		if err := database.EnsureConcoctionsTable(ctx); err != nil {
+			log.Warn("ensure concoctions table", "err", err)
+		}
+
 		imbPath := filepath.Join(filepath.Dir(filepath.Dir(o.appearances)), "XML", "imbuements.xml")
 	if imbReg, err := imbuements.LoadRegistry(imbPath); err != nil {
 		log.Warn("imbuements not loaded", "path", imbPath, "err", err)
