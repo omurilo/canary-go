@@ -864,6 +864,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseImbuementAction(r)
 	case 0xBA:
 		g.parseTaskHuntingAction(r)
+	case 0xAD:
+		g.parseCyclopediaHouseAuction(r)
 	case 0xAE:
 		// C_SendBosstiary: open the Boss Cyclopedia -> send rules + boss list.
 		g.SendBosstiaryData()

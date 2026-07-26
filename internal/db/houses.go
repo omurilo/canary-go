@@ -9,7 +9,7 @@ import (
 
 // LoadHouses loads all houses from the houses table into the world.
 func (d *DB) LoadHouses(ctx context.Context, w *game.World) error {
-	const q = `SELECT id, name, owner, rent, size, beds FROM houses`
+	const q = `SELECT id, name, owner, rent, size, beds, town_id FROM houses`
 	rows, err := d.SQL.QueryContext(ctx, q)
 	if err != nil {
 		return err
@@ -20,7 +20,7 @@ func (d *DB) LoadHouses(ctx context.Context, w *game.World) error {
 		var h game.House
 		h.RentPeriod = "monthly"
 		var ownerID sql.NullInt64
-		if err := rows.Scan(&h.ID, &h.Name, &ownerID, &h.Rent, &h.Size, &h.Beds); err != nil {
+		if err := rows.Scan(&h.ID, &h.Name, &ownerID, &h.Rent, &h.Size, &h.Beds, &h.TownID); err != nil {
 			continue
 		}
 		if ownerID.Valid {

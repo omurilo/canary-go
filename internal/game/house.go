@@ -16,6 +16,7 @@ type House struct {
 	Beds       uint8
 	Size       uint32 // square meters
 	RentPeriod string // "monthly", "weekly", "daily"
+	TownID       uint16
 	Position   Position // entrance
 
 	GuestList    []string
