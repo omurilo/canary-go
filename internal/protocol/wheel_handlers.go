@@ -67,6 +67,24 @@ func (g *GameProtocol) applyWheelSave(r *netmsg.Reader) {
 	}
 	wheel := g.player.GetWheel()
 	wheel.SetVocation(game.CIPVocation(g.player.Vocation))
+
+	// Process gem vessels (4 affinities): each has [u8 hasGem][if 1: u16 gemIndex]
+	for aff := 0; aff < 4 && r.Remaining() >= 1; aff++ {
+		hasGem := r.GetByte()
+		if hasGem == 0 {
+			wheel.ActiveGems[aff] = nil
+			continue
+		}
+		if r.Remaining() >= 2 {
+			gemIdx := r.GetU16()
+			if int(gemIdx) < len(wheel.RevealedGems) {
+				gem := wheel.RevealedGems[gemIdx]
+				gem.Affinity = game.WheelGemAffinity(aff)
+				wheel.ActiveGems[aff] = &gem
+			}
+		}
+	}
+
 	if !wheel.ValidateAndSave(pointsMap, wheel.GetTotalPoints(g.player.Level)) {
 		g.player.SendTextMessage(0x14, "Something went wrong, try relogging and try again.")
 		g.SendWheelOfDestiny()
@@ -138,41 +156,39 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 	switch action {
 	case 0: // Destroy gem
 		wheel.DestroyGem(param)
-	case 1: // Reveal gem — scan inventory for any gem, consume it, create PlayerWheelGem
+	case 1: // Reveal gem — use param as quality (0=lesser,1=regular,2=greater)
 		catalog := g.deps.Items
-		gemQualities := []struct {
-			names []string
-			quality game.WheelGemQuality
-		}{
-			{[]string{"greater guardian gem", "greater marksman gem", "greater sage gem",
-				"greater mystic gem", "greater spiritualist gem"}, 2},
-			{[]string{"guardian gem", "marksman gem", "sage gem",
-				"mystic gem", "spiritualist gem"}, 1},
-			{[]string{"lesser guardian gem", "lesser marksman gem", "lesser sage gem",
-				"lesser mystic gem", "lesser spiritualist gem"}, 0},
+		var gemNames []string
+		var gemQuality game.WheelGemQuality
+		switch game.WheelGemQuality(param) {
+		case 2:
+			gemNames = []string{"greater guardian gem", "greater marksman gem", "greater sage gem",
+				"greater mystic gem", "greater spiritualist gem"}
+			gemQuality = 2
+		case 1:
+			gemNames = []string{"guardian gem", "marksman gem", "sage gem",
+				"mystic gem", "spiritualist gem"}
+			gemQuality = 1
+		default:
+			gemNames = []string{"lesser guardian gem", "lesser marksman gem", "lesser sage gem",
+				"lesser mystic gem", "lesser spiritualist gem"}
+			gemQuality = 0
 		}
-		var foundQuality game.WheelGemQuality
 		removed := false
-		for _, q := range gemQualities {
-			for _, name := range q.names {
-				id, ok := catalog.IDByName(name)
-				if !ok {
-					continue
-				}
-				if g.player.GetItemCount(id) > 0 {
-					if g.player.RemoveItemOfType(catalog, id, 1, -1, false) {
-						foundQuality = q.quality
-						removed = true
-						break
-					}
-				}
+		for _, name := range gemNames {
+			id, ok := catalog.IDByName(name)
+			if !ok {
+				continue
 			}
-			if removed {
-				break
+			if g.player.GetItemCount(id) > 0 {
+				if g.player.RemoveItemOfType(catalog, id, 1, -1, false) {
+					removed = true
+					break
+				}
 			}
 		}
 		if removed {
-			gem := game.NewRevealedGem(foundQuality)
+			gem := game.NewRevealedGem(gemQuality)
 			wheel.RevealedGems = append(wheel.RevealedGems, gem)
 		}
 	case 2: // SwitchDomain

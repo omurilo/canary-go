@@ -44,9 +44,25 @@ func (g *GameProtocol) SendOpenMarket() {
 	}
 	w.AddByte(uint8(offerCount))
 
-	// Depot items: aggregate by (itemId, tier) → total count.
 	entries := g.collectDepotItems()
-	w.AddU16(uint16(len(entries)))
+	
+	entriesCount := uint16(len(entries))
+	if g.player.CoinTransferable > 0 {
+		entriesCount++
+	}
+	w.AddU16(entriesCount)
+
+	// Inject a virtual depot item for Tibia Coins so the user can click it in the Market Depot list.
+	// (Real Tibia/Canary C++ doesn't do this, but the user expects to find it here).
+	if g.player.CoinTransferable > 0 {
+		count := g.player.CoinTransferable
+		if count > 65535 {
+			count = 65535
+		}
+		w.AddU16(game.ItemStoreCoin)
+		w.AddU16(uint16(count))
+	}
+
 	for _, e := range entries {
 		w.AddU16(e.itemID)
 		t := g.deps.Items.Get(e.itemID)

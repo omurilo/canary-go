@@ -139,6 +139,14 @@ func (w *Writer) AddU16(v uint16) {
 	w.pos += 2
 }
 
+
+// SetU16 overwrites a u16 at the given offset (for updating previously written counts).
+func (w *Writer) SetU16(offset int, v uint16) {
+	if offset+2 > len(w.buf) {
+		return
+	}
+	binary.LittleEndian.PutUint16(w.buf[offset:], v)
+}
 func (w *Writer) AddU32(v uint32) {
 	binary.LittleEndian.PutUint32(w.buf[w.pos:], v)
 	w.pos += 4
