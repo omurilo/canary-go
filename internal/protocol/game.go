@@ -553,8 +553,7 @@ func (g *GameProtocol) enterWorld() {
 	}
 
 	// Restore any containers that were left open by the client in its local config.
-	// Restore any containers that were left open by the client in its local config.
-	// g.restoreOpenContainers() // Disabled to prevent ghost container bugs.
+	g.restoreOpenContainers()
 	// Send initial condition/protection zone icons
 	g.SendIcons()
 

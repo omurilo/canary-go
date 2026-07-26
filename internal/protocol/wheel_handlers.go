@@ -119,29 +119,56 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 		return
 	}
 	action := r.GetByte()
+	wheel := g.player.GetWheel()
 	switch action {
-	case 0: // Destroy
+		case 0: // Destroy gem
 		if r.Remaining() >= 2 {
-			_ = r.GetU16()
+			slotID := r.GetU16()
+			for i, g := range wheel.Gems {
+				if g.Slot == slotID {
+					wheel.Gems = append(wheel.Gems[:i], wheel.Gems[i+1:]...)
+					break
+				}
+			}
 		}
-	case 1: // Reveal
+	case 1: // Reveal gem
 		if r.Remaining() >= 1 {
-			_ = r.GetByte()
+			_ = r.GetByte() // quality
+			wheel.RevealedGems++
 		}
 	case 2: // SwitchDomain
 		if r.Remaining() >= 2 {
-			_ = r.GetU16()
+			slotID := r.GetU16()
+			for i, g := range wheel.Gems {
+				if g.Slot == slotID {
+					wheel.Gems[i].Domain = (g.Domain + 1) % 4
+					break
+				}
+			}
 		}
 	case 3: // ToggleLock
 		if r.Remaining() >= 2 {
-			_ = r.GetU16()
+			slotID := r.GetU16()
+			for i, g := range wheel.Gems {
+				if g.Slot == slotID {
+					wheel.Gems[i].Locked = !g.Locked
+					break
+				}
+			}
 		}
-	case 4: // ImproveGrade / Enhance Mod Grade
+	case 4: // ImproveGrade / Enhance
 		if r.Remaining() >= 2 {
-			_ = r.GetByte()
-			_ = r.GetByte()
-		}
-	}
+			slot := r.GetByte()
+			_ = r.GetByte() // extra param
+			for i, g := range wheel.Gems {
+				if g.Slot == uint16(slot) {
+					if wheel.Gems[i].Grade < 6 {
+						wheel.Gems[i].Grade++
+					}
+					break
+				}
+			}
+		}	}
 	g.SendWheelOfDestiny()
 }
 
@@ -191,24 +218,40 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	w.AddByte(0) // monk quest bonus flag (u8 = 1 byte)
 	w.AddU16(0)  // monk quest bonus amount (u16 = 2 bytes)
 
-	// Gems section
-	w.AddByte(0) // active gems count (u8 = 1 byte)
-	w.AddU16(0)  // revealed gems count (u16 = 2 bytes)
+	// Gems section — send real gem data from the Wheel
+	wheelGems := wheel.Gems
+	revealed := uint16(wheel.RevealedGems)
+	if revealed == 0 && len(wheelGems) > 0 {
+		revealed = uint16(len(wheelGems))
+	}
+	w.AddByte(byte(len(wheelGems))) // active gems count
+	w.AddU16(revealed)              // revealed gems count
+	for _, gem := range wheelGems {
+		w.AddU16(gem.Slot)
+		w.AddByte(gem.Domain)
+		w.AddByte(gem.Grade)
+		if gem.Locked { w.AddByte(1) } else { w.AddByte(0) }
+	}
 
-	// Grade modifiers section
-	// Basic grade modifiers (46 entries: 0x00..0x2D)
+	// Grade modifiers section — send actual grades from equipped gems
+	gradeMap := make(map[byte]byte)
+	for _, gem := range wheelGems {
+		if gem.Grade > 0 {
+			gradeMap[byte(gem.Slot)] = gem.Grade
+		}
+	}
 	w.AddByte(46)
 	for i := byte(0); i < 46; i++ {
 		w.AddByte(i)
-		w.AddByte(0) // grade 0
+		w.AddByte(gradeMap[i])
 	}
 
-	// Supreme grade modifiers (vocation-specific 23 entries matching C++ WheelGemSupremeModifier_t)
+	// Supreme grade modifiers (vocation-specific 23 entries)
 	supremeMods := getSupremeModifiers(g.player.Vocation)
 	w.AddByte(byte(len(supremeMods)))
 	for _, modPos := range supremeMods {
 		w.AddByte(modPos)
-		w.AddByte(0) // grade 0
+		w.AddByte(gradeMap[modPos])
 	}
 
 	g.SendToClient(w)
@@ -219,9 +262,9 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	// Send resource balance updates expected by Wheel UI
 	g.sendResourceBalance(0x00, g.player.BankBalance)
 	g.sendResourceBalance(0x01, uint64(g.player.GetMoney()))
-	g.sendResourceBalance(0x51, 0) // RESOURCE_LESSER_GEMS
-	g.sendResourceBalance(0x52, 0) // RESOURCE_REGULAR_GEMS
-	g.sendResourceBalance(0x53, 0) // RESOURCE_GREATER_GEMS
-	g.sendResourceBalance(0x54, 0) // RESOURCE_LESSER_FRAGMENT
-	g.sendResourceBalance(0x55, 0) // RESOURCE_GREATER_FRAGMENT
+	g.sendResourceBalance(0x51, uint64(wheel.LesserFragments))   // RESOURCE_LESSER_GEMS
+	g.sendResourceBalance(0x52, uint64(wheel.RegularFragments))  // RESOURCE_REGULAR_GEMS
+	g.sendResourceBalance(0x53, uint64(wheel.GreaterFragments))  // RESOURCE_GREATER_GEMS
+	g.sendResourceBalance(0x54, uint64(wheel.LesserFragments))   // RESOURCE_LESSER_FRAGMENT
+	g.sendResourceBalance(0x55, uint64(wheel.GreaterFragments))  // RESOURCE_GREATER_FRAGMENT
 }

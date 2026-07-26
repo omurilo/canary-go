@@ -730,9 +730,4 @@ func (g *GameProtocol) restoreOpenContainers() {
 		traverse(item)
 	}
 	traverse(g.player.StoreInbox)
-	if g.player.DepotManager != nil {
-		for _, locker := range g.player.DepotManager.Lockers {
-			traverse(locker)
-		}
-	}
 }

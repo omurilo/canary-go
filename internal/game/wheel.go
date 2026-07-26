@@ -200,12 +200,29 @@ type WheelBonusData struct {
 	Instants map[string]bool // unlocked wheel instants (inert until spells land)
 }
 
+// WheelGem tracks a single gem in a wheel slot.
+type WheelGem struct {
+	Slot        uint16 // 1..36
+	Domain      uint8  // 0=combat, 1=defense, 2=healing, 3=support
+	Grade       uint8  // 0..6
+	Locked      bool
+	Revealed    bool
+}
+
 // WheelOfDestiny models the character progression tree.
 type WheelOfDestiny struct {
 	mu           sync.RWMutex
 	BonusPoints  uint16            // extra points from quests/scrolls (gated ≥ level 51 in C++)
 	ActivePreset uint8             // current preset (0-2)
 	SlotPoints   map[uint16]uint16 // slot id (1..36) -> allocated points
+
+	Gems         []WheelGem  // gems installed in slots
+	RevealedGems int         // total revealed gem count
+
+	// Fragment resources for gem enhance.
+	LesserFragments   uint16
+	RegularFragments  uint16
+	GreaterFragments  uint16
 
 	cip   uint8          // cached CIP vocation, drives the per-vocation bonuses
 	bonus WheelBonusData // cached, recomputed lazily
