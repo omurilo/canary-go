@@ -33,44 +33,73 @@ func NewLoginFactory(deps *Deps) network.ProtocolFactory {
 
 func (p *LoginProtocol) OnConnect(c *network.Connection) { c.RawFirstPacket = true }
 
-// sendStatusString sends XML server status (used for HTTP requests on the login port).
+// sendStatusString sends XML server status matching C++ ProtocolStatus::sendStatusString.
 func (p *LoginProtocol) sendStatusString(c *network.Connection) {
 	uptime := uint64(time.Since(serverStartTime).Seconds())
 	serverName := "Canary-Go"
-	mapName := ""
+	serverPort := 7171
+	serverIP := ""
+	location := ""
+	url := ""
 	ownerName := ""
 	ownerEmail := ""
+	mapName := ""
+	mapAuthor := ""
+	var mapWidth, mapHeight uint32
 	maxPlayers := uint32(2000)
 	onlineCount := uint32(0)
-	var expRate, skillRate, lootRate, magicRate, spawnRate float64 = 1, 1, 1, 1, 1
+	uniqueIPs := uint32(0)
+	peakPlayers := uint32(0)
+	monstersOnline := uint32(0)
+	npcsOnline := uint32(0)
+	var expRate, skillRate, lootRate, magicRate, spawnRate uint32 = 1, 1, 1, 1, 1
+	motd := ""
 
 	if p.deps != nil {
 		cfg := p.deps.Cfg
 		if cfg != nil {
 			serverName = cfg.ServerName
-			maxPlayers = 2000
+			serverPort = cfg.LoginPort
+			serverIP = cfg.IP
+			if cfg.MOTD != "" {
+				motd = cfg.MOTD
+			}
 		}
-		if p.deps.World != nil {
-			onlineCount = uint32(p.deps.World.OnlineCount())
+		world := p.deps.World
+		if world != nil {
+			onlineCount = uint32(world.OnlineCount())
+			uniqueIPs = onlineCount
+			peakPlayers = onlineCount
 		}
 	}
 
+	boostedCreature := ""
+	boostedBoss := ""
+	if p.deps != nil && p.deps.World != nil {
+		boostedCreature = p.deps.World.BoostedCreature
+		boostedBoss = p.deps.World.BoostedBoss
+	}
+
 	var b strings.Builder
-	b.WriteString("HTTP/1.1 200 OK\r\n")
-	b.WriteString("Content-Type: text/xml\r\n")
-	b.WriteString("Connection: close\r\n")
-	b.WriteString("\r\n")
+	// Pure XML for binary status protocol (no HTTP headers for MyAAC).
 	b.WriteString("<?xml version=\"1.0\"?>\n")
 	b.WriteString("<tsqp version=\"1.0\">\n")
-	fmt.Fprintf(&b, "\t<serverinfo uptime=\"%d\" ip=\"\" servername=\"%s\" port=\"%d\" location=\"\" url=\"\" server=\"%s\" version=\"1.0\" client=\"13.15\"/>\n",
-		uptime, serverName, p.deps.Cfg.LoginPort, serverName)
+	fmt.Fprintf(&b, "\t<serverinfo uptime=\"%d\" ip=\"%s\" servername=\"%s\" port=\"%d\" location=\"%s\" url=\"%s\" server=\"%s\" version=\"1.0\" client=\"13.15\"/>\n",
+		uptime, serverIP, serverName, serverPort, location, url, serverName)
+	fmt.Fprintf(&b, "\t<boostedCreature name=\"%s\"/>\n", boostedCreature)
+	fmt.Fprintf(&b, "\t<boostedBoss name=\"%s\"/>\n", boostedBoss)
 	fmt.Fprintf(&b, "\t<owner name=\"%s\" email=\"%s\"/>\n", ownerName, ownerEmail)
-	fmt.Fprintf(&b, "\t<players online=\"%d\" unique=\"%d\" max=\"%d\" peak=\"0\"/>\n",
-		onlineCount, onlineCount, maxPlayers)
-	fmt.Fprintf(&b, "\t<monsters total=\"%d\"/>\n\t<npcs total=\"%d\"/>\n", 0, 0)
-	fmt.Fprintf(&b, "\t<rates experience=\"%.2f\" skill=\"%.2f\" loot=\"%.2f\" magic=\"%.2f\" spawn=\"%.2f\"/>\n",
+	fmt.Fprintf(&b, "\t<players online=\"%d\" unique=\"%d\" max=\"%d\" peak=\"%d\"/>\n",
+		onlineCount, uniqueIPs, maxPlayers, peakPlayers)
+	fmt.Fprintf(&b, "\t<monsters total=\"%d\"/>\n", monstersOnline)
+	fmt.Fprintf(&b, "\t<npcs total=\"%d\"/>\n", npcsOnline)
+	fmt.Fprintf(&b, "\t<rates experience=\"%d\" skill=\"%d\" loot=\"%d\" magic=\"%d\" spawn=\"%d\"/>\n",
 		expRate, skillRate, lootRate, magicRate, spawnRate)
-	fmt.Fprintf(&b, "\t<map name=\"%s\" author=\"\"/>\n", mapName)
+	fmt.Fprintf(&b, "\t<map name=\"%s\" author=\"%s\" width=\"%d\" height=\"%d\"/>\n",
+		mapName, mapAuthor, mapWidth, mapHeight)
+	if motd != "" {
+		fmt.Fprintf(&b, "\t<motd>%s</motd>\n", motd)
+	}
 	b.WriteString("</tsqp>\n")
 	c.WriteRaw([]byte(b.String()))
 }

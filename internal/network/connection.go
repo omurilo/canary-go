@@ -168,6 +168,8 @@ func (c *Connection) serve() {
 		if n > 0 {
 			c.gotFirst = true
 			c.proto.OnFirstPacket(c, raw[:n])
+			// After raw first packet, return to avoid re-entering the framed loop.
+			return
 		}
 	}
 
