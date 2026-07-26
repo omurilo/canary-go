@@ -77,7 +77,7 @@ func (g *GameProtocol) collectDepotItems() []depotEntry {
 		}
 		g.aggregateContainerItems(chest, agg)
 	}
-	// Add Tibia Coins from the account balance as virtual depot items.
+		// Add Tibia Coins from the account balance as virtual depot items.
 	if g.player.CoinTransferable > 0 {
 		coinKey := (uint32(game.ItemStoreCoin) << 8) | 0
 		if existing, ok := agg[coinKey]; ok {
@@ -680,7 +680,7 @@ func (g *GameProtocol) sendResourcesBalance() {
 	w3 := netmsg.NewWriter()
 	w3.AddByte(0xEE)
 	w3.AddByte(0x02)
-	w3.AddU32(g.player.PreyCards)
+	w3.AddU64(uint64(g.player.PreyCards))
 	g.SendToClient(w3)
 
 	// RESOURCE_FORGE_DUST = 4
