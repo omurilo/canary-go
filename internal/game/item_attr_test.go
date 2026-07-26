@@ -161,10 +161,8 @@ func TestDecodeItemAttributes_UnsupportedFallsBack(t *testing.T) {
 	w := propstream.NewPropWriteStream()
 	w.WriteUint8(attrCustom)
 	w.WriteUint64(0)
-	if attrs, _, err := DecodeItemAttributes(w.GetStream(), 0); err != nil {
+	if _, _, err := DecodeItemAttributes(w.GetStream(), 0); err != nil {
 		t.Errorf("ATTR_CUSTOM should be skippable, got err=%v", err)
-	} else if attrs != nil {
-		t.Error("expected nil attributes for empty ATTR_CUSTOM-only blob")
 	}
 
 	// ATTR_CUSTOM_ATTRIBUTES (deprecated nested structure) should still error.

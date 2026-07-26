@@ -83,6 +83,13 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 		sidMap[item] = sid
 
 		attrs := item.Attributes
+		if item.Attr != nil {
+			if b := item.Attr.Encode(item.Count); len(b) > 0 {
+				attrs = b
+			}
+		} else if len(item.Attributes) > 0 {
+			attrs = item.Attributes
+		}
 		if imbBlob := game.EncodeImbuementBlob(item.Imbuements); len(imbBlob) > 0 {
 			attrs = append(attrs, imbBlob...)
 		}

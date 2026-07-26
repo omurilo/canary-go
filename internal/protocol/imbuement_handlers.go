@@ -122,6 +122,25 @@ func (g *GameProtocol) addAvailableImbuementsInfo(w *netmsg.Writer, item *game.I
 			if cat == nil {
 				continue
 			}
+
+			// Hide categories already applied on this item.
+			if item.Imbuements != nil {
+				skip := false
+				for _, info := range item.Imbuements {
+					if info.ID == 0 || info.Duration == 0 {
+						continue
+					}
+					existing := imbReg.GetImbuement(info.ID)
+					if existing != nil && existing.CategoryID == imb.CategoryID {
+						skip = true
+						break
+					}
+				}
+				if skip {
+					continue
+				}
+			}
+
 			it := g.deps.Items.Get(item.ID)
 			if it == nil {
 				continue
@@ -286,10 +305,6 @@ func (g *GameProtocol) applyImbuement(slot uint8, imbuementID uint16) {
 	}
 
 	item := g.player.ImbuingItem
-	if item == nil {
-		g.player.SendTextMessage(0x14, "No item selected for imbuement.")
-		return
-	}
 
 	for _, imbItem := range imb.Items {
 		count := g.player.GetItemTypeCount(g.deps.Items, imbItem.ID, -1)
@@ -307,6 +322,37 @@ func (g *GameProtocol) applyImbuement(slot uint8, imbuementID uint16) {
 
 	for _, imbItem := range imb.Items {
 		g.player.RemoveItemOfType(g.deps.Items, imbItem.ID, uint32(imbItem.Count), -1, false)
+	}
+
+	// Scroll imbuement: when no item is selected but the imbuement has a ScrollID,
+	// create the scroll item directly in the player's backpack.
+	if item == nil {
+		if imb.ScrollID == 0 {
+			g.player.SendTextMessage(0x14, "No item selected for imbuement.")
+			return
+		}
+		if _, ok := g.player.InternalAddItem(g.deps.Items, imb.ScrollID, 1, -1, game.ConstSlotWhereever); !ok {
+			g.player.SendTextMessage(0x14, "You don't have enough space in your backpack.")
+			return
+		}
+		g.player.UpdateInventoryWeight(g.deps.Items)
+		g.refreshContainers()
+
+		g.player.SendTextMessage(0x13, "Imbuement scroll created successfully!")
+		g.SendImbuementWindow(game.ImbuementActionScroll, nil)
+		return
+	}
+
+	// Prevent applying the same imbuement type on different slots (Tibia behavior).
+	for s := uint8(0); s < 10; s++ {
+		if s == slot {
+			continue
+		}
+		info, ok := item.GetImbuementInfo(s)
+		if ok && info.ID == imbuementID {
+			g.player.SendTextMessage(0x14, "This item already has this imbuement.")
+			return
+		}
 	}
 
 	item.SetImbuement(slot, imbuementID, baseImb.Duration)
