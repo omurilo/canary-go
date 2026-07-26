@@ -121,6 +121,8 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 			traverse(locker)
 		}
 	}
+	traverse(p.Inbox)
+	traverse(p.RewardChest)
 
 	for cid, openCont := range p.GetOpenContainers() {
 		if openCont.Container != nil {
