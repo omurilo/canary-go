@@ -192,6 +192,7 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 		if removed {
 			gem := game.NewRevealedGem(gemQuality)
 			g.player.WheelGemManager.RevealedGems = append(g.player.WheelGemManager.RevealedGems, gem)
+			g.sendGemAtelierGemRevealed(uint16(len(g.player.WheelGemManager.RevealedGems) - 1))
 		}
 
 	case 2: // SwitchDomain
@@ -373,4 +374,13 @@ func findItemIDs(catalog *items.Catalog, names ...string) []uint16 {
 		}
 	}
 	return ids
+}
+
+
+// sendGemAtelierGemRevealed notifies the client that a gem was revealed (opcode 0xC5).
+func (g *GameProtocol) sendGemAtelierGemRevealed(gemIndex uint16) {
+	w := netmsg.NewWriter()
+	w.AddByte(0xC5)
+	w.AddU16(gemIndex)
+	g.SendToClient(w)
 }

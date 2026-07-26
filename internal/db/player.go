@@ -271,7 +271,7 @@ func (d *DB) SavePlayerWheel(ctx context.Context, p *game.Player) error {
 
 	// Append JSON gem data after slot points
 	gemPersist := game.WheelGemPersistData{}
-	if p.Wheel != nil {
+	if p.WheelGemManager != nil {
 		gemPersist.ActiveGems = p.WheelGemManager.ActiveGems
 		gemPersist.RevealedGems = p.WheelGemManager.RevealedGems
 	}
