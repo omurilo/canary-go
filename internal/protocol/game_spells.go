@@ -68,7 +68,7 @@ func (g *GameProtocol) tryCastSpell(talkType byte, text string) bool {
 
 	// On success the spell words are spoken to spectators
 	// (Game::playerSaySpell -> Player::saySpell, game.cpp:7475).
-	g.broadcastSay(p, talkType, sp.Words)
+	g.broadcastSay(p, talkType, sp.Words, "")
 	return true
 }
 

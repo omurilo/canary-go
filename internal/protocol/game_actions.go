@@ -8,6 +8,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/game/vocations"
+	"github.com/opentibiabr/canary-go/internal/game/imbuements"
 	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/moveevents"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
@@ -514,9 +515,10 @@ const (
 // handleSay parses a chat message and broadcasts it.
 func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 	talkType := r.GetByte()
+	receiver := ""
 	switch talkType {
 	case talkTypePrivateTo, talkTypePrivateRedTo:
-		_ = r.GetString() // receiver name
+		receiver = r.GetString() // receiver name
 	case talkTypeChannelY, talkTypeChannelR1:
 		_ = r.GetU16()    // channel ID
 	}
@@ -537,7 +539,7 @@ func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 	if g.tryCastSpell(talkType, text) {
 		return
 	}
-	g.broadcastSay(g.player, talkType, text)
+	g.broadcastSay(g.player, talkType, text, receiver)
 	g.deps.Lua.Call("onPlayerSay", g.player.Name, text)
 }
 
@@ -951,7 +953,12 @@ func BuildItemDescription(viewer *game.Player, item *game.Item, catalog *items.C
 	}
 
 	// Imbuements
-	imbReg := viewer.GetWorld().Imbuements
+	var imbReg *imbuements.Registry
+	if viewer != nil {
+		if w := viewer.GetWorld(); w != nil {
+			imbReg = w.Imbuements
+		}
+	}
 	if imbSlots, ok := itemType.Stats["imbuementslot"]; ok && imbSlots > 0 {
 		s.WriteString("\nImbuements: (")
 		for slot := uint8(0); slot < uint8(imbSlots); slot++ {
@@ -961,6 +968,9 @@ func BuildItemDescription(viewer *game.Player, item *game.Item, catalog *items.C
 			info, found := item.GetImbuementInfo(slot)
 			if !found {
 				s.WriteString("Empty Slot")
+				continue
+			}
+			if imbReg == nil {
 				continue
 			}
 			imb := imbReg.GetImbuement(info.ID)
@@ -1333,12 +1343,9 @@ func (g *GameProtocol) parseNpcGreet(r *netmsg.Reader) {
 		return
 	}
 
-	n := g.deps.World.Npc(npcId)
-	if n == nil {
-		return
+	if c := g.deps.World.CreatureByID(npcId); c != nil {
+		if npc, ok := c.(*game.Npc); ok {
+			g.deps.Lua.CallNpcOnCreatureSay(npc, p, 1, "hi") // TALKTYPE_SAY = 1
+		}
 	}
-
-	// Route the greet to Lua directly using TALKTYPE_SAY and "hi"
-	// We do not broadcast this to players because it's a UI-initiated greet.
-	g.deps.Lua.CallNpcOnCreatureSay(n, p, 1, "hi") // TALKTYPE_SAY = 1
 }
