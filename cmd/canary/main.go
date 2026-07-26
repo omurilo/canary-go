@@ -308,6 +308,26 @@ func run(o runOpts, log *slog.Logger) error {
 				world.TownsByID[uint16(t.ID)] = t.Pos
 				world.TownNames[uint16(t.ID)] = t.Name
 			}
+
+			// Load houses from the house XML file (OTBM reference).
+			if res.HouseFile != "" {
+				housePath := filepath.Join(mapDir, res.HouseFile)
+				houses, err := database.ParseHouseFile(housePath)
+				if err != nil {
+					log.Warn("parse house file", "path", housePath, "err", err)
+				} else {
+					for _, h := range houses {
+						// Insert/update the house in DB and register in world.
+						if err := database.SaveHouse(ctx, &h); err != nil {
+							log.Warn("save house", "id", h.ID, "err", err)
+							continue
+						}
+						w := h
+						world.RegisterHouse(&w)
+					}
+					log.Info("loaded houses from XML", "count", len(houses))
+				}
+			}
 			if len(res.Towns) > 0 {
 				spawn = res.Towns[0].Pos
 				log.Info("spawn set to town temple", "town", res.Towns[0].Name, "pos", spawn)

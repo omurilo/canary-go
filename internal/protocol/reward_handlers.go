@@ -13,5 +13,9 @@ func (g *GameProtocol) parseOpenRewardChest(r *netmsg.Reader) {
 		return
 	}
 
-	g.player.Session.OpenContainer(chest)
+	// In Tibia 13+, the client automatically sends 0xD0 on login to request the Daily Reward Wall UI.
+	// Replying with a 0x6E physical container opens a "ghost" Reward Chest window for the player.
+	// If they actually right-click a Reward Chest on the map, parseUseItem (0x82) will handle opening the container.
+	// For now, we do nothing on 0xD0 until the Daily Reward Wall UI is implemented.
+	// g.player.Session.OpenContainer(chest)
 }

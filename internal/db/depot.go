@@ -1,6 +1,7 @@
 package db
 
 import (
+	"strings"
 	"context"
 	"fmt"
 
@@ -76,12 +77,22 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 		return err
 	}
 
-	sidCounter := 100 // nested SIDs start at 100 to avoid colliding with PIDs (0-99)
-	sidMap := make(map[*game.Item]int)
+	var args []interface{}
+	var placeholders []string
+	sidCounter := 100
 
-	const insertQuery = `INSERT INTO player_depotitems
-		(player_id, pid, sid, itemtype, count, attributes)
-		VALUES (?, ?, ?, ?, ?, ?)`
+	flush := func() error {
+		if len(placeholders) == 0 {
+			return nil
+		}
+		query := "INSERT INTO player_depotitems (player_id, pid, sid, itemtype, count, attributes) VALUES " + strings.Join(placeholders, ",")
+		_, err := tx.ExecContext(ctx, query, args...)
+		
+		// Reset slices
+		args = args[:0]
+		placeholders = placeholders[:0]
+		return err
+	}
 
 	// Helper function to save an item and its children recursively
 	var saveItem func(item *game.Item, parentSID int) error
@@ -92,9 +103,8 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 
 		sid := sidCounter
 		sidCounter++
-		sidMap[item] = sid
 
-		attrs := item.Attributes
+		attrs := make([]byte, 0)
 		if item.Attr != nil {
 			if b := item.Attr.Encode(item.Count); len(b) > 0 {
 				attrs = b
@@ -111,14 +121,13 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 			count = 1
 		}
 
-		if attrs == nil {
-			attrs = []byte{}
-		}
+		placeholders = append(placeholders, "(?, ?, ?, ?, ?, ?)")
+		args = append(args, p.DBID, parentSID, sid, item.ID, count, attrs)
 
-		_, err := tx.ExecContext(ctx, insertQuery,
-			p.DBID, parentSID, sid, item.ID, count, attrs)
-		if err != nil {
-			return fmt.Errorf("failed to save depot item sid=%d: %w", sid, err)
+		if len(placeholders) >= 500 {
+			if err := flush(); err != nil {
+				return fmt.Errorf("failed to save depot item sid=%d: %w", sid, err)
+			}
 		}
 
 		// Save children recursively
@@ -131,16 +140,20 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 		return nil
 	}
 
-	// Save all chests
+	// Save all chests' contents
 	for pid, chest := range p.DepotManager.Chests {
-		if err := saveItem(chest, int(pid)); err != nil {
-			return err
+		if chest == nil {
+			continue
 		}
 		for _, item := range chest.Contents {
 			if err := saveItem(item, int(pid)); err != nil {
 				return err
 			}
 		}
+	}
+
+	if err := flush(); err != nil {
+		return err
 	}
 
 	return tx.Commit()

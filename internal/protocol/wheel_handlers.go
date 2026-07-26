@@ -114,61 +114,50 @@ func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
 }
 
 // parseWheelGemAction handles opcode 0xE7 (Wheel of Destiny Gem actions / enhance mod grade).
+// parseWheelGemAction handles opcode 0xE7 (Wheel of Destiny Gem actions / enhance mod grade).
+// Wire format (C++): [u8 action][u16 param][u8 pos]
+//   action 0=Destroy, 1=Reveal, 2=SwitchDomain, 3=ToggleLock, 4=ImproveGrade
 func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
-	if r.Remaining() < 1 {
+	if r.Remaining() < 4 {
 		return
 	}
 	action := r.GetByte()
+	param := r.GetU16()
+	pos := r.GetByte()
 	wheel := g.player.GetWheel()
+
 	switch action {
-		case 0: // Destroy gem
-		if r.Remaining() >= 2 {
-			slotID := r.GetU16()
-			for i, g := range wheel.Gems {
-				if g.Slot == slotID {
-					wheel.Gems = append(wheel.Gems[:i], wheel.Gems[i+1:]...)
-					break
-				}
-			}
+	case 0: // Destroy gem
+		if int(param) < len(wheel.Gems) {
+			wheel.Gems = append(wheel.Gems[:param], wheel.Gems[param+1:]...)
 		}
 	case 1: // Reveal gem
-		if r.Remaining() >= 1 {
-			_ = r.GetByte() // quality
-			wheel.RevealedGems++
-		}
+		wheel.Gems = append(wheel.Gems, game.WheelGem{
+			Slot:     uint16(len(wheel.Gems) + 1),
+			Domain:   0,
+			Grade:    0,
+			Locked:   false,
+			Revealed: true,
+		})
+		_ = param
 	case 2: // SwitchDomain
-		if r.Remaining() >= 2 {
-			slotID := r.GetU16()
-			for i, g := range wheel.Gems {
-				if g.Slot == slotID {
-					wheel.Gems[i].Domain = (g.Domain + 1) % 4
-					break
-				}
-			}
+		if int(param) < len(wheel.Gems) {
+			wheel.Gems[param].Domain = (wheel.Gems[param].Domain + 1) % 4
 		}
 	case 3: // ToggleLock
-		if r.Remaining() >= 2 {
-			slotID := r.GetU16()
-			for i, g := range wheel.Gems {
-				if g.Slot == slotID {
-					wheel.Gems[i].Locked = !g.Locked
-					break
-				}
-			}
+		if int(param) < len(wheel.Gems) {
+			wheel.Gems[param].Locked = !wheel.Gems[param].Locked
 		}
 	case 4: // ImproveGrade / Enhance
-		if r.Remaining() >= 2 {
-			slot := r.GetByte()
-			_ = r.GetByte() // extra param
-			for i, g := range wheel.Gems {
-				if g.Slot == uint16(slot) {
-					if wheel.Gems[i].Grade < 6 {
-						wheel.Gems[i].Grade++
-					}
-					break
+		for i, g := range wheel.Gems {
+			if g.Slot == uint16(pos) {
+				if wheel.Gems[i].Grade < 6 {
+					wheel.Gems[i].Grade++
 				}
+				break
 			}
-		}	}
+		}
+	}
 	g.SendWheelOfDestiny()
 }
 
@@ -262,18 +251,18 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 	// Send resource balance updates expected by Wheel UI
 	g.sendResourceBalance(0x00, g.player.BankBalance)
 	g.sendResourceBalance(0x01, uint64(g.player.GetMoney()))
-	lesser, reg, greater := g.countInventoryGems()
+	lesser, reg, greater, lesserFrags, greaterFrags := g.countInventoryGems()
 		g.sendResourceBalance(0x51, uint64(lesser))    // RESOURCE_LESSER_GEMS
 	g.sendResourceBalance(0x52, uint64(reg))       // RESOURCE_REGULAR_GEMS
 	g.sendResourceBalance(0x53, uint64(greater))   // RESOURCE_GREATER_GEMS
-	g.sendResourceBalance(0x54, uint64(wheel.LesserFragments))   // RESOURCE_LESSER_FRAGMENT
-	g.sendResourceBalance(0x55, uint64(wheel.GreaterFragments))  // RESOURCE_GREATER_FRAGMENT
+	g.sendResourceBalance(0x54, uint64(lesserFrags))   // RESOURCE_LESSER_FRAGMENT
+	g.sendResourceBalance(0x55, uint64(greaterFrags))  // RESOURCE_GREATER_FRAGMENT
 }
 
 // countInventoryGems scans the player's inventory for gem items and returns counts.
-func (g *GameProtocol) countInventoryGems() (lesser, regular, greater uint32) {
+func (g *GameProtocol) countInventoryGems() (lesser, regular, greater, lesserFrags, greaterFrags uint32) {
 	if g.player == nil || g.deps.Items == nil {
-		return 0, 0, 0
+		return 0, 0, 0, 0, 0
 	}
 	catalog := g.deps.Items
 	lesserNames := []string{
@@ -288,6 +277,11 @@ func (g *GameProtocol) countInventoryGems() (lesser, regular, greater uint32) {
 		"greater guardian gem", "greater marksman gem", "greater sage gem",
 		"greater mystic gem", "greater spiritualist gem",
 	}
+	// Fragment items (forge dust items used as wheel fragments)
+	// 46625 = lesser fragment, 46626 = greater fragment
+	fragmentLesserIDs := []uint16{46625}
+	fragmentGreaterIDs := []uint16{46626}
+	
 	for _, name := range lesserNames {
 		if id, ok := catalog.IDByName(name); ok {
 			lesser += uint32(g.player.GetItemCount(id))
@@ -302,6 +296,12 @@ func (g *GameProtocol) countInventoryGems() (lesser, regular, greater uint32) {
 		if id, ok := catalog.IDByName(name); ok {
 			greater += uint32(g.player.GetItemCount(id))
 		}
+	}
+	for _, id := range fragmentLesserIDs {
+		lesserFrags += uint32(g.player.GetItemCount(id))
+	}
+	for _, id := range fragmentGreaterIDs {
+		greaterFrags += uint32(g.player.GetItemCount(id))
 	}
 	return
 }
