@@ -6,13 +6,13 @@ Você está migrando um servidor MMORPG Tibia (Canary) de C++ para Go. O C++ ori
 
 Este documento mapeia **o que ainda precisa ser migrado**, organizado por prioridade e impacto.
 
-**Última atualização:** 2026-07-25
+**Última atualização:** 2026-07-26
 
 ---
 
 ## Status Atual: O Que Já Funciona
 
-**✅ Sistemas Completos:**
+**✅ Sistemas Completos (20/20 B-Systems — 100%):**
 - Rede/Protocolo (RSA, XTEA, framing)
 - Login e autenticação
 - OTBM map loading (1.94M tiles)
@@ -26,15 +26,26 @@ Este documento mapeia **o que ainda precisa ser migrado**, organizado por priori
 - Monstros básicos (spawn, aggro, pathfind, loot, xp)
 - Party (invite, join, shields, shared exp toggle)
 - Spells básicas (instant cast + damage)
-
-**🟡 Sistemas Parciais (funcionam mas incompletos):**
-- Player stats (falta skill tries, varStats, wheel bonuses)
-- Conditions (regeneration/food ok, falta DoT, haste/paralyze speed, icons)
-- Combat (falta PvP rules, damage split, elements/absorb, crit/leech, monster spells)
-- Vocations (loaded, mas fórmulas per-vocation não aplicadas)
-- Events (Action/MoveEvent/TalkAction ok, falta CreatureEvent/GlobalEvent/Zone)
-- Persistence (player core + items salvos, falta skills, maglevel, conditions, storages, depot/inbox)
-- Lua API (core functions, **414 stubs restantes**)
+- **B1** - Mounts & Outfits
+- **B2** - Blessings
+- **B3** - Bestiary & Bosstiary
+- **B4** - Charms
+- **B5** - Prey
+- **B6** - Task Hunting
+- **B7** - Achievements & Titles
+- **B8** - Wheel of Destiny
+- **B9** - Imbuements
+- **B10** - Exaltation Forge
+- **B11** - Market
+- **B12** - Houses
+- **B13** - Guilds
+- **B14** - VIP
+- **B15** - Familiars
+- **B16** - Animus Mastery
+- **B17** - Hazard System
+- **B18** - Concoctions
+- **B19** - Store / Tibia Coins
+- **B20** - Reward System
 
 ---
 

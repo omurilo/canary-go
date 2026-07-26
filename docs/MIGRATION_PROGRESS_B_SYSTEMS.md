@@ -1,33 +1,74 @@
 # 🎯 Progresso da Migração C++ → Go - Sistema B (Progressão)
 
-**Última Atualização:** 2026-07-25 15:00 UTC  
-**Status Geral:** 13 sistemas completos (65%)
+**Última Atualização:** 2026-07-26 23:00 UTC  
+**Status Geral:** 20 sistemas completos (100%) 🎉
 
 ---
 
-## ✅ Sistemas Completos (13/20)
+## ✅ Todos os Sistemas Completos (20/20)
 
-### Fase 1 (Implementados Hoje)
-1. **B1 - Mounts & Outfits** ✅
-   - Outfit storage (looktype + addons)
-   - Mount storage (bitflags + DB table)
-   - Protocol packets (SendOutfitWindow)
-   - Lua bindings completos
-   - DB migration criada
+| # | Sistema | Status |
+|---|---------|--------|
+| B1 | Mounts & Outfits | ✅ |
+| B2 | Blessings | ✅ |
+| B3 | Bestiary & Bosstiary | ✅ |
+| B4 | Charms | ✅ |
+| B5 | Prey | ✅ |
+| B6 | Task Hunting | ✅ |
+| B7 | Achievements & Titles | ✅ |
+| B8 | Wheel of Destiny | ✅ |
+| B9 | Imbuements | ✅ |
+| B10 | Exaltation Forge | ✅ |
+| B11 | Market | ✅ |
+| B12 | Houses | ✅ |
+| B13 | Guilds | ✅ |
+| B14 | VIP | ✅ |
+| B15 | Familiars | ✅ |
+| B16 | Animus Mastery | ✅ |
+| B17 | Hazard System | ✅ |
+| B18 | Concoctions | ✅ |
+| B19 | Store / Tibia Coins | ✅ |
+| B20 | Reward System | ✅ |
 
-2. **B13 - Guilds** ✅
-   - Guild/GuildRank/GuildMember models
-   - 13 operações de DB (Create, Load, Save, etc.)
-   - World integration (cache)
-   - Lua bindings (13 métodos)
-   - MOTD, ranks, bank system
+## Detalhes por Sistema
 
-### Fase 2 (Completados - Antes Parciais)
-9. **B2 - Blessings** ✅ (70% → 100%)
-   - Protocol: SendBlessingsDialog (0x9C), parseBuyBlessing (0xD3)
-   - Lua: player:sendBlessingsDialog()
+### B7 - Achievements & Titles ✅
+- Model + DB completos
+- Protocolo da cyclopedia (0xDA)
+- Lua bindings: registerAchievement, etc.
 
-10. **B9 - Imbuements** ✅ (30% → 100%)
+### B11 - Market ✅
+- Persistência no DB (offer + remove)
+- Tibia Coins como item virtual
+- Protocolo completo (browse, own offers, create/cancel/accept)
+- Depots via DepotManager
+
+### B12 - Houses ✅
+- OTBM house tiles
+- Door access control (owner/sub-owner/guest)
+- Lua bindings completos (10 métodos)
+- XML parser + DB persistence
+- Cyclopedia house list
+
+### B15 - Familiars ✅
+- Model + DB + Lua bindings
+- Ativado via EnsureFamiliarsTable
+
+### B16/B17/B18 - Animus / Hazard / Concoctions ✅
+- Player fields + DB load/save
+- Lua bindings
+
+### Wheel of Destiny (B8) ✅
+- Gem Atelier (reveal, destroy, switch domain, toggle lock)
+- Fragment Workshop (enhance/fragments)
+- Vessels (place/remove)
+- Persistência das gems como JSON
+
+## Status Protocol (7171)
+- ✅ XML para MyAAC (FF FF "info")
+- ✅ JSON para cliente (cacheinfo, boostedcreature, etc.)
+- ✅ HTTP headers + Content-Length
+- ✅ players_online sincronizado no DB
     - Core: imbuement.go (19 types, 3 tiers, costs, durations)
     - Protocol: SendImbuementWindow (0xEB), parseImbuementAction (0xEC)
 
