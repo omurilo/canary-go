@@ -611,14 +611,19 @@ func (g *GameProtocol) tryTalkAction(talkType byte, text string) bool {
 	return true
 }
 
-func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text string) {
+func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text string, receiver string) {
 	// Player→NPC speech (PRIVATE_PN) is routed ONLY to NPC spectators, never
 	// echoed to player clients (C++ Game::playerSay uses npcsSpectators). Echoing
 	// it — with or without a position — crashes the client, so deliver it to NPCs
 	// and stop.
 	if talkType == talkTypePrivatePN {
 		for _, n := range g.deps.World.SpectatingNpcs(speaker.Pos) {
-			g.deps.Lua.CallNpcOnCreatureSay(n, speaker, talkType, text)
+			if receiver != "" && !strings.EqualFold(n.Name, receiver) {
+				continue
+			}
+			if g.deps.Lua.CallNpcOnCreatureSay(n, speaker, talkType, text) {
+				break
+			}
 		}
 		return
 	}
@@ -1316,3 +1321,24 @@ func (g *GameProtocol) parseFightModes(r *netmsg.Reader) {
 	g.sendStats()
 }
 
+
+func (g *GameProtocol) parseNpcGreet(r *netmsg.Reader) {
+	npcId := r.GetU32()
+	if npcId == 0 {
+		return
+	}
+
+	p := g.player
+	if p == nil {
+		return
+	}
+
+	n := g.deps.World.Npc(npcId)
+	if n == nil {
+		return
+	}
+
+	// Route the greet to Lua directly using TALKTYPE_SAY and "hi"
+	// We do not broadcast this to players because it's a UI-initiated greet.
+	g.deps.Lua.CallNpcOnCreatureSay(n, p, 1, "hi") // TALKTYPE_SAY = 1
+}

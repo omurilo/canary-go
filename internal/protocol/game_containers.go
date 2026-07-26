@@ -126,6 +126,12 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		return
 	}
 
+	// Market
+	if item.ID == game.ItemMarket {
+		g.sendStatusText("Market is not implemented yet in Go.")
+		return
+	}
+
 	if t.IsContainer() {
 		if cid := g.player.GetContainerID(item); cid != -1 {
 			g.player.CloseContainer(uint8(cid))

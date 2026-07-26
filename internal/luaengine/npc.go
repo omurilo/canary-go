@@ -415,19 +415,19 @@ func (e *Engine) CallNpcCloseChannel(npc *game.Npc, player *game.Player) {
 	}
 }
 
-func (e *Engine) CallNpcOnCreatureSay(npc *game.Npc, player *game.Player, talkType byte, text string) {
+func (e *Engine) CallNpcOnCreatureSay(npc *game.Npc, player *game.Player, talkType byte, text string) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	e.npcCallbacksMu.Lock()
 	if e.npcCallbacks == nil {
 		e.npcCallbacksMu.Unlock()
-		return
+		return false
 	}
 	callbacks, ok := e.npcCallbacks[strings.ToLower(npc.Name)]
 	if !ok || callbacks["onSay"] == nil {
 		e.npcCallbacksMu.Unlock()
-		return
+		return false
 	}
 	fn := callbacks["onSay"]
 	e.npcCallbacksMu.Unlock()
@@ -448,7 +448,12 @@ func (e *Engine) CallNpcOnCreatureSay(npc *game.Npc, player *game.Player, talkTy
 	L.Push(lua.LNumber(talkType))
 	L.Push(lua.LString(text))
 
-	if err := L.PCall(4, 0, nil); err != nil {
+	if err := L.PCall(4, 1, nil); err != nil {
 		e.log.Error("lua npc onCreatureSay", "npc", npc.Name, "err", err)
+		return false
 	}
+
+	ret := L.Get(-1)
+	L.Pop(1)
+	return lua.LVAsBool(ret)
 }

@@ -72,16 +72,7 @@ function NpcDialog.remove(player, npcId)
 		return
 	end
 
-	local list = NpcDialog._getList(player)
-	if not list or #list == 0 then
-		return
-	end
-
-	for i = #list, 1, -1 do
-		if list[i] == npcId then
-			table.remove(list, i)
-		end
-	end
+	NpcDialog.clear(player)
 end
 
 function NpcDialog.clear(player)

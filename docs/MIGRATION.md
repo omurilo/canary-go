@@ -164,13 +164,13 @@ Cada subsistema aqui é uma feature completa que jogadores esperam. C++ possui *
 #### B7. Achievements & Titles (~1,500 LOC C++)
 **C++:** `src/creatures/players/achievement/`, `src/creatures/players/cyclopedia/`  
 **Go:** `internal/game/achievement.go`, `internal/db/achievements.go`  
-**Status:** Implementado ✓
-- Achievement registry (with ID/name/description/secret/points)
-- Player unlock tracking (map[id]timestamp)
-- DB: `player_achievements` table (Load/Save)
-- Title tracking with DB persistence
-- Lua bindings: registerAchievement, getAchievementInfo, hasAchievement, addAchievement, getTitles, addAchievementProgress, addAchievementPoints
-- Mastery medusa/score tracking
+**Status:** Model + DB + Lua bindings implementados. **Protocolo pendente (cyclopedia packets).**
+- ✅ Achievement registry (ID/name/description/secret/points)
+- ✅ Player unlock tracking (map[id]timestamp)
+- ✅ DB: `player_achievements` + `player_titles` (Load/Save)
+- ✅ Lua bindings: registerAchievement, getAchievementInfo, hasAchievement, addAchievement, getTitles, etc.
+- ❌ Protocolo: cyclopedia achievement packet (0x61)
+- ❌ Protocolo: SendCyopediaCharacterAchievements
 
 #### B8. Wheel of Destiny (~6,074 LOC C++)
 **C++:** `src/creatures/players/wheel/`  
@@ -208,24 +208,24 @@ Cada subsistema aqui é uma feature completa que jogadores esperam. C++ possui *
 #### B11. Market System (~650 LOC C++)
 **C++:** `src/io/iomarket.cpp`  
 **Go:** `internal/game/market.go`, `internal/db/market.go`  
-**Status:** Implementado ✓
-- MarketOffer model (buy/sell)
-- In-memory Market with active offer cache (by ID, item, player)
-- CRUD: Create/Remove/Get/LoadMarketOffers
-- Expiration/purge support
-- Lua openMarket binding (protocol callback)
-- DB: `market_offers` table (Load/Create/Remove)
+**Status:** Model + DB implementados. **Protocolo + Lua não implementados.**
+- ✅ MarketOffer model (buy/sell)
+- ✅ In-memory Market cache (by ID, item, player)
+- ✅ DB CRUD: Create/Remove/Get/LoadMarketOffers, `market_offers` table
+- ❌ Protocolo: market browse (0xEF), create offer (0xF0), cancel (0xF1), buy (0xF2)
+- ❌ Lua: openMarket é stub que chama interface inexistente
+- ❌ Item delivery via inbox
 
 #### B12. Houses (~1,689 LOC C++)
 **C++:** `src/map/house/`  
 **Go:** `internal/game/house.go`, `internal/db/houses.go`  
-**Status:** Implementado ✓
-- House model (ID, name, owner, rent, beds, size)
-- Access lists (guest players, guilds)
-- Door management model
-- World integration (register, lookup by ID/player)
-- DB: LoadHouses, SaveHouseOwner, SaveAccessList
-- DB: EnsureHousesTables (houses, house_lists)
+**Status:** Model + DB implementados. **Protocolo + Lua não implementados.**
+- ✅ House model (ID, name, owner, rent, beds, size, access lists)
+- ✅ World integration (register, lookup by ID/player)
+- ✅ DB: LoadHouses, SaveHouseOwner, SaveAccessList
+- ❌ Protocolo: house window (0x6F), edit door (0x70), rent/buy
+- ❌ Lua bindings: nenhum
+- ❌ Rent system (payHouses cron)
 
 #### B13. Guilds (~1,683 LOC C++ em grouping)
 **C++:** `src/creatures/players/grouping/guild.cpp`  
@@ -251,11 +251,12 @@ Cada subsistema aqui é uma feature completa que jogadores esperam. C++ possui *
 #### B15. Familiars (~300 LOC C++)
 **C++:** `src/creatures/players/grouping/familiars.cpp`  
 **Go:** `internal/game/familiar.go`, `internal/db/familiars.go`  
-**Status:** Implementado ✓
-- Familiar model (lookType, name, premium, type)
-- Player unlock/remove/has/set active familiar
-- DB: `player_familiars` table (Load/Save)
-- Lua bindings: addFamiliar, removeFamiliar, hasFamiliar, setFamiliarLooktype, getFamiliarLooktype
+**Status:** Model + DB + Lua implementados. **Protocolo pendente (familiar window).**
+- ✅ Familiar model (lookType, name, premium, type)
+- ✅ Player unlock/remove/has/set active familiar
+- ✅ DB: `player_familiars` table (Load/Save)
+- ✅ Lua bindings: addFamiliar, removeFamiliar, hasFamiliar, setFamiliarLooktype, getFamiliarLooktype
+- ❌ Protocolo: familiar window packet
 
 #### B17. Hazard System (LOC desconhecido)
 **C++:** Parte de `src/game/`  
@@ -527,11 +528,11 @@ Ao migrar cada sistema, consulte:
 
 ## Métricas de Progresso
 
-- **LOC migradas:** ~28k / ~100k (28%)
-- **Sistemas funcionais:** 21 / ~50 (42%) — +6: Achievements, Familiars, Houses, Market, Concoctions (stub), Animus (stub)
+- **LOC migradas:** ~27k / ~100k (27%)
+- **Sistemas funcionais:** 15 / ~50 (30%) — inalterado (os sistemas B7/B11/B12/B15 só têm model+DB, protocolo pendente)
 - **Lua stubs restantes:** ~130 / ~1300 (90% done, 10% critical)
 - **Packets implementados:** 31 / ~60 (52%)
-- **DB tables migradas:** 12 / ~25 (48%) — +4: player_achievements, player_titles, player_familiars, market_offers
+- **DB tables migradas:** 12 / ~25 (48%) — +4: player_achievements, player_titles, player_familiars, market_offers, houses
 
 ---
 
