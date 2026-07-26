@@ -14,10 +14,19 @@ const marketFeePercent uint64 = 2
 // Outbound packets
 // ──────────────────────────────────────────────────────────────────────────────
 
+// depotEntry aggregates depot items by (itemId, tier) → total count.
+type depotEntry struct {
+	itemID uint16
+	tier   uint8
+	count  uint16
+}
+
 // SendOpenMarket opens the market window on the client (opcode 0xF6).
-// It sends the player's depot contents and bank balance.
+// Format mirrors C++ ProtocolGame::sendMarketEnter:
+//   [0xF6][u8 offerCount][u16 itemCount] then per-item { [u16 itemId][u8 tier*][u16 count] }
+//   * tier byte only sent when tier > 0.
 func (g *GameProtocol) SendOpenMarket() {
-	if g.player == nil {
+	if g.player == nil || g.player.World == nil || g.player.World.Market == nil {
 		return
 	}
 	g.player.InMarket = true
@@ -25,51 +34,58 @@ func (g *GameProtocol) SendOpenMarket() {
 	w := netmsg.NewWriter()
 	w.AddByte(0xF6) // opMarketEnter
 
-	// Bank balance (u64 LE).
-	w.AddU64(g.player.BankBalance)
+	// Number of active offers the player currently has (capped at u8).
+	offerCount := g.player.World.Market.GetPlayerOfferCount(g.player.GetID())
+	if offerCount > 255 {
+		offerCount = 255
+	}
+	w.AddByte(uint8(offerCount))
 
-	// Depot items: flatten depot lockers into (depotId, itemId, amount, tier).
-	depotItems := g.collectDepotItems()
-	w.AddU16(uint16(len(depotItems)))
-	for _, di := range depotItems {
-		w.AddU16(di.depotID)
-		w.AddU16(di.itemID)
-		w.AddU16(di.amount)
-		if di.tier > 0 {
-			w.AddByte(di.tier)
+	// Depot items: aggregate by (itemId, tier) → total count.
+	entries := g.collectDepotItems()
+	w.AddU16(uint16(len(entries)))
+	for _, e := range entries {
+		w.AddU16(e.itemID)
+		if e.tier > 0 {
+			w.AddByte(e.tier)
 		}
+		w.AddU16(e.count)
 	}
 
 	g.SendToClient(w)
+
+	// C++ also sends updateCoinBalance and sendResourcesBalance after market enter.
+	// g.SendCoinBalance()
+	// g.sendResourcesBalance()
 }
 
-type depotItem struct {
-	depotID uint16
-	itemID  uint16
-	amount  uint16
-	tier    uint8
-}
-
-// collectDepotItems flattens the player's depot lockers into a slice for sending.
-func (g *GameProtocol) collectDepotItems() []depotItem {
+// collectDepotItems aggregates items from all depot lockers by (itemId, tier).
+func (g *GameProtocol) collectDepotItems() []depotEntry {
 	if g.player.DepotLockers == nil {
 		return nil
 	}
-	var items []depotItem
-	for depotID, locker := range g.player.DepotLockers {
+	agg := make(map[uint32]uint16) // key = (itemId<<8 | tier), value = count
+	for _, locker := range g.player.DepotLockers {
 		if locker == nil {
 			continue
 		}
-		g.collectContainerItems(depotID, locker, &items)
+		g.aggregateContainerItems(locker, agg)
 	}
-	return items
+	if len(agg) == 0 {
+		return nil
+	}
+	entries := make([]depotEntry, 0, len(agg))
+	for key, count := range agg {
+		itemID := uint16(key >> 8)
+		tier := uint8(key & 0xFF)
+		entries = append(entries, depotEntry{itemID: itemID, tier: tier, count: count})
+	}
+	return entries
 }
 
-// collectContainerItems recursively collects items from a container tree.
-func (g *GameProtocol) collectContainerItems(depotID uint16, container *game.Item, items *[]depotItem) {
-	if container == nil || container.IsContainer(nil) {
-		// It's a container — recurse into Contents.
-	} else {
+// aggregateContainerItems recursively aggregates items in a container tree.
+func (g *GameProtocol) aggregateContainerItems(container *game.Item, agg map[uint32]uint16) {
+	if container == nil || !container.IsContainer(nil) {
 		return
 	}
 	for _, child := range container.Contents {
@@ -77,14 +93,10 @@ func (g *GameProtocol) collectContainerItems(depotID uint16, container *game.Ite
 			continue
 		}
 		if child.IsContainer(nil) {
-			g.collectContainerItems(depotID, child, items)
+			g.aggregateContainerItems(child, agg)
 		} else {
-			*items = append(*items, depotItem{
-				depotID: depotID,
-				itemID:  child.ID,
-				amount:  child.Count,
-				tier:    child.GetTier(),
-			})
+			key := (uint32(child.ID) << 8) | uint32(child.GetTier())
+			agg[key] += child.Count
 		}
 	}
 }
@@ -210,7 +222,7 @@ func (g *GameProtocol) SendMarketBrowseOwnOffers() {
 
 // SendMarketBrowseOwnHistory sends the player's historical market offers (opcode 0xF5).
 func (g *GameProtocol) SendMarketBrowseOwnHistory() {
-	if g.player == nil {
+	if g.player == nil || g.player.World == nil || g.player.World.Market == nil {
 		return
 	}
 	// TODO: implement history tracking; send empty lists for now.
@@ -234,7 +246,7 @@ func (g *GameProtocol) SendMarketCancel() {
 
 // parseMarketLeave is called when the player leaves the market window (0xF3/0xF4).
 func (g *GameProtocol) parseMarketLeave() {
-	if g.player == nil {
+	if g.player == nil || g.player.World == nil || g.player.World.Market == nil {
 		return
 	}
 	g.player.InMarket = false
@@ -242,11 +254,22 @@ func (g *GameProtocol) parseMarketLeave() {
 
 // parseMarketBrowse handles item browsing / own offers / own history (0xF5).
 // Wire: [u8 browseId] — 0=own offers, 1=own history, 2..=browse item by itemId
+// If the player is not yet in the market, SendOpenMarket is sent first (mirrors
+// C++ Game::playerBrowseMarket calling sendMarketEnter when !player->isInMarket()).
 func (g *GameProtocol) parseMarketBrowse(r *netmsg.Reader) {
-	if g.player == nil {
+	if g.player == nil || g.player.World == nil || g.player.World.Market == nil {
 		return
 	}
 	browseId := r.GetByte()
+
+	// Auto-open the market window on first browse (client sends 0xF5 on open).
+	if !g.player.InMarket {
+		g.SendOpenMarket()
+		// After opening, the market window data is sent; the client will then
+		// request the browse explicitly on its own, so we can return here.
+		return
+	}
+
 	switch browseId {
 	case 0:
 		g.SendMarketBrowseOwnOffers()

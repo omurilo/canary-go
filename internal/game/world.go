@@ -137,6 +137,7 @@ func NewWorld() *World {
 		TypeRegistry: creatures.NewTypeRegistry(),
 		Charms:       charms.NewRegistry(),
 		Imbuements:   imbuements.NewRegistry(),
+			Market:       NewMarket(),
 		Fiendish:     NewFiendishManager(3),
 	}
 	w.Combat = NewCombatEngine(w)

@@ -155,6 +155,19 @@ func (m *Market) GetPlayerOffersByAction(playerID uint32, action MarketAction) [
 	return result
 }
 
+// GetPlayerOfferCount returns the number of active offers for a player.
+func (m *Market) GetPlayerOfferCount(playerID uint32) uint32 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var count uint32
+	for _, o := range m.byID {
+		if o.PlayerID == playerID {
+			count++
+		}
+	}
+	return count
+}
+
 // GetOfferByCounter looks up an offer by its timestamp and counter pair.
 func (m *Market) GetOfferByCounter(timestamp uint32, counter uint16) *MarketOffer {
 	m.mu.RLock()

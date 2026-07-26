@@ -126,9 +126,9 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		return
 	}
 
-	// Market
+	// Market (B11) — item ID 12903 in the depot locker.
 	if item.ID == game.ItemMarket {
-		g.sendStatusText("Market is not implemented yet in Go.")
+		g.SendOpenMarket()
 		return
 	}
 
