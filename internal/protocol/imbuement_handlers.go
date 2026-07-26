@@ -305,6 +305,16 @@ func (g *GameProtocol) applyImbuement(slot uint8, imbuementID uint16) {
 	}
 
 	item := g.player.ImbuingItem
+	isScroll := item == nil && imb.ScrollID > 0
+
+	// For scroll imbuements, check that the player has an empty scroll before
+	// removing any items or money.
+	if isScroll {
+		if g.player.GetItemTypeCount(g.deps.Items, emptyImbuementScrollID, -1) < 1 {
+			g.player.SendTextMessage(0x14, "You need an empty scroll for this imbuement.")
+			return
+		}
+	}
 
 	for _, imbItem := range imb.Items {
 		count := g.player.GetItemTypeCount(g.deps.Items, imbItem.ID, -1)
@@ -321,7 +331,10 @@ func (g *GameProtocol) applyImbuement(slot uint8, imbuementID uint16) {
 	}
 
 	for _, imbItem := range imb.Items {
-		g.player.RemoveItemOfType(g.deps.Items, imbItem.ID, uint32(imbItem.Count), -1, false)
+		if !g.player.RemoveItemOfType(g.deps.Items, imbItem.ID, uint32(imbItem.Count), -1, false) {
+			g.player.SendTextMessage(0x14, "Failed to remove required items.")
+			return
+		}
 	}
 
 	// Scroll imbuement: when no item is selected but the imbuement has a ScrollID,
@@ -331,7 +344,12 @@ func (g *GameProtocol) applyImbuement(slot uint8, imbuementID uint16) {
 			g.player.SendTextMessage(0x14, "No item selected for imbuement.")
 			return
 		}
+
+		g.player.RemoveItemOfType(g.deps.Items, emptyImbuementScrollID, 1, -1, false)
+
 		if _, ok := g.player.InternalAddItem(g.deps.Items, imb.ScrollID, 1, -1, game.ConstSlotWhereever); !ok {
+			// Refund the empty scroll if we can't fit the imbued scroll.
+			g.player.InternalAddItem(g.deps.Items, emptyImbuementScrollID, 1, -1, game.ConstSlotWhereever)
 			g.player.SendTextMessage(0x14, "You don't have enough space in your backpack.")
 			return
 		}
