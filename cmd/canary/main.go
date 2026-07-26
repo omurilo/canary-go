@@ -175,6 +175,11 @@ func run(o runOpts, log *slog.Logger) error {
 			log.Warn("load market offers", "err", err)
 		}
 
+		// Familiars table.
+		if err := database.EnsureFamiliarsTable(ctx); err != nil {
+			log.Warn("ensure familiars table", "err", err)
+		}
+
 		imbPath := filepath.Join(filepath.Dir(filepath.Dir(o.appearances)), "XML", "imbuements.xml")
 	if imbReg, err := imbuements.LoadRegistry(imbPath); err != nil {
 		log.Warn("imbuements not loaded", "path", imbPath, "err", err)

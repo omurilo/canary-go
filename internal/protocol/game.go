@@ -421,20 +421,15 @@ func (g *GameProtocol) sendCoinBalance() {
 	if g.player == nil {
 		return
 	}
-	// Pacote 1: updating flag (0xF2 0x01)
-	w1 := netmsg.NewWriter()
-	w1.AddByte(0xF2)
-	w1.AddByte(0x01)
-	g.SendToClient(w1)
-
-	// Pacote 2: values (0xDF 0x01 + data)
-	w2 := netmsg.NewWriter()
-	w2.AddByte(0xDF)
-	w2.AddByte(0x01)
-	w2.AddU32(g.player.CoinBalance)      // normal coins
-	w2.AddU32(g.player.CoinTransferable) // transferable coins
-	w2.AddU32(g.player.CoinBalance)      // reserved auction coins (modern protocol)
-	g.SendToClient(w2)
+	w := netmsg.NewWriter()
+	w.AddByte(0xF2)
+	w.AddByte(0x01)
+	w.AddByte(0xDF)
+	w.AddByte(0x01)
+	w.AddU32(g.player.CoinBalance) // normal coins
+	w.AddU32(g.player.CoinBalance) // transferable coins (use total balance so players can sell them on market)
+	w.AddU32(g.player.CoinBalance) // reserved auction coins (modern protocol)
+	g.SendToClient(w)
 }
 
 // dispatchStore forwards a store packet's payload (bytes after the opcode) to
@@ -552,7 +547,14 @@ func (g *GameProtocol) enterWorld() {
 	}
 
 	// Restore any containers that were left open by the client in its local config.
-	// g.restoreOpenContainers() // Disabled to prevent ghost container bugs.
+	// Force close all containers on the client to prevent ghost containers
+	// (where the client restores its layout but the server didn't send them).
+	for i := 0; i < 16; i++ {
+		w := netmsg.NewWriter()
+		w.AddByte(opContainerClose) // 0x6F
+		w.AddByte(uint8(i))
+		g.SendToClient(w)
+	}
 	// Send initial condition/protection zone icons
 	g.SendIcons()
 
