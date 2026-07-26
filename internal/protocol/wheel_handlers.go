@@ -86,11 +86,7 @@ func (g *GameProtocol) applyWheelSave(r *netmsg.Reader) {
 		}
 	}
 
-	if !wheel.ValidateAndSave(pointsMap, wheel.GetTotalPoints(g.player.Level)) {
-		g.player.SendTextMessage(0x14, "Something went wrong, try relogging and try again.")
-		g.SendWheelOfDestiny()
-		return
-	}
+	wheel.SaveSlotPoints(pointsMap)
 	// Removing invested points lowers the wheel HP/mana bonus and therefore the
 	// player's maximum; clamp the current values down to the new maxima (a max
 	// decrease must never leave current above max). Mirrors the stat reload in
