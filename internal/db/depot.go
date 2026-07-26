@@ -8,46 +8,43 @@ import (
 )
 
 // LoadPlayerDepot loads all depot items for a player from the player_depotitems table.
-// It constructs the depot locker hierarchy (lockers -> chests -> items) and attaches
-// it to the player's DepotManager.
+// It populates the individual depot chests (boxes 1-17+) in the DepotManager.
 func (d *DB) LoadPlayerDepot(ctx context.Context, p *game.Player) error {
 	itemsBySID, loadedRows, err := d.loadItemsFromTable(ctx, p.DBID, "player_depotitems")
 	if err != nil {
 		return err
 	}
 
-	if len(loadedRows) == 0 {
-		// No depot items, initialize empty depot manager
+	if p.DepotManager == nil {
 		p.DepotManager = game.NewPlayerDepotManager(p)
+	}
+
+	if len(loadedRows) == 0 {
 		return nil
 	}
 
-	// Build the item tree from parent-child relationships
+	// First pass: link children to their parent containers (for sid > 100)
 	for _, row := range loadedRows {
-		if row.pid == 0 {
-			// Top-level item (depot locker or chest)
+		if row.pid >= 0 && row.pid < 100 {
+			// This item belongs directly to a depot chest (pid = chest index)
 			continue
 		}
+		
 		parent := itemsBySID[row.pid]
 		if parent != nil {
 			parent.Contents = append(parent.Contents, row.item)
+			row.item.Parent = parent
 		}
 	}
 
-	// Initialize depot manager
-	p.DepotManager = game.NewPlayerDepotManager(p)
-
-	// Reconstruct depot lockers from loaded items
-	// SID 0-99 are reserved for depot lockers (one per town)
-	for sid, item := range itemsBySID {
-		if sid >= 0 && sid < 100 {
-			// This is a depot locker
-			if item.IsDepotLocker() {
-				// Determine town ID from SID (SID 0 = town 1, SID 1 = town 2, etc.)
-				townID := uint16(sid + 1)
-				locker := game.NewDepotLocker(townID)
-				locker.Item = item
-				p.DepotManager.Lockers[townID] = locker
+	// Second pass: put top-level items into their respective depot chests
+	for _, row := range loadedRows {
+		if row.pid >= 0 && row.pid < 100 {
+			// pid is the depotId (1-17)
+			chest := p.DepotManager.GetDepotChest(uint16(row.pid), true)
+			if chest != nil {
+				chest.Contents = append(chest.Contents, row.item)
+				row.item.Parent = chest
 			}
 		}
 	}
@@ -56,10 +53,8 @@ func (d *DB) LoadPlayerDepot(ctx context.Context, p *game.Player) error {
 }
 
 // SavePlayerDepot persists all depot items to the player_depotitems table.
-// It flattens the depot hierarchy into the parent-child SID structure.
 func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
-	if p.DepotManager == nil || len(p.DepotManager.Lockers) == 0 {
-		// No depot items, clear the table
+	if p.DepotManager == nil || len(p.DepotManager.Chests) == 0 {
 		_, err := d.SQL.ExecContext(ctx, "DELETE FROM player_depotitems WHERE player_id = ?", p.DBID)
 		return err
 	}
@@ -69,8 +64,7 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 		return err
 	}
 
-	// Flatten the depot hierarchy and assign SIDs
-	sidCounter := 0
+	sidCounter := 100 // nested SIDs start at 100 to avoid colliding with PIDs (0-99)
 	sidMap := make(map[*game.Item]int)
 
 	const insertQuery = `INSERT INTO player_depotitems
@@ -84,18 +78,15 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 			return nil
 		}
 
-		// Assign SID to this item
 		sid := sidCounter
 		sidCounter++
 		sidMap[item] = sid
 
-				// Use attributes blob (encoding handled elsewhere)
 		attrs := item.Attributes
 		if imbBlob := game.EncodeImbuementBlob(item.Imbuements); len(imbBlob) > 0 {
 			attrs = append(attrs, imbBlob...)
 		}
 
-		// Insert this item
 		count := item.Count
 		if count == 0 {
 			count = 1
@@ -117,43 +108,17 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 		return nil
 	}
 
-	// Save each depot locker (one per town)
-	for townID, locker := range p.DepotManager.Lockers {
-		if locker == nil || locker.Item == nil {
+	// Save each depot chest's contents
+	for pid, chest := range p.DepotManager.Chests {
+		if chest == nil {
 			continue
 		}
 
-		// SID for depot locker is based on town ID (town 1 = SID 0, town 2 = SID 1, etc.)
-		lockerSID := int(townID - 1)
-		if lockerSID < 0 {
-			lockerSID = 0
-		}
-
-		sidCounter = lockerSID + 1 // Start children after the locker
-		sidMap[locker.Item] = lockerSID
-
-		// Save the locker itself
-		attrs := locker.Item.Attributes
-		if imbBlob := game.EncodeImbuementBlob(locker.Item.Imbuements); len(imbBlob) > 0 {
-			attrs = append(attrs, imbBlob...)
-		}
-
-		_, err := d.SQL.ExecContext(ctx, insertQuery,
-			p.DBID, 0, lockerSID, locker.Item.ID, 1, attrs)
-		if err != nil {
-			return fmt.Errorf("failed to save depot locker town=%d: %w", townID, err)
-		}
-
-		// Save all depot chests and their contents
-		for _, chest := range locker.Item.Contents {
-			if err := saveItem(chest, lockerSID); err != nil {
+		for _, item := range chest.Contents {
+			if err := saveItem(item, int(pid)); err != nil {
 				return err
 			}
 		}
-
-		// Reserve SID range for this town (0-99 are for lockers)
-		// Next town starts at next 100 boundary to avoid collisions
-		sidCounter = ((sidCounter / 100) + 1) * 100
 	}
 
 	return nil

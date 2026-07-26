@@ -161,6 +161,11 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	}
 
 	if destContainer != nil {
+		if destContainer.ID == game.ItemLocker || destContainer.ID == game.ItemDepot {
+			g.sendStatusText("You cannot put an object there.")
+			g.revertMove(fromPos, toPos, spriteID)
+			return
+		}
 		if item.IsContainer(g.deps.Items) && isChildOf(item, destContainer) {
 			g.sendStatusText("You cannot put an object inside itself.")
 			g.revertMove(fromPos, toPos, spriteID)

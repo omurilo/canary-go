@@ -26,13 +26,10 @@ func (g *GameProtocol) handleDepotLocker(worldLocker *game.Item, pos netmsg.Posi
 
 	// Use the world locker's ID for the visual (3497-3500)
 	// but the depot contents come from the player's depot
-	depotLocker.Item.ID = worldLocker.ID
-
-	// The depot locker is a special container that shows depot chests (boxes)
-	// We'll open the depot locker itself, which contains the depot chests
+	depotLocker.ID = worldLocker.ID
 
 	// Check if it's already open
-	if cid := g.player.GetContainerID(depotLocker.Item); cid != -1 {
+	if cid := g.player.GetContainerID(depotLocker); cid != -1 {
 		// Already open, close it
 		g.player.CloseContainer(uint8(cid))
 		w := netmsg.NewWriter()
@@ -52,30 +49,13 @@ func (g *GameProtocol) handleDepotLocker(worldLocker *game.Item, pos netmsg.Posi
 		containerPos = game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
 	}
 
-	// Ensure depot has at least one chest (depot chest 1)
-	firstChest := depotLocker.GetOrCreateDepotChest(0)
-	if firstChest != nil {
-		// Add first chest to locker contents if not already there
-		hasFirstChest := false
-		for _, c := range depotLocker.Item.Contents {
-			if c == firstChest {
-				hasFirstChest = true
-				break
-			}
-		}
-		if !hasFirstChest {
-			depotLocker.Item.Contents = append(depotLocker.Item.Contents, firstChest)
-		}
-	}
-
 	// Open the depot locker container
-	g.player.OpenContainerAtWithPos(index, depotLocker.Item, containerPos, isOnMap)
-	g.sendDepotContainer(index, depotLocker, worldLocker, depotLocker.Item.Parent != nil)
+	g.player.OpenContainerAtWithPos(index, depotLocker, containerPos, isOnMap)
+	g.sendDepotContainer(index, depotLocker, worldLocker, depotLocker.Parent != nil)
 }
 
 // sendDepotContainer sends a depot locker container window with special depot handling.
-func (g *GameProtocol) sendDepotContainer(cid uint8, depotLocker *game.DepotLocker, worldLocker *game.Item, hasParent bool) {
-	item := depotLocker.Item
+func (g *GameProtocol) sendDepotContainer(cid uint8, depotLocker *game.Item, worldLocker *game.Item, hasParent bool) {
 	// Use world locker for the icon (visual appearance)
 	displayItem := worldLocker
 	t := g.deps.Items.Get(displayItem.ID)
@@ -84,13 +64,13 @@ func (g *GameProtocol) sendDepotContainer(cid uint8, depotLocker *game.DepotLock
 		name = t.Name
 	}
 
-	contents := item.Contents
-	capacity := 17 // Depot lockers can hold up to 17 depot chests
+	contents := depotLocker.Contents
+	capacity := len(contents)
+	if capacity < 4 {
+		capacity = 4 // usually holds Market, Inbox, Stash, and the nested Depot Chest
+	}
 
 	// Ensure we have at least the contents we're showing
-	if capacity < len(contents) {
-		capacity = len(contents)
-	}
 	if capacity < 1 {
 		capacity = 1
 	}

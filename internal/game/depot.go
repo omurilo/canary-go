@@ -1,99 +1,101 @@
 package game
 
-// Depot system implementation, mirroring the C++ DepotLocker and DepotChest
-// classes (src/items/containers/depot/). A depot is a per-town storage that
-// persists in the player_depotitems table.
-//
-// Structure:
-// - Each town has a DepotLocker (item ID 2589-2598, one per town)
-// - Inside each locker are DepotChest boxes (17 boxes, item ID 2590-2606)
-// - Each chest can hold items (max 2000 items per depot)
-//
-// The depot system uses a hierarchical SID (slot ID) scheme:
-// - SID 0-99: reserved for depot lockers (one per town)
-// - SID 100+: items inside depot chests
-
 const (
-	// MaxDepotItems is the maximum number of items allowed in a depot chest.
 	MaxDepotItems = 2000
 
-	// DepotChestCount is the number of depot chests (boxes) per locker.
-	DepotChestCount = 17
-
-	// Item IDs for depot lockers (one per town, ID 1-11 correspond to town IDs)
-	ItemDepotLocker = 2589
-
-	// Item IDs for depot chests (boxes inside lockers)
-	// Note: In Tibia, depot chests are all ID 3502, not a range
-	ItemDepotChest = 3502
+	ItemDepot      = 3502
+	ItemLocker     = 3497
+	ItemInbox      = 12902
+	ItemMarket     = 12903
+	ItemStoreInbox = 23396
+	ItemStash      = 28750
 )
 
-// DepotLocker represents a town-specific depot locker container. It's a special
-// container that can only contain DepotChest boxes and cannot be moved or removed.
-// Mirrors src/items/containers/depot/depotlocker.hpp.
-type DepotLocker struct {
-	*Item
-	DepotID uint16 // town ID this locker belongs to
+// PlayerDepotManager manages all depot lockers and chests for a player.
+type PlayerDepotManager struct {
+	player  *Player
+	Lockers map[uint16]*Item // keyed by town ID
+	Chests  map[uint16]*Item // keyed by depot chest ID (1-17)
 }
 
-// NewDepotLocker creates a new depot locker for a specific town.
-func NewDepotLocker(townID uint16) *DepotLocker {
-	return &DepotLocker{
-		Item: &Item{
-			ID:       ItemDepotLocker,
-			Contents: make([]*Item, 0, DepotChestCount),
-		},
-		DepotID: townID,
+func NewPlayerDepotManager(p *Player) *PlayerDepotManager {
+	return &PlayerDepotManager{
+		player:  p,
+		Lockers: make(map[uint16]*Item),
+		Chests:  make(map[uint16]*Item),
 	}
 }
 
-// IsDepotLocker returns true if this item is a depot locker.
-func (it *Item) IsDepotLocker() bool {
-	return it != nil && it.ID == ItemDepotLocker
-}
-
-// IsDepotChest returns true if this item is a depot chest (box).
-func (it *Item) IsDepotChest() bool {
-	return it != nil && it.ID == ItemDepotChest
-}
-
-// GetOrCreateDepotChest returns the depot chest at the given index (0-16),
-// creating it if it doesn't exist. This mirrors the lazy initialization
-// behavior in the C++ server.
-func (dl *DepotLocker) GetOrCreateDepotChest(index int) *Item {
-	if index < 0 || index >= DepotChestCount {
+func (dm *PlayerDepotManager) GetDepotChest(depotId uint16, autoCreate bool) *Item {
+	if chest, ok := dm.Chests[depotId]; ok {
+		return chest
+	}
+	if !autoCreate {
 		return nil
 	}
 
-	// Ensure the locker has enough capacity
-	for len(dl.Contents) <= index {
-		dl.Contents = append(dl.Contents, nil)
+	chestID := uint16(22796 + depotId) // ITEM_DEPOT_NULL + depotId
+	if depotId == 18 {
+		chestID = 22814 // ITEM_DEPOT_XVIII
+	} else if depotId == 19 {
+		chestID = 22815 // ITEM_DEPOT_XIX
+	} else if depotId > 19 {
+		chestID = 22816 // ITEM_DEPOT_XX
 	}
 
-	// Create the chest if it doesn't exist
-	if dl.Contents[index] == nil {
-		dl.Contents[index] = &Item{
-			ID:       ItemDepotChest, // All depot chests use the same ID (3502)
-			Contents: make([]*Item, 0),
-		}
-	}
-
-	return dl.Contents[index]
+	chest := &Item{ID: chestID, Contents: make([]*Item, 0)}
+	dm.Chests[depotId] = chest
+	return chest
 }
 
-// GetDepotItemCount returns the total number of items stored in this depot
-// locker (across all chests), counting recursively.
-func (dl *DepotLocker) GetDepotItemCount() int {
-	count := 0
-	for _, chest := range dl.Contents {
-		if chest != nil && chest.IsDepotChest() {
-			count += countItemsRecursive(chest)
+func (dm *PlayerDepotManager) GetDepotLocker(depotId uint16) *Item {
+	if locker, ok := dm.Lockers[depotId]; ok {
+		// In C++, the inbox parent is updated here, and the depotBoxes parents are updated.
+		return locker
+	}
+
+	locker := &Item{ID: ItemLocker, Contents: make([]*Item, 0)}
+
+	market := &Item{ID: ItemMarket}
+	locker.Contents = append(locker.Contents, market)
+
+	if dm.player.Inbox == nil {
+		dm.player.Inbox = &Item{ID: ItemInbox, Contents: make([]*Item, 0)}
+	}
+	locker.Contents = append(locker.Contents, dm.player.Inbox)
+
+	stash := &Item{ID: ItemStash}
+	locker.Contents = append(locker.Contents, stash)
+
+	// Depot Box container that holds the 17 nested boxes
+	depotChestContainer := &Item{ID: ItemDepot, Contents: make([]*Item, 0)}
+	for i := uint16(17); i > 0; i-- {
+		chest := dm.GetDepotChest(i, true)
+		depotChestContainer.Contents = append(depotChestContainer.Contents, chest)
+		if chest.Parent == nil {
+			chest.Parent = depotChestContainer
 		}
 	}
-	return count
+	locker.Contents = append(locker.Contents, depotChestContainer)
+
+	dm.Lockers[depotId] = locker
+	return locker
 }
 
-// countItemsRecursive counts all items in a container and its sub-containers.
+// GetDepotItemCount returns the total number of items in the player's depot
+// across all chests.
+func (p *Player) GetDepotItemCount() int {
+	if p.DepotManager == nil {
+		return 0
+	}
+
+	total := 0
+	for _, chest := range p.DepotManager.Chests {
+		total += countItemsRecursive(chest)
+	}
+	return total
+}
+
 func countItemsRecursive(container *Item) int {
 	if container == nil {
 		return 0
@@ -106,70 +108,4 @@ func countItemsRecursive(container *Item) int {
 		}
 	}
 	return count
-}
-
-// CanAddToDepot checks if an item can be added to the depot (respects the 2000 item limit).
-func (dl *DepotLocker) CanAddToDepot(itemCount int) bool {
-	currentCount := dl.GetDepotItemCount()
-	return currentCount+itemCount <= MaxDepotItems
-}
-
-// PlayerDepotManager manages all depot lockers for a player across all towns.
-type PlayerDepotManager struct {
-	player  *Player
-	Lockers map[uint16]*DepotLocker // keyed by town ID
-}
-
-// NewPlayerDepotManager creates a new depot manager for a player.
-func NewPlayerDepotManager(p *Player) *PlayerDepotManager {
-	return &PlayerDepotManager{
-		player:  p,
-		Lockers: make(map[uint16]*DepotLocker),
-	}
-}
-
-// GetDepotLocker returns the depot locker for a specific town, creating it if needed.
-func (dm *PlayerDepotManager) GetDepotLocker(townID uint16) *DepotLocker {
-	if locker, exists := dm.Lockers[townID]; exists {
-		return locker
-	}
-
-	// Create new locker for this town
-	locker := NewDepotLocker(townID)
-	dm.Lockers[townID] = locker
-	return locker
-}
-
-// GetDepotChest returns a specific depot chest (box) for a town and index.
-func (dm *PlayerDepotManager) GetDepotChest(townID uint16, chestIndex int) *Item {
-	locker := dm.GetDepotLocker(townID)
-	return locker.GetOrCreateDepotChest(chestIndex)
-}
-
-// OpenDepot opens the depot for the player's current town. This is called when
-// the player clicks on a depot chest in the game world.
-func (p *Player) OpenDepot() *DepotLocker {
-	if p.TownID == 0 {
-		return nil
-	}
-
-	if p.DepotManager == nil {
-		p.DepotManager = NewPlayerDepotManager(p)
-	}
-
-	return p.DepotManager.GetDepotLocker(p.TownID)
-}
-
-// GetDepotItemCount returns the total number of items in the player's depot
-// across all towns.
-func (p *Player) GetDepotItemCount() int {
-	if p.DepotManager == nil {
-		return 0
-	}
-
-	total := 0
-	for _, locker := range p.DepotManager.Lockers {
-		total += locker.GetDepotItemCount()
-	}
-	return total
 }
