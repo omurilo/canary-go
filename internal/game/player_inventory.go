@@ -424,7 +424,7 @@ func AddItemToContainer(catalog *items.Catalog, container *Item, item *Item) boo
 	}
 	if int(cap) > len(container.Contents) {
 		item.Parent = container
-		container.Contents = append(container.Contents, item)
+		container.Contents = append([]*Item{item}, container.Contents...)
 		return true
 	}
 
@@ -445,7 +445,7 @@ func AddItemToContainer(catalog *items.Catalog, container *Item, item *Item) boo
 func addToContainerTree(catalog *items.Catalog, c *Item, it *Item) bool {
 	if int(c.ContainerCapacity(catalog)) > len(c.Contents) {
 		it.Parent = c
-		c.Contents = append(c.Contents, it)
+		c.Contents = append([]*Item{it}, c.Contents...)
 		return true
 	}
 	for _, child := range c.Contents {
