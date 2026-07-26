@@ -125,6 +125,13 @@ func (e *Engine) registerAPI() {
 
 	L.SetGlobal("SERVER_NAME", lua.LString("Canary"))
 
+	// Server save stubs
+	L.SetGlobal("saveServer", L.NewFunction(func(L *lua.LState) int {
+		return 0
+	}))
+	L.SetGlobal("SaveHirelings", L.NewFunction(func(L *lua.LState) int {
+		return 0
+	}))
 	// Inject a custom loader to map "data.*" to "data-otservbr-global/*"
 	pkg := L.GetGlobal("package")
 	if tbl, ok := pkg.(*lua.LTable); ok {
