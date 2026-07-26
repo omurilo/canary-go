@@ -66,6 +66,9 @@ func (g *GameProtocol) applyWheelSave(r *netmsg.Reader) {
 	}
 	wheel := g.player.GetWheel()
 	wheel.SetVocation(game.CIPVocation(g.player.Vocation))
+	if g.player.WheelGemManager == nil {
+		g.player.WheelGemManager = &game.WheelGemCollection{}
+	}
 
 	// Process gem vessels (4 affinities): each has [u8 hasGem][if 1: u16 gemIndex]
 	for aff := 0; aff < 4 && r.Remaining() >= 1; aff++ {
