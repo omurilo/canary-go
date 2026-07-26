@@ -57,13 +57,22 @@ func (d *DB) LoadPlayerDepot(ctx context.Context, p *game.Player) error {
 
 // SavePlayerDepot persists all depot items to the player_depotitems table.
 func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
-	if p.DepotManager == nil || len(p.DepotManager.Chests) == 0 {
-		_, err := d.SQL.ExecContext(ctx, "DELETE FROM player_depotitems WHERE player_id = ?", p.DBID)
+	tx, err := d.SQL.BeginTx(ctx, nil)
+	if err != nil {
 		return err
+	}
+	defer tx.Rollback()
+
+	if p.DepotManager == nil || len(p.DepotManager.Chests) == 0 {
+		_, err := tx.ExecContext(ctx, "DELETE FROM player_depotitems WHERE player_id = ?", p.DBID)
+		if err != nil {
+			return err
+		}
+		return tx.Commit()
 	}
 
 	// Clear existing depot items
-	if _, err := d.SQL.ExecContext(ctx, "DELETE FROM player_depotitems WHERE player_id = ?", p.DBID); err != nil {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM player_depotitems WHERE player_id = ?", p.DBID); err != nil {
 		return err
 	}
 
@@ -102,7 +111,7 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 			count = 1
 		}
 
-		_, err := d.SQL.ExecContext(ctx, insertQuery,
+		_, err := tx.ExecContext(ctx, insertQuery,
 			p.DBID, parentSID, sid, item.ID, count, attrs)
 		if err != nil {
 			return fmt.Errorf("failed to save depot item sid=%d: %w", sid, err)
@@ -118,12 +127,11 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 		return nil
 	}
 
-	// Save each depot chest's contents
+	// Save all chests
 	for pid, chest := range p.DepotManager.Chests {
-		if chest == nil {
-			continue
+		if err := saveItem(chest, int(pid)); err != nil {
+			return err
 		}
-
 		for _, item := range chest.Contents {
 			if err := saveItem(item, int(pid)); err != nil {
 				return err
@@ -131,5 +139,5 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }
