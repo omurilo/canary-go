@@ -8,7 +8,7 @@ import (
 
 // LoadMarketOffers loads all active market offers from the market_offers table.
 func (d *DB) LoadMarketOffers(ctx context.Context, m *game.Market) error {
-	const q = `SELECT id, player_id, sale, itemtype, amount, price, tier, created, anonymous
+	const q = `SELECT id, player_id, sale, itemtype, amount, price, tier, created, anonymous, (SELECT name FROM players WHERE id = player_id) AS player_name
 	           FROM market_offers`
 	rows, err := d.SQL.QueryContext(ctx, q)
 	if err != nil {
@@ -21,11 +21,11 @@ func (d *DB) LoadMarketOffers(ctx context.Context, m *game.Market) error {
 		var sale uint8
 		var anonymous uint8
 		if err := rows.Scan(&offer.ID, &offer.PlayerID, &sale, &offer.ItemID,
-			&offer.Amount, &offer.Price, &offer.Tier, &offer.Timestamp, &anonymous); err != nil {
+			&offer.Amount, &offer.Price, &offer.Tier, &offer.Timestamp, &anonymous, &offer.PlayerName); err != nil {
 			continue
 		}
 		offer.Anonymous = anonymous > 0
-			offer.Action = game.MarketAction(sale)
+		offer.Action = game.MarketAction(sale)
 		m.AddOffer(&offer)
 	}
 	return nil
@@ -63,7 +63,7 @@ func (d *DB) RemoveMarketOffer(ctx context.Context, offerID uint32) (bool, error
 
 // GetPlayerMarketOffers loads all offers for a specific player.
 func (d *DB) GetPlayerMarketOffers(ctx context.Context, playerID uint32) ([]game.MarketOffer, error) {
-	const q = `SELECT id, player_id, sale, itemtype, amount, price, tier, created, anonymous
+	const q = `SELECT id, player_id, sale, itemtype, amount, price, tier, created, anonymous, (SELECT name FROM players WHERE id = player_id) AS player_name
 	           FROM market_offers WHERE player_id = ? ORDER BY created ASC`
 	rows, err := d.SQL.QueryContext(ctx, q, playerID)
 	if err != nil {
@@ -77,11 +77,11 @@ func (d *DB) GetPlayerMarketOffers(ctx context.Context, playerID uint32) ([]game
 		var sale uint8
 		var anonymous uint8
 		if err := rows.Scan(&offer.ID, &offer.PlayerID, &sale, &offer.ItemID,
-			&offer.Amount, &offer.Price, &offer.Tier, &offer.Timestamp, &anonymous); err != nil {
+			&offer.Amount, &offer.Price, &offer.Tier, &offer.Timestamp, &anonymous, &offer.PlayerName); err != nil {
 			continue
 		}
 		offer.Anonymous = anonymous > 0
-			offer.Action = game.MarketAction(sale)
+		offer.Action = game.MarketAction(sale)
 		offers = append(offers, offer)
 	}
 	return offers, nil

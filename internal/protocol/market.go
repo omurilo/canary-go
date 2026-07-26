@@ -148,7 +148,11 @@ func (g *GameProtocol) SendMarketBrowse(itemId uint16, tier uint8) {
 		w.AddU16(offer.Counter)
 		w.AddU16(offer.Amount)
 		w.AddU64(offer.Price)
-		w.AddString(offer.PlayerName)
+		if offer.Anonymous {
+			w.AddString("Anonymous")
+		} else {
+			w.AddString(offer.PlayerName)
+		}
 	}
 
 	w.AddU32(uint32(len(sellOffers)))
@@ -157,7 +161,11 @@ func (g *GameProtocol) SendMarketBrowse(itemId uint16, tier uint8) {
 		w.AddU16(offer.Counter)
 		w.AddU16(offer.Amount)
 		w.AddU64(offer.Price)
-		w.AddString(offer.PlayerName)
+		if offer.Anonymous {
+			w.AddString("Anonymous")
+		} else {
+			w.AddString(offer.PlayerName)
+		}
 	}
 
 	g.SendToClient(w)
