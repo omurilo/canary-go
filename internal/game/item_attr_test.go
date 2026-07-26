@@ -157,11 +157,22 @@ func TestDecodeItemAttributes_Empty(t *testing.T) {
 }
 
 func TestDecodeItemAttributes_UnsupportedFallsBack(t *testing.T) {
+	// ATTR_CUSTOM is now handled (skipped) so DecodeItemAttributes should succeed.
 	w := propstream.NewPropWriteStream()
-	w.WriteUint8(attrCustom) // nested structure we do not model
+	w.WriteUint8(attrCustom)
 	w.WriteUint64(0)
-	if _, _, err := DecodeItemAttributes(w.GetStream(), 0); err == nil {
-		t.Error("expected error for unsupported ATTR_CUSTOM so caller preserves raw blob")
+	if attrs, _, err := DecodeItemAttributes(w.GetStream(), 0); err != nil {
+		t.Errorf("ATTR_CUSTOM should be skippable, got err=%v", err)
+	} else if attrs != nil {
+		t.Error("expected nil attributes for empty ATTR_CUSTOM-only blob")
+	}
+
+	// ATTR_CUSTOM_ATTRIBUTES (deprecated nested structure) should still error.
+	w2 := propstream.NewPropWriteStream()
+	w2.WriteUint8(attrCustomAttributes)
+	w2.WriteUint64(0)
+	if _, _, err := DecodeItemAttributes(w2.GetStream(), 0); err == nil {
+		t.Error("expected error for unsupported attrCustomAttributes so caller preserves raw blob")
 	}
 }
 

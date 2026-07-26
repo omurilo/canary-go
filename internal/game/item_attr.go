@@ -326,8 +326,38 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 
 		// Tags whose payload is a nested structure we cannot faithfully parse
 		// yet: signal the caller to preserve the raw blob instead.
-		case attrContainerItems, attrCustom, attrCustomAttributes:
+		case attrContainerItems, attrCustomAttributes:
 			return nil, subType, fmt.Errorf("item attr %d not supported for decode", attrType)
+
+		// ATTR_CUSTOM carries key-value pairs (e.g. imbuement data). We skip
+		// over it so DecodeItemAttributes succeeds and Attr stays non-nil,
+		// avoiding blob duplication on every save.
+		case attrCustom:
+			count, err := ps.ReadUint64()
+			if err != nil {
+				return nil, subType, err
+			}
+			for i := uint64(0); i < count; i++ {
+				if _, err := ps.ReadString(); err != nil {
+					return nil, subType, err
+				}
+				valType, err := ps.ReadUint8()
+				if err != nil {
+					return nil, subType, err
+				}
+				switch valType {
+				case 1: // string
+					if _, err := ps.ReadString(); err != nil {
+						return nil, subType, err
+					}
+				case 2: // int64
+					if _, err := ps.ReadInt64(); err != nil {
+						return nil, subType, err
+					}
+				default:
+					ps.Skip(8)
+				}
+			}
 
 		default:
 			return nil, subType, fmt.Errorf("unknown item attr %d", attrType)

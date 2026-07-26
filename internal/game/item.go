@@ -263,37 +263,93 @@ func DecodeImbuementBlob(blob []byte) map[uint8]ImbuementInfo {
 
 func skipAttrTag(r *propstream.PropStream, tag uint8) bool {
 	switch tag {
-	case attrStore: // u32
-		_, err := r.ReadUint32()
+	case attrStore: // int64
+		_, err := r.ReadInt64()
 		return err == nil
-	case attrActionID: // u16
+	case attrTileFlags: // uint64
+		_, err := r.ReadUint64()
+		return err == nil
+	case attrActionID: // uint16
 		_, err := r.ReadUint16()
 		return err == nil
-	case attrUniqueID: // u16
+	case attrUniqueID: // uint16
 		_, err := r.ReadUint16()
 		return err == nil
-	case attrText, attrDesc, attrTeleDest, attrSpecial, attrStoreInboxCategory: // string
+	case attrTeleDest: // position (x: u16, y: u16, z: u8)
+		if err := r.Skip(5); err != nil {
+			return false
+		}
+		return true
+	case attrItem: // uint16
+		_, err := r.ReadUint16()
+		return err == nil
+	case attrDepotID: // uint16
+		_, err := r.ReadUint16()
+		return err == nil
+	case attrHouseDoorID: // uint8
+		_, err := r.ReadUint8()
+		return err == nil
+	case attrRuneCharges, attrCount: // uint8
+		_, err := r.ReadUint8()
+		return err == nil
+	case attrDuration: // int32
+		_, err := r.ReadInt32()
+		return err == nil
+	case attrDecayingState: // uint8
+		_, err := r.ReadUint8()
+		return err == nil
+	case attrWrittenDate: // uint64
+		_, err := r.ReadUint64()
+		return err == nil
+	case attrWrittenBy: // string
 		_, err := r.ReadString()
 		return err == nil
-	case attrDepotID: // u16
-		_, err := r.ReadUint16()
-		return err == nil
-	case attrRuneCharges, attrCount: // u16
-		_, err := r.ReadUint16()
-		return err == nil
-	case attrDuration: // u32
+	case attrSleeperGUID: // uint32
 		_, err := r.ReadUint32()
 		return err == nil
-	case attrAmount: // u16
+	case attrSleepStart: // uint64
+		_, err := r.ReadUint64()
+		return err == nil
+	case attrCharges: // uint16
 		_, err := r.ReadUint16()
 		return err == nil
-	case attrOwner: // u32
+	case attrText, attrDesc, attrSpecial, attrStoreInboxCategory: // string
+		_, err := r.ReadString()
+		return err == nil
+	case attrName, attrArticle, attrPluralName: // string
+		_, err := r.ReadString()
+		return err == nil
+	case attrWeight: // uint32
 		_, err := r.ReadUint32()
 		return err == nil
-	case attrQuickLootContainer: // u32
+	case attrAttack, attrDefense, attrExtraDefense, attrArmor: // int32
+		_, err := r.ReadInt32()
+		return err == nil
+	case attrHitChance: // int8
+		_, err := r.ReadInt8()
+		return err == nil
+	case attrShootRange: // uint8
+		_, err := r.ReadUint8()
+		return err == nil
+	case attrImbuementSlot, attrMantra: // int32
+		_, err := r.ReadInt32()
+		return err == nil
+	case attrOpenContainer: // uint8
+		_, err := r.ReadUint8()
+		return err == nil
+	case attrAmount: // uint16
+		_, err := r.ReadUint16()
+		return err == nil
+	case attrTier: // uint8
+		_, err := r.ReadUint8()
+		return err == nil
+	case attrOwner: // uint32
 		_, err := r.ReadUint32()
 		return err == nil
-	case attrObtainContainer: // u32
+	case attrQuickLootContainer: // uint32
+		_, err := r.ReadUint32()
+		return err == nil
+	case attrObtainContainer: // uint32
 		_, err := r.ReadUint32()
 		return err == nil
 	default:
