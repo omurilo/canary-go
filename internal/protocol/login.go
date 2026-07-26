@@ -103,7 +103,7 @@ func (p *LoginProtocol) OnDisconnect(c *network.Connection) { println("LoginProt
 func (p *LoginProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {}
 // handleHTTPRequest parses an HTTP request body and returns the appropriate JSON response.
 func (p *LoginProtocol) handleHTTPRequest(c *network.Connection, body []byte) {
-	fmt.Printf("handleHTTPRequest: body=%%s\n", string(body))
+	fmt.Printf("handleHTTPRequest: body=%s\n", string(body))
 	var req struct {
 		Type string `json:"type"`
 	}
@@ -140,8 +140,9 @@ func jsonEmpty(c *network.Connection) {
 	sendJSON(c, resp)
 }
 func sendJSON(c *network.Connection, data []byte) {
-	resp := "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n" + string(data)
-	c.WriteRaw([]byte(resp))
+	resp := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", len(data), string(data))
+	_ = c.WriteRaw([]byte(resp))
+	time.Sleep(50 * time.Millisecond) // Give client time to receive response
 }
 func jsonCacheInfo(c *network.Connection, p *LoginProtocol) {
 	online := uint32(0)
