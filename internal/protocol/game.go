@@ -536,6 +536,16 @@ func (g *GameProtocol) enterWorld() {
 	g.addBasicData(w)
 	g.SendToClient(w)
 
+	// Force close all containers on the client to clear any ghost containers.
+	// The client caches open containers locally, but if the server doesn't have them
+	// saved (e.g. lost state), the client shows an empty "Container" ghost window.
+	for i := uint8(0); i < 16; i++ {
+		wClose := netmsg.NewWriter()
+		wClose.AddByte(0x6F) // opContainerClose
+		wClose.AddByte(i)
+		g.SendToClient(wClose)
+	}
+
 	// Restore any containers that were left open by the client in its local config.
 	g.restoreOpenContainers()
 

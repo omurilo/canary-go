@@ -61,6 +61,10 @@ func (m *Market) AddOffer(offer *MarketOffer) uint32 {
 		offer.ID = m.nextID
 		m.nextID++
 	}
+	offer.Counter = uint16(offer.ID & 0xFFFF)
+	if offer.Counter == 0 {
+		offer.Counter = 1 // Ensure it's never 0 just in case the client dislikes 0
+	}
 	m.byID[offer.ID] = offer
 	m.byItem[offer.ItemID] = append(m.byItem[offer.ItemID], offer)
 	return offer.ID
