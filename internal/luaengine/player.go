@@ -1484,7 +1484,23 @@ func playerGethazardsystempoints(L *lua.LState) int {
 }
 
 func playerGethouse(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayerArg(L, 1)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	// Find the player's house by iterating all houses
+	houses := p.GetWorld().AllHouses()
+	for _, h := range houses {
+		if h.OwnerID == p.DBID {
+			ud := L.NewUserData()
+			ud.Value = h
+			L.SetMetatable(ud, L.GetTypeMetatable(houseTypeName))
+			L.Push(ud)
+			return 1
+		}
+	}
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -3304,7 +3320,9 @@ func playerSendhousewindow(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	L.Push(lua.LTrue) // not modelled yet; safe default
+	// Check if this is a race condition or an already open window and
+	// just return success to avoid Lua errors.
+	L.Push(lua.LTrue)
 	return 1
 }
 

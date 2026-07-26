@@ -127,6 +127,16 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		return
 	}
 
+	// House door access check.
+	if item.Attr != nil && item.Attr.HouseDoorID != nil {
+		doorID := *item.Attr.HouseDoorID
+		house := g.deps.World.GetHouseByDoorID(doorID)
+		if house != nil && !house.CanPlayerUseDoor(g.player) {
+			g.sendStatusText("That is locked.")
+			return
+		}
+	}
+
 	// Market (B11) — item ID 12903 in the depot locker.
 	if item.ID == game.ItemMarket {
 		g.SendOpenMarket()

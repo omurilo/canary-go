@@ -9,7 +9,7 @@ const (
 	ItemMarket     = 12903
 	ItemStoreInbox = 23396
 	ItemStash      = 28750
-	ItemStoreCoin  = 24712
+	ItemStoreCoin  = 22118
 )
 
 // PlayerDepotManager manages all depot lockers and chests for a player.

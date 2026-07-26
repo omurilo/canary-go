@@ -12,6 +12,7 @@ type Tile struct {
 	Items     []*Item // stacked items (top + down), excluding creatures
 	Creatures []Creature
 	Flags     uint32  // tile flags (e.g. Protection Zone, No-PVP, etc.)
+	HouseID   uint32  // 0 = not a house tile; >0 = owned by house with this ID
 }
 
 // IsProtectionZone reports whether the tile has the protection zone flag.

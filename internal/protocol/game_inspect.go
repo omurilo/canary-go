@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	cyclopediaCharacterInfoInspection = 9
+	cyclopediaCharacterInfoInspection   = 9
+	cyclopediaCharacterInfoAchievements = 5
 )
 
 func (g *GameProtocol) parseInspectPlayer(r *netmsg.Reader) {
@@ -49,10 +50,71 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 	switch characterInfoType {
 	case cyclopediaCharacterInfoInspection: // 9
 		g.sendCyclopediaCharacterInspection(g.player)
+	case cyclopediaCharacterInfoAchievements: // 5
+		g.sendCyclopediaCharacterAchievements(g.player)
 	default:
 		// Not yet implemented — send "no data" so the client renders empty.
 		g.sendCyclopediaNoData(characterInfoType, 1)
 	}
+}
+
+// sendCyclopediaCharacterAchievements sends the player's achievements (cyclopedia tab).
+// Mirrors C++ ProtocolGame::sendCyclopediaCharacterAchievements:
+//   [0xDA][u8 type=5][u8 error]
+//   [u16 totalPoints][u16 secretsUnlocked][u16 count]
+//   per-achievement: [u16 id][u32 timestamp][u8 hasInfo(?name/desc/grade)]
+//   hasInfo is 1 for secret achievements, which includes name/description/grade.
+func (g *GameProtocol) sendCyclopediaCharacterAchievements(p *game.Player) {
+	if p == nil {
+		return
+	}
+	reg := g.deps.World.Achievements
+	if reg == nil {
+		g.sendCyclopediaNoData(cyclopediaCharacterInfoAchievements, 1)
+		return
+	}
+
+	// Build entries from the player's unlocked achievements.
+	type entry struct {
+		ach        *game.Achievement
+		timestamp  uint32
+	}
+	entries := make([]entry, 0, len(p.Achievements))
+	var totalPoints uint16
+	var secretsUnlocked uint16
+
+	for id, ts := range p.Achievements {
+		ach := reg.GetByID(uint16(id))
+		if ach == nil {
+			continue
+		}
+		entries = append(entries, entry{ach: ach, timestamp: uint32(ts)})
+		totalPoints += uint16(ach.Points)
+		if ach.Secret {
+			secretsUnlocked++
+		}
+	}
+
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoAchievements) // 5
+	w.AddByte(0x00)                                  // no error
+	w.AddU16(totalPoints)
+	w.AddU16(secretsUnlocked)
+	w.AddU16(uint16(len(entries)))
+	for _, e := range entries {
+		w.AddU16(e.ach.ID)
+		w.AddU32(e.timestamp)
+		if e.ach.Secret {
+			w.AddByte(1)
+			w.AddString(e.ach.Name)
+			w.AddString(e.ach.Description)
+			w.AddByte(1) // grade (stars), default 1
+		} else {
+			w.AddByte(0)
+		}
+	}
+	g.SendToClient(w)
 }
 
 // sendCyclopediaNoData sends a "not available" response for a cyclopedia tab, mirroring

@@ -283,7 +283,25 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			return 1
 		},
 		"getHouse": func(L *lua.LState) int {
-			L.Push(lua.LNil) // not modelled yet; safe default
+			tile := checkTile(L, 1)
+			if tile.tile == nil || tile.tile.HouseID == 0 {
+				L.Push(lua.LNil)
+				return 1
+			}
+			world := e.world
+			if world == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			h := world.Houses[tile.tile.HouseID]
+			if h == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			ud := L.NewUserData()
+			ud.Value = h
+			L.SetMetatable(ud, L.GetTypeMetatable(houseTypeName))
+			L.Push(ud)
 			return 1
 		},
 	}

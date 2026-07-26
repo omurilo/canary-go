@@ -283,9 +283,11 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 				return nil, subType, err
 			}
 		case attrHouseDoorID: // uint8
-			if err := ps.Skip(1); err != nil {
+			v, err := ps.ReadUint8()
+			if err != nil {
 				return nil, subType, err
 			}
+			a.HouseDoorID = &v
 		case attrSleeperGUID: // uint32
 			if err := ps.Skip(4); err != nil {
 				return nil, subType, err

@@ -221,6 +221,7 @@ func (e *Engine) registerAPI() {
 	e.registerNetworkMessage()
 	e.registerBank()
 	e.registerParty()
+	e.registerHouseMetatable()
 	e.registerTown()
 	e.registerCreatureEvent()
 	e.registerGlobalEventClass()

@@ -417,7 +417,8 @@ type ItemAttributes struct {
 	Armor          *int32  // ATTR_ARMOR (31)     int32
 	HitChance      *int8   // ATTR_HITCHANCE (32) int8
 	ShootRange     *uint8  // ATTR_SHOOTRANGE (33) uint8
-	Tier           *uint8  // ATTR_TIER (40)      uint8
+	Tier           *uint8
+		HouseDoorID    *uint8  // ATTR_TIER (40)      uint8
 	Amount         *uint16 // ATTR_AMOUNT (39)    uint16
 	Owner          *uint32 // ATTR_OWNER (43)     uint32
 	OpenContainer  *uint8  // ATTR_OPENCONTAINER (36) uint8

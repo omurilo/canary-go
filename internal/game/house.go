@@ -18,9 +18,11 @@ type House struct {
 	RentPeriod string // "monthly", "weekly", "daily"
 	Position   Position // entrance
 
-	GuestList  []string
-	DoorList   []HouseDoor
-	AccessList AccessList
+	GuestList    []string
+	SubOwnerList []string
+	DoorList     []HouseDoor
+	AccessList   AccessList
+	HouseTiles   []Position // all tiles that belong to this house
 }
 
 // HouseDoor represents a lockable door in a house.
@@ -50,6 +52,76 @@ func (h *House) SetOwner(playerID uint32) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.OwnerID = playerID
+}
+
+// GetHouseByDoorID finds the house that contains a door with the given door ID.
+func (w *World) GetHouseByDoorID(doorID uint8) *House {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	for _, h := range w.Houses {
+		for _, d := range h.DoorList {
+			if d.ID == doorID {
+				return h
+			}
+		}
+	}
+	return nil
+}
+
+// CanPlayerUseDoor checks if a player can open a house door.
+// The player must be the owner, a sub-owner, or on the guest list.
+func (h *House) CanPlayerUseDoor(p *Player) bool {
+	if p == nil {
+		return false
+	}
+	if h.IsOwner(p.DBID) {
+		return true
+	}
+	if h.IsSubOwner(p.Name) {
+		return true
+	}
+	if h.IsGuest(p.Name) {
+		return true
+	}
+	return false
+}
+
+// IsSubOwner checks if a player name is on the sub-owner list.
+func (h *House) IsSubOwner(name string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, s := range h.SubOwnerList {
+		if s == name {
+			return true
+		}
+	}
+	return false
+}
+
+// AddSubOwner adds a player to the sub-owner list.
+func (h *House) AddSubOwner(name string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, s := range h.SubOwnerList {
+		if s == name {
+			return false
+		}
+	}
+	h.SubOwnerList = append(h.SubOwnerList, name)
+	return true
+}
+
+// RemoveSubOwner removes a player from the sub-owner list.
+func (h *House) RemoveSubOwner(name string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for i, s := range h.SubOwnerList {
+		if s == name {
+			h.SubOwnerList = append(h.SubOwnerList[:i], h.SubOwnerList[i+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 // IsGuest checks if a player name is on the guest list.
@@ -150,6 +222,34 @@ func (w *World) AllHouses() []*House {
 		list = append(list, h)
 	}
 	return list
+}
+
+// GetHouseByPosition returns the house that owns the tile at pos, or nil.
+func (w *World) GetHouseByPosition(pos Position) *House {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	tile := w.Map.GetTile(pos)
+	if tile == nil || tile.HouseID == 0 {
+		return nil
+	}
+	return w.Houses[tile.HouseID]
+}
+
+// RegisterHouseTiles iterates every map tile and populates each house's HouseTiles.
+func (w *World) RegisterHouseTiles() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.Map.Range(func(pos Position, t *Tile) bool {
+		if t.HouseID == 0 {
+			return true
+		}
+		h := w.Houses[t.HouseID]
+		if h == nil {
+			return true
+		}
+		h.HouseTiles = append(h.HouseTiles, pos)
+		return true
+	})
 }
 
 // HouseCountByAccount returns the number of houses owned by players of a given account.

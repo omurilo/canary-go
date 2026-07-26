@@ -295,7 +295,7 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 	tile := &game.Tile{}
 
 	if house {
-		_ = r.u32() // house id
+		tile.HouseID = r.u32() // house id
 		tile.Flags |= 1 // House tiles are protection zones
 	}
 

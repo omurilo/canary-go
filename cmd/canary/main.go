@@ -307,6 +307,16 @@ func run(o runOpts, log *slog.Logger) error {
 	world.DefaultSpawn = spawn
 	world.StartDecayingMap()
 
+	// Load houses from DB and register their map tiles.
+	if err := database.LoadHouses(ctx, world); err != nil {
+		log.Warn("load houses", "err", err)
+	} else {
+		world.RegisterHouseTiles()
+		log.Info("houses loaded and tiles registered", "count", len(world.Houses))
+	}
+
+		// Load houses from DB and register their map tiles.
+
 	var lengine *luaengine.Engine
 
 	world.OnCreatureMove = func(c game.Creature, oldPos game.Position, newPos game.Position, oldTileIndex int) {
