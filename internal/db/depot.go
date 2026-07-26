@@ -91,6 +91,9 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 
 				// Use attributes blob (encoding handled elsewhere)
 		attrs := item.Attributes
+		if imbBlob := game.EncodeImbuementBlob(item.Imbuements); len(imbBlob) > 0 {
+			attrs = append(attrs, imbBlob...)
+		}
 
 		// Insert this item
 		count := item.Count
@@ -131,6 +134,9 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 
 		// Save the locker itself
 		attrs := locker.Item.Attributes
+		if imbBlob := game.EncodeImbuementBlob(locker.Item.Imbuements); len(imbBlob) > 0 {
+			attrs = append(attrs, imbBlob...)
+		}
 
 		_, err := d.SQL.ExecContext(ctx, insertQuery,
 			p.DBID, 0, lockerSID, locker.Item.ID, 1, attrs)

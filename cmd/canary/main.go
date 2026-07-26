@@ -46,7 +46,7 @@ func main() {
 		mapFile     = flag.String("map", "", "path to an OTBM map file (empty = synthetic spawn field)")
 		migrate     = flag.Bool("migrate", true, "apply the schema on startup (idempotent)")
 		seed        = flag.Bool("seed", false, "seed a test account (god/god, char 'Gm Test')")
-		logLevelStr = flag.String("loglevel", "info", "log level (debug, info, warn, error)")
+		logLevelStr = flag.String("logLevel", "info", "log level (debug, info, warn, error)")
 	)
 	flag.Parse()
 
@@ -94,6 +94,24 @@ func run(o runOpts, log *slog.Logger) error {
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		log.Warn("using default config", "err", err)
+	}
+
+	if v, ok := cfg.Custom["logLevel"]; ok {
+		if lv := v.String(); lv != "" {
+			var lvl slog.Level
+			switch strings.ToLower(lv) {
+			case "debug":
+				lvl = slog.LevelDebug
+			case "warn", "warning":
+				lvl = slog.LevelWarn
+			case "error":
+				lvl = slog.LevelError
+			default:
+				lvl = slog.LevelInfo
+			}
+			log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: lvl}))
+			slog.SetDefault(log)
+		}
 	}
 	
 	if scriptsDir == "scripts" && cfg.DataPack != "" {

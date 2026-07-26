@@ -46,6 +46,9 @@ func (d *DB) loadItemsFromTable(ctx context.Context, playerID uint32, tableName 
 			item.Attr = attr
 			item.Count = subType
 		}
+		if imbs := game.DecodeImbuementBlob(attrs); len(imbs) > 0 {
+			item.Imbuements = imbs
+		}
 		itemsBySID[sid] = item
 		loadedRows = append(loadedRows, itemRow{pid: pid, sid: sid, item: item})
 	}
