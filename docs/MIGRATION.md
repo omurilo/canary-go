@@ -207,14 +207,18 @@ Cada subsistema aqui é uma feature completa que jogadores esperam. C++ possui *
 
 #### B11. Market System (~650 LOC C++)
 **C++:** `src/io/iomarket.cpp`  
-**Go:** `internal/game/market.go`, `internal/db/market.go`  
-**Status:** Model + DB implementados. **Protocolo + Lua não implementados.**
-- ✅ MarketOffer model (buy/sell)
+**Go:** `internal/game/market.go`, `internal/db/market.go`, `internal/protocol/market.go`  
+**Status:** ✅ Implementado.
+- ✅ MarketOffer model (buy/sell with Action field)
 - ✅ In-memory Market cache (by ID, item, player)
 - ✅ DB CRUD: Create/Remove/Get/LoadMarketOffers, `market_offers` table
-- ❌ Protocolo: market browse (0xEF), create offer (0xF0), cancel (0xF1), buy (0xF2)
-- ❌ Lua: openMarket é stub que chama interface inexistente
-- ❌ Item delivery via inbox
+- ✅ Protocolo: parseMarketLeave (0xF3/0xF4), parseMarketBrowse (0xF5), parseMarketCreateOffer (0xF6), parseMarketCancelOffer (0xF7), parseMarketAcceptOffer (0xF8)
+- ✅ Protocolo outbound: SendOpenMarket (0xF6), SendMarketBrowse (0xF7), SendMarketDetail (0xF8), SendMarketAccept (0xF9), SendMarketBrowseOwnOffers (0xF5), SendMarketCancel (0xFA)
+- ✅ Fee calculation (2% of total cost)
+- ✅ Depot item collection/removal/return helpers
+- ✅ Lua: playerOpenmarket → SendOpenMarket via Session interface
+- ✅ Session interface: SendOpenMarket() added
+- ⚠️ Pending: offer persistence to DB (in-memory only), offer history tracking
 
 #### B12. Houses (~1,689 LOC C++)
 **C++:** `src/map/house/`  
@@ -529,9 +533,9 @@ Ao migrar cada sistema, consulte:
 ## Métricas de Progresso
 
 - **LOC migradas:** ~27k / ~100k (27%)
-- **Sistemas funcionais:** 15 / ~50 (30%) — inalterado (os sistemas B7/B11/B12/B15 só têm model+DB, protocolo pendente)
-- **Lua stubs restantes:** ~130 / ~1300 (90% done, 10% critical)
-- **Packets implementados:** 31 / ~60 (52%)
+- **Sistemas funcionais:** 16 / ~50 (32%) — B11 Market agora completo (protocolo + Lua)
+- **Lua stubs restantes:** ~129 / ~1300 (90% done, 10% critical)
+- **Packets implementados:** 37 / ~60 (62%) — +6 market opcodes (0xF3-0xF8 inbound, 0xF5-0xFA outbound)
 - **DB tables migradas:** 12 / ~25 (48%) — +4: player_achievements, player_titles, player_familiars, market_offers, houses
 
 ---

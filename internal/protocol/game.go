@@ -93,6 +93,12 @@ const (
 	inPassPartyLeadership  = 0xA6
 	inLeaveParty           = 0xA7
 	inEnableSharedPartyExp = 0xA8
+	// Inbound market opcodes (0xF3..0xF8).
+	inMarketLeave    = 0xF3
+	inMarketBrowse   = 0xF5
+	inMarketCreate   = 0xF6
+	inMarketCancel   = 0xF7
+	inMarketAccept   = 0xF8
 )
 
 // GameProtocol is one game-server session.
@@ -860,6 +866,21 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case 0xE4:
 		// C_BuyCharmRune: unlock/upgrade, assign, clear, or reset charms.
 		g.parseSendBuyCharmRune(r)
+	case inMarketLeave, 0xF4:
+		// Market: player leaves the market window.
+		g.parseMarketLeave()
+	case inMarketBrowse:
+		// Market: browse items / own offers / own history.
+		g.parseMarketBrowse(r)
+	case inMarketCreate:
+		// Market: create a buy or sell offer.
+		g.parseMarketCreateOffer(r)
+	case inMarketCancel:
+		// Market: cancel an existing offer.
+		g.parseMarketCancelOffer(r)
+	case inMarketAccept:
+		// Market: accept (execute) an existing offer.
+		g.parseMarketAcceptOffer(r)
 	case 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xE8, 0xE9, 0xEF:
 		// In-game store packets (C_OpenStore/RequestStoreOffers/BuyStoreOffer/
 		// transaction history, plus GetOfferDescription/StoreEvent/TransferCoins).

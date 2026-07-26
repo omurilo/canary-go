@@ -19,6 +19,7 @@ type MarketOffer struct {
 	ID         uint32
 	PlayerID   uint32
 	PlayerName string
+	Action     MarketAction // buy or sell
 	ItemID     uint16
 	Amount     uint16
 	Price      uint64
@@ -113,6 +114,57 @@ func (m *Market) GetPlayerOffers(playerID uint32) []*MarketOffer {
 		}
 	}
 	return result
+}
+
+// GetBuyOffers returns buy offers for a given item ID.
+func (m *Market) GetBuyOffers(itemID uint16) []*MarketOffer {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var result []*MarketOffer
+	for _, o := range m.byItem[itemID] {
+		if o.Action == MarketActionBuy {
+			result = append(result, o)
+		}
+	}
+	return result
+}
+
+// GetSellOffers returns sell offers for a given item ID.
+func (m *Market) GetSellOffers(itemID uint16) []*MarketOffer {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var result []*MarketOffer
+	for _, o := range m.byItem[itemID] {
+		if o.Action == MarketActionSell {
+			result = append(result, o)
+		}
+	}
+	return result
+}
+
+// GetPlayerOffersByAction returns a player's offers filtered by buy/sell action.
+func (m *Market) GetPlayerOffersByAction(playerID uint32, action MarketAction) []*MarketOffer {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var result []*MarketOffer
+	for _, o := range m.byID {
+		if o.PlayerID == playerID && o.Action == action {
+			result = append(result, o)
+		}
+	}
+	return result
+}
+
+// GetOfferByCounter looks up an offer by its timestamp and counter pair.
+func (m *Market) GetOfferByCounter(timestamp uint32, counter uint16) *MarketOffer {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, offer := range m.byID {
+		if uint32(offer.Timestamp) == timestamp && offer.Counter == counter {
+			return offer
+		}
+	}
+	return nil
 }
 
 // PurgeExpired removes all offers older than the given duration.

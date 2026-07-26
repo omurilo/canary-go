@@ -44,6 +44,9 @@ type Session interface {
 
 	// Exaltation Forge. Opens the forge window (0x87 + 0x86) for the player.
 	SendOpenForge()
+
+	// Market (B11). Opens the market window showing depot contents and bank balance.
+	SendOpenMarket()
 }
 
 // Equipment slot indices (CONST_SLOT_*). Slot 0 is "wherever" (auto-place).
@@ -174,6 +177,9 @@ type Player struct {
 
 	// DepotManager manages all depot lockers across all towns
 	DepotManager *PlayerDepotManager
+
+	// InMarket is true while the player has the market window open.
+	InMarket bool
 
 	// Stash holds the player's supply stash items (ItemID -> Count).
 	Stash map[uint16]uint32
