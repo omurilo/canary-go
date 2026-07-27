@@ -374,6 +374,14 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 	if g.player != nil {
 		firstIndex = g.player.GetContainerIndex(cid)
 	}
+	// Force pagination for items C++ marks in Container constructor
+	// (gold pouch, store inbox) that may lack flag if created before fix
+	if item.ID == game.ItemGoldPouch || item.ID == game.ItemStoreInbox {
+		item.Pagination = true
+		if item.MaxSize == 0 {
+			item.MaxSize = 32
+		}
+	}
 	page := len(contents)
 	if page > 0xFF {
 		page = 0xFF
@@ -456,15 +464,21 @@ func (g *GameProtocol) parseSeekContainer(r *netmsg.Reader) {
 	r.GetByte() // containerCategory (unused for now)
 
 	container := g.player.GetContainerByID(cid)
-	if container == nil || !container.HasPagination() {
+	if container == nil {
+		slog.Default().Info("parseSeekContainer: container nil", "cid", cid)
 		return
 	}
-	// C++: validate index % capacity == 0 && index < size
+	if !container.HasPagination() {
+		slog.Default().Info("parseSeekContainer: no pagination", "cid", cid, "id", container.ID)
+		return
+	}
 	cap := int(container.ContainerCapacity(g.deps.Items))
 	if cap <= 0 {
 		cap = 1
 	}
 	if int(index)%cap != 0 || int(index) >= len(container.Contents) {
+		slog.Default().Info("parseSeekContainer: validation failed",
+			"cid", cid, "index", index, "cap", cap, "size", len(container.Contents))
 		return
 	}
 
