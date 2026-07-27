@@ -325,8 +325,8 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 
 				if !merged {
 					moveItem.Parent = toContainer
-					// Insert at the beginning of the container (index 0)
-					toContainer.Contents = append([]*game.Item{moveItem}, toContainer.Contents...)
+					// Append ao final (prepend quebra indices em containers paginados)
+					toContainer.Contents = append(toContainer.Contents, moveItem)
 					if len(toContainer.Contents) > 0xFF {
 						toContainer.Contents = toContainer.Contents[:0xFF] // simple truncation
 					}
