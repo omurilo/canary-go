@@ -196,6 +196,7 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 g.deps.Log.Info("case4: entered")
 		catalog := g.deps.Items
 		if catalog == nil {
+g.deps.Log.Info("case4: catalog not nil")
 			break
 		}
 		wheel := g.player.GetWheel()
