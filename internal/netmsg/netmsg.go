@@ -4,7 +4,10 @@
 // checksum and length headers without copying the body.
 package netmsg
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"math"
+)
 
 const (
 	// Headroom reserved at the front of an outbound buffer for prepended
@@ -186,6 +189,13 @@ func (w *Writer) AddDouble(value float64, precision uint8) {
 		scale *= 10
 	}
 	w.AddU32(uint32(value*scale) + 0x7FFFFFFF)
+}
+
+// AddRawDouble writes an IEEE 754 double-precision float as 8 raw bytes
+// (little-endian), matching C++ msg.add<double>(value).
+func (w *Writer) AddRawDouble(value float64) {
+	bits := math.Float64bits(value)
+	w.AddU64(bits)
 }
 
 // PrependByte writes a byte just before the current body start.

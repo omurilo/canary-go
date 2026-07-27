@@ -676,31 +676,31 @@ func (g *GameProtocol) sendCyclopediaCharacterOffenceStats() {
 
 	// — Critical Hit Chance (addCyclopediaCriticalSkill: 6 doubles) —
 	for i := 0; i < 6; i++ {
-		w.AddDouble(0.0, 4)
+		w.AddRawDouble(0.0)
 	}
 
 	// — Critical Hit Damage (addCyclopediaCriticalSkill: 6 doubles) —
 	for i := 0; i < 6; i++ {
-		w.AddDouble(0.0, 4)
+		w.AddRawDouble(0.0)
 	}
 
 	// — Life Leech Amount (addCyclopediaSkills: 5 doubles) —
 	for i := 0; i < 5; i++ {
-		w.AddDouble(0.0, 4)
+		w.AddRawDouble(0.0)
 	}
 
 	// — Mana Leech Amount (addCyclopediaSkills: 5 doubles) —
 	for i := 0; i < 5; i++ {
-		w.AddDouble(0.0, 4)
+		w.AddRawDouble(0.0)
 	}
 
 	// — Onslaught (4 doubles) —
 	for i := 0; i < 4; i++ {
-		w.AddDouble(0.0, 4)
+		w.AddRawDouble(0.0)
 	}
 
 	// — Cleave (1 double) —
-	w.AddDouble(0.0, 4)
+	w.AddRawDouble(0.0)
 
 	// — Perfect shot damage (7 u16, one per range 1-7) —
 	for i := 0; i < 7; i++ {
@@ -720,12 +720,12 @@ func (g *GameProtocol) sendCyclopediaCharacterOffenceStats() {
 	w.AddU16(0) // attackSkill
 	w.AddU16(0) // attackTotal - attackRawTotal
 	w.AddByte(0) // CIPBIA_ELEMENTAL_PHYSICAL
-	w.AddDouble(0.0, 4) // elemental conversion
+	w.AddRawDouble(0.0) // elemental conversion
 	w.AddByte(0) // element type
 	w.AddByte(0) // accuracy count
 
 	// — Influenced / Bosses damage (1 double) —
-	w.AddDouble(0.0, 4)
+	w.AddRawDouble(0.0)
 
 	// — Bestiary damages count (u16, 0 entries) —
 	w.AddU16(0)
@@ -734,15 +734,15 @@ func (g *GameProtocol) sendCyclopediaCharacterOffenceStats() {
 	w.AddByte(0) // hasElementCriticalChance (0 = no)
 
 	// — Runes & Auto Attack Critical Chance (2 doubles) —
-	w.AddDouble(0.0, 4) // runesCritical.chance
-	w.AddDouble(0.0, 4) // autoAttackCritical.chance
+	w.AddRawDouble(0.0) // runesCritical.chance
+	w.AddRawDouble(0.0) // autoAttackCritical.chance
 
 	// — Element Critical Damage —
 	w.AddByte(0) // hasElementCriticalDamage (0 = no)
 
 	// — Runes & Auto Attack Critical Damage (2 doubles) —
-	w.AddDouble(0.0, 4) // runesCritical.damage
-	w.AddDouble(0.0, 4) // autoAttackCritical.damage
+	w.AddRawDouble(0.0) // runesCritical.damage
+	w.AddRawDouble(0.0) // autoAttackCritical.damage
 
 	// — Life/Mana Gain on Hit/Kill (4 u16) —
 	w.AddU16(0) // lifeGainOnHit
@@ -756,9 +756,9 @@ func (g *GameProtocol) sendCyclopediaCharacterOffenceStats() {
 	w.AddByte(0) // hasSpellHealing
 
 	// — Final three doubles + elemental pierces count —
-	w.AddDouble(0.0, 4) // fullHpExtraDamage
-	w.AddDouble(0.0, 4) // lowHpExtraDamage
-	w.AddDouble(0.0, 4) // armorPenetration
+	w.AddRawDouble(0.0) // fullHpExtraDamage
+	w.AddRawDouble(0.0) // lowHpExtraDamage
+	w.AddRawDouble(0.0) // armorPenetration
 	w.AddByte(0) // elementalPiercesCount
 
 	g.SendToClient(w)
@@ -778,13 +778,13 @@ func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
 
 	// — Dodge (5 doubles) —
 	for i := 0; i < 5; i++ {
-		w.AddDouble(0.0, 4)
+		w.AddRawDouble(0.0)
 	}
 
 	// — Magic shield capacity —
 	w.AddU32(0) // total capacity
 	w.AddU16(0) // flat bonus
-	w.AddDouble(0.0, 4) // percent bonus
+	w.AddRawDouble(0.0) // percent bonus
 
 	// — Reflect physical flat —
 	w.AddU16(0)
@@ -804,7 +804,7 @@ func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
 
 	// — Mitigation (5 doubles) —
 	for i := 0; i < 5; i++ {
-		w.AddDouble(0.0, 4)
+		w.AddRawDouble(0.0)
 	}
 
 	// — Combat absorbs (0 combats) —
@@ -827,17 +827,17 @@ func (g *GameProtocol) sendCyclopediaCharacterMiscStats() {
 
 	// — Momentum (5 doubles) —
 	for i := 0; i < 5; i++ {
-		w.AddDouble(0.0, 4)
+		w.AddRawDouble(0.0)
 	}
 
 	// — Forge Legs (4 doubles) —
 	for i := 0; i < 4; i++ {
-		w.AddDouble(0.0, 4)
+		w.AddRawDouble(0.0)
 	}
 
 	// — Forge Feet (3 doubles) —
 	for i := 0; i < 3; i++ {
-		w.AddDouble(0.0, 4)
+		w.AddRawDouble(0.0)
 	}
 
 	// — Blessings —
