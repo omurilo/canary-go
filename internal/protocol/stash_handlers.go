@@ -97,9 +97,8 @@ func (g *GameProtocol) resolveStowItem(pos netmsg.Position, stackpos int, itemID
 			if container == nil {
 				return nil
 			}
-			slot := int(pos.Z)
 			// C++: player->getContainerIndex(cid) + slot → getItemByIndex
-			// Simplified: slot is the 0-based index (containerIndex offset not tracked yet)
+			slot := int(pos.Z) + int(g.player.GetContainerIndex(cid))
 			if slot < 0 || slot >= len(container.Contents) {
 				return nil
 			}
