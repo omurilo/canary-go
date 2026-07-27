@@ -79,11 +79,24 @@ func (g *GameProtocol) sendDepotContainer(cid uint8, depotLocker *game.Item, wor
 	}
 
 	unlocked := byte(1)
-	pagination := byte(0) // Depot lockers don't paginate
+	pagination := boolByte(depotLocker.Pagination)
 	firstIndex := uint16(0)
+	if g.player != nil {
+		firstIndex = g.player.GetContainerIndex(cid)
+	}
 	page := len(contents)
-	if page > 0xFF {
+	if depotLocker.Pagination && len(contents) > capacity {
+		page = capacity
+	} else if page > 0xFF {
 		page = 0xFF
+	}
+	start := int(firstIndex)
+	visible := page
+	if start+visible > len(contents) {
+		visible = len(contents) - start
+	}
+	if visible < 0 {
+		visible = 0
 	}
 
 	w := netmsg.NewWriter()
@@ -98,8 +111,8 @@ func (g *GameProtocol) sendDepotContainer(cid uint8, depotLocker *game.Item, wor
 	w.AddByte(pagination)
 	w.AddU16(uint16(len(contents)))
 	w.AddU16(firstIndex)
-	w.AddByte(byte(page))
-	for i := 0; i < page; i++ {
+	w.AddByte(byte(visible))
+	for i := start; i < start+visible; i++ {
 		g.addItem(w, contents[i])
 	}
 	// 13.21+ trailer for a depot container

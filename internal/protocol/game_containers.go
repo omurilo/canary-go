@@ -381,21 +381,41 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 	if page > 0xFF {
 		page = 0xFF
 	}
+	// C++: if paginated, maxItems = min(capacity, size-firstIndex)
+	// else: maxItems = capacity
+	var maxItems int
+	if item.Pagination && firstIndex > 0 {
+		maxItems = int(firstIndex) + capacity
+		if maxItems > len(contents) {
+			maxItems = len(contents)
+		}
+	} else {
+		maxItems = len(contents)
+		if maxItems > capacity {
+			maxItems = capacity
+		}
+	}
+	if maxItems > 0xFF {
+		maxItems = 0xFF
+	}
+	if maxItems < 0 {
+		maxItems = 0
+	}
 
 	w := netmsg.NewWriter()
 	w.AddByte(opContainerOpen)
 	w.AddByte(cid)
-	g.addItem(w, item) // the container item itself
+	g.addItem(w, item)
 	w.AddString(name)
 	w.AddByte(byte(capacity))
 	w.AddByte(boolByte(hasParent))
-	w.AddByte(0) // depot search available
+	w.AddByte(0)
 	w.AddByte(unlocked)
 	w.AddByte(pagination)
 	w.AddU16(uint16(len(contents)))
 	w.AddU16(firstIndex)
-	w.AddByte(byte(page))
-	for i := 0; i < page; i++ {
+	w.AddByte(byte(maxItems - int(firstIndex)))
+	for i := int(firstIndex); i < maxItems; i++ {
 		g.addItem(w, contents[i])
 	}
 	// 13.21+ trailer for a normal container.
@@ -416,6 +436,33 @@ func (g *GameProtocol) parseCloseContainer(r *netmsg.Reader) {
 	w.AddByte(opContainerClose)
 	w.AddByte(cid)
 	g.SendToClient(w)
+}
+
+// parseSeekContainer handles inbound 0x6E (seek/scroll in paginated container).
+// C++: ProtocolGame::parseSeekInContainer → Game::playerSeekInContainer.
+func (g *GameProtocol) parseSeekContainer(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
+	cid := r.GetByte()
+	index := r.GetU16()
+	r.GetByte() // containerCategory (unused for now)
+
+	container := g.player.GetContainerByID(cid)
+	if container == nil || !container.HasPagination() {
+		return
+	}
+	// C++: validate index % capacity == 0 && index < size
+	cap := int(container.ContainerCapacity(g.deps.Items))
+	if cap <= 0 {
+		cap = 1
+	}
+	if int(index)%cap != 0 || int(index) >= len(container.Contents) {
+		return
+	}
+
+	g.player.SetContainerIndex(cid, index)
+	g.sendContainer(cid, container, container.Parent != nil)
 }
 
 // parseContainerUp handles a container up navigation request (0x88).

@@ -44,7 +44,7 @@ func (dm *PlayerDepotManager) GetDepotChest(depotId uint16, autoCreate bool) *It
 		chestID = 22816 // ITEM_DEPOT_XX
 	}
 
-	chest := &Item{ID: chestID, Contents: make([]*Item, 0)}
+	chest := &Item{ID: chestID, Contents: make([]*Item, 0), Pagination: true}
 	dm.Chests[depotId] = chest
 	return chest
 }
@@ -55,10 +55,10 @@ func (dm *PlayerDepotManager) GetDepotLocker(depotId uint16) *Item {
 		return locker
 	}
 
-	locker := &Item{ID: ItemLocker, Contents: make([]*Item, 0)}
+	locker := &Item{ID: ItemLocker, Contents: make([]*Item, 0), Pagination: true}
 
 	// Depot Box container that holds the 17 nested boxes
-	depotChestContainer := &Item{ID: ItemDepot, Contents: make([]*Item, 0)}
+	depotChestContainer := &Item{ID: ItemDepot, Contents: make([]*Item, 0), Pagination: true}
 	for i := uint16(1); i <= 17; i++ {
 		chest := dm.GetDepotChest(i, true)
 		depotChestContainer.Contents = append(depotChestContainer.Contents, chest)
@@ -72,7 +72,7 @@ func (dm *PlayerDepotManager) GetDepotLocker(depotId uint16) *Item {
 	locker.Contents = append(locker.Contents, stash)
 
 	if dm.player.Inbox == nil {
-		dm.player.Inbox = &Item{ID: ItemInbox, Contents: make([]*Item, 0)}
+		dm.player.Inbox = &Item{ID: ItemInbox, Contents: make([]*Item, 0), Pagination: true}
 	}
 	locker.Contents = append(locker.Contents, dm.player.Inbox)
 

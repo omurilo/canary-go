@@ -56,6 +56,10 @@ type ImbuementInfo struct {
 	Duration uint32
 }
 
+// HasPagination returns whether this container supports paginated browsing
+// (scroll offset). Mirrors C++ Container::hasPagination.
+func (i *Item) HasPagination() bool { return i != nil && i.Pagination }
+
 // ContainerCapacity returns the container's slot capacity, preferring the
 // stored MaxSize and falling back to the catalog's ItemType.Capacity. catalog
 // may be nil (then only the stored MaxSize is used). Mirrors Container::capacity.
