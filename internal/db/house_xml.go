@@ -47,6 +47,7 @@ func (d *DB) ParseHouseFile(path string) ([]game.House, error) {
 			Rent:       uint32(hx.Rent),
 			Size:       uint32(hx.Size),
 			Beds:       uint8(hx.Beds),
+			TownID:     uint16(hx.TownID),
 			RentPeriod: "monthly",
 			Position:   game.Position{X: uint16(hx.EntryX), Y: uint16(hx.EntryY), Z: uint8(hx.EntryZ)},
 		}
@@ -60,11 +61,11 @@ func (d *DB) ParseHouseFile(path string) ([]game.House, error) {
 
 // SaveHouse inserts or updates a house record in the database.
 func (d *DB) SaveHouse(ctx context.Context, h *game.House) error {
-	const q = `INSERT INTO houses (id, name, owner, rent, size, beds)
-	           VALUES (?, ?, ?, ?, ?, ?)
+	const q = `INSERT INTO houses (id, name, owner, rent, size, beds, town_id)
+	           VALUES (?, ?, ?, ?, ?, ?, ?)
 	           ON DUPLICATE KEY UPDATE name=?, rent=?, size=?, beds=?`
 	_, err := d.SQL.ExecContext(ctx, q,
-		h.ID, h.Name, h.OwnerID, h.Rent, h.Size, h.Beds,
+		h.ID, h.Name, h.OwnerID, h.Rent, h.Size, h.Beds, h.TownID,
 		h.Name, h.Rent, h.Size, h.Beds)
 	return err
 }
