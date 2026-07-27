@@ -41,7 +41,7 @@ func (p *LoginProtocol) sendStatusString(c *network.Connection) {
 	mapName := ""
 	mapAuthor := ""
 	var mapWidth, mapHeight uint32
-	maxPlayers := uint32(2000)
+	maxPlayers := uint32(0)
 	onlineCount := uint32(0)
 	uniqueIPs := uint32(0)
 	peakPlayers := uint32(0)

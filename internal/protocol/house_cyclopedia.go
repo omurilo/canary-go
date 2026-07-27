@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -18,9 +19,11 @@ func (g *GameProtocol) parseCyclopediaHouseAuction(r *netmsg.Reader) {
 		return
 	}
 	actionType := r.GetByte()
+	slog.Default().Info("0xAD actionType=%d remaining=%d\n", actionType, r.Remaining())
 	switch actionType {
 	case 0:
 		townName := r.GetString()
+		slog.Default().Info("townName=%q\n", townName)
 		g.sendCyclopediaHouseList(townName)
 	case 1:
 		// bid on house — not implemented
@@ -41,6 +44,7 @@ func (g *GameProtocol) sendCyclopediaHouseList(townName string) {
 	// Filter houses by the requested town (lowercase match)
 	var townHouses []*game.House
 	world := g.deps.World
+	slog.Default().Info("world.Houses=%d towns=%d\n", len(world.Houses), len(world.TownNames))
 	for _, h := range world.Houses {
 		if h == nil {
 			continue
