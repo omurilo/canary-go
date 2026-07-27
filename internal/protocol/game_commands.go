@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -95,7 +96,7 @@ func (g *GameProtocol) handleCommand(text string) bool {
 	case "pos", "position":
 		g.sendStatusText(fmt.Sprintf("Position: [%d, %d, %d]", p.Pos.X, p.Pos.Y, p.Pos.Z))
 	case "up":
-		g.floorTeleport(-1) // higher floor = lower z
+		g.floorTeleport(-1)
 	case "down":
 		g.floorTeleport(+1)
 	case "goto", "go", "cliport":
@@ -112,10 +113,33 @@ func (g *GameProtocol) handleCommand(text string) bool {
 		g.cmdBroadcast(args)
 	case "outfit":
 		g.SendOutfitWindow()
+
+	// GM utility commands
+	case "addexp":
+		g.cmdAddExp(args)
+	case "addmoney":
+		g.cmdAddMoney(args)
+	case "level":
+		g.cmdSetLevel(args)
+	case "health", "hp":
+		g.cmdSetHealth(args)
+	case "mana", "mp":
+		g.cmdSetMana(args)
+	case "speed":
+		g.cmdSetSpeed(args)
+	case "online":
+		g.cmdOnline()
+	case "info":
+		g.cmdInfo()
+	case "skull":
+		g.cmdSkull(args)
+	case "sex", "gender":
+		g.cmdToggleSex()
 	case "commands", "help":
-		g.sendStatusText("Commands: /pos /goto x y z /up /down /town <name> /i <id> [count] /addskill <skill> [n] /save /b <text>")
+		g.sendStatusText("/pos /goto /up /down /town /i /addexp /addmoney /level /health /mana /speed /online /info /skull /sex /b /save /addskill /outfit")
 	default:
-		g.sendStatusText("Invalid command.")
+		// Not a native Go command — let Lua talkactions try.
+		return false
 	}
 	return true
 }
@@ -298,4 +322,153 @@ func (g *GameProtocol) cmdTown(args []string) {
 	} else {
 		g.sendStatusText("Unknown town: " + name)
 	}
+}
+
+// cmdAddExp adds experience: /addexp <amount>
+func (g *GameProtocol) cmdAddExp(args []string) {
+	if len(args) == 0 {
+		g.sendStatusText("Usage: /addexp <amount>")
+		return
+	}
+	amount, err := strconv.ParseUint(args[0], 10, 64)
+	if err != nil || amount == 0 {
+		g.sendStatusText("Invalid amount.")
+		return
+	}
+	g.player.AddExperience(amount)
+	g.sendStatusText(fmt.Sprintf("Added %d experience.", amount))
+}
+
+// cmdAddMoney adds gold to bank: /addmoney <amount>
+func (g *GameProtocol) cmdAddMoney(args []string) {
+	if len(args) == 0 {
+		g.sendStatusText("Usage: /addmoney <amount>")
+		return
+	}
+	amount, err := strconv.ParseUint(args[0], 10, 64)
+	if err != nil || amount == 0 {
+		g.sendStatusText("Invalid amount.")
+		return
+	}
+	g.player.BankBalance += amount
+	g.sendResourceBalances()
+	g.sendStatusText(fmt.Sprintf("Added %d gold to bank.", amount))
+}
+
+// cmdSetLevel sets player level: /level <n>
+func (g *GameProtocol) cmdSetLevel(args []string) {
+	if len(args) == 0 {
+		g.sendStatusText(fmt.Sprintf("Current level: %d", g.player.Level))
+		return
+	}
+	lvl, err := strconv.ParseUint(args[0], 10, 16)
+	if err != nil || lvl == 0 || lvl > 2000 {
+		g.sendStatusText("Invalid level (1-2000).")
+		return
+	}
+	p := g.player
+	p.Level = uint16(lvl)
+	p.Experience = game.ExpForLevel(uint64(lvl))
+	p.SendStats()
+	p.SetBaseSpeed()
+	g.sendStatusText(fmt.Sprintf("Set level to %d.", lvl))
+}
+
+// cmdSetHealth sets/maxes health: /health [hp]
+func (g *GameProtocol) cmdSetHealth(args []string) {
+	p := g.player
+	if len(args) == 0 {
+		p.Health = p.MaxHealth
+	} else {
+		hp, err := strconv.Atoi(args[0])
+		if err != nil || hp < 1 {
+			g.sendStatusText("Invalid HP.")
+			return
+		}
+		p.Health = uint32(hp)
+	}
+	p.SendStats()
+	g.sendStatusText(fmt.Sprintf("Health set to %d.", p.Health))
+}
+
+// cmdSetMana sets/maxes mana: /mana [mp]
+func (g *GameProtocol) cmdSetMana(args []string) {
+	p := g.player
+	if len(args) == 0 {
+		p.Mana = p.MaxMana
+	} else {
+		mp, err := strconv.Atoi(args[0])
+		if err != nil || mp < 1 {
+			g.sendStatusText("Invalid MP.")
+			return
+		}
+		p.Mana = uint32(mp)
+	}
+	p.SendStats()
+	g.sendStatusText(fmt.Sprintf("Mana set to %d.", p.Mana))
+}
+
+// cmdSetSpeed sets movement speed: /speed <value>
+func (g *GameProtocol) cmdSetSpeed(args []string) {
+	if len(args) == 0 {
+		g.sendStatusText(fmt.Sprintf("Current speed: %d", g.player.Speed))
+		return
+	}
+	spd, err := strconv.ParseUint(args[0], 10, 16)
+	if err != nil || spd == 0 || spd > 100000 {
+		g.sendStatusText("Invalid speed.")
+		return
+	}
+	g.player.Speed = uint16(spd)
+	g.player.SendChangeSpeed(g.player)
+	g.sendStatusText(fmt.Sprintf("Speed set to %d.", spd))
+}
+
+// cmdOnline lists online players.
+func (g *GameProtocol) cmdOnline() {
+	players := g.deps.World.Players()
+	names := make([]string, 0, len(players))
+	for _, p := range players {
+		if p != nil {
+			names = append(names, p.Name)
+		}
+	}
+	g.sendStatusText(fmt.Sprintf("Online (%d): %s", len(names), strings.Join(names, ", ")))
+}
+
+// cmdInfo shows player info.
+func (g *GameProtocol) cmdInfo() {
+	p := g.player
+	g.sendStatusText(fmt.Sprintf("Name: %s | Level: %d | Vocation: %d | HP: %d/%d | MP: %d/%d | Bank: %d",
+		p.Name, p.Level, p.Vocation, p.Health, p.MaxHealth, p.Mana, p.MaxMana, p.BankBalance))
+}
+
+// cmdSkull sets skull type: /skull <0-5>
+func (g *GameProtocol) cmdSkull(args []string) {
+	if len(args) == 0 {
+		g.sendStatusText("Usage: /skull <0=none 1=yellow 2=green 3=white 4=red 5=black>")
+		return
+	}
+	sk, err := strconv.Atoi(args[0])
+	if err != nil || sk < 0 || sk > 5 {
+		g.sendStatusText("Invalid skull type (0-5).")
+		return
+	}
+	g.player.Skull = uint8(sk)
+	// Send creature update to all spectators
+	g.deps.World.BroadcastSkullUpdate(g.player)
+	g.sendStatusText(fmt.Sprintf("Skull set to %d.", sk))
+}
+
+// cmdToggleSex toggles the player's gender.
+func (g *GameProtocol) cmdToggleSex() {
+	p := g.player
+	if p.Sex == 0 {
+		p.Sex = 1
+	} else {
+		p.Sex = 0
+	}
+	g.sendStatusText(fmt.Sprintf("Sex changed to %s.", map[uint8]string{0: "female", 1: "male"}[p.Sex]))
+	// Update outfit to reflect new sex
+	g.SendOutfitWindow()
 }

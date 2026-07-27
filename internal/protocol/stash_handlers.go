@@ -4,116 +4,82 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
-// parseStashAction handles opcode 0x28 (stash stow/withdraw actions).
-// Mirrors C++ ProtocolGame::parseStashWithdraw.
+// parseStashAction handles opcode 0x28 (stash stow/withdraw).
+// Wire format: [u8 action][Position*][u16 itemId][u8 stackpos][u8 count] (*action 0-2 only)
 func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
-	if g.deps.Log != nil { g.deps.Log.Info("stash: parseStashAction called") }
 	if g.player == nil {
 		return
 	}
-	action := r.GetByte()
-	switch action {
-	case 0: // STASH_ACTION_STOW_ITEM — stow items of this type from inventory
-		pos := r.GetByte()
-		clientID := r.GetU16()
-		count := r.GetByte()
-		g.deps.Log.Info("stash: stow item", "pos", pos, "clientID", clientID, "count", count)
-		// Use the item at the position if possible; otherwise scan all inventory
-		var itemID uint16
-		if int(pos) < len(g.player.Inventory) && g.player.Inventory[pos] != nil {
-			itemID = g.player.Inventory[pos].ID
-		}
-if itemID == 0 {
-			itemID = clientID
-			g.deps.Log.Info("stash: using clientID", "itemID", itemID)
-		}
-		allItems := (count == 0)
-g.deps.Log.Info("stash: calling StowItem", "itemID", itemID, "count", count, "allItems", allItems)
-		stowed := g.player.StowItem(itemID, uint32(count), allItems)
-		g.deps.Log.Info("stash: StowItem returned", "stowed", stowed)
-		if stowed > 0 {
-			g.sendStashAndInventory()
-		}
-
-	case 1: // STASH_ACTION_STOW_CONTAINER — stow all items of type from container
-		itemID := r.GetU16()
-		_ = g.player.StowItem(itemID, 0, true)
-		g.sendStashAndInventory()
-
-	case 2: // STASH_ACTION_STOW_STACK — stow all matching items from inventory+depot
-		itemID := r.GetU16()
-		_ = g.player.StowItem(itemID, 0, true)
-		g.sendStashAndInventory()
-
-	case 3: // STASH_ACTION_WITHDRAW — withdraw from stash
-		itemID := r.GetU16()
-		count := r.GetU32()
-		g.withdrawFromStash(itemID, count)
-
-	default:
-		if g.deps.Log != nil {
-			g.deps.Log.Info("stash: unknown action", "action", action)
-		}
-	}
-}
-
-// sendStashAndInventory refreshes the stash window, inventory and all open containers.
-func (g *GameProtocol) sendStashAndInventory() {
-	g.sendOpenStash()
-	g.player.Session.SendInventoryIds()
-	// Refresh open containers so the client sees removed items (C++ end of stashContainer)
-	for cid, oc := range g.player.OpenContainersSnapshot() {
-		if oc.Container != nil {
-			g.sendContainer(uint8(cid), oc.Container, oc.Container.Parent != nil)
-		}
-	}
-}
-
-// withdrawFromStash moves items from stash to the player's inventory.
-func (g *GameProtocol) withdrawFromStash(itemID uint16, count uint32) {
-	p := g.player
-	if !p.RemoveFromStash(itemID, count) {
+	if g.player.IsUIExhausted(500) {
 		return
 	}
-	g.deps.Log.Info("stash: withdrawn", "player", p.Name, "itemId", itemID, "count", count)
-	g.sendOpenStash()
+	g.player.UpdateUIExhausted()
+
+	action := r.GetByte()
+	switch action {
+	case 0: // STOW_ITEM: Position(5), itemId(2), stackpos(1), count(1)
+		_ = r.GetPosition()
+		itemID := r.GetU16()
+		_ = r.GetByte()
+		_ = r.GetByte()
+		g.player.StowItem(itemID, 0, false)
+		g.SendOpenStash()
+
+	case 1: // STOW_CONTAINER
+		_ = r.GetPosition()
+		itemID := r.GetU16()
+		_ = r.GetByte()
+		_ = r.GetByte()
+		g.player.StowItem(itemID, 0, true)
+		g.SendOpenStash()
+
+	case 2: // STOW_STACK
+		_ = r.GetPosition()
+		itemID := r.GetU16()
+		_ = r.GetByte()
+		_ = r.GetByte()
+		g.player.StowItem(itemID, 0, true)
+		g.SendOpenStash()
+
+	case 3: // WITHDRAW: itemId(2), count(4), stackpos(1)
+		itemID := r.GetU16()
+		count := r.GetU32()
+		_ = r.GetByte()
+		if g.player.GetFreeCapacity() < 100 {
+			return
+		}
+		if g.player.RemoveFromStash(itemID, count) {
+			g.SendOpenStash()
+		}
+	}
 }
 
-// SendOpenStash is the Session entry point used by player:openStash().
 func (g *GameProtocol) SendOpenStash() {
-	g.sendOpenStash()
-}
-
-// sendOpenStash sends the stash contents (opcode 0x29).
-// Mirrors C++ ProtocolGame::sendOpenStash.
-func (g *GameProtocol) sendOpenStash() {
 	if g.player == nil {
 		return
 	}
 	w := netmsg.NewWriter()
 	w.AddByte(0x29)
-	if g.player.Stash == nil || len(g.player.Stash) == 0 {
+	if g.player.Stash == nil {
 		w.AddU16(0)
 		g.SendToClient(w)
 		return
 	}
 	w.AddU16(uint16(len(g.player.Stash)))
-	for itemID, count := range g.player.Stash {
-		if count == 0 {
+	for id, cnt := range g.player.Stash {
+		if cnt == 0 {
 			continue
 		}
-		w.AddU16(itemID)
-		w.AddU32(count)
+		w.AddU16(id)
+		w.AddU32(cnt)
 	}
 	g.SendToClient(w)
 }
 
-// sendSpecialContainersAvailable sends opcode 0x2A (stash/market availability).
-// Mirrors C++ ProtocolGame::sendSpecialContainersAvailable.
 func (g *GameProtocol) sendSpecialContainersAvailable() {
 	w := netmsg.NewWriter()
 	w.AddByte(0x2A)
-	w.AddByte(1) // stashAvailable
-	w.AddByte(1) // marketAvailable
+	w.AddByte(1)
+	w.AddByte(1)
 	g.SendToClient(w)
 }
