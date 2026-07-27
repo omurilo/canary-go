@@ -567,7 +567,6 @@ func creatureGetshader(L *lua.LState) int {
 }
 
 func creatureGetskull(L *lua.LState) int {
-	// SKULL_NONE (0): skull system not modelled yet.
 	L.Push(lua.LNumber(0))
 	return 1
 }

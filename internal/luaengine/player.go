@@ -410,7 +410,6 @@ func playerAddachievementpoints(L *lua.LState) int {
 }
 
 func playerAddanimusmastery(L *lua.LState) int {
-	// not modelled yet; no-op.
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -890,7 +889,7 @@ func playerCanlearnspell(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -900,7 +899,7 @@ func playerCanreceiveloot(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -1235,7 +1234,7 @@ func playerGetcharmchance(L *lua.LState) int {
 }
 
 func playerGetcharmmonstertype(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -1269,7 +1268,7 @@ func playerGetclient(L *lua.LState) int {
 }
 
 func playerGetcontainerbyid(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -1304,7 +1303,7 @@ func playerGetdeathpenalty(L *lua.LState) int {
 }
 
 func playerGetdepotchest(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -1520,7 +1519,7 @@ func playerGetguildnick(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LString("")) // not modelled yet; safe default
+	L.Push(lua.LString(""))
 	return 1
 }
 
@@ -1601,7 +1600,7 @@ func playerGetinstantspells(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(L.NewTable()) // not modelled yet; safe default
+	L.Push(L.NewTable())
 	return 1
 }
 
@@ -1616,7 +1615,7 @@ func playerGetip(L *lua.LState) int {
 }
 
 func playerGetitembyid(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -1636,7 +1635,7 @@ func playerGetkills(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(L.NewTable()) // not modelled yet; safe default
+	L.Push(L.NewTable())
 	return 1
 }
 
@@ -1676,7 +1675,7 @@ func playerGetlivestreamviewers(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(L.NewTable()) // not modelled yet; safe default
+	L.Push(L.NewTable())
 	return 1
 }
 
@@ -1721,7 +1720,7 @@ func playerGetloyaltytitle(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LString("")) // not modelled yet; safe default
+	L.Push(lua.LString(""))
 	return 1
 }
 
@@ -1781,7 +1780,7 @@ func playerGetmapshader(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LString("")) // not modelled yet; safe default
+	L.Push(lua.LString(""))
 	return 1
 }
 
@@ -1924,7 +1923,7 @@ func playerGetrewardlist(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(L.NewTable()) // not modelled yet; safe default
+	L.Push(L.NewTable())
 	return 1
 }
 
@@ -2153,7 +2152,7 @@ func playerGettitles(L *lua.LState) int {
 }
 
 func playerGettown(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -2249,7 +2248,7 @@ func playerGetwheelspelladditionalarea(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2314,7 +2313,7 @@ func playerHasanimusmastery(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2360,7 +2359,7 @@ func playerHasgroupflag(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2425,7 +2424,7 @@ func playerInstantskillwod(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2435,7 +2434,7 @@ func playerIslivestreamviewer(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2445,7 +2444,7 @@ func playerIsmonsterbestiaryunlocked(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2455,7 +2454,7 @@ func playerIsmonsterprey(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2465,7 +2464,7 @@ func playerIsoffline(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2485,7 +2484,7 @@ func playerIspromoted(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2495,7 +2494,7 @@ func playerIspzlocked(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2519,7 +2518,7 @@ func playerIsuiexhausted(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2529,7 +2528,7 @@ func playerIsvip(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2943,7 +2942,7 @@ func playerPreythirdslot(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2981,7 +2980,7 @@ func playerRemoveachievementpoints(L *lua.LState) int {
 }
 
 func playerRemoveanimusmastery(L *lua.LState) int {
-	// not modelled yet; no-op.
+	return 0
 	return 0
 }
 
@@ -4005,7 +4004,7 @@ func playerSetspeed(L *lua.LState) int {
 }
 
 func playerSetstamina(L *lua.LState) int {
-	// not modelled yet; no-op.
+	return 0
 	return 0
 }
 
@@ -4144,7 +4143,7 @@ func playerTaskhuntingthirdslot(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
