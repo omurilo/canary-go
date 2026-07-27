@@ -2924,10 +2924,10 @@ func playerOpenstash(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
-	return 1
+	if p.Session != nil {
+		p.Session.SendOpenStash()
+	}
+	return 0
 }
 
 func playerPopupfyi(L *lua.LState) int {
