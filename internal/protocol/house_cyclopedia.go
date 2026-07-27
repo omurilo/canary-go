@@ -138,21 +138,12 @@ func (g *GameProtocol) sendCyclopediaHouseList(townName string) {
 
 	// Filter houses by the requested town name (case-insensitive).
 	var townHouses []*game.House
-	if townName == "" {
-		// "Own Houses" view: send all houses
-		for _, h := range world.Houses {
-			if h != nil {
-				townHouses = append(townHouses, h)
-			}
+	for _, h := range world.Houses {
+		if h == nil || townName == "" {
+			continue
 		}
-	} else {
-		for _, h := range world.Houses {
-			if h == nil {
-				continue
-			}
-			if name, ok := world.TownNames[h.TownID]; ok && strings.EqualFold(name, townName) {
-				townHouses = append(townHouses, h)
-			}
+		if name, ok := world.TownNames[h.TownID]; ok && strings.EqualFold(name, townName) {
+			townHouses = append(townHouses, h)
 		}
 	}
 

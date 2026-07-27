@@ -241,6 +241,10 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 			break
 		}
 	}
+	// Persist gem changes immediately so they survive relog.
+	if g.deps.DB != nil && g.player != nil {
+		_ = g.deps.DB.SavePlayerWheel(context.Background(), g.player)
+	}
 	g.SendWheelOfDestiny()
 }
 
