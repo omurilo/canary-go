@@ -1672,6 +1672,49 @@ func (p *Player) GetItemCount(id uint16) uint32 {
 	return count
 }
 
+// AddToStash adds the given count of an item to the player's supply stash.
+func (p *Player) AddToStash(itemID uint16, count uint32) {
+	if p.Stash == nil {
+		p.Stash = make(map[uint16]uint32)
+	}
+	p.Stash[itemID] += count
+}
+
+// RemoveFromStash subtracts the given count from the stash. Returns false if
+// the stash doesn't have enough.
+func (p *Player) RemoveFromStash(itemID uint16, count uint32) bool {
+	if p.Stash == nil {
+		return false
+	}
+	have := p.Stash[itemID]
+	if have < count {
+		return false
+	}
+	have -= count
+	if have == 0 {
+		delete(p.Stash, itemID)
+	} else {
+		p.Stash[itemID] = have
+	}
+	return true
+}
+
+// GetStashItemCount returns the number of stashed items for the given ID.
+func (p *Player) GetStashItemCount(itemID uint16) uint32 {
+	if p.Stash == nil {
+		return 0
+	}
+	return p.Stash[itemID]
+}
+
+// GetStashSlotCount returns the number of distinct item entries in the stash.
+func (p *Player) GetStashSlotCount() uint32 {
+	if p.Stash == nil {
+		return 0
+	}
+	return uint32(len(p.Stash))
+}
+
 // countItemInTree recursively counts items matching the given ID in a container tree.
 func (p *Player) countItemInTree(item *Item, id uint16) uint32 {
 	if item == nil {

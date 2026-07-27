@@ -759,6 +759,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		w := netmsg.NewWriter()
 		w.AddByte(opPingBack)
 		g.SendToClient(w)
+	case 0x28: // Stash action (stow/withdraw)
+		g.parseStashAction(r)
 	case inPong, 0x60, 0xBE:
 		// Reply to our own keep-alive ping, or safely ignored opcodes (imbuements/cancel attack).
 	case inWalkNorth:

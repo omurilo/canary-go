@@ -588,9 +588,10 @@ func playerAdditemstash(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	itemID := uint16(L.CheckInt(2))
+	count := uint32(L.OptInt(3, 1))
+	p.AddToStash(itemID, count)
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -2068,20 +2069,21 @@ func playerGetstaminaxpboost(L *lua.LState) int {
 func playerGetstashcount(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LNumber(p.GetStashSlotCount()))
 	return 1
 }
 
 func playerGetstashitemcount(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	itemID := uint16(L.CheckInt(2))
+	L.Push(lua.LNumber(p.GetStashItemCount(itemID)))
 	return 1
 }
 
@@ -2923,9 +2925,9 @@ func playerOpenstash(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	// openStash called from Lua (NPC dialogue). The protocol layer handles
+	// the actual stash window; this Lua binding is informational.
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3205,11 +3207,12 @@ func playerRemovereward(L *lua.LState) int {
 func playerRemovestashitem(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LFalse)
+		return 1
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	itemID := uint16(L.CheckInt(2))
+	count := uint32(L.OptInt(3, 1))
+	L.Push(lua.LBool(p.RemoveFromStash(itemID, count)))
 	return 1
 }
 
