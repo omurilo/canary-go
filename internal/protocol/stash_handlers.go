@@ -28,7 +28,9 @@ if itemID == 0 {
 			g.deps.Log.Info("stash: using clientID", "itemID", itemID)
 		}
 		allItems := (count == 0)
+g.deps.Log.Info("stash: calling StowItem", "itemID", itemID, "count", count, "allItems", allItems)
 		stowed := g.player.StowItem(itemID, uint32(count), allItems)
+		g.deps.Log.Info("stash: StowItem returned", "stowed", stowed)
 		if stowed > 0 {
 			g.sendStashAndInventory()
 		}

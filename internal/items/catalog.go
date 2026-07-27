@@ -119,6 +119,7 @@ func (t *ItemType) GetWeight() uint32 {
 type Catalog struct {
 	byID   map[uint16]*ItemType
 	byName map[string]uint16 // lower-cased name -> first id seen
+	byClientID map[uint16]uint16 // client ID -> server item ID
 }
 
 // NewCatalog builds a catalog from an explicit set of item types, indexing them
