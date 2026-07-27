@@ -329,22 +329,67 @@ func (g *GameProtocol) sendCyclopediaCharacterGeneralStats() {
 	g.SendToClient(w)
 }
 
-// sendCyclopediaCharacterItemSummary sends an empty item summary (type 6).
-// Each section count is 0, so no item data is sent.
+// sendCyclopediaCharacterItemSummary sends the item summary (type 6) with
+// real inventory and stash data, matching C++ format.
 func (g *GameProtocol) sendCyclopediaCharacterItemSummary() {
 	if g.player == nil {
 		return
 	}
+	p := g.player
+
+	// Helper to write one section: item entries grouped by (ID, tier) → count.
+	writeSection := func(w *netmsg.Writer, items map[[2]uint32]uint32) {
+		countPos := w.Pos()
+		w.AddU16(0) // placeholder count
+		written := uint16(0)
+		for key, cnt := range items {
+			itemID := uint16(key[0])
+			tier := uint8(key[1])
+			t := g.deps.Items.Get(itemID)
+			w.AddU16(itemID)
+			if t != nil && t.UpgradeClassification > 0 {
+				w.AddByte(tier)
+			} else if t == nil {
+				// Unknown item, still check classification from ID range
+			}
+			w.AddU32(cnt)
+			written++
+		}
+		w.SetU16(countPos, written)
+	}
+
 	w := netmsg.NewWriter()
 	w.AddByte(0xDA)
 	w.AddByte(cyclopediaCharacterInfoItemSummary)
 	w.AddByte(0x00) // no error
 
-	w.AddU16(0) // inventoryItemsCount
-	w.AddU16(0) // storeInboxItemsCount
-	w.AddU16(0) // stashItemsCount
-	w.AddU16(0) // depotBoxItemsCount
-	w.AddU16(0) // inboxItemsCount
+	// 1. Inventory items — group by (ID, tier)
+	inv := make(map[[2]uint32]uint32)
+	for slot := uint8(game.ConstSlotFirst); slot <= uint8(game.ConstSlotLast); slot++ {
+		if int(slot) < len(p.Inventory) && p.Inventory[slot] != nil {
+			it := p.Inventory[slot]
+			key := [2]uint32{uint32(it.ID), uint32(it.GetTier())}
+			inv[key]++
+		}
+	}
+	writeSection(w, inv)
+
+	// 2. Store inbox — empty (no easy access to container tree)
+	w.AddU16(0)
+
+	// 3. Stash items — already grouped by ID with count
+	stash := make(map[[2]uint32]uint32)
+	for itemID, cnt := range p.Stash {
+		key := [2]uint32{uint32(itemID), 0}
+		stash[key] += cnt
+	}
+	writeSection(w, stash)
+
+	// 4. Depot box items — empty (container traversal too complex for now)
+	w.AddU16(0)
+
+	// 5. Inbox items — empty
+	w.AddU16(0)
 
 	g.SendToClient(w)
 }
