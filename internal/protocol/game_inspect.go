@@ -10,8 +10,11 @@ import (
 )
 
 const (
-	cyclopediaCharacterInfoInspection   = 9
-	cyclopediaCharacterInfoAchievements = 5
+	cyclopediaCharacterInfoBaseInformation = 0
+	cyclopediaCharacterInfoGeneralStats    = 1
+	cyclopediaCharacterInfoOutfitsMounts   = 7
+	cyclopediaCharacterInfoInspection      = 9
+	cyclopediaCharacterInfoAchievements    = 5
 )
 
 func (g *GameProtocol) parseInspectPlayer(r *netmsg.Reader) {
@@ -48,10 +51,16 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 	}
 
 	switch characterInfoType {
-	case cyclopediaCharacterInfoInspection: // 9
-		g.sendCyclopediaCharacterInspection(g.player)
+	case cyclopediaCharacterInfoBaseInformation: // 0
+		g.sendCyclopediaCharacterBaseInformation()
+	case cyclopediaCharacterInfoGeneralStats: // 1
+		g.sendCyclopediaCharacterGeneralStats()
 	case cyclopediaCharacterInfoAchievements: // 5
 		g.sendCyclopediaCharacterAchievements(g.player)
+	case cyclopediaCharacterInfoOutfitsMounts: // 7
+		g.sendCyclopediaCharacterOutfitsMounts()
+	case cyclopediaCharacterInfoInspection: // 9
+		g.sendCyclopediaCharacterInspection(g.player)
 	default:
 		g.sendCyclopediaNoData(characterInfoType, 1)
 	}
@@ -170,6 +179,153 @@ func (g *GameProtocol) sendCyclopediaCharacterInspection(p *game.Player) {
 		w.AddString(d.Key)
 		w.AddString(d.Val)
 	}
+	g.SendToClient(w)
+}
+
+// sendCyclopediaCharacterBaseInformation sends the character's base info (type 0).
+// Matches C++ ProtocolGame::sendCyclopediaCharacterBaseInformation.
+func (g *GameProtocol) sendCyclopediaCharacterBaseInformation() {
+	if g.player == nil {
+		return
+	}
+	p := g.player
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoBaseInformation)
+	w.AddByte(0x00) // no error
+
+	w.AddString(p.Name)
+
+	vocName := "unknown"
+	if voc := vocations.GetVocation(uint32(p.Vocation)); voc != nil {
+		vocName = voc.Name
+	}
+	w.AddString(vocName)
+
+	w.AddU16(p.Level)
+	addOutfitNoMount(w, p.Outfit)
+
+	// Store summary & Character titles flag
+	w.AddByte(0x01)
+	w.AddString("") // current title (empty for now)
+	g.SendToClient(w)
+}
+
+// sendCyclopediaCharacterGeneralStats sends the character's general stats (type 1).
+// Matches C++ ProtocolGame::sendCyclopediaCharacterGeneralStats.
+func (g *GameProtocol) sendCyclopediaCharacterGeneralStats() {
+	if g.player == nil {
+		return
+	}
+	p := g.player
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoGeneralStats)
+	w.AddByte(0x00) // no error
+
+	// Experience & level
+	w.AddU64(p.Experience)
+	w.AddU16(p.Level)
+	levelPercent := p.GetLevelPercent() * 100
+	if levelPercent > 10000 {
+		levelPercent = 10000
+	}
+	w.AddU16(levelPercent)
+
+	// XP gain rates (defaults — stamina/boosts not yet implemented)
+	w.AddU16(150)   // BaseXPGainRate (default)
+	w.AddU16(0)     // LowLevelBonus (grindingXpBoost not implemented)
+	w.AddU16(0)     // XPBoost percent (xpBoostPercent not implemented)
+	w.AddU16(100)   // StaminaMultiplier (100 = x1.0)
+	w.AddU16(0)     // xpBoostRemainingTime
+	w.AddByte(1)    // canBuyXpBoost (1 since xpBoostTime is 0)
+
+	// Health
+	w.AddU32(p.Health)
+	w.AddU32(p.GetMaxHealth())
+
+	// Mana
+	w.AddU32(p.Mana)
+	w.AddU32(p.GetMaxMana())
+
+	// Soul
+	w.AddByte(p.Soul)
+
+	// Stamina
+	w.AddU16(0) // staminaMinutes (not implemented yet)
+
+	// Regeneration ticks
+	regenTicks := uint16(0)
+	if p.RegenTicks > 0 {
+		regenTicks = uint16(p.RegenTicks / 1000)
+	}
+	w.AddU16(regenTicks)
+
+	// Offline training time (milliseconds -> minutes)
+	offlineMinutes := uint16(0)
+	if p.OfflineTrainingTime > 0 {
+		offlineMinutes = uint16(p.OfflineTrainingTime / 60000)
+	}
+	w.AddU16(offlineMinutes)
+
+	// Speed
+	w.AddU16(p.GetSpeed())
+	w.AddU16(p.GetBaseSpeed())
+
+	// Capacity
+	w.AddU32(p.GetCapacity())
+	w.AddU32(p.Capacity) // base capacity
+	w.AddU32(p.GetFreeCapacity())
+
+	// Hardcoded bytes (client version indicators)
+	w.AddByte(8)
+	w.AddByte(1)
+
+	// Magic level
+	w.AddU16(p.GetEffectiveMagLevel())
+	w.AddU16(p.MagLevel) // base magic level
+	w.AddU16(0)          // loyalty magic level (not implemented)
+	magPct := p.GetMagLevelPercent() * 100
+	w.AddU16(magPct)
+
+	// Skills: Fist, Club, Sword, Axe, Distance, Shielding, Fishing
+	// Hardcoded skill IDs matching C++: {11, 9, 8, 10, 7, 6, 13}
+	hardcodedSkillIDs := []uint8{11, 9, 8, 10, 7, 6, 13}
+	skillOrder := []game.Skill{game.SkillFist, game.SkillClub, game.SkillSword, game.SkillAxe, game.SkillDistance, game.SkillShielding, game.SkillFishing}
+	for i, sk := range skillOrder {
+		w.AddByte(hardcodedSkillIDs[i])
+		w.AddU16(p.GetEffectiveSkill(sk))
+		w.AddU16(p.Skills[sk]) // base skill
+		w.AddU16(0)            // loyalty skill (not implemented)
+		skPct := p.GetSkillPercent(sk) * 100
+		w.AddU16(skPct)
+	}
+
+	// Combat stats (empty for now)
+	w.AddByte(0)
+
+	g.SendToClient(w)
+}
+
+// sendCyclopediaCharacterOutfitsMounts sends outfits, mounts, and familiars (type 7).
+// For now sends empty lists for all three categories. Matches C++
+// ProtocolGame::sendCyclopediaCharacterOutfitsMounts.
+func (g *GameProtocol) sendCyclopediaCharacterOutfitsMounts() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoOutfitsMounts)
+	w.AddByte(0x00) // no error
+
+	// Outfits — empty list
+	w.AddU16(0)
+	// Mounts — empty list
+	w.AddU16(0)
+	// Familiars — empty list
+	w.AddU16(0)
+
 	g.SendToClient(w)
 }
 
