@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"fmt"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -369,8 +368,9 @@ func (g *GameProtocol) cmdSetLevel(args []string) {
 	p := g.player
 	p.Level = uint16(lvl)
 	p.Experience = game.ExpForLevel(uint64(lvl))
-	p.SendStats()
-	p.SetBaseSpeed()
+	if p.Session != nil {
+		p.Session.SendStats()
+	}
 	g.sendStatusText(fmt.Sprintf("Set level to %d.", lvl))
 }
 
@@ -387,7 +387,9 @@ func (g *GameProtocol) cmdSetHealth(args []string) {
 		}
 		p.Health = uint32(hp)
 	}
-	p.SendStats()
+	if p.Session != nil {
+		p.Session.SendStats()
+	}
 	g.sendStatusText(fmt.Sprintf("Health set to %d.", p.Health))
 }
 
@@ -404,7 +406,9 @@ func (g *GameProtocol) cmdSetMana(args []string) {
 		}
 		p.Mana = uint32(mp)
 	}
-	p.SendStats()
+	if p.Session != nil {
+		p.Session.SendStats()
+	}
 	g.sendStatusText(fmt.Sprintf("Mana set to %d.", p.Mana))
 }
 
@@ -420,7 +424,9 @@ func (g *GameProtocol) cmdSetSpeed(args []string) {
 		return
 	}
 	g.player.Speed = uint16(spd)
-	g.player.SendChangeSpeed(g.player)
+	if g.player.Session != nil {
+		g.player.Session.SendChangeSpeed(g.player)
+	}
 	g.sendStatusText(fmt.Sprintf("Speed set to %d.", spd))
 }
 
@@ -455,8 +461,6 @@ func (g *GameProtocol) cmdSkull(args []string) {
 		return
 	}
 	g.player.Skull = uint8(sk)
-	// Send creature update to all spectators
-	g.deps.World.BroadcastSkullUpdate(g.player)
 	g.sendStatusText(fmt.Sprintf("Skull set to %d.", sk))
 }
 
