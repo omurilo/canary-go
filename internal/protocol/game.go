@@ -801,9 +801,9 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case inCloseContainer:
 		g.parseCloseContainer(r)
 	case inContainerUp:
-		case 0x6E: // Seek in paginated container (opContainerOpen inbound)
-			g.parseSeekContainer(r)
 		g.parseContainerUp(r)
+	case 0x6E: // Seek in paginated container (opContainerOpen inbound)
+		g.parseSeekContainer(r)
 	case inSay:
 		g.handleSay(r)
 	case inThrowItem:
