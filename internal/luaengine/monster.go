@@ -100,7 +100,18 @@ func monsterAdddefensespell(L *lua.LState) int {
 }
 
 func monsterAddfriend(L *lua.LState) int {
-	// TODO: implement addFriend
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	other := checkCreature(L)
+	if other == nil {
+		return 0
+	}
+	if m.Friends == nil {
+		m.Friends = make(map[uint32]game.Creature)
+	}
+	m.Friends[other.GetID()] = other
 	return 0
 }
 
@@ -110,7 +121,18 @@ func monsterAddreflectelement(L *lua.LState) int {
 }
 
 func monsterAddtarget(L *lua.LState) int {
-	// TODO: implement addTarget
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	other := checkCreature(L)
+	if other == nil {
+		return 0
+	}
+	if m.Targets == nil {
+		m.Targets = make(map[uint32]game.Creature)
+	}
+	m.Targets[other.GetID()] = other
 	return 0
 }
 
@@ -169,8 +191,13 @@ func monsterGetforgestack(L *lua.LState) int {
 }
 
 func monsterGetfriendcount(L *lua.LState) int {
-	// TODO: implement getFriendCount
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	L.Push(lua.LNumber(len(m.Friends)))
+	return 1
 }
 
 func monsterGetfriendlist(L *lua.LState) int {
@@ -210,8 +237,13 @@ func monsterGetspawnposition(L *lua.LState) int {
 }
 
 func monsterGettargetcount(L *lua.LState) int {
-	// TODO: implement getTargetCount
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	L.Push(lua.LNumber(len(m.Targets)))
+	return 1
 }
 
 func monsterGettargetlist(L *lua.LState) int {
@@ -268,8 +300,13 @@ func monsterIschallenged(L *lua.LState) int {
 }
 
 func monsterIsdead(L *lua.LState) int {
-	// TODO: implement isDead
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LBool(m.GetHealth() == 0))
+	return 1
 }
 
 func monsterIsforgeable(L *lua.LState) int {
@@ -281,18 +318,40 @@ func monsterIsforgeable(L *lua.LState) int {
 }
 
 func monsterIsfriend(L *lua.LState) int {
-	// TODO: implement isFriend
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	other := checkCreature(L)
+	if other == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	_, ok := m.Friends[other.GetID()]
+	L.Push(lua.LBool(ok))
+	return 1
 }
 
 func monsterIsidle(L *lua.LState) int {
-	// TODO: implement isIdle
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LBool(m.Idle))
+	return 1
 }
 
 func monsterIsinspawnrange(L *lua.LState) int {
-	// TODO: implement isInSpawnRange
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	dist := m.GetPosition().MaxDistance(m.SpawnPosition)
+	L.Push(lua.LBool(dist < 30))
+	return 1
 }
 
 func monsterIsmonster(L *lua.LState) int {
@@ -301,22 +360,54 @@ func monsterIsmonster(L *lua.LState) int {
 }
 
 func monsterIsopponent(L *lua.LState) int {
-	// TODO: implement isOpponent
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func monsterIstarget(L *lua.LState) int {
-	// TODO: implement isTarget
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	other := checkCreature(L)
+	if other == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	_, ok := m.Targets[other.GetID()]
+	L.Push(lua.LBool(ok))
+	return 1
 }
 
 func monsterRemovefriend(L *lua.LState) int {
-	// TODO: implement removeFriend
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	other := checkCreature(L)
+	if other == nil {
+		return 0
+	}
+	delete(m.Friends, other.GetID())
 	return 0
 }
 
 func monsterRemovetarget(L *lua.LState) int {
-	// TODO: implement removeTarget
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	other := checkCreature(L)
+	if other == nil {
+		return 0
+	}
+	delete(m.Targets, other.GetID())
 	return 0
 }
 

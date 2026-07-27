@@ -1,4 +1,4 @@
-FROM php:8.3-apache
+FROM php:8.2-apache
 
 ARG MYAAC_REF=develop
 ENV COMPOSER_ALLOW_SUPERUSER=1
@@ -20,9 +20,11 @@ RUN apt-get update \
 	&& a2enmod headers rewrite \
 	&& rm -rf /var/lib/apt/lists/*
 
-RUN cp /usr/include/lua5.3/*.h /usr/include/ \
+    RUN cp /usr/include/lua5.3/*.h /usr/include/ \
+    && ln -s /usr/lib/$(dpkg-architecture -q DEB_BUILD_MULTIARCH)/liblua5.3.so /usr/lib/liblua.so \
     && pecl install lua \
-    && docker-php-ext-enable lua
+    && docker-php-ext-enable lua \
+    && rm -rf /tmp/pear
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
