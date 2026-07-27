@@ -562,7 +562,8 @@ func (g *GameProtocol) enterWorld() {
 	g.SendToClient(w)
 	// Cyclopedia houses info (enables the house auction UI in the client).
 	g.sendHousesInfo()
-
+	// Enable stash/market special containers menu so "Stow" appears.
+	g.sendSpecialContainersAvailable()
 
 	// Force close all containers on the client to clear any ghost containers.
 	// The client caches open containers locally, but if the server doesn't have them
