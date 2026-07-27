@@ -1768,139 +1768,277 @@ func (p *Player) SetStashMenuAvailable(v bool) {
 	p.stashMenuAvailable = v
 }
 
-// StowItem moves items of the given ID from inventory/containers to the stash.
-// If allItems is true, stows ALL matching items. If count > 0, stows up to count.
-// Returns the number of items actually stowed. Mirrors C++ Player::stowItem.
-func (p *Player) StowItem(itemID uint16, count uint32, allItems bool) uint32 {
-	if p.Stash == nil {
-		p.Stash = make(map[uint16]uint32)
-	}
-	// Pass 1: collect all matching items with their counts (StashContainerList equivalent)
-	type stowEntry struct {
-		item  *Item
-		count uint32
-		slot  int // inventory slot or -1 for containers
-	}
-	var list []stowEntry
-
-	var collect func(parent *Item, slot int)
-	collect = func(parent *Item, slot int) {
-		if parent == nil {
-			return
-		}
-		if parent.ID == itemID && (allItems || count > 0) {
-			itemCount := uint32(parent.Count)
-			if itemCount == 0 {
-				itemCount = 1
-			}
-			take := itemCount
-			if !allItems && take > count {
-				take = count
-			}
-			if take > 0 {
-				list = append(list, stowEntry{item: parent, count: take, slot: slot})
-				if !allItems {
-					count -= take
-				}
-			}
-		}
-		for _, child := range parent.Contents {
-			if child != nil {
-				collect(child, -1)
-			}
-		}
-	}
-
-	// Scan inventory slots
-	for slot := 0; slot < len(p.Inventory); slot++ {
-		collect(p.Inventory[slot], slot)
-	}
-	// Scan inbox
-	if p.Inbox != nil {
-		collect(p.Inbox, -1)
-	}
-	if p.StoreInbox != nil {
-		collect(p.StoreInbox, -1)
-	}
-
-	// Pass 2: process each collected item (add to stash, remove from inventory)
-	var total uint32
-	for _, e := range list {
-		p.Stash[itemID] += e.count
-		total += e.count
-		if e.slot >= 0 && e.slot < len(p.Inventory) {
-			// Direct inventory slot
-			if uint32(e.item.Count) > e.count {
-				e.item.Count -= uint16(e.count)
-			} else {
-				p.Inventory[e.slot] = nil
-			}
-		} else {
-			// Inside a container — decrement count
-			if uint32(e.item.Count) > e.count {
-				e.item.Count -= uint16(e.count)
-			} else {
-				e.item.Count = 0
-			}
-		}
-	}
-
-	// Clean up empty container entries
-	for slot := 0; slot < len(p.Inventory); slot++ {
-		if p.Inventory[slot] != nil {
-			p.cleanContainerContents(p.Inventory[slot])
-		}
-	}
-	return total
+// StashContainerEntry maps an item instance to the count to stow.
+type StashContainerEntry struct {
+	Item  *Item
+	Count uint32
 }
 
-// StowInventoryItem stows a specific item from the player's inventory by position.
-// If allItems is true, scaneia todos os items do mesmo tipo no inventario.
-// Se count > 0, stow so ate count unidades deste item especifico.
-func (p *Player) StowInventoryItem(slot int, count uint32, allItems bool) bool {
-	if p.Stash == nil {
-		p.Stash = make(map[uint16]uint32)
-	}
-	item := p.Inventory[slot]
+// StashContainerList is a list of items to stow with their counts.
+type StashContainerList []StashContainerEntry
+
+// isItemStorable checks if a specific item instance can be stowed.
+// C++: Item::isItemStorable (item.cpp:905)
+func (p *Player) isItemStorable(item *Item) bool {
 	if item == nil {
 		return false
 	}
-	have := uint32(item.Count)
-	if have == 0 {
-		have = 1
-	}
-	take := have
-	if !allItems && count > 0 && take > count {
-		take = count
-	}
-	if take == 0 {
-		return false
-	}
-	p.Stash[item.ID] += take
-	if take >= have {
-		p.Inventory[slot] = nil
-	} else {
-		item.Count -= uint16(take)
+	if item.Attr != nil {
+		if item.Attr.StoreTimestamp != nil {
+			return false
+		}
+		if item.Attr.Owner != nil && *item.Attr.Owner != p.DBID {
+			return false
+		}
 	}
 	return true
 }
 
-// cleanContainerContents recursively removes items with Count == 0 from containers.
-func (p *Player) cleanContainerContents(parent *Item) {
-	if parent == nil || len(parent.Contents) == 0 {
-		return
+// isInsideDepot checks if the item is inside a depot locker (IDs 3497-3500).
+func (p *Player) isInsideDepot(item *Item) bool {
+	for parent := item.Parent; parent != nil; parent = parent.Parent {
+		if parent.ID >= 3497 && parent.ID <= 3500 {
+			return true
+		}
 	}
-	var remaining []*Item
-	for _, child := range parent.Contents {
-		if child == nil {
+	return false
+}
+
+// FindItemInOpenContainers searches open containers for an item at the given
+// position and stackpos index. Only matches containers whose Position matches.
+func (p *Player) FindItemInOpenContainers(pos Position, stackpos int, itemID uint16) *Item {
+	for _, oc := range p.openContainers {
+		if oc.Container == nil {
 			continue
 		}
-		p.cleanContainerContents(child)
-		if child.Count > 0 {
-			remaining = append(remaining, child)
+		if oc.Position == pos {
+			if stackpos >= 0 && stackpos < len(oc.Container.Contents) {
+				candidate := oc.Container.Contents[stackpos]
+				if candidate != nil && candidate.ID == itemID {
+					return candidate
+				}
+			}
 		}
 	}
-	parent.Contents = remaining
+	return nil
+}
+
+// StowItem moves items from inventory/containers to stash, ported 1:1 from
+// C++ Player::stowItem (player.cpp:10101). The item parameter is the actual
+// Item* the player clicked on (resolved from protocol position).
+func (p *Player) StowItem(item *Item, count uint32, allItems bool) uint32 {
+	if p.Stash == nil {
+		p.Stash = make(map[uint16]uint32)
+	}
+
+	// C++: !isItemStorable && !goldPouch → cancel
+	if !p.isItemStorable(item) {
+		return 0
+	}
+
+	maxItemsToStow := uint32(1000) // STASH_MANAGE_AMOUNT
+	itemDict := make(StashContainerList, 0)
+	var totalItemsToStow uint32
+
+	if allItems {
+		// C++: containers cannot be stowed via allItems
+		if len(item.Contents) > 0 {
+			return 0
+		}
+
+		if p.isInsideDepot(item) {
+			// C++: scan depot locker contents
+			var depotContainer *Item
+			for parent := item.Parent; parent != nil; parent = parent.Parent {
+				if parent.ID >= 3497 && parent.ID <= 3500 {
+					depotContainer = parent
+					break
+				}
+			}
+			if depotContainer != nil {
+				totalItemsToStow = p.collectItemsSameType(item, depotContainer, itemDict, totalItemsToStow, maxItemsToStow)
+			}
+		} else {
+			// C++: scan backpack
+			if bp := p.Inventory[ConstSlotBackpack]; bp != nil {
+				totalItemsToStow = p.collectItemsSameType(item, bp, itemDict, totalItemsToStow, maxItemsToStow)
+			}
+		}
+	} else if len(item.Contents) > 0 {
+		// C++: allItems=false, item is a container → scan its stowable items
+		for _, child := range item.Contents {
+			if totalItemsToStow >= maxItemsToStow {
+				break
+			}
+			if child == nil || !p.isItemStorable(child) {
+				continue
+			}
+			childCount := uint32(child.Count)
+			if childCount == 0 {
+				childCount = 1
+			}
+			if remaining := maxItemsToStow - totalItemsToStow; childCount > remaining {
+				childCount = remaining
+			}
+			itemDict = append(itemDict, StashContainerEntry{Item: child, Count: childCount})
+			totalItemsToStow += childCount
+		}
+	} else {
+		// C++: allItems=false, single item
+		stowCount := count
+		if stowCount == 0 {
+			stowCount = uint32(item.Count)
+			if stowCount == 0 {
+				stowCount = 1
+			}
+		}
+		if remaining := maxItemsToStow - totalItemsToStow; stowCount > remaining {
+			stowCount = remaining
+		}
+		itemDict = append(itemDict, StashContainerEntry{Item: item, Count: stowCount})
+		totalItemsToStow += stowCount
+	}
+
+	if len(itemDict) == 0 {
+		return 0
+	}
+
+	p.stashContainer(itemDict)
+	return totalItemsToStow
+}
+
+// collectItemsSameType scans a container tree recursively for all items matching
+// the target item's ID. C++: sendStowItems helper (player.cpp:10073) scans a
+// single container's getStowableItems — we recurse so nested containers (bags
+// in backpacks, items in nested depot chests) are found correctly.
+func (p *Player) collectItemsSameType(target *Item, container *Item, itemDict StashContainerList, totalSoFar, maxCount uint32) uint32 {
+	var added uint32
+	p.collectRecursive(target, container, &itemDict, &added, totalSoFar, maxCount)
+	return added
+}
+
+// collectRecursive is the recursive helper for collectItemsSameType.
+func (p *Player) collectRecursive(target *Item, current *Item, itemDict *StashContainerList, added *uint32, totalSoFar, maxCount uint32) {
+	if current == nil || totalSoFar+*added >= maxCount {
+		return
+	}
+
+	if current.ID == target.ID && p.isItemStorable(current) {
+		itemCount := uint32(current.Count)
+		if itemCount == 0 {
+			itemCount = 1
+		}
+		stowableToAdd := itemCount
+		if remaining := maxCount - (totalSoFar + *added); stowableToAdd > remaining {
+			stowableToAdd = remaining
+		}
+		if stowableToAdd > 0 {
+			*itemDict = append(*itemDict, StashContainerEntry{Item: current, Count: stowableToAdd})
+			*added += stowableToAdd
+		}
+	}
+
+	for _, child := range current.Contents {
+		if child != nil {
+			p.collectRecursive(target, child, itemDict, added, totalSoFar, maxCount)
+		}
+	}
+}
+
+// stashContainer processes the item dict, removing items and adding to stash.
+// C++: Player::stashContainer (player.cpp:5132)
+func (p *Player) stashContainer(itemDict StashContainerList) {
+	for _, entry := range itemDict {
+		if entry.Item == nil || !p.isItemStorable(entry.Item) {
+			continue
+		}
+		if p.removeItemFromContainer(entry.Item, uint16(entry.Count)) {
+			p.AddToStash(entry.Item.ID, entry.Count)
+		}
+	}
+}
+
+// removeItemFromContainer removes a specific item instance from inventory or
+// from any container tree (including open containers like depot chests).
+// C++: handles both player-held items (removeItem) and external containers
+// (parent->removeThing). Returns true on success.
+func (p *Player) removeItemFromContainer(item *Item, itemCount uint16) bool {
+	if item == nil {
+		return false
+	}
+
+	// Check direct inventory slots
+	for i := ConstSlotFirst; i <= ConstSlotLast; i++ {
+		if p.Inventory[i] == item {
+			if itemCount >= item.Count {
+				p.Inventory[i] = nil
+			} else {
+				item.Count -= itemCount
+			}
+			return true
+		}
+	}
+
+	// Check inventory container tree (backpack bags, etc.)
+	for _, slot := range p.Inventory {
+		if slot != nil && p.removeFromContentsRecursive(slot, item, itemCount) {
+			return true
+		}
+	}
+
+	// Check item's explicit parent
+	if item.Parent != nil {
+		p.removeFromContents(item.Parent, item, itemCount)
+		return true
+	}
+
+	// Check open containers tree (depot chests, etc. — items might not have
+	// Parent set but are referenced from openContainers)
+	for _, oc := range p.openContainers {
+		if oc.Container != nil && p.removeFromContentsRecursive(oc.Container, item, itemCount) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// removeFromContents removes a child item from a parent's Contents slice.
+func (p *Player) removeFromContents(parent *Item, item *Item, count uint16) {
+	for i, child := range parent.Contents {
+		if child == item {
+			if count >= child.Count {
+				parent.Contents = append(parent.Contents[:i], parent.Contents[i+1:]...)
+			} else {
+				child.Count -= count
+			}
+			return
+		}
+	}
+}
+
+// removeFromContentsRecursive recursively searches for an item in a container
+// tree and removes it when found.
+func (p *Player) removeFromContentsRecursive(container *Item, target *Item, count uint16) bool {
+	if container == nil {
+		return false
+	}
+	for i, child := range container.Contents {
+		if child == target {
+			if count >= child.Count {
+				container.Contents = append(container.Contents[:i], container.Contents[i+1:]...)
+			} else {
+				child.Count -= count
+			}
+			return true
+		}
+		if len(child.Contents) > 0 {
+			if p.removeFromContentsRecursive(child, target, count) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // countItemInTree recursively counts items matching the given ID in a container tree.
