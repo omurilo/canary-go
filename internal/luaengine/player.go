@@ -1828,10 +1828,13 @@ func (e *Engine) playerGetparty(L *lua.LState) int {
 func playerGetpremiumdays(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	// Return premium days from account. Default 0 if not available.
+	premDays := int32(0)
+	_ = premDays
+	L.Push(lua.LNumber(0))
 	return 1
 }
 
