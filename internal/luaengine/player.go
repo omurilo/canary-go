@@ -2144,7 +2144,7 @@ func playerGettitles(L *lua.LState) int {
 		return 1
 	}
 	tbl := L.NewTable()
-	for _, title := range p.Titles {
+	for _, title := range p.TitleStrings {
 		tbl.Append(lua.LString(title))
 	}
 	L.Push(tbl)

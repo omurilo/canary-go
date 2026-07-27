@@ -211,8 +211,8 @@ type Player struct {
 
 	// Achievements (B7) — map of achievement ID → unlock timestamp (unix).
 	Achievements map[uint16]int64
-	// Titles are string labels unlocked alongside achievements.
-	Titles []string
+	// TitleStrings are string labels unlocked alongside achievements.
+	TitleStrings []string
 
 	// Familiars (B15) — unlocked familiars for this player.
 	Familiars      []Familiar
@@ -221,6 +221,9 @@ type Player struct {
 		// Badges (B10/cyclopedia) — unlocked account badges. Mirrors C++
 		// PlayerBadge (player_badge.hpp).
 		Badges *PlayerBadges
+
+		// Titles (B11/cyclopedia) — unlocked character titles.
+		Titles   *PlayerTitles
 
 	// Hazard (B17) — current hazard system points.
 	HazardPoints uint32
@@ -360,6 +363,14 @@ func (p *Player) GetBadges() *PlayerBadges {
 		p.Badges = &PlayerBadges{Unlocked: make(map[uint32]bool)}
 	}
 	return p.Badges
+}
+
+// GetTitles returns the player title state, initialising it on first use.
+func (p *Player) GetTitles() *PlayerTitles {
+	if p.Titles == nil {
+		p.Titles = &PlayerTitles{Unlocked: make(map[uint8]bool)}
+	}
+	return p.Titles
 }
 
 // HasLearnedSpell mirrors Player::hasLearnedInstantSpell

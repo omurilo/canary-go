@@ -73,11 +73,11 @@ func (d *DB) LoadPlayerTitles(ctx context.Context, p *game.Player) error {
 	}
 	defer rows.Close()
 
-	p.Titles = nil
+	p.TitleStrings = nil
 	for rows.Next() {
 		var title string
 		if err := rows.Scan(&title); err == nil {
-			p.Titles = append(p.Titles, title)
+			p.TitleStrings = append(p.TitleStrings, title)
 		}
 	}
 	return nil
@@ -85,14 +85,14 @@ func (d *DB) LoadPlayerTitles(ctx context.Context, p *game.Player) error {
 
 // SavePlayerTitles persists the player's titles.
 func (d *DB) SavePlayerTitles(ctx context.Context, p *game.Player) error {
-	if len(p.Titles) == 0 {
+	if len(p.TitleStrings) == 0 {
 		return nil
 	}
 	if _, err := d.SQL.ExecContext(ctx, `DELETE FROM player_titles WHERE player_id = ?`, p.DBID); err != nil {
 		return err
 	}
 	const q = `INSERT INTO player_titles (player_id, title) VALUES (?, ?)`
-	for _, title := range p.Titles {
+	for _, title := range p.TitleStrings {
 		if _, err := d.SQL.ExecContext(ctx, q, p.DBID, title); err != nil {
 			return err
 		}

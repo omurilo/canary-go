@@ -616,18 +616,47 @@ func (g *GameProtocol) sendCyclopediaCharacterBadges() {
 }
 
 // sendCyclopediaCharacterTitles sends the character titles (type 11).
-// Matches C++ ProtocolGame::sendCyclopediaCharacterTitles.
+// Wire format: 0xDA + u8 type + u8 error + u8 currentTitle + u8 count
+//   for each unlocked title: string name + string desc + u8 permanent + u8 unlocked(1)
+// Matches C++ ProtocolGame::sendCyclopediaCharacterTitles (omitting the u8 m_id
+// that the C++ sends before name, since OTClient skips it).
 func (g *GameProtocol) sendCyclopediaCharacterTitles() {
 	if g.player == nil {
 		return
 	}
+	p := g.player
 	w := netmsg.NewWriter()
 	w.AddByte(0xDA)
 	w.AddByte(cyclopediaCharacterInfoTitles)
 	w.AddByte(0x00) // no error
 
-	w.AddByte(0) // currentTitle (0 = none)
-	w.AddByte(0) // titlesCount (0 for now)
+	titles := p.GetTitles()
+	w.AddByte(titles.CurrentID) // current title ID
+
+	// Count unlocked titles and collect them for sending.
+	count := uint8(0)
+	var unlocked []game.TitleInfo
+	for _, t := range game.DefaultTitles {
+		if titles.IsUnlocked(t.ID) {
+			unlocked = append(unlocked, t)
+			count++
+		}
+	}
+	w.AddByte(count)
+	for _, t := range unlocked {
+		name := t.MaleName
+		if p.Sex == 0 && t.FemaleName != "" { // Female (PLAYERSEX_FEMALE)
+			name = t.FemaleName
+		}
+		w.AddString(name)
+		w.AddString(t.Description)
+		if t.Permanent {
+			w.AddByte(1)
+		} else {
+			w.AddByte(0)
+		}
+		w.AddByte(1) // unlocked=1 (we only iterate unlocked titles)
+	}
 
 	g.SendToClient(w)
 }

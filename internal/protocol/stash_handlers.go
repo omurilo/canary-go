@@ -23,17 +23,14 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 		if int(pos) < len(g.player.Inventory) && g.player.Inventory[pos] != nil {
 			itemID = g.player.Inventory[pos].ID
 		}
-		if itemID == 0 {
-			// No item at position — try to look up by position in containers,
-			// or just reject. The client might send a container position.
-			g.deps.Log.Info("stash: no item at pos, trying full scan")
+if itemID == 0 {
+			itemID = clientID
+			g.deps.Log.Info("stash: using clientID", "itemID", itemID)
 		}
-		if itemID > 0 {
-			allItems := (count == 0)
-			stowed := g.player.StowItem(itemID, uint32(count), allItems)
-			if stowed > 0 {
-				g.sendStashAndInventory()
-			}
+		allItems := (count == 0)
+		stowed := g.player.StowItem(itemID, uint32(count), allItems)
+		if stowed > 0 {
+			g.sendStashAndInventory()
 		}
 
 	case 1: // STASH_ACTION_STOW_CONTAINER — stow all items of type from container
