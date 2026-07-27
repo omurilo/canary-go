@@ -1854,6 +1854,37 @@ func (p *Player) StowItem(itemID uint16, count uint32, allItems bool) uint32 {
 	return total
 }
 
+// StowInventoryItem stows a specific item from the player's inventory by position.
+// If allItems is true, scaneia todos os items do mesmo tipo no inventario.
+// Se count > 0, stow so ate count unidades deste item especifico.
+func (p *Player) StowInventoryItem(slot int, count uint32, allItems bool) bool {
+	if p.Stash == nil {
+		p.Stash = make(map[uint16]uint32)
+	}
+	item := p.Inventory[slot]
+	if item == nil {
+		return false
+	}
+	have := uint32(item.Count)
+	if have == 0 {
+		have = 1
+	}
+	take := have
+	if !allItems && count > 0 && take > count {
+		take = count
+	}
+	if take == 0 {
+		return false
+	}
+	p.Stash[item.ID] += take
+	if take >= have {
+		p.Inventory[slot] = nil
+	} else {
+		item.Count -= uint16(take)
+	}
+	return true
+}
+
 // cleanContainerContents recursively removes items with Count == 0 from containers.
 func (p *Player) cleanContainerContents(parent *Item) {
 	if parent == nil || len(parent.Contents) == 0 {

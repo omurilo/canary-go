@@ -17,12 +17,17 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 
 	action := r.GetByte()
 	switch action {
-	case 0: // STOW_ITEM: Position + itemId + stackpos + count
-		_ = r.GetPosition()
+	case 0: // STOW_ITEM: Position (5) + itemId (2) + stackpos (1) + count (1)
+		pos := r.GetPosition()
 		itemID := r.GetU16()
-		_ = r.GetByte()
+		_ = r.GetByte() // stackpos
 		count := r.GetByte()
-		g.player.StowItem(itemID, uint32(count), count == 0)
+		// C++: internalGetThing(pos) → item → player->stowItem(item, count, false)
+		if pos.X == 0xFFFF && int(pos.Y) < len(g.player.Inventory) {
+			g.player.StowInventoryItem(int(pos.Y), uint32(count), false)
+		} else {
+			g.player.StowItem(itemID, uint32(count), count == 0)
+		}
 		g.sendStashRefresh()
 
 	case 1: // STOW_CONTAINER: Position + itemId + stackpos
