@@ -193,25 +193,29 @@ func jsonBoostedCreature(c *network.Connection, p *LoginProtocol) {
 	creatureRaceID := uint16(0)
 	bossRaceID := uint16(0)
 
-	// Use the World methods that populate BoostedCreature/BoostedBoss with
-	// sensible defaults (first monster / daily rotator) when none is configured.
 	boostedCreature := ""
 	boostedBoss := ""
 	if p.deps != nil && p.deps.World != nil {
-		boostedCreature = p.deps.World.GetBoostedCreature()
+		boostedCreature = p.deps.World.BoostedCreature
+		if boostedCreature == "" || boostedCreature == "default" {
+			boostedCreature = "Dragon" // sensible fallback
+		}
 		p.deps.World.EnsureBoostedBoss()
 		boostedBoss = p.deps.World.BoostedBoss
 
-		if p.deps.World.Monsters != nil {
+		// NOTE: Lua monster types live in World.TypeRegistry.Monsters, NOT World.Monsters
+		// (which is always nil). Use the registry that the Lua loader populates.
+		reg := p.deps.World.TypeRegistry
+		if reg != nil {
 			// Look up the boosted creature's bestiary race ID
 			if name := strings.TrimSpace(boostedCreature); name != "" && name != "default" {
-				if mt, ok := p.deps.World.Monsters.Monsters[strings.ToLower(name)]; ok {
+				if mt, ok := reg.Monsters[strings.ToLower(name)]; ok {
 					creatureRaceID = mt.RaceID
 				}
 			}
 			// Look up the boosted boss's bosstiary race ID
 			if name := strings.TrimSpace(boostedBoss); name != "" && name != "None" && name != "default" {
-				if mt, ok := p.deps.World.Monsters.Monsters[strings.ToLower(name)]; ok {
+				if mt, ok := reg.Monsters[strings.ToLower(name)]; ok {
 					if mt.BosstiaryRaceID != 0 {
 						bossRaceID = mt.BosstiaryRaceID
 					} else {
