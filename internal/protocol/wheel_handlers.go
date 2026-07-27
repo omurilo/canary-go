@@ -343,24 +343,18 @@ func (g *GameProtocol) SendWheelOfDestiny() {
 		}
 	}
 
-	// Grade modifiers section — basic (46 entries) + supreme (23)
-	gradeMap := make(map[byte]byte)
-	for range revealedGems {
-		// Each revealed gem contributes its quality as grade to some modifier
-		// positions (simplified — C++ maps each gem to specific positions).
-	}
-	w.AddByte(46)
+	// Grade modifiers: read from wheel.BasicGrades / SupremeGrades (C++ addGradeModifiers)
+	w.AddByte(46) // basic modifier count (0x2E)
 	for i := byte(0); i < 46; i++ {
 		w.AddByte(i)
-		w.AddByte(gradeMap[i])
+		w.AddByte(wheel.BasicGrades[i])
 	}
 
-	// Supreme grade modifiers (vocation-specific 23 entries)
 	supremeMods := getSupremeModifiers(g.player.Vocation)
-	w.AddByte(byte(len(supremeMods)))
+	w.AddByte(byte(len(supremeMods))) // supreme modifier count
 	for _, modPos := range supremeMods {
 		w.AddByte(modPos)
-		w.AddByte(gradeMap[modPos])
+		w.AddByte(wheel.SupremeGrades[modPos])
 	}
 
 	g.SendToClient(w)

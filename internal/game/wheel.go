@@ -215,6 +215,10 @@ type WheelOfDestiny struct {
 	RevelationStages map[string]uint8
 	// RevelationPoints tracks accumulated revelation points per spell (threshold model).
 	RevelationPoints map[string]uint16
+	// BasicGrades tracks modifier grades for the 46 basic modifier positions.
+	BasicGrades [46]uint8
+	// SupremeGrades tracks modifier grades for the 23 supreme modifier positions.
+	SupremeGrades [23]uint8
 
 	cip   uint8          // cached CIP vocation, drives the per-vocation bonuses
 	bonus WheelBonusData // cached, recomputed lazily
@@ -289,6 +293,28 @@ func (w *WheelOfDestiny) AddRevelationBonus(spellName string, points uint16) uin
 		w.dirty = true
 	}
 	return w.RevelationStages[spellName]
+}
+
+// ImproveModGrade upgrades a modifier grade (0→1→2→3 max).
+// fragmentType: 0=Lesser(basic), 1=Greater(supreme).
+func (w *WheelOfDestiny) ImproveModGrade(fragmentType uint8, pos uint8) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if fragmentType == 0 {
+		if int(pos) >= len(w.BasicGrades) || w.BasicGrades[pos] >= 3 {
+			return false
+		}
+		w.BasicGrades[pos]++
+	} else if fragmentType == 1 {
+		if int(pos) >= len(w.SupremeGrades) || w.SupremeGrades[pos] >= 3 {
+			return false
+		}
+		w.SupremeGrades[pos]++
+	} else {
+		return false
+	}
+	w.dirty = true
+	return true
 }
 
 // GetUnlockedInstants returns a snapshot of which wheel instants are active.
