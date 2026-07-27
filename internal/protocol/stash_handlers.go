@@ -1,8 +1,6 @@
 package protocol
 
 import (
-	"log/slog"
-
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -14,21 +12,34 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 	}
 	action := r.GetByte()
 	switch action {
-	case 0: // STASH_ACTION_STOW_ITEM — stow a single item
+	case 0: // STASH_ACTION_STOW_ITEM — stow a single item from a position
 		_ = r.GetByte() // pos (inventory slot)
-		_ = r.GetU16()  // clientID (item client id)
+		_ = r.GetU16()  // clientID
 		_ = r.GetByte() // count
+		// StowItem not yet implemented
 	case 1: // STASH_ACTION_STOW_CONTAINER — stow all items of type from container
 		_ = r.GetU16() // itemId
+		// StowContainer not yet implemented
 	case 2: // STASH_ACTION_STOW_STACK — stow all matching items from inventory+depot
 		_ = r.GetU16() // itemId
+		// StowStack not yet implemented
 	case 3: // STASH_ACTION_WITHDRAW — withdraw from stash
 		itemID := r.GetU16()
 		count := r.GetU32()
-		slog.Default().Info("stash: withdraw", "player", g.player.Name, "itemId", itemID, "count", count)
+		g.withdrawFromStash(itemID, count)
 	default:
-		slog.Default().Info("stash: unknown action", "action", action)
+		g.deps.Log.Info("stash: unknown action", "action", action)
 	}
+}
+
+// withdrawFromStash moves items from stash to the player's inventory.
+func (g *GameProtocol) withdrawFromStash(itemID uint16, count uint32) {
+	p := g.player
+	if !p.RemoveFromStash(itemID, count) {
+		return
+	}
+	g.deps.Log.Info("stash: withdrawn", "player", p.Name, "itemId", itemID, "count", count)
+	g.sendOpenStash()
 }
 
 // SendOpenStash is the Session entry point used by player:openStash().
@@ -44,7 +55,7 @@ func (g *GameProtocol) sendOpenStash() {
 	}
 	w := netmsg.NewWriter()
 	w.AddByte(0x29)
-	if g.player.Stash == nil {
+	if g.player.Stash == nil || len(g.player.Stash) == 0 {
 		w.AddU16(0)
 		g.SendToClient(w)
 		return
@@ -57,7 +68,6 @@ func (g *GameProtocol) sendOpenStash() {
 		w.AddU16(itemID)
 		w.AddU32(count)
 	}
-	slog.Default().Info("stash: sent 0x29", "player", g.player.Name, "count", len(g.player.Stash))
 	g.SendToClient(w)
 }
 

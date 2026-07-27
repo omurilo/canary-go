@@ -261,6 +261,12 @@ func (g *GameProtocol) processHouseCancelTransfer(houseID uint32) {
 	house.TransferPrice = 0
 	house.TransferAccept = 0
 
+	if g.deps.DB != nil {
+		if err := g.deps.DB.ClearHouseTransfer(context.Background(), house.ID); err != nil {
+			slog.Default().Info("house: failed to clear transfer in DB", "error", err)
+		}
+	}
+
 	g.sendHouseAuctionMessage(houseID, 5, 0)
 	slog.Default().Info("house: transfer cancelled", "houseId", houseID, "player", g.player.Name)
 }
@@ -299,6 +305,12 @@ func (g *GameProtocol) processHouseAcceptTransfer(houseID uint32) {
 	house.BidHolderLimit = 0
 	house.BidEndDate = 0
 
+	if g.deps.DB != nil {
+		if err := g.deps.DB.SaveHouseOwner(context.Background(), house.ID, g.player.DBID); err != nil {
+			slog.Default().Info("house: failed to persist transfer owner", "error", err)
+		}
+	}
+
 	g.sendHouseAuctionMessage(houseID, 6, 0)
 	slog.Default().Info("house: transfer accepted", "houseId", houseID,
 		"newOwner", g.player.Name)
@@ -326,6 +338,12 @@ func (g *GameProtocol) processHouseRejectTransfer(houseID uint32) {
 	house.TransferToName = ""
 	house.TransferPrice = 0
 	house.TransferAccept = 0
+
+	if g.deps.DB != nil {
+		if err := g.deps.DB.ClearHouseTransfer(context.Background(), house.ID); err != nil {
+			slog.Default().Info("house: failed to clear transfer rejection in DB", "error", err)
+		}
+	}
 
 	g.sendHouseAuctionMessage(houseID, 7, 0)
 	slog.Default().Info("house: transfer rejected", "houseId", houseID, "player", g.player.Name)
