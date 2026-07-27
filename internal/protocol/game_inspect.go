@@ -633,29 +633,28 @@ func (g *GameProtocol) sendCyclopediaCharacterTitles() {
 	titles := p.GetTitles()
 	w.AddByte(titles.CurrentID) // current title ID
 
-	// Count unlocked titles and collect them for sending.
-	count := uint8(0)
-	var unlocked []game.TitleInfo
+	// DEBUG: send first 3 titles regardless of unlock to test format
+	slog.Default().Info("titles: sending",
+		"player", p.Name,
+		"unlockedCount", len(titles.Unlocked))
+
+	testTitles := []game.TitleInfo{}
 	for _, t := range game.DefaultTitles {
-		if titles.IsUnlocked(t.ID) {
-			unlocked = append(unlocked, t)
-			count++
+		if t.ID <= 3 {
+			testTitles = append(testTitles, t)
 		}
 	}
-	w.AddByte(count)
-	for _, t := range unlocked {
+
+	w.AddByte(byte(len(testTitles)))
+	for _, t := range testTitles {
 		name := t.MaleName
-		if p.Sex == 0 && t.FemaleName != "" { // Female (PLAYERSEX_FEMALE)
+		if p.Sex == 0 && t.FemaleName != "" {
 			name = t.FemaleName
 		}
 		w.AddString(name)
 		w.AddString(t.Description)
-		if t.Permanent {
-			w.AddByte(1)
-		} else {
-			w.AddByte(0)
-		}
-		w.AddByte(1) // unlocked=1 (we only iterate unlocked titles)
+		w.AddByte(1) // permanent
+		w.AddByte(1) // unlocked
 	}
 
 	g.SendToClient(w)
