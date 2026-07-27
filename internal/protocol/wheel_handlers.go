@@ -148,8 +148,6 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 	if r.Remaining() >= 1 {
 		pos = r.GetByte()
 	}
-	_ = pos
-
 	switch action {
 	case 0: // Destroy gem
 		g.player.WheelGemManager.DestroyGem(param)
@@ -197,12 +195,13 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 	case 3: // ToggleLock
 		g.player.WheelGemManager.ToggleGemLock(param)
 
-	case 4: // ImproveGrade / Enhance
+	case 4: // ImproveGrade / Enhance — param = fragmentType (0=Lesser,1=Greater), pos = gem index
 		catalog := g.deps.Items
 		if catalog == nil {
 			break
 		}
-		gemIndex := param
+		fragmentType := param
+		gemIndex := uint16(pos)
 		if int(gemIndex) >= len(g.player.WheelGemManager.RevealedGems) {
 			break
 		}
@@ -214,15 +213,15 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 		var fragID uint16
 		var fragCount uint32
 		var goldCost uint64
-		switch gem.Quality {
-		case game.GemQualityLesser:
+		switch fragmentType {
+		case 0: // Lesser fragment — improve basic grade
 			fragID = 46625
-			fragCount = 50
-			goldCost = 500000
-		case game.GemQualityRegular:
-			fragID = 46626
-			fragCount = 25
+			fragCount = 5
 			goldCost = 2000000
+		case 1: // Greater fragment — improve supreme grade
+			fragID = 46626
+			fragCount = 5
+			goldCost = 5000000
 		default:
 			break
 		}
