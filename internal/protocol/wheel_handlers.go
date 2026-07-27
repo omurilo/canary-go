@@ -149,7 +149,7 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 	case 0: // Destroy gem
 		g.player.WheelGemManager.DestroyGem(param)
 
-	case 1: // Reveal gem — consume item from inventory by quality
+	case 1: // Reveal gem
 		catalog := g.deps.Items
 		var gemNames []string
 		var gemQuality game.WheelGemQuality
@@ -186,37 +186,37 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 			g.sendGemAtelierGemRevealed(uint16(len(g.player.WheelGemManager.RevealedGems) - 1))
 		}
 
-	case 2: // SwitchDomain
+	case 2:
 		g.player.WheelGemManager.SwitchGemDomain(param)
 
-	case 3: // ToggleLock
+	case 3:
 		g.player.WheelGemManager.ToggleGemLock(param)
 
-		case 4: // ImproveGrade / Enhance - param = fragmentType, pos = modifier position
-			catalog := g.deps.Items
-			if catalog == nil {
-				break
-			}
-			wheel := g.player.GetWheel()
-			modPos := pos
-			fragmentType := byte(param)
-
-			var fragID uint16
-			var fragCount uint32
-			var goldCost uint64
-			switch fragmentType {
-			case 0:
-				fragID = 46625
-				fragCount = 5
-				goldCost = 2000000
-			case 1:
-				fragID = 46626
-				fragCount = 5
-				goldCost = 5000000
-			default:
-				break
-			}
-			if fragID == 0 {
+	case 4:
+		catalog := g.deps.Items
+		if catalog == nil {
+			break
+		}
+		wheel := g.player.GetWheel()
+		modPos := pos
+		fragmentType := byte(param)
+		var fragID uint16
+		var fragCount uint32
+		var goldCost uint64
+		switch fragmentType {
+		case 0:
+			fragID = 46625
+			fragCount = 5
+			goldCost = 2000000
+		case 1:
+			fragID = 46626
+			fragCount = 5
+			goldCost = 5000000
+		default:
+			break
+		}
+		if fragID == 0 {
+			break
 		}
 		if g.player.GetItemCount(fragID) < fragCount {
 			break
