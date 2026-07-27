@@ -414,8 +414,18 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 	w.AddByte(pagination)
 	w.AddU16(uint16(len(contents)))
 	w.AddU16(firstIndex)
-	w.AddByte(byte(maxItems - int(firstIndex)))
-	for i := int(firstIndex); i < maxItems; i++ {
+	// C++: if firstIndex >= containerSize, send 0 items
+	var itemsToSend int
+	if int(firstIndex) >= len(contents) {
+		itemsToSend = 0
+	} else {
+		itemsToSend = maxItems - int(firstIndex)
+		if itemsToSend < 0 {
+			itemsToSend = 0
+		}
+	}
+	w.AddByte(byte(itemsToSend))
+	for i := int(firstIndex); i < int(firstIndex)+itemsToSend && i < len(contents); i++ {
 		g.addItem(w, contents[i])
 	}
 	// 13.21+ trailer for a normal container.
@@ -473,6 +483,9 @@ func (g *GameProtocol) parseContainerUp(r *netmsg.Reader) {
 	}
 	c := g.player.GetContainerByID(cid)
 	if c != nil && c.Parent != nil {
+		// C++: reseta o scroll index ao subir (evita que o container pai
+		// herde um firstIndex inválido do container filho paginado)
+		g.player.SetContainerIndex(cid, 0)
 		g.player.OpenContainerAt(cid, c.Parent)
 		g.sendContainer(cid, c.Parent, c.Parent.Parent != nil)
 	}

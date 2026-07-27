@@ -1856,12 +1856,12 @@ func (p *Player) StowItem(item *Item, count uint32, allItems bool) uint32 {
 				}
 			}
 			if depotContainer != nil {
-				totalItemsToStow = p.collectItemsSameType(item, depotContainer, itemDict, totalItemsToStow, maxItemsToStow)
+				totalItemsToStow = p.collectItemsSameType(item, depotContainer, &itemDict, totalItemsToStow, maxItemsToStow)
 			}
 		} else {
 			// C++: scan backpack
 			if bp := p.Inventory[ConstSlotBackpack]; bp != nil {
-				totalItemsToStow = p.collectItemsSameType(item, bp, itemDict, totalItemsToStow, maxItemsToStow)
+				totalItemsToStow = p.collectItemsSameType(item, bp, &itemDict, totalItemsToStow, maxItemsToStow)
 			}
 		}
 	} else if len(item.Contents) > 0 {
@@ -1911,9 +1911,11 @@ func (p *Player) StowItem(item *Item, count uint32, allItems bool) uint32 {
 // the target item's ID. C++: sendStowItems helper (player.cpp:10073) scans a
 // single container's getStowableItems — we recurse so nested containers (bags
 // in backpacks, items in nested depot chests) are found correctly.
-func (p *Player) collectItemsSameType(target *Item, container *Item, itemDict StashContainerList, totalSoFar, maxCount uint32) uint32 {
+// NOTE: itemDict deve ser um ponteiro para a slice original (Go passa slice
+// header por valor; sem o ponteiro as modificações vão pra cópia).
+func (p *Player) collectItemsSameType(target *Item, container *Item, itemDict *StashContainerList, totalSoFar, maxCount uint32) uint32 {
 	var added uint32
-	p.collectRecursive(target, container, &itemDict, &added, totalSoFar, maxCount)
+	p.collectRecursive(target, container, itemDict, &added, totalSoFar, maxCount)
 	return added
 }
 
