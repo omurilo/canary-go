@@ -48,8 +48,8 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 	}
 
 	switch characterInfoType {
-	case cyclopediaCharacterInfoInspection: // 9
-		g.sendCyclopediaCharacterInspection(g.player)
+	case cyclopediaCharacterInfoInspection: // 9 — client doesn't expect full data, send "no data"
+		g.sendCyclopediaNoData(characterInfoType, 1)
 	case cyclopediaCharacterInfoAchievements: // 5
 		g.sendCyclopediaCharacterAchievements(g.player)
 	default:
@@ -192,7 +192,7 @@ func (g *GameProtocol) sendCyclopediaCharacterInspection(target *game.Player) {
 	if target == nil {
 		return
 	}
-	slog.Default().Info("sendCyclopediaCharacterInspection", "target", target.Name, "deps.Items", g.deps.Items)
+	slog.Default().Info("sendCyclopediaCharacterInspection", "target", target.Name)
 	w := netmsg.NewWriter()
 	w.AddByte(0xDA)
 	w.AddByte(cyclopediaCharacterInfoInspection) // 9
