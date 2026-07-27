@@ -1779,30 +1779,13 @@ func (p *Player) stowItemFromTree(parent *Item, itemID uint16, want uint32, allI
 		}
 		parent.Count = 0
 	}
-	// Rebuild contents without consumed items
+	// Rebuild contents excluding consumed items (Count == 0)
 	for _, child := range parent.Contents {
 		if child != nil && child.Count > 0 {
 			remaining = append(remaining, child)
 		}
 	}
 	parent.Contents = remaining
-	// Check the item itself (for direct inventory slots)
-	if parent.ID == itemID {
-		itemCount := uint32(parent.Count)
-		if itemCount == 0 {
-			itemCount = 1
-		}
-		take := itemCount
-		if !allItems && take > want-stowed {
-			take = want - stowed
-		}
-		stowed += take
-		if slotPtr != nil {
-			p.Inventory[*slotPtr] = nil
-		} else {
-			// This shouldn't happen for direct stash items, but handle gracefully
-		}
-	}
 	return stowed
 }
 
