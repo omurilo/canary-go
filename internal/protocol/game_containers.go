@@ -362,7 +362,7 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 	}
 	contents := item.Contents
 	// Force pagination for items C++ marks in Container constructor
-	if item.ID == game.ItemGoldPouch || item.ID == game.ItemStoreInbox {
+	if item.ID == game.ItemStoreInbox {
 		item.Pagination = true
 		if item.MaxSize == 0 {
 			item.MaxSize = 32

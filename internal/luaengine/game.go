@@ -355,11 +355,9 @@ func (e *Engine) gameCreateItem(L *lua.LState) int {
 		Count: uint16(count),
 	}
 
-	// C++ Container constructor: ITEM_GOLD_POUCH -> pagination, maxSize=32
+	// Gold pouch — sem paginacao (cliente oficial nao suporta em containers nao-padrao)
 	if item.ID == game.ItemGoldPouch {
-		item.Pagination = true
 		item.Contents = make([]*game.Item, 0)
-		item.MaxSize = 32
 	}
 
 	if L.GetTop() >= 3 {
