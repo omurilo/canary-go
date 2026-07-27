@@ -1491,7 +1491,16 @@ func playerGetguid(L *lua.LState) int {
 }
 
 func playerGetguild(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil || p.GuildName == "" {
+		L.Push(lua.LNil)
+		return 1
+	}
+	t := L.NewTable()
+	t.RawSetString("name", lua.LString(p.GuildName))
+	t.RawSetString("rank", lua.LString(p.GuildRankName))
+	t.RawSetString("nick", lua.LString(p.GuildNick))
+	L.Push(t)
 	return 1
 }
 
@@ -1682,7 +1691,7 @@ func playerGetlivestreamviewerscount(L *lua.LState) int {
 }
 
 func playerGetlootpouch(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -1900,7 +1909,12 @@ func playerGetpronoun(L *lua.LState) int {
 }
 
 func playerGetreward(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil || p.RewardChest == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LNumber(p.RewardChest.ID))
 	return 1
 }
 
