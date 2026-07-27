@@ -70,8 +70,8 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 		g.sendCyclopediaCharacterItemSummary()
 	case cyclopediaCharacterInfoOutfitsMounts: // 7
 		g.sendCyclopediaCharacterOutfitsMounts()
-	case cyclopediaCharacterInfoStoreSummary: // 8 — noData p/ não crashar cliente oficial
-		g.sendCyclopediaNoData(cyclopediaCharacterInfoStoreSummary, 1)
+	case cyclopediaCharacterInfoStoreSummary: // 8
+		g.sendCyclopediaCharacterStoreSummary()
 	case cyclopediaCharacterInfoInspection: // 9
 		g.sendCyclopediaCharacterInspection(g.player)
 	case cyclopediaCharacterInfoBadges: // 10
