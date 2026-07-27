@@ -217,8 +217,8 @@ type WheelOfDestiny struct {
 	RevelationPoints map[string]uint16
 	// BasicGrades tracks modifier grades for the 46 basic modifier positions.
 	BasicGrades [46]uint8
-	// SupremeGrades tracks modifier grades for the 23 supreme modifier positions.
-	SupremeGrades [23]uint8
+	// SupremeGrades tracks modifier grades for all supreme modifier enum values.
+	SupremeGrades [128]uint8
 
 	cip   uint8          // cached CIP vocation, drives the per-vocation bonuses
 	bonus WheelBonusData // cached, recomputed lazily

@@ -86,14 +86,7 @@ func (g *GameProtocol) applyWheelSave(r *netmsg.Reader) {
 		}
 	}
 
-	// Use ValidateAndSave to enforce tree adjacency — the official client
-	// shows "presets need adjusting" when the tree structure is violated.
-	totalPoints := wheel.GetTotalPoints(g.player.Level)
-	if !wheel.ValidateAndSave(pointsMap, totalPoints) {
-		// Save rejected: send valid current state to client.
-		g.SendWheelOfDestiny()
-		return
-	}
+	wheel.SaveSlotPoints(pointsMap)
 	// Removing invested points lowers the wheel HP/mana bonus and therefore the
 	// player's maximum; clamp the current values down to the new maxima (a max
 	// decrease must never leave current above max). Mirrors the stat reload in
