@@ -6,6 +6,7 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/game/vocations"
+	"github.com/opentibiabr/canary-go/internal/mounts"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -19,6 +20,7 @@ const (
 	cyclopediaCharacterInfoInspection      = 9
 	cyclopediaCharacterInfoBadges          = 10
 	cyclopediaCharacterInfoTitles          = 11
+	cyclopediaCharacterInfoWheel           = 12
 	cyclopediaCharacterInfoOffenceStats    = 13
 	cyclopediaCharacterInfoDefenceStats    = 14
 	cyclopediaCharacterInfoMiscStats       = 15
@@ -68,14 +70,16 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 		g.sendCyclopediaCharacterItemSummary()
 	case cyclopediaCharacterInfoOutfitsMounts: // 7
 		g.sendCyclopediaCharacterOutfitsMounts()
-	case cyclopediaCharacterInfoStoreSummary: // 8
-		g.sendCyclopediaCharacterStoreSummary()
+	case cyclopediaCharacterInfoStoreSummary: // 8 — noData p/ não crashar cliente oficial
+		g.sendCyclopediaNoData(cyclopediaCharacterInfoStoreSummary, 1)
 	case cyclopediaCharacterInfoInspection: // 9
 		g.sendCyclopediaCharacterInspection(g.player)
 	case cyclopediaCharacterInfoBadges: // 10
 		g.sendCyclopediaCharacterBadges()
 	case cyclopediaCharacterInfoTitles: // 11
 		g.sendCyclopediaCharacterTitles()
+	case cyclopediaCharacterInfoWheel: // 12
+		g.sendCyclopediaCharacterWheel()
 	case cyclopediaCharacterInfoOffenceStats: // 13
 		g.sendCyclopediaCharacterOffenceStats()
 	case cyclopediaCharacterInfoDefenceStats: // 14
@@ -346,24 +350,146 @@ func (g *GameProtocol) sendCyclopediaCharacterItemSummary() {
 }
 
 // sendCyclopediaCharacterOutfitsMounts sends outfits, mounts, and familiars (type 7).
-// For now sends empty lists for all three categories. Matches C++
-// ProtocolGame::sendCyclopediaCharacterOutfitsMounts.
+// Matches C++ ProtocolGame::sendCyclopediaCharacterOutfitsMounts.
 func (g *GameProtocol) sendCyclopediaCharacterOutfitsMounts() {
 	if g.player == nil {
 		return
 	}
+	p := g.player
 	w := netmsg.NewWriter()
 	w.AddByte(0xDA)
 	w.AddByte(cyclopediaCharacterInfoOutfitsMounts)
 	w.AddByte(0x00) // no error
 
-	// Outfits — empty list
-	w.AddU16(0)
-	// Mounts — empty list
-	w.AddU16(0)
-	// Familiars — empty list
-	w.AddU16(0)
+	currentOutfit := p.Outfit
 
+	// -- Outfits --
+	outfitsCountPos := w.Pos()
+	w.AddU16(0) // placeholder
+
+	outfitsSent := uint16(0)
+	for _, lookType := range game.GetOutfitsBySex(p.Sex) {
+		if !p.HasOutfit(lookType) {
+			continue
+		}
+		info, ok := game.GetOutfitInfo(lookType)
+		if !ok {
+			// Skip outfits not in our registry.
+			continue
+		}
+		addons := p.GetOutfitAddons(lookType)
+
+		var outfitType uint8
+		switch info.From {
+		case "store":
+			outfitType = game.OutfitTypeStore
+		case "quest":
+			outfitType = game.OutfitTypeQuest
+		default:
+			outfitType = game.OutfitTypeNone
+		}
+
+		var isCurrent uint32
+		if lookType == currentOutfit.LookType {
+			isCurrent = 1000
+		}
+
+		w.AddU16(lookType)
+		w.AddString(info.Name)
+		w.AddByte(addons)
+		w.AddByte(outfitType)
+		w.AddU32(isCurrent)
+		outfitsSent++
+	}
+
+	if outfitsSent > 0 {
+		w.AddByte(currentOutfit.Head)
+		w.AddByte(currentOutfit.Body)
+		w.AddByte(currentOutfit.Legs)
+		w.AddByte(currentOutfit.Feet)
+	}
+
+	// -- Mounts --
+	mountsCountPos := w.Pos()
+	w.AddU16(0) // placeholder
+
+	mountsSent := uint16(0)
+	for _, m := range mounts.All() {
+		if !p.HasMount(m.ID) {
+			continue
+		}
+		mountType := game.OutfitTypeNone
+		switch m.Type {
+		case "store":
+			mountType = game.OutfitTypeStore
+		case "quest":
+			mountType = game.OutfitTypeQuest
+		}
+
+		w.AddU16(m.ClientID)
+		w.AddString(m.Name)
+		w.AddByte(mountType)
+		w.AddU32(1000) // isCurrent (always 1000 for mounts in C++)
+		mountsSent++
+	}
+
+	if mountsSent > 0 {
+		w.AddByte(currentOutfit.MountHead)
+		w.AddByte(currentOutfit.MountBody)
+		w.AddByte(currentOutfit.MountLegs)
+		w.AddByte(currentOutfit.MountFeet)
+	}
+
+	// -- Familiars --
+	familiarsCountPos := w.Pos()
+	w.AddU16(0) // placeholder
+
+	familiarsSent := uint16(0)
+	for _, f := range p.Familiars {
+		if !f.Unlocked {
+			continue
+		}
+		vocationID := uint16(p.Vocation)
+		info, ok := game.GetFamiliarInfo(vocationID, f.LookType)
+
+		familiarName := f.Name
+		if familiarName == "" && ok {
+			familiarName = info.Name
+		} else if familiarName == "" {
+			familiarName = fmt.Sprintf("Familiar %d", f.LookType)
+		}
+
+		familiarType := game.OutfitTypeNone
+		if ok && info.From == "quest" {
+			familiarType = game.OutfitTypeQuest
+		}
+
+		w.AddU16(f.LookType)
+		w.AddString(familiarName)
+		w.AddByte(familiarType)
+		w.AddU32(0) // isCurrent (always 0 for familiars)
+		familiarsSent++
+	}
+
+	// Backfill section counts (C++ writes at end via setBufferPosition).
+	w.SetU16(outfitsCountPos, outfitsSent)
+	w.SetU16(mountsCountPos, mountsSent)
+	w.SetU16(familiarsCountPos, familiarsSent)
+
+	g.SendToClient(w)
+}
+
+// sendCyclopediaCharacterWheel sends the cyclopedia wheel response (type 12).
+// The OTClient's CyclopediaCharacterInfo parser does nothing with the body
+// for CYCLOPEDIA_CHARACTERINFO_WHEEL, so we only send the header.
+func (g *GameProtocol) sendCyclopediaCharacterWheel() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoWheel)
+	w.AddByte(0x00) // no error
 	g.SendToClient(w)
 }
 

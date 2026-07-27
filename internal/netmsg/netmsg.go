@@ -147,6 +147,9 @@ func (w *Writer) SetU16(offset int, v uint16) {
 	}
 	binary.LittleEndian.PutUint16(w.buf[offset:], v)
 }
+
+// Pos returns the current absolute write position in the buffer.
+func (w *Writer) Pos() int { return w.pos }
 func (w *Writer) AddU32(v uint32) {
 	binary.LittleEndian.PutUint32(w.buf[w.pos:], v)
 	w.pos += 4
