@@ -13,6 +13,7 @@ const (
 	cyclopediaCharacterInfoBaseInformation = 0
 	cyclopediaCharacterInfoGeneralStats    = 1
 	cyclopediaCharacterInfoAchievements    = 5
+	cyclopediaCharacterInfoItemSummary     = 6
 	cyclopediaCharacterInfoOutfitsMounts   = 7
 	cyclopediaCharacterInfoStoreSummary    = 8
 	cyclopediaCharacterInfoInspection      = 9
@@ -63,6 +64,8 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 		g.sendCyclopediaCharacterGeneralStats()
 	case cyclopediaCharacterInfoAchievements: // 5
 		g.sendCyclopediaCharacterAchievements(g.player)
+	case cyclopediaCharacterInfoItemSummary: // 6
+		g.sendCyclopediaCharacterItemSummary()
 	case cyclopediaCharacterInfoOutfitsMounts: // 7
 		g.sendCyclopediaCharacterOutfitsMounts()
 	case cyclopediaCharacterInfoStoreSummary: // 8
@@ -322,6 +325,26 @@ func (g *GameProtocol) sendCyclopediaCharacterGeneralStats() {
 	g.SendToClient(w)
 }
 
+// sendCyclopediaCharacterItemSummary sends an empty item summary (type 6).
+// Each section count is 0, so no item data is sent.
+func (g *GameProtocol) sendCyclopediaCharacterItemSummary() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoItemSummary)
+	w.AddByte(0x00) // no error
+
+	w.AddU16(0) // inventoryItemsCount
+	w.AddU16(0) // storeInboxItemsCount
+	w.AddU16(0) // stashItemsCount
+	w.AddU16(0) // depotBoxItemsCount
+	w.AddU16(0) // inboxItemsCount
+
+	g.SendToClient(w)
+}
+
 // sendCyclopediaCharacterOutfitsMounts sends outfits, mounts, and familiars (type 7).
 // For now sends empty lists for all three categories. Matches C++
 // ProtocolGame::sendCyclopediaCharacterOutfitsMounts.
@@ -345,8 +368,7 @@ func (g *GameProtocol) sendCyclopediaCharacterOutfitsMounts() {
 }
 
 // sendCyclopediaCharacterStoreSummary sends the store summary (type 8).
-// Matches C++ ProtocolGame::sendCyclopediaCharacterStoreSummary.
-// Sends all zeros since store/blessings/prey/hirelings not implemented yet.
+// Exact match of C++ ProtocolGame::sendCyclopediaCharacterStoreSummary.
 func (g *GameProtocol) sendCyclopediaCharacterStoreSummary() {
 	if g.player == nil {
 		return
@@ -356,32 +378,34 @@ func (g *GameProtocol) sendCyclopediaCharacterStoreSummary() {
 	w.AddByte(cyclopediaCharacterInfoStoreSummary)
 	w.AddByte(0x00) // no error
 
-	// Store Xp Boost
 	w.AddU32(0) // xpBoostTime remaining
 	w.AddU32(0) // dailyRewardXpBoostTime (deprecated)
+	w.AddByte(0) // blessingCount
 
-	// Blessings — send 0 count (skip blessing names)
+	// preySlotsUnlocked
 	w.AddByte(0)
-
-	// Prey
-	w.AddByte(0) // preySlotsUnlocked
-	w.AddByte(0) // preyWildcards
-
-	// Rewards / expansion flags
-	w.AddByte(0) // hasPermanentWeeklyTaskExpansion (gated by GameTaskboard)
+	// preyWildcards
+	w.AddByte(0)
+	// hasPermanentWeeklyTaskExpansion (GameTaskboard feature)
+	w.AddByte(0)
 	w.AddByte(0) // instantRewards
 	w.AddByte(0) // hasCharmExpansion
 	w.AddByte(0) // hirelingsObtained
-	w.AddByte(0) // reserved current-client store summary field
 
-	// Hireling skills
-	w.AddByte(0) // hirelingSkillsCount
-	// Hireling outfits
-	w.AddByte(0) // hirelingOutfitsCount
+	// In C++: msg.addByte(0x00) reserved; then msg.addByte(m_hSkills.size())
+	// The OTClient parser reads the reserved byte as hirelingSkillsCount
+	// C++ sequence: reserved(0x00) + hirelingSkillsCount(0) + hirelingOutfitsCount(0x00) + u16 houseItemsCount(0)
+	// OTClient reads: reserved→hirelingSkillsCount, skillCount→hirelingOutfitsCount,
+	// hirelingOutfitsCount→houseItemsCount LO, houseItemsCount LO→houseItemsCount HI.
+	w.AddByte(0) // reserved (OTClient reads as hirelingSkillsCount)
+	w.AddByte(0) // hirelingSkillsCount (OTClient reads as hirelingOutfitsCount)
+	w.AddByte(0) // hirelingOutfitsCount (OTClient reads as u16 houseItemsCount LO)
+	w.AddU16(0)  // houseItemsCount (OTClient reads LO byte as houseItemsCount HI; HI byte leftover)
 
-	// House items
-	w.AddU16(0) // houseItemsCount
-
+	slog.Default().Info("store: sending summary",
+		"player", g.player.Name,
+		"packetHex", fmt.Sprintf("%x", w.Bytes()),
+		"packetLen", len(w.Bytes()))
 	g.SendToClient(w)
 }
 
