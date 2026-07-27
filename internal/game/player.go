@@ -1752,39 +1752,55 @@ func (p *Player) StowItem(itemID uint16, count uint32, allItems bool) uint32 {
 // matching items to the stash. If slotPtr is non-nil, items in inventory slots
 // are removed by setting the slot to nil.
 func (p *Player) stowItemFromTree(parent *Item, itemID uint16, want uint32, allItems bool, slotPtr *int) uint32 {
-	if want == 0 {
+	if want == 0 && !allItems {
 		return 0
 	}
 	var stowed uint32
-	// Check the item itself
+	var remaining []*Item
+	// Recurse into children first, then check this item
+	for _, child := range parent.Contents {
+		if child != nil {
+			stowed += p.stowItemFromTree(child, itemID, want-stowed, allItems, nil)
+		}
+	}
+	// Now check the item itself
+	if parent.ID == itemID && (allItems || stowed < want) {
+		count := uint32(parent.Count)
+		if count == 0 {
+			count = 1
+		}
+		take := count
+		if !allItems && take > want-stowed {
+			take = want - stowed
+		}
+		stowed += take
+		if slotPtr != nil {
+			p.Inventory[*slotPtr] = nil
+		}
+		parent.Count = 0
+	}
+	// Rebuild contents without consumed items
+	for _, child := range parent.Contents {
+		if child != nil && child.Count > 0 {
+			remaining = append(remaining, child)
+		}
+	}
+	parent.Contents = remaining
+	// Check the item itself (for direct inventory slots)
 	if parent.ID == itemID {
 		itemCount := uint32(parent.Count)
 		if itemCount == 0 {
 			itemCount = 1
 		}
 		take := itemCount
-		if !allItems && take > want {
-			take = want
+		if !allItems && take > want-stowed {
+			take = want - stowed
 		}
 		stowed += take
 		if slotPtr != nil {
 			p.Inventory[*slotPtr] = nil
 		} else {
-			parent.Count -= uint16(take)
-		}
-		want -= take
-		if want == 0 && !allItems {
-			return stowed
-		}
-	}
-	// Scan contents (containers)
-	for _, child := range parent.Contents {
-		if child != nil {
-			taken := p.stowItemFromTree(child, itemID, want-stowed, allItems, nil)
-			stowed += taken
-			if !allItems && stowed >= want {
-				break
-			}
+			// This shouldn't happen for direct stash items, but handle gracefully
 		}
 	}
 	return stowed
