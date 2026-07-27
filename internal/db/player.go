@@ -237,13 +237,12 @@ func (d *DB) LoadPlayerWheel(ctx context.Context, p *game.Player) error {
 		return nil
 	}
 
-	// Find where propstream ends and possible JSON begins
-	propEnd := len(slotBlob)
-	for i := 0; i < len(slotBlob)-1; i++ {
-		if slotBlob[i] == '{' {
-			propEnd = i
-			break
-		}
+	// Propstream is always 108 bytes (36 slots × 3 bytes each: [U8 slotID][U16 pts]).
+	// Any data beyond 108 bytes is the JSON payload.
+	const propstreamSize = 108
+	propEnd := propstreamSize
+	if propstreamSize > len(slotBlob) {
+		propEnd = len(slotBlob)
 	}
 
 	ps := propstream.NewPropStream(slotBlob[:propEnd])

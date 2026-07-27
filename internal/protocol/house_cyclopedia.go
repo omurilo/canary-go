@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"log/slog"
+	"strings"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
@@ -135,28 +136,27 @@ func (g *GameProtocol) sendCyclopediaHouseList(townName string) {
 	slog.Default().Info("house: sendCyclopediaHouseList start",
 		"worldHouses", len(world.Houses), "townName", townName)
 
-	// Filter houses by the requested town name (string comparison, like C++).
+	// Filter houses by the requested town name (case-insensitive).
 	var townHouses []*game.House
-	for _, h := range world.Houses {
-		if h == nil {
-			continue
-		}
-		if name, ok := world.TownNames[h.TownID]; ok && name == townName {
-			townHouses = append(townHouses, h)
-		}
-	}
-
-	slog.Default().Info("house: filtered by town", "matched", len(townHouses), "total", len(world.Houses))
-
-	// Fallback: send ALL houses if none matched the town name.
-	if len(townHouses) == 0 {
-		slog.Default().Info("house: no houses matched town, sending ALL as fallback")
+	if townName == "" {
+		// "Own Houses" view: send all houses
 		for _, h := range world.Houses {
 			if h != nil {
 				townHouses = append(townHouses, h)
 			}
 		}
+	} else {
+		for _, h := range world.Houses {
+			if h == nil {
+				continue
+			}
+			if name, ok := world.TownNames[h.TownID]; ok && strings.EqualFold(name, townName) {
+				townHouses = append(townHouses, h)
+			}
+		}
 	}
+
+	slog.Default().Info("house: filtered by town", "matched", len(townHouses), "total", len(world.Houses))
 
 	w := netmsg.NewWriter()
 	w.AddByte(0xC7)

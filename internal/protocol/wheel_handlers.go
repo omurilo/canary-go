@@ -131,7 +131,7 @@ func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
 }
 
 // parseWheelGemAction handles opcode 0xE7 (Wheel of Destiny Gem actions / enhance mod grade).
-// Wire format (C++): [u8 action][u16 param][u8 pos]
+// Wire format (C++): [u8 action][u8 param][u8 pos] — param and pos are BOTH u8!
 func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 	if r.Remaining() < 1 {
 		return
@@ -140,11 +140,8 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 		g.player.WheelGemManager = &game.WheelGemCollection{}
 	}
 	action := r.GetByte()
-	var param uint16
+	param := uint16(r.GetByte()) // C++ uses getByte() for param (U8), NOT getU16!
 	var pos uint8
-	if r.Remaining() >= 2 {
-		param = r.GetU16()
-	}
 	if r.Remaining() >= 1 {
 		pos = r.GetByte()
 	}
