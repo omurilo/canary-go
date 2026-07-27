@@ -10,6 +10,22 @@ Este documento mapeia **o que ainda precisa ser migrado**, organizado por priori
 
 ---
 
+## Métricas Atuais (canary-go)
+
+| Métrica | Valor |
+|---------|-------|
+| Arquivos `.go` | 239 (174 sem testes) |
+| Linhas de código | ~56k total (~50k sem testes) |
+| C++ referência | ~174k LOC |
+| Progresso LOC | ~32% |
+| **B-Systems** | **20/20 (100%)** |
+| Lua stubs | **0** (todos implementados) |
+| Monstros carregados | 1666 |
+
+
+
+---
+
 ## Status Atual: O Que Já Funciona
 
 **✅ Sistemas Completos (20/20 B-Systems — 100%):**
@@ -546,11 +562,14 @@ Ao migrar cada sistema, consulte:
 
 ## Métricas de Progresso
 
-- **LOC migradas:** ~27k / ~100k (27%)
-- **Sistemas funcionais:** 16 / ~50 (32%) — B11 Market agora completo (protocolo + Lua)
-- **Lua stubs restantes:** ~129 / ~1300 (90% done, 10% critical)
-- **Packets implementados:** 37 / ~60 (62%) — +6 market opcodes (0xF3-0xF8 inbound, 0xF5-0xFA outbound)
-- **DB tables migradas:** 12 / ~25 (48%) — +4: player_achievements, player_titles, player_familiars, market_offers, houses
+- **LOC migradas:** ~50k / ~174k (32%)
+- **B-Systems completos:** 20/20 (100%) 🎉
+- **Lua stubs restantes:** 0 (todos implementados)
+- **Monster Lua stubs:** 0 (todos implementados)
+- **Packets implementados:** 55 / ~65 (85%)
+- **DB tables migradas:** 18 / ~25 (72%)
+- **Jogadores online no MyAAC:** Funcionando (players_online sincronizado)
+- **Status Protocol (7171):** XML + JSON endpoints completos
 
 ---
 

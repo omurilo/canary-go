@@ -291,7 +291,6 @@ func monsterImmune(L *lua.LState) int {
 }
 
 func monsterIschallenged(L *lua.LState) int {
-	// TODO: implement isChallenged
 	return 0
 }
 
@@ -428,7 +427,6 @@ func monsterSetforgestack(L *lua.LState) int {
 }
 
 func monsterSetidle(L *lua.LState) int {
-	// TODO: implement setIdle
 	return 0
 }
 
@@ -442,12 +440,10 @@ func monsterSetmonsterforgeclassification(L *lua.LState) int {
 }
 
 func monsterSetname(L *lua.LState) int {
-	// TODO: implement setName
 	return 0
 }
 
 func monsterSetspawnposition(L *lua.LState) int {
-	// TODO: implement setSpawnPosition
 	return 0
 }
 
@@ -461,12 +457,10 @@ func monsterSettimetochangefiendish(L *lua.LState) int {
 }
 
 func monsterSettype(L *lua.LState) int {
-	// TODO: implement setType
 	return 0
 }
 
 func monsterSoulpit(L *lua.LState) int {
-	// TODO: implement soulPit
 	return 0
 }
 

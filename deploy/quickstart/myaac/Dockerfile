@@ -1,4 +1,4 @@
-FROM php:8.3-apache
+FROM php:8.2-apache
 
 ARG MYAAC_REF=develop
 ENV COMPOSER_ALLOW_SUPERUSER=1
