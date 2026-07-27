@@ -1720,73 +1720,106 @@ func (p *Player) GetStashSlotCount() uint32 {
 
 // StowItem moves items of the given ID from inventory/containers to the stash.
 // If allItems is true, stows ALL matching items. If count > 0, stows up to count.
-// Returns the number of items actually stowed.
+// Returns the number of items actually stowed. Mirrors C++ Player::stowItem.
 func (p *Player) StowItem(itemID uint16, count uint32, allItems bool) uint32 {
 	if p.Stash == nil {
 		p.Stash = make(map[uint16]uint32)
 	}
-	var stowed uint32
-	slot := 1
-	for slot <= 10 && (allItems || stowed < count) {
-		item := p.Inventory[slot]
-		if item != nil {
-			stowed += p.stowItemFromTree(item, itemID, count-stowed, allItems, &slot)
+	// Pass 1: collect all matching items with their counts (StashContainerList equivalent)
+	type stowEntry struct {
+		item  *Item
+		count uint32
+		slot  int // inventory slot or -1 for containers
+	}
+	var list []stowEntry
+
+	var collect func(parent *Item, slot int)
+	collect = func(parent *Item, slot int) {
+		if parent == nil {
+			return
 		}
-		slot++
+		if parent.ID == itemID && (allItems || count > 0) {
+			itemCount := uint32(parent.Count)
+			if itemCount == 0 {
+				itemCount = 1
+			}
+			take := itemCount
+			if !allItems && take > count {
+				take = count
+			}
+			if take > 0 {
+				list = append(list, stowEntry{item: parent, count: take, slot: slot})
+				if !allItems {
+					count -= take
+				}
+			}
+		}
+		for _, child := range parent.Contents {
+			if child != nil {
+				collect(child, -1)
+			}
+		}
+	}
+
+	// Scan inventory slots
+	for slot := 0; slot < len(p.Inventory); slot++ {
+		collect(p.Inventory[slot], slot)
 	}
 	// Scan inbox
-	if p.Inbox != nil && (allItems || stowed < count) {
-		stowed += p.stowItemFromTree(p.Inbox, itemID, count-stowed, allItems, nil)
+	if p.Inbox != nil {
+		collect(p.Inbox, -1)
 	}
-	// Scan store inbox
-	if p.StoreInbox != nil && (allItems || stowed < count) {
-		stowed += p.stowItemFromTree(p.StoreInbox, itemID, count-stowed, allItems, nil)
+	if p.StoreInbox != nil {
+		collect(p.StoreInbox, -1)
 	}
-	if stowed > 0 {
-		p.Stash[itemID] += stowed
+
+	// Pass 2: process each collected item (add to stash, remove from inventory)
+	var total uint32
+	for _, e := range list {
+		p.Stash[itemID] += e.count
+		total += e.count
+		if e.slot >= 0 && e.slot < len(p.Inventory) {
+			// Direct inventory slot
+			if uint32(e.item.Count) > e.count {
+				e.item.Count -= uint16(e.count)
+			} else {
+				p.Inventory[e.slot] = nil
+			}
+		} else {
+			// Inside a container — decrement count
+			if uint32(e.item.Count) > e.count {
+				e.item.Count -= uint16(e.count)
+			} else {
+				e.item.Count = 0
+			}
+		}
 	}
-	return stowed
+
+	// Clean up empty container entries
+	for slot := 0; slot < len(p.Inventory); slot++ {
+		if p.Inventory[slot] != nil {
+			p.cleanContainerContents(p.Inventory[slot])
+		}
+	}
+	return total
 }
 
-// stowItemFromTree scans an item tree (which may be a container) and moves
-// matching items to the stash. If slotPtr is non-nil, items in inventory slots
-// are removed by setting the slot to nil.
-func (p *Player) stowItemFromTree(parent *Item, itemID uint16, want uint32, allItems bool, slotPtr *int) uint32 {
-	if want == 0 && !allItems {
-		return 0
+// cleanContainerContents recursively removes items with Count == 0 from containers.
+func (p *Player) cleanContainerContents(parent *Item) {
+	if parent == nil || len(parent.Contents) == 0 {
+		return
 	}
-	var stowed uint32
 	var remaining []*Item
-	// Recurse into children first, then check this item
 	for _, child := range parent.Contents {
-		if child != nil {
-			stowed += p.stowItemFromTree(child, itemID, want-stowed, allItems, nil)
+		if child == nil {
+			continue
 		}
-	}
-	// Now check the item itself
-	if parent.ID == itemID && (allItems || stowed < want) {
-		count := uint32(parent.Count)
-		if count == 0 {
-			count = 1
-		}
-		take := count
-		if !allItems && take > want-stowed {
-			take = want - stowed
-		}
-		stowed += take
-		if slotPtr != nil {
-			p.Inventory[*slotPtr] = nil
-		}
-		parent.Count = 0
-	}
-	// Rebuild contents excluding consumed items (Count == 0)
-	for _, child := range parent.Contents {
-		if child != nil && child.Count > 0 {
+		p.cleanContainerContents(child)
+		if child.Count > 0 {
 			remaining = append(remaining, child)
 		}
 	}
 	parent.Contents = remaining
-	return stowed
 }
 
 // countItemInTree recursively counts items matching the given ID in a container tree.

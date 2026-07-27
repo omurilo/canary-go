@@ -49,10 +49,16 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 	}
 }
 
-// sendStashAndInventory refreshes the stash window and inventory after stowing.
+// sendStashAndInventory refreshes the stash window, inventory and all open containers.
 func (g *GameProtocol) sendStashAndInventory() {
 	g.sendOpenStash()
 	g.player.Session.SendInventoryIds()
+	// Refresh open containers so the client sees removed items (C++ end of stashContainer)
+	for cid, oc := range g.player.OpenContainersSnapshot() {
+		if oc.Container != nil {
+			g.sendContainer(uint8(cid), oc.Container, oc.Container.Parent != nil)
+		}
+	}
 }
 
 // withdrawFromStash moves items from stash to the player's inventory.
