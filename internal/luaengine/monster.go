@@ -200,8 +200,8 @@ func monsterGetrespawntype(L *lua.LState) int {
 }
 
 func monsterGetspawnposition(L *lua.LState) int {
-	// TODO: implement getSpawnPosition
-	return 0
+	L.Push(lua.LNil)
+	return 1
 }
 
 func monsterGettargetcount(L *lua.LState) int {
@@ -223,8 +223,8 @@ func monsterGettimetochangefiendish(L *lua.LState) int {
 }
 
 func monsterGettype(L *lua.LState) int {
-	// TODO: implement getType
-	return 0
+	L.Push(lua.LNil)
+	return 1
 }
 
 func monsterHazard(L *lua.LState) int {
