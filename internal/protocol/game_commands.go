@@ -323,15 +323,25 @@ func (g *GameProtocol) cmdTown(args []string) {
 	}
 }
 
-// cmdAddExp adds experience: /addexp <amount>
+// cmdAddExp adds experience: /addexp <amount> [playerName]
 func (g *GameProtocol) cmdAddExp(args []string) {
 	if len(args) == 0 {
-		g.sendStatusText("Usage: /addexp <amount>")
+		g.sendStatusText("Usage: /addexp <amount> [playerName]")
 		return
 	}
 	amount, err := strconv.ParseUint(args[0], 10, 64)
 	if err != nil || amount == 0 {
 		g.sendStatusText("Invalid amount.")
+		return
+	}
+	if len(args) >= 2 {
+		name := strings.Join(args[1:], " ")
+		if p := g.deps.World.PlayerByName(name); p != nil {
+			p.AddExperience(amount)
+			g.sendStatusText(fmt.Sprintf("Added %d experience to %s.", amount, p.Name))
+		} else {
+			g.sendStatusText("Player not found: " + name)
+		}
 		return
 	}
 	g.player.AddExperience(amount)
