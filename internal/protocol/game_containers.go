@@ -148,6 +148,12 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		slog.Default().Info("parseUseItem CALLED FOR REWARD CHEST", "pos", pos, "index", index)
 	}
 
+		// Stash icon in depot — open stash window, not as container
+		if item.ID == game.ItemStash {
+			g.SendOpenStash()
+			return
+		}
+
 		// Gold pouch (ITEM_GOLD_POUCH = 23721) pode nao ser marcado como container no protobuf
 		// Tratar explicitamente como container (C++ Container subclass)
 		if item.ID == game.ItemGoldPouch || t.IsContainer() {
@@ -361,6 +367,15 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 		}
 	}
 	contents := item.Contents
+	// Force pagination for items C++ marks in Container constructor
+	// (gold pouch, store inbox) that may lack flag if created before fix.
+	// MUST be before ContainerCapacity so capacity reflects MaxSize.
+	if item.ID == game.ItemGoldPouch || item.ID == game.ItemStoreInbox {
+		item.Pagination = true
+		if item.MaxSize == 0 {
+			item.MaxSize = 32
+		}
+	}
 	capacity := int(item.ContainerCapacity(g.deps.Items))
 	if capacity < 1 {
 		capacity = 1
@@ -373,14 +388,6 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 	firstIndex := uint16(0)
 	if g.player != nil {
 		firstIndex = g.player.GetContainerIndex(cid)
-	}
-	// Force pagination for items C++ marks in Container constructor
-	// (gold pouch, store inbox) that may lack flag if created before fix
-	if item.ID == game.ItemGoldPouch || item.ID == game.ItemStoreInbox {
-		item.Pagination = true
-		if item.MaxSize == 0 {
-			item.MaxSize = 32
-		}
 	}
 	page := len(contents)
 	if page > 0xFF {

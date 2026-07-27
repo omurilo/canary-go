@@ -2,3 +2,4 @@ bin
 data-otservbr-global/world/otservbr.otbm
 *:Zone.Identifier
 canary
+canary-go-bin
