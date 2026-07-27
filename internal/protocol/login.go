@@ -190,12 +190,16 @@ func jsonCacheInfo(c *network.Connection, p *LoginProtocol) {
 	sendJSON(c, resp)
 }
 func jsonBoostedCreature(c *network.Connection, p *LoginProtocol) {
-	boostedCreature := ""
-	boostedBoss := ""
 	creatureRaceID := uint16(0)
 	bossRaceID := uint16(0)
+
+	// Use the World methods that populate BoostedCreature/BoostedBoss with
+	// sensible defaults (first monster / daily rotator) when none is configured.
+	boostedCreature := ""
+	boostedBoss := ""
 	if p.deps != nil && p.deps.World != nil {
-		boostedCreature = p.deps.World.BoostedCreature
+		boostedCreature = p.deps.World.GetBoostedCreature()
+		p.deps.World.EnsureBoostedBoss()
 		boostedBoss = p.deps.World.BoostedBoss
 
 		if p.deps.World.Monsters != nil {
