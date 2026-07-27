@@ -27,7 +27,7 @@ type LoginProtocol struct {
 func NewLoginFactory(deps *Deps) network.ProtocolFactory {
 	return func() network.Protocol { return &LoginProtocol{deps: deps} }
 }
-func (p *LoginProtocol) OnConnect(c *network.Connection) { c.RawFirstPacket = true; println("LoginProtocol.OnConnect") }
+func (p *LoginProtocol) OnConnect(c *network.Connection) { c.RawFirstPacket = true;  }
 // sendStatusString sends XML server status matching C++ ProtocolStatus::sendStatusString.
 func (p *LoginProtocol) sendStatusString(c *network.Connection) {
 	uptime := uint64(time.Since(serverStartTime).Seconds())
@@ -129,11 +129,11 @@ func (p *LoginProtocol) sendMyAACStatus(c *network.Connection) {
 	c.WriteRaw([]byte(b.String()))
 }
 
-func (p *LoginProtocol) OnDisconnect(c *network.Connection) { println("LoginProtocol.OnDisconnect") }
+func (p *LoginProtocol) OnDisconnect(c *network.Connection) {  }
 func (p *LoginProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {}
 // handleHTTPRequest parses an HTTP request body and returns the appropriate JSON response.
 func (p *LoginProtocol) handleHTTPRequest(c *network.Connection, body []byte) {
-	fmt.Printf("handleHTTPRequest: body=%s\n", string(body))
+	
 	var req struct {
 		Type string `json:"type"`
 	}
@@ -210,7 +210,7 @@ func jsonBoostedCreature(c *network.Connection, p *LoginProtocol) {
 }
 // OnFirstPacket parses the login request, authenticates and replies.
 func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
-	fmt.Printf("OnFirstPacket: len=%d hex=%.30x\n", len(body), body)
+	
 	// MyAAC binary status: [2-byte len] + FF FF "info"
 	if len(body) >= 8 && body[0] == 0x06 && body[1] == 0x00 && body[2] == 0xFF && body[3] == 0xFF && string(body[4:8]) == "info" {
 		p.sendMyAACStatus(c)

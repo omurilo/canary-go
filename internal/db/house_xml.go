@@ -63,9 +63,9 @@ func (d *DB) ParseHouseFile(path string) ([]game.House, error) {
 func (d *DB) SaveHouse(ctx context.Context, h *game.House) error {
 	const q = `INSERT INTO houses (id, name, owner, rent, size, beds, town_id)
 	           VALUES (?, ?, ?, ?, ?, ?, ?)
-	           ON DUPLICATE KEY UPDATE name=?, rent=?, size=?, beds=?`
+	           ON DUPLICATE KEY UPDATE name=?, rent=?, size=?, beds=?, town_id=?`
 	_, err := d.SQL.ExecContext(ctx, q,
 		h.ID, h.Name, h.OwnerID, h.Rent, h.Size, h.Beds, h.TownID,
-		h.Name, h.Rent, h.Size, h.Beds)
+		h.Name, h.Rent, h.Size, h.Beds, h.TownID)
 	return err
 }
