@@ -1,7 +1,6 @@
 package db
 
 import (
-	"context"
 	"encoding/xml"
 	"fmt"
 	"os"
@@ -59,15 +58,4 @@ func (d *DB) ParseHouseFile(path string) ([]game.House, error) {
 		houses = append(houses, h)
 	}
 	return houses, nil
-}
-
-// SaveHouse inserts or updates a house record in the database.
-func (d *DB) SaveHouse(ctx context.Context, h *game.House) error {
-	const q = `INSERT INTO houses (id, name, owner, rent, size, beds, town_id, client_id)
-	           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	           ON DUPLICATE KEY UPDATE name=?, rent=?, size=?, beds=?, town_id=?, client_id=?`
-	_, err := d.SQL.ExecContext(ctx, q,
-		h.ID, h.Name, h.OwnerID, h.Rent, h.Size, h.Beds, h.TownID, h.ClientID,
-		h.Name, h.Rent, h.Size, h.Beds, h.TownID, h.ClientID)
-	return err
 }

@@ -3,13 +3,18 @@ package db
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 )
 
 // LoadHouses loads all houses from the houses table into the world.
 func (d *DB) LoadHouses(ctx context.Context, w *game.World) error {
-	const q = `SELECT id, name, owner, rent, size, beds, town_id, client_id FROM houses`
+	const q = `SELECT id, name, owner, rent, size, beds, town_id, client_id,
+		COALESCE(bidder_name,''), COALESCE(highest_bid,0), COALESCE(internal_bid,0),
+		COALESCE(bid_holder_limit,0), COALESCE(bid_end_date,0), COALESCE(bidder,0),
+		COALESCE(transfer_to_name,''), COALESCE(transfer_price,0), COALESCE(transfer_accept,0)
+		FROM houses`
 	rows, err := d.SQL.QueryContext(ctx, q)
 	if err != nil {
 		return err
@@ -20,7 +25,9 @@ func (d *DB) LoadHouses(ctx context.Context, w *game.World) error {
 		var h game.House
 		h.RentPeriod = "monthly"
 		var ownerID sql.NullInt64
-		if err := rows.Scan(&h.ID, &h.Name, &ownerID, &h.Rent, &h.Size, &h.Beds, &h.TownID, &h.ClientID); err != nil {
+		if err := rows.Scan(&h.ID, &h.Name, &ownerID, &h.Rent, &h.Size, &h.Beds, &h.TownID, &h.ClientID,
+			&h.BidderName, &h.HighestBid, &h.InternalBid, &h.BidHolderLimit, &h.BidEndDate, &h.Bidder,
+			&h.TransferToName, &h.TransferPrice, &h.TransferAccept); err != nil {
 			continue
 		}
 		if ownerID.Valid {
@@ -31,9 +38,53 @@ func (d *DB) LoadHouses(ctx context.Context, w *game.World) error {
 	return nil
 }
 
+// SaveHouse inserts or updates a house record in the database.
+func (d *DB) SaveHouse(ctx context.Context, h *game.House) error {
+	const q = `INSERT INTO houses (id, name, owner, rent, size, beds, town_id, client_id)
+	           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	           ON DUPLICATE KEY UPDATE name=?, rent=?, size=?, beds=?, town_id=?, client_id=?`
+	_, err := d.SQL.ExecContext(ctx, q,
+		h.ID, h.Name, h.OwnerID, h.Rent, h.Size, h.Beds, h.TownID, h.ClientID,
+		h.Name, h.Rent, h.Size, h.Beds, h.TownID, h.ClientID)
+	return err
+}
+
 // SaveHouseOwner persists the owner of a house.
 func (d *DB) SaveHouseOwner(ctx context.Context, houseID uint32, ownerID uint32) error {
 	_, err := d.SQL.ExecContext(ctx, `UPDATE houses SET owner = ? WHERE id = ?`, ownerID, houseID)
+	return err
+}
+
+// SaveHouseBid persists the bid information for a house.
+func (d *DB) SaveHouseBid(ctx context.Context, h *game.House) error {
+	const q = `UPDATE houses SET bidder_name=?, highest_bid=?, internal_bid=?,
+		bid_holder_limit=?, bid_end_date=?, bidder=? WHERE id=?`
+	_, err := d.SQL.ExecContext(ctx, q,
+		h.BidderName, h.HighestBid, h.InternalBid,
+		h.BidHolderLimit, h.BidEndDate, h.Bidder, h.ID)
+	return err
+}
+
+// ClearHouseBid clears the bid info for a house (e.g. after auction ends).
+func (d *DB) ClearHouseBid(ctx context.Context, houseID uint32) error {
+	const q = `UPDATE houses SET bidder_name='', highest_bid=0, internal_bid=0,
+		bid_holder_limit=0, bid_end_date=0, bidder=0 WHERE id=?`
+	_, err := d.SQL.ExecContext(ctx, q, houseID)
+	return err
+}
+
+// SaveHouseTransfer persists the transfer info for a house.
+func (d *DB) SaveHouseTransfer(ctx context.Context, h *game.House) error {
+	const q = `UPDATE houses SET transfer_to_name=?, transfer_price=?, transfer_accept=? WHERE id=?`
+	_, err := d.SQL.ExecContext(ctx, q,
+		h.TransferToName, h.TransferPrice, h.TransferAccept, h.ID)
+	return err
+}
+
+// ClearHouseTransfer clears the transfer info for a house.
+func (d *DB) ClearHouseTransfer(ctx context.Context, houseID uint32) error {
+	const q = `UPDATE houses SET transfer_to_name='', transfer_price=0, transfer_accept=0 WHERE id=?`
+	_, err := d.SQL.ExecContext(ctx, q, houseID)
 	return err
 }
 
@@ -72,13 +123,37 @@ func (d *DB) EnsureHousesTables(ctx context.Context) error {
 		town_id INT UNSIGNED NOT NULL DEFAULT 0,
 		beds SMALLINT UNSIGNED NOT NULL DEFAULT 0,
 		client_id INT UNSIGNED NOT NULL DEFAULT 0,
+		bidder_name VARCHAR(100) NOT NULL DEFAULT '',
+		highest_bid BIGINT UNSIGNED NOT NULL DEFAULT 0,
+		internal_bid BIGINT UNSIGNED NOT NULL DEFAULT 0,
+		bid_holder_limit BIGINT UNSIGNED NOT NULL DEFAULT 0,
+		bid_end_date INT UNSIGNED NOT NULL DEFAULT 0,
+		bidder INT UNSIGNED NOT NULL DEFAULT 0,
+		transfer_to_name VARCHAR(100) NOT NULL DEFAULT '',
+		transfer_price BIGINT UNSIGNED NOT NULL DEFAULT 0,
+		transfer_accept INT UNSIGNED NOT NULL DEFAULT 0,
 		PRIMARY KEY (id)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
 	if _, err := d.SQL.ExecContext(ctx, ddl); err != nil {
 		return err
 	}
-	// Add client_id column to existing tables (safe no-op if already present).
-	_, _ = d.SQL.ExecContext(ctx, `ALTER TABLE houses ADD COLUMN client_id INT UNSIGNED NOT NULL DEFAULT 0 AFTER beds`)
+
+	// Add columns for existing tables (safe no-ops if already present).
+	alterQueries := []string{
+		`ALTER TABLE houses ADD COLUMN client_id INT UNSIGNED NOT NULL DEFAULT 0 AFTER beds`,
+		`ALTER TABLE houses ADD COLUMN bidder_name VARCHAR(100) NOT NULL DEFAULT '' AFTER client_id`,
+		`ALTER TABLE houses ADD COLUMN highest_bid BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER bidder_name`,
+		`ALTER TABLE houses ADD COLUMN internal_bid BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER highest_bid`,
+		`ALTER TABLE houses ADD COLUMN bid_holder_limit BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER internal_bid`,
+		`ALTER TABLE houses ADD COLUMN bid_end_date INT UNSIGNED NOT NULL DEFAULT 0 AFTER bid_holder_limit`,
+		`ALTER TABLE houses ADD COLUMN bidder INT UNSIGNED NOT NULL DEFAULT 0 AFTER bid_end_date`,
+		`ALTER TABLE houses ADD COLUMN transfer_to_name VARCHAR(100) NOT NULL DEFAULT '' AFTER bidder`,
+		`ALTER TABLE houses ADD COLUMN transfer_price BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER transfer_to_name`,
+		`ALTER TABLE houses ADD COLUMN transfer_accept INT UNSIGNED NOT NULL DEFAULT 0 AFTER transfer_price`,
+	}
+	for _, q := range alterQueries {
+		_, _ = d.SQL.ExecContext(ctx, q)
+	}
 
 	const ddl2 = `CREATE TABLE IF NOT EXISTS house_lists (
 		house_id INT UNSIGNED NOT NULL,
@@ -89,3 +164,6 @@ func (d *DB) EnsureHousesTables(ctx context.Context) error {
 	_, err := d.SQL.ExecContext(ctx, ddl2)
 	return err
 }
+
+// HouseBidExpiryDuration is how long an auction lasts after the first bid.
+const HouseBidExpiryDuration = 7 * 24 * time.Hour // 7 days

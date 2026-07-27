@@ -27,12 +27,17 @@ type House struct {
 	HouseTiles   []Position // all tiles that belong to this house
 
 	// Auction/bid fields
-	BidderName    string
-	HighestBid    uint64
-	InternalBid   uint64
+	BidderName     string
+	HighestBid     uint64
+	InternalBid    uint64
 	BidHolderLimit uint64
-	BidEndDate    uint32
-	Bidder        uint32 // player GUID who bid
+	BidEndDate     uint32
+	Bidder         uint32 // player GUID who bid
+
+	// Transfer fields
+	TransferToName string
+	TransferPrice  uint64
+	TransferAccept uint32 // player GUID who accepted transfer
 }
 
 // HouseDoor represents a lockable door in a house.

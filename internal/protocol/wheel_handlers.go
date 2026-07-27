@@ -192,57 +192,55 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 	case 3:
 		g.player.WheelGemManager.ToggleGemLock(param)
 
-	case 4:
-g.deps.Log.Info("case4: entered")
-		catalog := g.deps.Items
-		if catalog == nil {
-g.deps.Log.Info("case4: catalog not nil")
-			break
+		case 4:
+			catalog := g.deps.Items
+			if catalog == nil {
+				break
+			}
+			wheel := g.player.GetWheel()
+			modPos := pos
+			fragmentType := byte(param)
+			var fragID uint16
+			var fragCount uint32
+			var goldCost uint64
+			switch fragmentType {
+			case 0:
+				fragID = 46625
+				fragCount = 5
+				goldCost = 2000000
+			case 1:
+				fragID = 46626
+				fragCount = 5
+				goldCost = 5000000
+			default:
+				break
+			}
+			if fragID == 0 {
+				break
+			}
+			if g.player.GetItemCount(fragID) < fragCount {
+				break
+			}
+			if g.player.GetMoney() < goldCost {
+				break
+			}
+			if !g.player.RemoveItemOfType(catalog, fragID, fragCount, -1, false) {
+				break
+			}
+			if !g.player.RemoveMoney(goldCost, true) {
+				break
+			}
+			if !wheel.ImproveModGrade(fragmentType, modPos) {
+				break
+			}
 		}
-		wheel := g.player.GetWheel()
-		modPos := pos
-		fragmentType := byte(param)
-		var fragID uint16
-		var fragCount uint32
-		var goldCost uint64
-		switch fragmentType {
-		case 0:
-			fragID = 46625
-			fragCount = 5
-			goldCost = 2000000
-		case 1:
-			fragID = 46626
-			fragCount = 5
-			goldCost = 5000000
-		default:
-			break
+		// Persist gem changes
+		if g.deps.DB != nil && g.player != nil {
+			_ = g.deps.DB.SavePlayerWheel(context.Background(), g.player)
 		}
-		if fragID == 0 {
-			break
-		}
-		if g.player.GetItemCount(fragID) < fragCount {
-			break
-		}
-		if g.player.GetMoney() < goldCost {
-			break
-		}
-		if !g.player.RemoveItemOfType(catalog, fragID, fragCount, -1, false) {
-			break
-		}
-		if !g.player.RemoveMoney(goldCost, true) {
-			break
-		}
-		if !wheel.ImproveModGrade(fragmentType, modPos) {
-			break
-		}
-	}
-	// Persist gem changes immediately so they survive relog.
-	if g.deps.DB != nil && g.player != nil {
-		_ = g.deps.DB.SavePlayerWheel(context.Background(), g.player)
-	}
-	g.SendWheelOfDestiny()
-}
+		g.SendWheelOfDestiny()
 
+}
 // SendWheelOfDestiny sends the full Wheel of Destiny payload (Opcode 0x5F) to client.
 func (g *GameProtocol) SendWheelOfDestiny() {
 	wheel := g.player.GetWheel()
