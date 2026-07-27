@@ -157,7 +157,8 @@ func (p *LoginProtocol) handleHTTPRequest(c *network.Connection, body []byte) {
 		jsonEmpty(c) // not implemented
 	case "showoff":
 		jsonEmpty(c) // not implemented
-	default:
+	jsonHouseList(c, p)
+		default:
 		jsonError(c, "Unknown type: "+req.Type)
 	}
 }

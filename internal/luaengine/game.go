@@ -272,9 +272,31 @@ func (e *Engine) gameLoadMapChunk(L *lua.LState) int {
 	return e.gameLoadMap(L)
 }
 func (e *Engine) gameGetExperienceForLevel(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
-func (e *Engine) gameGetMonsterCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
+func (e *Engine) gameGetMonsterCount(L *lua.LState) int {
+	count := 0
+	if e.world != nil {
+		for _, c := range e.world.Creatures() {
+			if c.GetCreatureType() == 1 { // CREATURETYPE_MONSTER
+				count++
+			}
+		}
+	}
+	L.Push(lua.LNumber(count))
+	return 1
+}
 func (e *Engine) gameGetPlayerCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
-func (e *Engine) gameGetNpcCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
+func (e *Engine) gameGetNpcCount(L *lua.LState) int {
+	count := 0
+	if e.world != nil {
+		for _, c := range e.world.Creatures() {
+			if c.GetCreatureType() == 2 { // CREATURETYPE_NPC
+				count++
+			}
+		}
+	}
+	L.Push(lua.LNumber(count))
+	return 1
+}
 func (e *Engine) gameGetMonsterTypes(L *lua.LState) int {
 	tbl := L.NewTable()
 	if e != nil && e.world != nil && e.world.TypeRegistry != nil {
@@ -288,8 +310,32 @@ func (e *Engine) gameGetMonsterTypes(L *lua.LState) int {
 	L.Push(tbl)
 	return 1
 }
-func (e *Engine) gameGetTowns(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
-func (e *Engine) gameGetHouses(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetTowns(L *lua.LState) int {
+	tbl := L.NewTable()
+	if e.world != nil {
+		for id := range e.world.TownNames {
+			pushTown(L, id)
+			tbl.Append(L.Get(-1))
+			L.Pop(1)
+		}
+	}
+	L.Push(tbl)
+	return 1
+}
+func (e *Engine) gameGetHouses(L *lua.LState) int {
+	tbl := L.NewTable()
+	if e.world != nil {
+		houseMt := L.GetTypeMetatable("House")
+		for _, h := range e.world.Houses {
+			ud := L.NewUserData()
+			ud.Value = h
+			L.SetMetatable(ud, houseMt)
+			tbl.Append(ud)
+		}
+	}
+	L.Push(tbl)
+	return 1
+}
 func (e *Engine) gameGetGameState(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameSetGameState(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetWorldType(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }

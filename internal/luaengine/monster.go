@@ -2,6 +2,7 @@ package luaengine
 
 import (
 	lua "github.com/yuin/gopher-lua"
+	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
 )
 
@@ -256,7 +257,19 @@ func monsterGettimetochangefiendish(L *lua.LState) int {
 }
 
 func monsterGettype(L *lua.LState) int {
-	L.Push(lua.LNil)
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if m.Type == nil {
+		// Return a sentinel empty MonsterType so Lua scripts that call
+		// getType():isRewardBoss() (e.g. monster:setReward()) don't crash
+		// on a nil dereference. All boolean flags default to false.
+		pushMonsterType(L, &creatures.MonsterType{Name: m.Name})
+		return 1
+	}
+	pushMonsterType(L, m.Type)
 	return 1
 }
 

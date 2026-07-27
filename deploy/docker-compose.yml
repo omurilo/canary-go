@@ -82,7 +82,7 @@ services:
       - "8080:80"
     volumes:
       - ../ip.txt:/var/www/html/install/ip.txt
-      - ../config.lua:/canary/config.lua
+      - ../config.lua:/canary/config.lua:ro
       - ../data/items:/canary/data/items
       - ../data/XML:/canary/data/XML
       - ../data-otservbr-global/monsters:/canary/data/monsters

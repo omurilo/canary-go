@@ -89,6 +89,9 @@ func (e *Engine) luaDBExecute(L *lua.LState) int {
 	query := L.CheckString(1)
 	if e.database != nil && e.database.SQL != nil {
 		_, err := e.database.SQL.Exec(query)
+		if err != nil && e.log != nil {
+			e.log.Warn("lua query failed", "err", err, "query", query[:min(len(query), 200)])
+		}
 		L.Push(lua.LBool(err == nil))
 		return 1
 	}
@@ -176,7 +179,7 @@ func (e *Engine) luaDBAsyncStoreQuery(L *lua.LState) int {
 
 func (e *Engine) luaDBEscapeString(L *lua.LState) int {
 	str := L.CheckString(1)
-	escaped := strings.ReplaceAll(str, "'", "''")
+	escaped := "'" + strings.ReplaceAll(str, "'", "''") + "'"
 	L.Push(lua.LString(escaped))
 	return 1
 }

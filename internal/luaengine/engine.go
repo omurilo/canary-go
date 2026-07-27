@@ -4,8 +4,10 @@
 package luaengine
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"os"
 	"regexp"
 	"strings"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/db"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/globalevents"
 	"github.com/opentibiabr/canary-go/internal/spells"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -46,6 +49,11 @@ type Engine struct {
 
 	creatureEventsOnLogin  []*lua.LFunction
 	creatureEventsOnLogout []*lua.LFunction
+
+	// GlobalEvents is the scheduling engine for server-wide startup/think/time
+	// events. It is created alongside the Lua engine and started after all
+	// scripts have loaded.
+	GlobalEvents *globalevents.Engine
 }
 
 // New creates an engine with the base libraries loaded.
@@ -56,6 +64,7 @@ func New(world *game.World, log *slog.Logger) *Engine {
 	e.overrideFileLoaders()
 	e.registerScheduler()
 	e.registerLuaCompat()
+	e.overrideMathRandom()
 
 	if world != nil {
 		world.OnCastSpell = func(name string, caster game.Creature, target game.Creature) bool {
@@ -128,6 +137,7 @@ func New(world *game.World, log *slog.Logger) *Engine {
 		}
 	}
 
+	e.GlobalEvents = globalevents.NewEngine(log)
 	return e
 }
 
@@ -161,6 +171,42 @@ func (e *Engine) registerLuaCompat() {
 		}
 		return 2
 	}))
+}
+
+// overrideMathRandom replaces gopher-lua's math.random with a version that
+// handles edge cases (max ≤ min) gracefully. The default implementation panics
+// via rand.Intn(0) when the range is empty. This matches LuaJIT behaviour of
+// returning 0 rather than crashing.
+func (e *Engine) overrideMathRandom() {
+	mathTbl, ok := e.L.GetGlobal("math").(*lua.LTable)
+	if !ok {
+		return
+	}
+	mathTbl.RawSetString("random", e.L.NewFunction(safeRandom))
+}
+
+func safeRandom(L *lua.LState) int {
+	top := L.GetTop()
+	switch top {
+	case 0:
+		L.Push(lua.LNumber(rand.Float64()))
+	case 1:
+		n := L.CheckInt(1)
+		if n <= 0 {
+			L.Push(lua.LNumber(0))
+		} else {
+			L.Push(lua.LNumber(rand.Intn(n) + 1))
+		}
+	default:
+		min := L.CheckInt(1)
+		max := L.CheckInt(2)
+		if max < min {
+			L.Push(lua.LNumber(0))
+		} else {
+			L.Push(lua.LNumber(rand.Intn(max-min+1) + min))
+		}
+	}
+	return 1
 }
 
 // registerScheduler installs the global addEvent/stopEvent scheduling functions
@@ -277,7 +323,19 @@ func (e *Engine) overrideFileLoaders() {
 func (e *Engine) Close() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.GlobalEvents != nil {
+		e.GlobalEvents.Stop()
+	}
 	e.L.Close()
+}
+
+// StartGlobalEventScheduler begins the background tick loop for think and time
+// global events. Must be called after all Lua scripts have been loaded and
+// RunStartupGlobalEvents has completed.
+func (e *Engine) StartGlobalEventScheduler(ctx context.Context) {
+	if e.GlobalEvents != nil {
+		e.GlobalEvents.Start(ctx)
+	}
 }
 
 // DoFile executes a Lua script file under the engine lock.

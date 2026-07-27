@@ -9,7 +9,7 @@ import (
 
 // LoadHouses loads all houses from the houses table into the world.
 func (d *DB) LoadHouses(ctx context.Context, w *game.World) error {
-	const q = `SELECT id, name, owner, rent, size, beds, town_id FROM houses`
+	const q = `SELECT id, name, owner, rent, size, beds, town_id, client_id FROM houses`
 	rows, err := d.SQL.QueryContext(ctx, q)
 	if err != nil {
 		return err
@@ -20,7 +20,7 @@ func (d *DB) LoadHouses(ctx context.Context, w *game.World) error {
 		var h game.House
 		h.RentPeriod = "monthly"
 		var ownerID sql.NullInt64
-		if err := rows.Scan(&h.ID, &h.Name, &ownerID, &h.Rent, &h.Size, &h.Beds, &h.TownID); err != nil {
+		if err := rows.Scan(&h.ID, &h.Name, &ownerID, &h.Rent, &h.Size, &h.Beds, &h.TownID, &h.ClientID); err != nil {
 			continue
 		}
 		if ownerID.Valid {
@@ -71,11 +71,15 @@ func (d *DB) EnsureHousesTables(ctx context.Context) error {
 		size INT UNSIGNED NOT NULL DEFAULT 0,
 		town_id INT UNSIGNED NOT NULL DEFAULT 0,
 		beds SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+		client_id INT UNSIGNED NOT NULL DEFAULT 0,
 		PRIMARY KEY (id)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
 	if _, err := d.SQL.ExecContext(ctx, ddl); err != nil {
 		return err
 	}
+	// Add client_id column to existing tables (safe no-op if already present).
+	_, _ = d.SQL.ExecContext(ctx, `ALTER TABLE houses ADD COLUMN client_id INT UNSIGNED NOT NULL DEFAULT 0 AFTER beds`)
+
 	const ddl2 = `CREATE TABLE IF NOT EXISTS house_lists (
 		house_id INT UNSIGNED NOT NULL,
 		type VARCHAR(20) NOT NULL,

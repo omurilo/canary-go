@@ -534,19 +534,22 @@ func (g *GameProtocol) enterWorld() {
 	g.addStats(w)
 	g.addSkills(w)
 
-	// 0x82 world light.
+	// 0x82 world light (level + color).
 	w.AddByte(opWorldLight)
-	w.AddByte(0xFF) // full daylight
-	w.AddByte(0xD7)
+	w.AddByte(0xFF) // full daylight level
+	w.AddByte(0x00) // light color (default)
 
 	// 0x8D creature light.
 	w.AddByte(opCreatureLight)
 	w.AddU32(p.ID)
-	w.AddByte(0)
-	w.AddByte(0)
+	w.AddByte(0) // light level
+	w.AddByte(0) // light color
 
 	g.addBasicData(w)
 	g.SendToClient(w)
+	// Cyclopedia houses info (enables the house auction UI in the client).
+	g.sendHousesInfo()
+
 
 	// Force close all containers on the client to clear any ghost containers.
 	// The client caches open containers locally, but if the server doesn't have them
@@ -560,6 +563,7 @@ func (g *GameProtocol) enterWorld() {
 
 	// Restore any containers that were left open by the client in its local config.
 	g.restoreOpenContainers()
+
 	// Send initial condition/protection zone icons
 	g.SendIcons()
 

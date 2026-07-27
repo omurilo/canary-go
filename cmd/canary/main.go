@@ -190,6 +190,11 @@ func run(o runOpts, log *slog.Logger) error {
 			log.Warn("ensure concoctions table", "err", err)
 		}
 
+			// Houses table.
+			if err := database.EnsureHousesTables(ctx); err != nil {
+				log.Warn("ensure houses table", "err", err)
+			}
+
 		imbPath := filepath.Join(filepath.Dir(filepath.Dir(o.appearances)), "XML", "imbuements.xml")
 	if imbReg, err := imbuements.LoadRegistry(imbPath); err != nil {
 		log.Warn("imbuements not loaded", "path", imbPath, "err", err)
@@ -465,6 +470,7 @@ func run(o runOpts, log *slog.Logger) error {
 
 	// Lua engine.
 	lengine = luaengine.New(world, log)
+	lengine.SetDB(database)
 	defer lengine.Close()
 	lengine.SetGameFunc("getPlayerCount", func(L *lua.LState) int {
 		L.Push(lua.LNumber(world.OnlineCount()))
@@ -617,6 +623,9 @@ func run(o runOpts, log *slog.Logger) error {
 	}
 
 	lengine.RunStartupGlobalEvents()
+
+	// Start the background globalevent scheduler (think/time events).
+	lengine.StartGlobalEventScheduler(ctx)
 
 	eventsEngine := events.NewEngine(lengine.L)
 

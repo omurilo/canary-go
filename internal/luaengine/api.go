@@ -227,6 +227,12 @@ func (e *Engine) registerAPI() {
 	e.registerGlobalEventClass()
 	e.registerVocation()
 
+	// HirelingsInit is a no-op stub called by server_initialization.lua.
+	// The full hireling system is not ported to Go yet.
+	L.SetGlobal("HirelingsInit", L.NewFunction(func(L *lua.LState) int {
+		return 0
+	}))
+
 	// Mock constructors for unused revscriptsys classes so scripts don't crash
 	mockClass := func(name string) {
 		mt := L.NewTypeMetatable(name)
@@ -240,7 +246,7 @@ func (e *Engine) registerAPI() {
 					L.Push(lua.LNumber(0))
 					return 1
 				}
-				if key == "getPositions" || key == "getZones" || key == "getCreatures" || key == "getPlayers" || key == "getMonsters" {
+				if key == "getPositions" || key == "getZones" || key == "getCreatures" || key == "getPlayers" || key == "getMonsters" || key == "getItems" {
 					L.Push(L.NewTable())
 					return 1
 				}
