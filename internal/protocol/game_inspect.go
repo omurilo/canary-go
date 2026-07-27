@@ -616,10 +616,9 @@ func (g *GameProtocol) sendCyclopediaCharacterBadges() {
 }
 
 // sendCyclopediaCharacterTitles sends the character titles (type 11).
-// Wire format: 0xDA + u8 type + u8 error + u8 currentTitle + u8 count
-//   for each unlocked title: string name + string desc + u8 permanent + u8 unlocked(1)
-// Matches C++ ProtocolGame::sendCyclopediaCharacterTitles (omitting the u8 m_id
-// that the C++ sends before name, since OTClient skips it).
+// Exact wire format matching C++: 0xDA + u8 type + u8 error +
+//   u8 currentTitle + u8 count +
+//   for each: u8 id + string name + string desc + u8 permanent + u8 unlocked
 func (g *GameProtocol) sendCyclopediaCharacterTitles() {
 	if g.player == nil {
 		return
@@ -633,20 +632,23 @@ func (g *GameProtocol) sendCyclopediaCharacterTitles() {
 	titles := p.GetTitles()
 	w.AddByte(titles.CurrentID) // current title ID
 
-	// DEBUG: send first 3 titles regardless of unlock to test format
-	slog.Default().Info("titles: sending",
-		"player", p.Name,
-		"unlockedCount", len(titles.Unlocked))
-
-	testTitles := []game.TitleInfo{}
+	// Count unlocked titles.
+	count := uint8(0)
+	var unlocked []game.TitleInfo
 	for _, t := range game.DefaultTitles {
-		if t.ID <= 3 {
-			testTitles = append(testTitles, t)
+		if titles.IsUnlocked(t.ID) {
+			unlocked = append(unlocked, t)
+			count++
 		}
 	}
 
-	w.AddByte(byte(len(testTitles)))
-	for _, t := range testTitles {
+	slog.Default().Info("titles: sending",
+		"player", p.Name,
+		"unlockedCount", count)
+
+	w.AddByte(count)
+	for _, t := range unlocked {
+		w.AddByte(t.ID) // u8 id — required by official client
 		name := t.MaleName
 		if p.Sex == 0 && t.FemaleName != "" {
 			name = t.FemaleName
@@ -654,7 +656,7 @@ func (g *GameProtocol) sendCyclopediaCharacterTitles() {
 		w.AddString(name)
 		w.AddString(t.Description)
 		w.AddByte(1) // permanent
-		w.AddByte(1) // unlocked
+		w.AddByte(1) // unlocked (we only send unlocked)
 	}
 
 	g.SendToClient(w)
