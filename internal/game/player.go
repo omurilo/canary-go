@@ -186,6 +186,8 @@ type Player struct {
 
 	// Stash holds the player's supply stash items (ItemID -> Count).
 	Stash map[uint16]uint32
+	// stashMenuAvailable is true when the stash menu is available (set by NPC).
+	stashMenuAvailable bool
 
 	// Wheel of Destiny progression tree
 	Wheel *WheelOfDestiny
@@ -1740,6 +1742,30 @@ func (p *Player) GetStashSlotCount() uint32 {
 		return 0
 	}
 	return uint32(len(p.Stash))
+}
+
+// GetStashItems returns a copy of the stash map.
+func (p *Player) GetStashItems() map[uint16]uint32 {
+	out := make(map[uint16]uint32)
+	for k, v := range p.Stash {
+		out[k] = v
+	}
+	return out
+}
+
+// WithdrawFromStash removes count of itemID from stash. Returns false if insufficient.
+func (p *Player) WithdrawFromStash(itemID uint16, count uint32) bool {
+	return p.RemoveFromStash(itemID, count)
+}
+
+// IsStashMenuAvailable returns true if the stash context menu is active.
+func (p *Player) IsStashMenuAvailable() bool {
+	return p.stashMenuAvailable
+}
+
+// SetStashMenuAvailable enables or disables the stash context menu.
+func (p *Player) SetStashMenuAvailable(v bool) {
+	p.stashMenuAvailable = v
 }
 
 // StowItem moves items of the given ID from inventory/containers to the stash.
