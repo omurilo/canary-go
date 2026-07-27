@@ -192,19 +192,44 @@ func jsonCacheInfo(c *network.Connection, p *LoginProtocol) {
 func jsonBoostedCreature(c *network.Connection, p *LoginProtocol) {
 	boostedCreature := ""
 	boostedBoss := ""
+	creatureRaceID := uint16(0)
+	bossRaceID := uint16(0)
 	if p.deps != nil && p.deps.World != nil {
 		boostedCreature = p.deps.World.BoostedCreature
 		boostedBoss = p.deps.World.BoostedBoss
+
+		if p.deps.World.Monsters != nil {
+			// Look up the boosted creature's bestiary race ID
+			if name := strings.TrimSpace(boostedCreature); name != "" && name != "default" {
+				if mt, ok := p.deps.World.Monsters.Monsters[strings.ToLower(name)]; ok {
+					creatureRaceID = mt.RaceID
+				}
+			}
+			// Look up the boosted boss's bosstiary race ID
+			if name := strings.TrimSpace(boostedBoss); name != "" && name != "None" && name != "default" {
+				if mt, ok := p.deps.World.Monsters.Monsters[strings.ToLower(name)]; ok {
+					if mt.BosstiaryRaceID != 0 {
+						bossRaceID = mt.BosstiaryRaceID
+					} else {
+						bossRaceID = mt.RaceID // fallback
+					}
+				}
+			}
+		}
 	}
-	// The client expects fields that setBoostedCreatureAndBoss can parse
+	// The client's setBoostedCreatureAndBoss expects:
+	//   data.creatureraceid (or data.raceid for backwards compat)
+	//   data.bossraceid
 	resp, _ := json.Marshal(map[string]interface{}{
-		"boostedCreature": boostedCreature,
-		"boostedBoss":     boostedBoss,
-		"raceId":          0,
-		"bonus":           "",
-		"bonusXp":         0,
-		"bonusLoot":       0,
-		"bonusSkill":      0,
+		"boostedCreature":  boostedCreature,
+		"boostedBoss":      boostedBoss,
+		"raceId":           creatureRaceID, // backwards compat
+		"creatureraceid":   creatureRaceID,
+		"bossraceid":       bossRaceID,
+		"bonus":            "",
+		"bonusXp":          0,
+		"bonusLoot":        0,
+		"bonusSkill":       0,
 	})
 	sendJSON(c, resp)
 }
