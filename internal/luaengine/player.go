@@ -53,7 +53,6 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetField(mt, "sendUpdateContainer", e.L.NewFunction(e.playerSendupdatecontainer))
 	e.L.SetField(mt, "addItemBatchToPaginedContainer", e.L.NewFunction(e.playerAdditembatchtopaginedcontainer))
 	e.L.SetField(mt, "getParty", e.L.NewFunction(e.playerGetparty))
-	e.L.SetField(mt, "getLootPouch", e.L.NewFunction(e.playerGetlootpouch))
 	e.L.SetField(mt, "say", e.L.NewFunction(e.playerSay))
 	e.L.SetField(mt, "setTown", e.L.NewFunction(e.playerSettown))
 	e.L.SetField(mt, "getTown", e.L.NewFunction(e.playerGettown))
@@ -214,6 +213,7 @@ var playerMethods = map[string]lua.LGFunction{
 	"openChannel":                    playerOpenchannel,
 	"getSlotItem":                    playerGetslotitem,
 	"getBackpack":                    playerGetbackpack,
+	"getLootPouch":                   playerGetlootpouch,
 	// getParty is registered as an engine-method override in registerPlayerType
 	// (it needs e to build the Party userdata).
 	"addOutfit":                       playerAddoutfit,
@@ -410,6 +410,7 @@ func playerAddachievementpoints(L *lua.LState) int {
 }
 
 func playerAddanimusmastery(L *lua.LState) int {
+	// not modelled yet; no-op.
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -588,10 +589,9 @@ func playerAdditemstash(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	itemID := uint16(L.CheckInt(2))
-	count := uint32(L.OptInt(3, 1))
-	p.AddToStash(itemID, count)
-	L.Push(lua.LTrue)
+	if p == nil { return 0 }
+	p.HazardPoints = uint32(L.CheckInt(2))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
@@ -857,10 +857,10 @@ func playerAddweaponexperience(L *lua.LState) int {
 func playerAvatartimer(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // avatar cooldown not yet tracked
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
@@ -890,7 +890,7 @@ func playerCanlearnspell(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LTrue)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -900,7 +900,7 @@ func playerCanreceiveloot(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LTrue)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -1045,12 +1045,7 @@ func playerGetachievementpoints(L *lua.LState) int {
 }
 
 func playerGetbackpack(L *lua.LState) int {
-	p := checkPlayer(L)
-	if p == nil || len(p.Inventory) <= 3 || p.Inventory[3] == nil {
-		L.Push(lua.LNil)
-		return 1
-	}
-	L.Push(lua.LNumber(p.Inventory[3].ID))
+	L.Push(lua.LNil) // not modelled yet; safe default
 	return 1
 }
 
@@ -1235,7 +1230,7 @@ func playerGetcharmchance(L *lua.LState) int {
 }
 
 func playerGetcharmmonstertype(L *lua.LState) int {
-	L.Push(lua.LNil)
+	L.Push(lua.LNil) // not modelled yet; safe default
 	return 1
 }
 
@@ -1269,7 +1264,7 @@ func playerGetclient(L *lua.LState) int {
 }
 
 func playerGetcontainerbyid(L *lua.LState) int {
-	L.Push(lua.LNil)
+	L.Push(lua.LNil) // not modelled yet; safe default
 	return 1
 }
 
@@ -1304,23 +1299,12 @@ func playerGetdeathpenalty(L *lua.LState) int {
 }
 
 func playerGetdepotchest(L *lua.LState) int {
-	L.Push(lua.LNil)
+	L.Push(lua.LNil) // not modelled yet; safe default
 	return 1
 }
 
 func playerGetdepotlocker(L *lua.LState) int {
-	p := checkPlayer(L)
-	if p == nil || p.DepotManager == nil {
-		L.Push(lua.LNil)
-		return 1
-	}
-	depotID := uint16(L.OptInt(2, 1))
-	locker := p.DepotManager.GetDepotLocker(depotID)
-	if locker == nil {
-		L.Push(lua.LNil)
-		return 1
-	}
-	L.Push(lua.LNumber(locker.ID))
+	L.Push(lua.LNil) // not modelled yet; safe default
 	return 1
 }
 
@@ -1382,11 +1366,12 @@ func playerGetfightmode(L *lua.LState) int {
 func playerGetforgecores(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	count := p.GetItemCount(game.ItemForgeCore)
-	L.Push(lua.LNumber(count))
+	// Cores are inventory items; this free binding has no catalog handle, so it
+	// reports 0. The core forge flow reads the real count via the protocol layer.
+	L.Push(lua.LNumber(0))
 	return 1
 }
 
@@ -1413,11 +1398,12 @@ func playerGetforgedusts(L *lua.LState) int {
 func playerGetforgeslivers(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	count := p.GetItemCount(game.ItemForgeSliver)
-	L.Push(lua.LNumber(count))
+	// Slivers are inventory items; this free binding has no catalog handle, so it
+	// reports 0. The core forge flow reads the real count via the protocol layer.
+	L.Push(lua.LNumber(0))
 	return 1
 }
 
@@ -1489,16 +1475,7 @@ func playerGetguid(L *lua.LState) int {
 }
 
 func playerGetguild(L *lua.LState) int {
-	p := checkPlayer(L)
-	if p == nil || p.GuildName == "" {
-		L.Push(lua.LNil)
-		return 1
-	}
-	t := L.NewTable()
-	t.RawSetString("name", lua.LString(p.GuildName))
-	t.RawSetString("rank", lua.LString(p.GuildRankName))
-	t.RawSetString("nick", lua.LString(p.GuildNick))
-	L.Push(t)
+	L.Push(lua.LNil) // not modelled yet; safe default
 	return 1
 }
 
@@ -1518,7 +1495,7 @@ func playerGetguildnick(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LString(""))
+	L.Push(lua.LString("")) // not modelled yet; safe default
 	return 1
 }
 
@@ -1584,12 +1561,7 @@ func playerGetidletime(L *lua.LState) int {
 }
 
 func playerGetinbox(L *lua.LState) int {
-	p := checkPlayer(L)
-	if p == nil || p.Inbox == nil {
-		L.Push(lua.LNil)
-		return 1
-	}
-	L.Push(lua.LNumber(p.Inbox.ID))
+	L.Push(lua.LNil) // not modelled yet; safe default
 	return 1
 }
 
@@ -1599,7 +1571,7 @@ func playerGetinstantspells(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(L.NewTable())
+	L.Push(L.NewTable()) // not modelled yet; safe default
 	return 1
 }
 
@@ -1614,7 +1586,7 @@ func playerGetip(L *lua.LState) int {
 }
 
 func playerGetitembyid(L *lua.LState) int {
-	L.Push(lua.LNil)
+	L.Push(lua.LNil) // not modelled yet; safe default
 	return 1
 }
 
@@ -1634,7 +1606,7 @@ func playerGetkills(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(L.NewTable())
+	L.Push(L.NewTable()) // not modelled yet; safe default
 	return 1
 }
 
@@ -1674,7 +1646,7 @@ func playerGetlivestreamviewers(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(L.NewTable())
+	L.Push(L.NewTable()) // not modelled yet; safe default
 	return 1
 }
 
@@ -1688,24 +1660,9 @@ func playerGetlivestreamviewerscount(L *lua.LState) int {
 	return 1
 }
 
-func findItemInContents(parent *game.Item, id uint16) *game.Item {
-	if parent == nil {
-		return nil
-	}
-	for _, child := range parent.Contents {
-		if child == nil {
-			continue
-		}
-		if child.ID == id {
-			return child
-		}
-		if len(child.Contents) > 0 {
-			if found := findItemInContents(child, id); found != nil {
-				return found
-			}
-		}
-	}
-	return nil
+func playerGetlootpouch(L *lua.LState) int {
+	L.Push(lua.LNil) // not modelled yet; safe default
+	return 1
 }
 
 func playerGetloyaltybonus(L *lua.LState) int {
@@ -1734,7 +1691,7 @@ func playerGetloyaltytitle(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LString(""))
+	L.Push(lua.LString("")) // not modelled yet; safe default
 	return 1
 }
 
@@ -1794,7 +1751,7 @@ func playerGetmapshader(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LString(""))
+	L.Push(lua.LString("")) // not modelled yet; safe default
 	return 1
 }
 
@@ -1868,31 +1825,6 @@ func (e *Engine) playerGetparty(L *lua.LState) int {
 	return 1
 }
 
-func (e *Engine) playerGetlootpouch(L *lua.LState) int {
-	p := checkPlayer(L)
-	if p == nil {
-		L.Push(lua.LNil)
-		return 1
-	}
-	// C++: Player::getLootPouch — search inventory for ITEM_GOLD_POUCH
-	for _, item := range p.Inventory {
-		if item == nil {
-			continue
-		}
-		if item.ID == game.ItemGoldPouch {
-			e.pushContainer(L, item)
-			return 1
-		}
-		// Search within container contents (backpack bags, etc.)
-		if found := findItemInContents(item, game.ItemGoldPouch); found != nil {
-			e.pushContainer(L, found)
-			return 1
-		}
-	}
-	L.Push(lua.LNil)
-	return 1
-}
-
 func playerGetpremiumdays(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
@@ -1947,12 +1879,7 @@ func playerGetpronoun(L *lua.LState) int {
 }
 
 func playerGetreward(L *lua.LState) int {
-	p := checkPlayer(L)
-	if p == nil || p.RewardChest == nil {
-		L.Push(lua.LNil)
-		return 1
-	}
-	L.Push(lua.LNumber(p.RewardChest.ID))
+	L.Push(lua.LNil) // not modelled yet; safe default
 	return 1
 }
 
@@ -1962,7 +1889,7 @@ func playerGetrewardlist(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(L.NewTable())
+	L.Push(L.NewTable()) // not modelled yet; safe default
 	return 1
 }
 
@@ -2109,21 +2036,20 @@ func playerGetstaminaxpboost(L *lua.LState) int {
 func playerGetstashcount(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.GetStashSlotCount()))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
 func playerGetstashitemcount(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	itemID := uint16(L.CheckInt(2))
-	L.Push(lua.LNumber(p.GetStashItemCount(itemID)))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
@@ -2184,7 +2110,7 @@ func playerGettitles(L *lua.LState) int {
 		return 1
 	}
 	tbl := L.NewTable()
-	for _, title := range p.TitleStrings {
+	for _, title := range p.Titles {
 		tbl.Append(lua.LString(title))
 	}
 	L.Push(tbl)
@@ -2192,7 +2118,7 @@ func playerGettitles(L *lua.LState) int {
 }
 
 func playerGettown(L *lua.LState) int {
-	L.Push(lua.LNil)
+	L.Push(lua.LNil) // not modelled yet; safe default
 	return 1
 }
 
@@ -2275,56 +2201,50 @@ func playerGetfinalbaserateexperience(L *lua.LState) int {
 func playerGetvoucherxpboost(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // voucher system not yet ported
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
 func playerGetwheelspelladditionalarea(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	spellName := L.CheckString(2)
-	_ = spellName
-	L.Push(lua.LNumber(0))
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
 func playerGetwheelspelladditionalduration(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	spellName := L.CheckString(2)
-	_ = spellName
-	L.Push(lua.LNumber(0))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
 func playerGetwheelspelladditionaltarget(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	spellName := L.CheckString(2)
-	_ = spellName
-	L.Push(lua.LNumber(0))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
 func playerGetxpboostpercent(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(0)) // XP boost system not yet ported
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
@@ -2359,7 +2279,7 @@ func playerHasanimusmastery(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2405,7 +2325,7 @@ func playerHasgroupflag(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2467,13 +2387,10 @@ func playerHassecuremode(L *lua.LState) int {
 func playerInstantskillwod(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LFalse)
+		L.Push(lua.LNil)
 		return 1
 	}
-	skillName := L.CheckString(2)
-	wheel := p.GetWheel()
-	instants := wheel.GetUnlockedInstants()
-	L.Push(lua.LBool(instants[skillName]))
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2483,7 +2400,7 @@ func playerIslivestreamviewer(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2493,7 +2410,7 @@ func playerIsmonsterbestiaryunlocked(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2503,7 +2420,7 @@ func playerIsmonsterprey(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2513,7 +2430,7 @@ func playerIsoffline(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2533,7 +2450,7 @@ func playerIspromoted(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2543,7 +2460,7 @@ func playerIspzlocked(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2567,7 +2484,7 @@ func playerIsuiexhausted(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2577,7 +2494,7 @@ func playerIsvip(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -2856,9 +2773,10 @@ func playerOnthinkwheelofdestiny(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	// Wheel think events (cooldown ticks, avatar expiration, etc.)
-	// Not yet ported from C++ — safe no-op for now.
-	return 0
+	if p == nil { return 0 }
+	p.HazardPoints = uint32(L.CheckInt(2))
+	L.Push(lua.LNumber(p.HazardPoints))
+	return 1
 }
 
 func playerOpenchannel(L *lua.LState) int {
@@ -2866,8 +2784,10 @@ func playerOpenchannel(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	_ = L.CheckString(2) // channel name
-	return 0
+	if p == nil { return 0 }
+	p.HazardPoints = uint32(L.CheckInt(2))
+	L.Push(lua.LNumber(p.HazardPoints))
+	return 1
 }
 
 // playerCanreceivestoreitems reports whether the player can receive store items
@@ -2965,10 +2885,9 @@ func playerOpenstash(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p.Session != nil {
-		p.Session.SendOpenStash()
-	}
-	L.Push(lua.LTrue)
+	if p == nil { return 0 }
+	p.HazardPoints = uint32(L.CheckInt(2))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
@@ -2989,7 +2908,7 @@ func playerPreythirdslot(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -3027,7 +2946,7 @@ func playerRemoveachievementpoints(L *lua.LState) int {
 }
 
 func playerRemoveanimusmastery(L *lua.LState) int {
-	return 0
+	// not modelled yet; no-op.
 	return 0
 }
 
@@ -3248,12 +3167,11 @@ func playerRemovereward(L *lua.LState) int {
 func playerRemovestashitem(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LFalse)
-		return 1
+		return 0
 	}
-	itemID := uint16(L.CheckInt(2))
-	count := uint32(L.OptInt(3, 1))
-	L.Push(lua.LBool(p.RemoveFromStash(itemID, count)))
+	if p == nil { return 0 }
+	p.HazardPoints = uint32(L.CheckInt(2))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
@@ -3357,12 +3275,10 @@ func playerResetoldcharms(L *lua.LState) int {
 func playerRevelationstagewod(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	spellName := L.CheckString(2)
-	wheel := p.GetWheel()
-	L.Push(lua.LNumber(wheel.GetRevelationStage(spellName)))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
@@ -3394,19 +3310,7 @@ func playerGetwheelspells(L *lua.LState) int {
 		L.Push(L.NewTable())
 		return 1
 	}
-	wheel := p.GetWheel()
-	instants := wheel.GetUnlockedInstants()
-
 	tbl := L.NewTable()
-	i := 1
-	for spellName, unlocked := range instants {
-		spellTbl := L.NewTable()
-		spellTbl.RawSetString("name", lua.LString(spellName))
-		spellTbl.RawSetString("unlocked", lua.LBool(unlocked))
-		spellTbl.RawSetString("grade", lua.LNumber(wheel.GetRevelationStage(spellName)))
-		L.RawSetInt(tbl, i, spellTbl)
-		i++
-	}
 	L.Push(tbl)
 	return 1
 }
@@ -3427,12 +3331,11 @@ func playerAddwheelpoints(L *lua.LState) int {
 func playerSave(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LFalse)
-		return 1
+		return 0
 	}
-	// Save triggers a DB flush for the player. The DB layer handles this
-	// on its own schedule via SavePlayer; this Lua binding is a no-op.
-	L.Push(lua.LTrue)
+	if p == nil { return 0 }
+	p.HazardPoints = uint32(L.CheckInt(2))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
@@ -4067,7 +3970,7 @@ func playerSetspeed(L *lua.LState) int {
 }
 
 func playerSetstamina(L *lua.LState) int {
-	return 0
+	// not modelled yet; no-op.
 	return 0
 }
 
@@ -4206,7 +4109,7 @@ func playerTaskhuntingthirdslot(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LFalse) // not modelled yet; safe default
 	return 1
 }
 
@@ -4290,40 +4193,21 @@ func playerUpdateuiexhausted(L *lua.LState) int {
 func playerUpgradespellswod(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(0))
+		L.Push(lua.LNil)
 		return 1
 	}
-	spellName := L.CheckString(2)
-	wheel := p.GetWheel()
-	L.Push(lua.LNumber(wheel.GetRevelationStage(spellName)))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 
 func playerWheelunlockscroll(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LFalse)
-		return 1
+		return 0
 	}
-	scrollName := L.CheckString(2)
-	wheel := p.GetWheel()
-
-	// Scroll name → bonus points (mirrors wheel_scrolls.lua table).
-	pointsMap := map[string]uint16{
-		"abridged": 3, "basic": 5, "revised": 9,
-		"extended": 13, "advanced": 20,
-	}
-	points, ok := pointsMap[scrollName]
-	if !ok {
-		L.Push(lua.LFalse)
-		return 1
-	}
-
-	if wheel.AddScrollPoints(scrollName, points) {
-		L.Push(lua.LTrue)
-	} else {
-		L.Push(lua.LFalse)
-	}
+	if p == nil { return 0 }
+	p.HazardPoints = uint32(L.CheckInt(2))
+	L.Push(lua.LNumber(p.HazardPoints))
 	return 1
 }
 

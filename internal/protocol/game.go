@@ -592,11 +592,45 @@ func (g *GameProtocol) enterWorld() {
 	// Boss Cyclopedia fight cooldowns (empty when the player has none).
 	g.SendBosstiaryCooldownTimer()
 
+	// Send boosted creature and boss race IDs via extended opcode so the
+	// OTClient can show them in the bottom-menu boosted panel.
+	g.sendBoostedCreature()
+
 	// Keep-alive pings start once the player is in the world.
 	g.startPingLoop()
 
 	// Notify other spectators that we appeared.
 	g.broadcastAppear(p)
+}
+
+// sendBoostedCreature sends the boosted creature and boss race IDs to the
+// client using the OTClient extended opcode mechanism (opcode 0x32, sub-opcode 1).
+func (g *GameProtocol) sendBoostedCreature() {
+	creatureRaceID := uint16(0)
+	bossRaceID := uint16(0)
+
+	if g.deps.World != nil && g.deps.World.Monsters != nil {
+		if name := strings.TrimSpace(g.deps.World.BoostedCreature); name != "" && name != "default" {
+			if mt, ok := g.deps.World.Monsters.Monsters[strings.ToLower(name)]; ok {
+				creatureRaceID = mt.RaceID
+			}
+		}
+		if name := strings.TrimSpace(g.deps.World.BoostedBoss); name != "" && name != "None" && name != "default" {
+			if mt, ok := g.deps.World.Monsters.Monsters[strings.ToLower(name)]; ok {
+				if mt.BosstiaryRaceID != 0 {
+					bossRaceID = mt.BosstiaryRaceID
+				} else {
+					bossRaceID = mt.RaceID
+				}
+			}
+		}
+	}
+
+	w := netmsg.NewWriter()
+	w.AddByte(0x32) // opExtendedOpcode
+	w.AddByte(1)    // sub-opcode: boosted creature data
+	w.AddString(fmt.Sprintf(`{"creatureraceid":%d,"bossraceid":%d}`, creatureRaceID, bossRaceID))
+	g.SendToClient(w)
 }
 
 func (g *GameProtocol) sendStats() {
@@ -802,7 +836,7 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseCloseContainer(r)
 	case inContainerUp:
 		g.parseContainerUp(r)
-	case 0x6E: // Seek in paginated container (opContainerOpen inbound)
+	case 0xCC: // Seek in paginated container
 		g.parseSeekContainer(r)
 	case inSay:
 		g.handleSay(r)
