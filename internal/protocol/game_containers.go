@@ -148,6 +148,14 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		slog.Default().Info("parseUseItem CALLED FOR REWARD CHEST", "pos", pos, "index", index)
 	}
 
+		// Stash icon — nao abrir como container
+		if item.ID == game.ItemStash {
+			// A acao Lua (stash.onUse) roda antes de chegar aqui e
+			// chama player:openStash(). Se nao rodou por algum motivo,
+			// ignora pra nao abrir o stash como container comum.
+			return
+		}
+
 		// Gold pouch (ITEM_GOLD_POUCH = 23721) pode nao ser marcado como container no protobuf
 		// Tratar explicitamente como container (C++ Container subclass)
 		if item.ID == game.ItemGoldPouch || t.IsContainer() {
