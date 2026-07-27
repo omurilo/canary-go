@@ -359,12 +359,7 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 		}
 	}
 	contents := item.Contents
-	// Real container capacity (Container::capacity), clamped to at least the
-	// number of items currently shown and to the byte range the packet allows.
 	capacity := int(item.ContainerCapacity(g.deps.Items))
-	if capacity < len(contents) {
-		capacity = len(contents)
-	}
 	if capacity < 1 {
 		capacity = 1
 	}

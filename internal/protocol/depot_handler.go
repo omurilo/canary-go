@@ -65,7 +65,8 @@ func (g *GameProtocol) sendDepotContainer(cid uint8, depotLocker *game.Item, wor
 	}
 
 	contents := depotLocker.Contents
-	capacity := len(contents)
+	// C++: container->capacity() — número fixo de slots visíveis por página
+	capacity := int(depotLocker.ContainerCapacity(g.deps.Items))
 	if capacity < 4 {
 		capacity = 4 // usually holds Market, Inbox, Stash, and the nested Depot Chest
 	}

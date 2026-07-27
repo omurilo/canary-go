@@ -56,7 +56,7 @@ func (dm *PlayerDepotManager) GetDepotLocker(depotId uint16) *Item {
 		return locker
 	}
 
-	locker := &Item{ID: ItemLocker, Contents: make([]*Item, 0), Pagination: true}
+	locker := &Item{ID: ItemLocker, Contents: make([]*Item, 0), Pagination: true, MaxSize: 36}
 
 	// Depot Box container that holds the 17 nested boxes
 	depotChestContainer := &Item{ID: ItemDepot, Contents: make([]*Item, 0), Pagination: true}
