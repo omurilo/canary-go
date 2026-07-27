@@ -77,11 +77,9 @@ func (g *GameProtocol) SendOpenMarket() {
 	// C++ sends sendResourcesBalance immediately.
 	g.sendResourcesBalance()
 	
-	// We restore the 50ms delay because combining 0xF2 and 0xDF into a single packet
-	// can trigger the UI update race condition if it arrives too close to 0xF6.
-	time.AfterFunc(50*time.Millisecond, func() {
-		g.sendCoinBalance()
-	})
+	// We no longer need the 50ms delay because splitting 0xF2 and 0xDF into two blocks
+	// naturally solves the UI update race condition in the client.
+	g.sendCoinBalance()
 }
 
 // collectDepotItems aggregates items from all depot chests by (itemId, tier).

@@ -424,23 +424,24 @@ func (g *GameProtocol) sendCoinBalance() {
 		return
 	}
 
-	w := netmsg.NewWriter()
-	
 	// 0xF2: Coin Balance Updating (show spinner)
-	w.AddByte(0xF2)
-	w.AddByte(0x01)
+	w1 := netmsg.NewWriter()
+	w1.AddByte(0xF2)
+	w1.AddByte(0x01)
+	g.SendToClient(w1)
 
 	// 0xDF: Coin Balance (hide spinner and update UI)
-	w.AddByte(0xDF)
-	w.AddByte(0x01)
+	w2 := netmsg.NewWriter()
+	w2.AddByte(0xDF)
+	w2.AddByte(0x01)
 
 	// Total must be >= Transferable, otherwise the client disables the Sell UI.
 	total := g.player.CoinBalance + g.player.CoinTransferable
-	w.AddU32(total)
-	w.AddU32(g.player.CoinTransferable)
-	w.AddU32(total) // reserved auction coins
+	w2.AddU32(total)
+	w2.AddU32(g.player.CoinTransferable)
+	w2.AddU32(total) // reserved auction coins
 
-	g.SendToClient(w)
+	g.SendToClient(w2)
 }
 
 // dispatchStore forwards a store packet's payload (bytes after the opcode) to
