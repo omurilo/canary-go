@@ -22,6 +22,16 @@ type Monster struct {
 	// combat engine falls back to a default. Populated from MonsterType.Corpse.
 	CorpseID uint16
 
+	// SpawnPosition is where this monster was spawned (for IsInSpawnRange).
+	SpawnPosition Position
+
+	// Friends and Targets track relationships for AI targeting.
+	Friends map[uint32]Creature
+	Targets map[uint32]Creature
+
+	// Idle indicates this monster has been idled (no AI processing).
+	Idle bool
+
 	// Type is the shared, immutable monster definition (attacks, loot,
 	// experience, flags). May be nil for synthetic/test monsters.
 	Type *creatures.MonsterType

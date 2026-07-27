@@ -146,18 +146,18 @@ func monsterConfigureforgesystem(L *lua.LState) int {
 }
 
 func monsterCriticalchance(L *lua.LState) int {
-	// TODO: implement criticalChance
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func monsterCriticaldamage(L *lua.LState) int {
-	// TODO: implement criticalDamage
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func monsterGetdefense(L *lua.LState) int {
-	// TODO: implement getDefense
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func monsterGetforgestack(L *lua.LState) int {
@@ -200,7 +200,12 @@ func monsterGetrespawntype(L *lua.LState) int {
 }
 
 func monsterGetspawnposition(L *lua.LState) int {
-	L.Push(lua.LNil)
+	c := checkMonster(L)
+	if c == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pushPosition(L, c.SpawnPosition)
 	return 1
 }
 

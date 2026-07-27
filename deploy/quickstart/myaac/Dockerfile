@@ -17,10 +17,12 @@ RUN apt-get update \
 		nodejs \
 		npm \
 	&& docker-php-ext-install -j"$(nproc)" gd intl mysqli opcache pdo_mysql zip \
-	&& pecl install lua \
-	&& docker-php-ext-enable lua \
 	&& a2enmod headers rewrite \
 	&& rm -rf /var/lib/apt/lists/*
+
+RUN cp /usr/include/lua5.3/*.h /usr/include/ \
+    && pecl install lua \
+    && docker-php-ext-enable lua
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
