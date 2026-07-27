@@ -594,7 +594,6 @@ func (g *GameProtocol) enterWorld() {
 
 	// Send boosted creature and boss race IDs via extended opcode so the
 	// OTClient can show them in the bottom-menu boosted panel.
-	g.sendBoostedCreature()
 
 	// Keep-alive pings start once the player is in the world.
 	g.startPingLoop()
