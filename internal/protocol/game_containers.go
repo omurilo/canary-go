@@ -148,9 +148,9 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		slog.Default().Info("parseUseItem CALLED FOR REWARD CHEST", "pos", pos, "index", index)
 	}
 
-		// Stash icon in depot — open stash window, not as container
+		// Stash icon in depot — cliente oficial nao reconhece 0x29.
+		// Desabilitado temporariamente. Stash continua via 0x28.
 		if item.ID == game.ItemStash {
-			g.SendOpenStash()
 			return
 		}
 
