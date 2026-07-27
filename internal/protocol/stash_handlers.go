@@ -54,11 +54,11 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 		if !g.player.RemoveFromStash(itemID, count) {
 			return
 		}
-		// Cria o item no inventário
+		// Cria o item no inicio da backpack (C++: internalAddItem no inicio)
 		item := &game.Item{ID: itemID, Count: uint16(count)}
 		bp := g.player.Inventory[game.ConstSlotBackpack]
 		if bp != nil {
-			bp.Contents = append(bp.Contents, item)
+			bp.Contents = append([]*game.Item{item}, bp.Contents...)
 		}
 		g.sendStashRefresh()
 	}
