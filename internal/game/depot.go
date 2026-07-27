@@ -68,6 +68,7 @@ func (dm *PlayerDepotManager) GetDepotLocker(depotId uint16) *Item {
 		}
 	}
 	locker.Contents = append(locker.Contents, depotChestContainer)
+	depotChestContainer.Parent = locker
 
 	stash := &Item{ID: ItemStash}
 	locker.Contents = append(locker.Contents, stash)

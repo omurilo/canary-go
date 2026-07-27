@@ -53,6 +53,7 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetField(mt, "sendUpdateContainer", e.L.NewFunction(e.playerSendupdatecontainer))
 	e.L.SetField(mt, "addItemBatchToPaginedContainer", e.L.NewFunction(e.playerAdditembatchtopaginedcontainer))
 	e.L.SetField(mt, "getParty", e.L.NewFunction(e.playerGetparty))
+	e.L.SetField(mt, "getLootPouch", e.L.NewFunction(e.playerGetlootpouch))
 	e.L.SetField(mt, "say", e.L.NewFunction(e.playerSay))
 	e.L.SetField(mt, "setTown", e.L.NewFunction(e.playerSettown))
 	e.L.SetField(mt, "getTown", e.L.NewFunction(e.playerGettown))
@@ -213,7 +214,6 @@ var playerMethods = map[string]lua.LGFunction{
 	"openChannel":                    playerOpenchannel,
 	"getSlotItem":                    playerGetslotitem,
 	"getBackpack":                    playerGetbackpack,
-	"getLootPouch":                   playerGetlootpouch,
 	// getParty is registered as an engine-method override in registerPlayerType
 	// (it needs e to build the Party userdata).
 	"addOutfit":                       playerAddoutfit,
@@ -1688,9 +1688,24 @@ func playerGetlivestreamviewerscount(L *lua.LState) int {
 	return 1
 }
 
-func playerGetlootpouch(L *lua.LState) int {
-	L.Push(lua.LNil)
-	return 1
+func findItemInContents(parent *game.Item, id uint16) *game.Item {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Contents {
+		if child == nil {
+			continue
+		}
+		if child.ID == id {
+			return child
+		}
+		if len(child.Contents) > 0 {
+			if found := findItemInContents(child, id); found != nil {
+				return found
+			}
+		}
+	}
+	return nil
 }
 
 func playerGetloyaltybonus(L *lua.LState) int {
@@ -1850,6 +1865,31 @@ func (e *Engine) playerGetparty(L *lua.LState) int {
 		return 1
 	}
 	e.pushParty(L, p.Party)
+	return 1
+}
+
+func (e *Engine) playerGetlootpouch(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	// C++: Player::getLootPouch — search inventory for ITEM_GOLD_POUCH
+	for _, item := range p.Inventory {
+		if item == nil {
+			continue
+		}
+		if item.ID == game.ItemGoldPouch {
+			e.pushContainer(L, item)
+			return 1
+		}
+		// Search within container contents (backpack bags, etc.)
+		if found := findItemInContents(item, game.ItemGoldPouch); found != nil {
+			e.pushContainer(L, found)
+			return 1
+		}
+	}
+	L.Push(lua.LNil)
 	return 1
 }
 
