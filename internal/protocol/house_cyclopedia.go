@@ -123,7 +123,7 @@ func (g *GameProtocol) processHouseBid(clientID uint32, bidValue uint64) {
 	slog.Default().Info("house: bid successful", "clientId", clientID,
 		"bidValue", bidValue, "newBalance", newBalance)
 	// Refresh house list for the player
-	g.sendCyclopediaHouseList("")
+	// house list refreshed via client next request
 	g.sendResourceBalances()
 }
 
@@ -261,6 +261,6 @@ func (g *GameProtocol) sendHousesInfo() {
 
 	// Also proactively send the full house list (0xC7) for ALL houses.
 	// This bypasses the need for the client to send 0xAD first.
-	g.sendCyclopediaHouseList("")
+	// house list refreshed via client next request
 	g.sendResourceBalances()
 }
