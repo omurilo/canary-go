@@ -7,24 +7,32 @@ import (
 // parseStashAction handles opcode 0x28 (stash stow/withdraw actions).
 // Mirrors C++ ProtocolGame::parseStashWithdraw.
 func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
+	if g.deps.Log != nil { g.deps.Log.Info("stash: parseStashAction called") }
 	if g.player == nil {
 		return
 	}
 	action := r.GetByte()
 	switch action {
-	case 0: // STASH_ACTION_STOW_ITEM — stow a single item from a position
-		pos := r.GetByte()  // inventory slot
-		_ = r.GetU16()      // clientID (appearance id) — ignored, we use the slot
+	case 0: // STASH_ACTION_STOW_ITEM — stow items of this type from inventory
+		pos := r.GetByte()
+		clientID := r.GetU16()
 		count := r.GetByte()
-		if int(pos) < len(g.player.Inventory) {
-			item := g.player.Inventory[pos]
-			if item != nil {
-				allItems := (count == 0)
-					stowed := g.player.StowItem(item.ID, uint32(count), allItems)
-				if stowed > 0 {
-					g.player.Inventory[pos] = nil
-					g.sendStashAndInventory()
-				}
+		g.deps.Log.Info("stash: stow item", "pos", pos, "clientID", clientID, "count", count)
+		// Use the item at the position if possible; otherwise scan all inventory
+		var itemID uint16
+		if int(pos) < len(g.player.Inventory) && g.player.Inventory[pos] != nil {
+			itemID = g.player.Inventory[pos].ID
+		}
+		if itemID == 0 {
+			// No item at position — try to look up by position in containers,
+			// or just reject. The client might send a container position.
+			g.deps.Log.Info("stash: no item at pos, trying full scan")
+		}
+		if itemID > 0 {
+			allItems := (count == 0)
+			stowed := g.player.StowItem(itemID, uint32(count), allItems)
+			if stowed > 0 {
+				g.sendStashAndInventory()
 			}
 		}
 

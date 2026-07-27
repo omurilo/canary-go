@@ -599,8 +599,18 @@ func (g *GameProtocol) sendCyclopediaCharacterBadges() {
 	// Loyalty title (empty)
 	w.AddString("")
 
-	// Badges count (0 for now)
-	w.AddByte(0)
+	// Count matching badges first so we can write the correct count.
+	var matching []game.BadgeInfo
+	for _, badge := range game.DefaultBadges {
+		if g.player.GetBadges().HasBadge(badge.ID) {
+			matching = append(matching, badge)
+		}
+	}
+	w.AddByte(byte(len(matching)))
+	for _, badge := range matching {
+		w.AddU32(badge.ID)
+		w.AddString(badge.Name)
+	}
 
 	g.SendToClient(w)
 }

@@ -218,6 +218,10 @@ type Player struct {
 	Familiars      []Familiar
 	ActiveFamiliar uint16 // lookType of active familiar (0 = none)
 
+		// Badges (B10/cyclopedia) — unlocked account badges. Mirrors C++
+		// PlayerBadge (player_badge.hpp).
+		Badges *PlayerBadges
+
 	// Hazard (B17) — current hazard system points.
 	HazardPoints uint32
 
@@ -347,6 +351,15 @@ func (p *Player) Cooldowns() *combat.CooldownManager {
 		p.cooldowns = combat.NewCooldownManager()
 	}
 	return p.cooldowns
+}
+
+
+// GetBadges returns the player badge state, initialising it on first use.
+func (p *Player) GetBadges() *PlayerBadges {
+	if p.Badges == nil {
+		p.Badges = &PlayerBadges{Unlocked: make(map[uint32]bool)}
+	}
+	return p.Badges
 }
 
 // HasLearnedSpell mirrors Player::hasLearnedInstantSpell
