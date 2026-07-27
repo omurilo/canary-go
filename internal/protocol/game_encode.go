@@ -24,8 +24,22 @@ type posKey struct {
 	z uint8
 }
 
-// addOutfit writes an Outfit.
+// addOutfit writes an Outfit with mount.
 func addOutfit(w *netmsg.Writer, o game.Outfit) {
+	addOutfitNoMount(w, o)
+	w.AddU16(o.LookMount)
+	if o.LookMount != 0 {
+		w.AddByte(o.MountHead)
+		w.AddByte(o.MountBody)
+		w.AddByte(o.MountLegs)
+		w.AddByte(o.MountFeet)
+	}
+}
+
+// addOutfitNoMount writes an Outfit without mount bytes. Used in contexts
+// where the caller passes false for addMount to AddOutfit (e.g. cyclopedia
+// character inspection), matching C++ ProtocolGame::AddOutfit(addMount=false).
+func addOutfitNoMount(w *netmsg.Writer, o game.Outfit) {
 	w.AddU16(o.LookType)
 	if o.LookType != 0 {
 		w.AddByte(o.Head)
@@ -35,13 +49,6 @@ func addOutfit(w *netmsg.Writer, o game.Outfit) {
 		w.AddByte(o.Addons)
 	} else {
 		w.AddU16(o.LookTypeEx)
-	}
-	w.AddU16(o.LookMount)
-	if o.LookMount != 0 {
-		w.AddByte(o.MountHead)
-		w.AddByte(o.MountBody)
-		w.AddByte(o.MountLegs)
-		w.AddByte(o.MountFeet)
 	}
 }
 

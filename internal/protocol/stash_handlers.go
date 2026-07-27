@@ -13,23 +13,46 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 	action := r.GetByte()
 	switch action {
 	case 0: // STASH_ACTION_STOW_ITEM — stow a single item from a position
-		_ = r.GetByte() // pos (inventory slot)
-		_ = r.GetU16()  // clientID
-		_ = r.GetByte() // count
-		// StowItem not yet implemented
+		pos := r.GetByte()  // inventory slot
+		_ = r.GetU16()      // clientID (appearance id) — ignored, we use the slot
+		count := r.GetByte()
+		if int(pos) < len(g.player.Inventory) {
+			item := g.player.Inventory[pos]
+			if item != nil {
+				stowed := g.player.StowItem(item.ID, uint32(count), false)
+				if stowed > 0 {
+					g.player.Inventory[pos] = nil
+					g.sendStashAndInventory()
+				}
+			}
+		}
+
 	case 1: // STASH_ACTION_STOW_CONTAINER — stow all items of type from container
-		_ = r.GetU16() // itemId
-		// StowContainer not yet implemented
+		itemID := r.GetU16()
+		_ = g.player.StowItem(itemID, 0, true)
+		g.sendStashAndInventory()
+
 	case 2: // STASH_ACTION_STOW_STACK — stow all matching items from inventory+depot
-		_ = r.GetU16() // itemId
-		// StowStack not yet implemented
+		itemID := r.GetU16()
+		_ = g.player.StowItem(itemID, 0, true)
+		g.sendStashAndInventory()
+
 	case 3: // STASH_ACTION_WITHDRAW — withdraw from stash
 		itemID := r.GetU16()
 		count := r.GetU32()
 		g.withdrawFromStash(itemID, count)
+
 	default:
-		g.deps.Log.Info("stash: unknown action", "action", action)
+		if g.deps.Log != nil {
+			g.deps.Log.Info("stash: unknown action", "action", action)
+		}
 	}
+}
+
+// sendStashAndInventory refreshes the stash window and inventory after stowing.
+func (g *GameProtocol) sendStashAndInventory() {
+	g.sendOpenStash()
+	g.player.Session.SendInventoryIds()
 }
 
 // withdrawFromStash moves items from stash to the player's inventory.

@@ -1718,6 +1718,78 @@ func (p *Player) GetStashSlotCount() uint32 {
 	return uint32(len(p.Stash))
 }
 
+// StowItem moves items of the given ID from inventory/containers to the stash.
+// If allItems is true, stows ALL matching items. If count > 0, stows up to count.
+// Returns the number of items actually stowed.
+func (p *Player) StowItem(itemID uint16, count uint32, allItems bool) uint32 {
+	if p.Stash == nil {
+		p.Stash = make(map[uint16]uint32)
+	}
+	var stowed uint32
+	slot := 1
+	for slot <= 10 && (allItems || stowed < count) {
+		item := p.Inventory[slot]
+		if item != nil {
+			stowed += p.stowItemFromTree(item, itemID, count-stowed, allItems, &slot)
+		}
+		slot++
+	}
+	// Scan inbox
+	if p.Inbox != nil && (allItems || stowed < count) {
+		stowed += p.stowItemFromTree(p.Inbox, itemID, count-stowed, allItems, nil)
+	}
+	// Scan store inbox
+	if p.StoreInbox != nil && (allItems || stowed < count) {
+		stowed += p.stowItemFromTree(p.StoreInbox, itemID, count-stowed, allItems, nil)
+	}
+	if stowed > 0 {
+		p.Stash[itemID] += stowed
+	}
+	return stowed
+}
+
+// stowItemFromTree scans an item tree (which may be a container) and moves
+// matching items to the stash. If slotPtr is non-nil, items in inventory slots
+// are removed by setting the slot to nil.
+func (p *Player) stowItemFromTree(parent *Item, itemID uint16, want uint32, allItems bool, slotPtr *int) uint32 {
+	if want == 0 {
+		return 0
+	}
+	var stowed uint32
+	// Check the item itself
+	if parent.ID == itemID {
+		itemCount := uint32(parent.Count)
+		if itemCount == 0 {
+			itemCount = 1
+		}
+		take := itemCount
+		if !allItems && take > want {
+			take = want
+		}
+		stowed += take
+		if slotPtr != nil {
+			p.Inventory[*slotPtr] = nil
+		} else {
+			parent.Count -= uint16(take)
+		}
+		want -= take
+		if want == 0 && !allItems {
+			return stowed
+		}
+	}
+	// Scan contents (containers)
+	for _, child := range parent.Contents {
+		if child != nil {
+			taken := p.stowItemFromTree(child, itemID, want-stowed, allItems, nil)
+			stowed += taken
+			if !allItems && stowed >= want {
+				break
+			}
+		}
+	}
+	return stowed
+}
+
 // countItemInTree recursively counts items matching the given ID in a container tree.
 func (p *Player) countItemInTree(item *Item, id uint16) uint32 {
 	if item == nil {

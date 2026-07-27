@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/game/vocations"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
@@ -47,8 +48,8 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 	}
 
 	switch characterInfoType {
-	case cyclopediaCharacterInfoInspection: // 9 — oficial client doesn't handle this format
-		g.sendCyclopediaNoData(characterInfoType, 1)
+	case cyclopediaCharacterInfoInspection: // 9
+		g.sendCyclopediaCharacterInspection(g.player)
 	case cyclopediaCharacterInfoAchievements: // 5
 		g.sendCyclopediaCharacterAchievements(g.player)
 	default:
@@ -120,6 +121,7 @@ func (g *GameProtocol) sendCyclopediaNoData(infoType uint8, errorCode uint8) {
 
 // sendCyclopediaCharacterInspection sends the 0xDA inspection packet with
 // the full item serialization (matching C++ ProtocolGame::sendCyclopediaCharacterInspection).
+// Mount is NOT sent in the outfit, matching the C++ addMount=false call.
 func (g *GameProtocol) sendCyclopediaCharacterInspection(p *game.Player) {
 	if p == nil {
 		return
@@ -152,20 +154,21 @@ func (g *GameProtocol) sendCyclopediaCharacterInspection(p *game.Player) {
 	}
 
 	w.AddString(p.Name)
-	addOutfit(w, p.Outfit)
+	addOutfitNoMount(w, p.Outfit) // C++ calls AddOutfit(msg, outfit, false)
 
-	// Summary entries (key-value pairs).
-	summary := []struct{ Key, Val string }{
-		{"Level", fmt.Sprintf("%d", p.Level)},
-		{"Health", fmt.Sprintf("%d / %d", p.Health, p.MaxHealth)},
-		{"Mana", fmt.Sprintf("%d / %d", p.Mana, p.MaxMana)},
-		{"Speed", fmt.Sprintf("%d", p.Speed)},
-		{"Position", fmt.Sprintf("(%d, %d, %d)", p.Pos.X, p.Pos.Y, p.Pos.Z)},
+	// Player descriptions (key-value pairs matching C++ sendCyclopediaCharacterInspection).
+	vocName := "unknown"
+	if voc := vocations.GetVocation(uint32(p.Vocation)); voc != nil {
+		vocName = voc.Name
 	}
-	w.AddByte(byte(len(summary)))
-	for _, s := range summary {
-		w.AddString(s.Key)
-		w.AddString(s.Val)
+	descriptions := []struct{ Key, Val string }{
+		{"Level", fmt.Sprintf("%d", p.Level)},
+		{"Vocation", vocName},
+	}
+	w.AddByte(byte(len(descriptions)))
+	for _, d := range descriptions {
+		w.AddString(d.Key)
+		w.AddString(d.Val)
 	}
 	g.SendToClient(w)
 }
