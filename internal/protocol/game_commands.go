@@ -85,7 +85,7 @@ func (g *GameProtocol) handleCommand(text string) bool {
 	args := fields[1:]
 	p := g.player
 
-	// Staff commands require gamemaster group level
+	// All native commands require gamemaster+
 	if !hasGroupPermission(p, "gamemaster") {
 		g.sendStatusText("You cannot execute this command.")
 		return true
@@ -112,8 +112,6 @@ func (g *GameProtocol) handleCommand(text string) bool {
 		g.cmdBroadcast(args)
 	case "outfit":
 		g.SendOutfitWindow()
-
-	// GM utility commands
 	case "addexp":
 		g.cmdAddExp(args)
 	case "addmoney":
@@ -134,13 +132,32 @@ func (g *GameProtocol) handleCommand(text string) bool {
 		g.cmdSkull(args)
 	case "sex", "gender":
 		g.cmdToggleSex()
+	case "summon":
+		g.cmdSummon(args)
+	case "kick":
+		g.cmdKick(args)
 	case "commands", "help":
-		g.sendStatusText("/pos /goto /up /down /town /i /addexp /addmoney /level /health /mana /speed /online /info /skull /sex /b /save /addskill /outfit")
+		g.sendStatusText("Commands: /pos /goto /up /down /town /i /addexp /addmoney /level /health /mana /speed /online /info /skull /sex /summon /kick /b /save /addskill /outfit")
 	default:
-		// Not a native Go command — let Lua talkactions try.
-		return false
+		return false // Let Lua talkactions try
 	}
 	return true
+}
+
+// targetPlayerFromArgs looks for "PlayerName, <rest>" in args.
+func targetPlayerFromArgs(g *GameProtocol, args []string) (*game.Player, []string, bool) {
+	full := strings.TrimSpace(strings.Join(args, " "))
+	if idx := strings.LastIndex(full, ","); idx > 0 {
+		name := strings.TrimSpace(full[:idx])
+		if p := g.deps.World.PlayerByName(name); p != nil {
+			rest := strings.TrimSpace(full[idx+1:])
+			if rest == "" {
+				return p, nil, true
+			}
+			return p, strings.Fields(rest), true
+		}
+	}
+	return nil, args, false
 }
 
 // cmdCreateItem places an item on the tile under the player (/i <id> [count]).
@@ -323,36 +340,24 @@ func (g *GameProtocol) cmdTown(args []string) {
 	}
 }
 
-// cmdAddExp adds experience: /addexp [PlayerName, ]<amount>
-// Examples: /addexp 5000 | /addexp Player Name, 5000
+// cmdAddExp adds experience: /addexp <amount> | /addexp PlayerName, <amount>
 func (g *GameProtocol) cmdAddExp(args []string) {
-	if len(args) == 0 {
-		g.sendStatusText("Usage: /addexp <amount> or /addexp <playerName>, <amount>")
+	target, rest, hasTarget := targetPlayerFromArgs(g, args)
+	if !hasTarget {
+		target = g.player
+		rest = args
+	}
+	if len(rest) == 0 {
+		g.sendStatusText("Usage: /addexp <amount> or /addexp PlayerName, <amount>")
 		return
 	}
-	full := strings.Join(args, " ")
-	// Check for comma-separated format: "PlayerName, amount"
-	if idx := strings.LastIndex(full, ","); idx > 0 {
-		name := strings.TrimSpace(full[:idx])
-		amountStr := strings.TrimSpace(full[idx+1:])
-		if amount, err := strconv.ParseUint(amountStr, 10, 64); err == nil && amount > 0 {
-			if p := g.deps.World.PlayerByName(name); p != nil {
-				p.AddExperience(amount)
-				g.sendStatusText(fmt.Sprintf("Added %d experience to %s.", amount, p.Name))
-			} else {
-				g.sendStatusText("Player not found: " + name)
-			}
-			return
-		}
-	}
-	// Simple format: just amount
-	amount, err := strconv.ParseUint(args[0], 10, 64)
+	amount, err := strconv.ParseUint(rest[0], 10, 64)
 	if err != nil || amount == 0 {
 		g.sendStatusText("Invalid amount.")
 		return
 	}
-	g.player.AddExperience(amount)
-	g.sendStatusText(fmt.Sprintf("Added %d experience.", amount))
+	target.AddExperience(amount)
+	g.sendStatusText(fmt.Sprintf("Added %d experience to %s.", amount, target.Name))
 }
 
 // cmdAddMoney adds gold to bank: /addmoney <amount>
@@ -492,4 +497,26 @@ func (g *GameProtocol) cmdToggleSex() {
 	g.sendStatusText(fmt.Sprintf("Sex changed to %s.", map[uint8]string{0: "female", 1: "male"}[p.Sex]))
 	// Update outfit to reflect new sex
 	g.SendOutfitWindow()
+}
+
+// cmdSummon shows usage info: full summon is handled by Lua talkaction /c
+func (g *GameProtocol) cmdSummon(args []string) {
+	g.sendStatusText("Use /c <name> to summon creatures.")
+}
+
+// cmdKick kicks a player: /kick <player>
+func (g *GameProtocol) cmdKick(args []string) {
+	if len(args) == 0 {
+		g.sendStatusText("Usage: /kick <player>")
+		return
+	}
+	name := strings.Join(args, " ")
+	if p := g.deps.World.PlayerByName(name); p != nil {
+		if p.Session != nil {
+			p.Session.Disconnect()
+		}
+		g.sendStatusText(fmt.Sprintf("Kicked %s.", name))
+	} else {
+		g.sendStatusText("Player not found: " + name)
+	}
 }
