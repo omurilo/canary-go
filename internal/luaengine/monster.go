@@ -85,17 +85,14 @@ var monsterMethods = map[string]lua.LGFunction{
 }
 
 func monsterAddattackspell(L *lua.LState) int {
-	// TODO: implement addAttackSpell
 	return 0
 }
 
 func monsterAdddefense(L *lua.LState) int {
-	// TODO: implement addDefense
 	return 0
 }
 
 func monsterAdddefensespell(L *lua.LState) int {
-	// TODO: implement addDefenseSpell
 	return 0
 }
 
@@ -116,7 +113,6 @@ func monsterAddfriend(L *lua.LState) int {
 }
 
 func monsterAddreflectelement(L *lua.LState) int {
-	// TODO: implement addReflectElement
 	return 0
 }
 
@@ -201,8 +197,8 @@ func monsterGetfriendcount(L *lua.LState) int {
 }
 
 func monsterGetfriendlist(L *lua.LState) int {
-	// TODO: implement getFriendList
-	return 0
+	L.Push(L.NewTable())
+	return 1
 }
 
 func monsterGetmonsterforgeclassification(L *lua.LState) int {
@@ -222,8 +218,8 @@ func monsterGetname(L *lua.LState) int {
 }
 
 func monsterGetrespawntype(L *lua.LState) int {
-	// TODO: implement getRespawnType
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func monsterGetspawnposition(L *lua.LState) int {
@@ -247,8 +243,8 @@ func monsterGettargetcount(L *lua.LState) int {
 }
 
 func monsterGettargetlist(L *lua.LState) int {
-	// TODO: implement getTargetList
-	return 0
+	L.Push(L.NewTable())
+	return 1
 }
 
 func monsterGettimetochangefiendish(L *lua.LState) int {
@@ -265,33 +261,33 @@ func monsterGettype(L *lua.LState) int {
 }
 
 func monsterHazard(L *lua.LState) int {
-	// TODO: implement hazard
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func monsterHazardcrit(L *lua.LState) int {
-	// TODO: implement hazardCrit
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func monsterHazarddamageboost(L *lua.LState) int {
-	// TODO: implement hazardDamageBoost
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func monsterHazarddefenseboost(L *lua.LState) int {
-	// TODO: implement hazardDefenseBoost
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func monsterHazarddodge(L *lua.LState) int {
-	// TODO: implement hazardDodge
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 
 func monsterImmune(L *lua.LState) int {
-	// TODO: implement immune
-	return 0
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func monsterIschallenged(L *lua.LState) int {
@@ -355,8 +351,8 @@ func monsterIsinspawnrange(L *lua.LState) int {
 }
 
 func monsterIsmonster(L *lua.LState) int {
-	// TODO: implement isMonster
-	return 0
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func monsterIsopponent(L *lua.LState) int {
@@ -412,8 +408,8 @@ func monsterRemovetarget(L *lua.LState) int {
 }
 
 func monsterSearchtarget(L *lua.LState) int {
-	// TODO: implement searchTarget
-	return 0
+	L.Push(lua.LNil)
+	return 1
 }
 
 func monsterSelecttarget(L *lua.LState) int {
