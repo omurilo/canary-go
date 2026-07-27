@@ -1045,7 +1045,12 @@ func playerGetachievementpoints(L *lua.LState) int {
 }
 
 func playerGetbackpack(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil || len(p.Inventory) <= 3 || p.Inventory[3] == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LNumber(p.Inventory[3].ID))
 	return 1
 }
 
@@ -1304,7 +1309,18 @@ func playerGetdepotchest(L *lua.LState) int {
 }
 
 func playerGetdepotlocker(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil || p.DepotManager == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	depotID := uint16(L.OptInt(2, 1))
+	locker := p.DepotManager.GetDepotLocker(depotID)
+	if locker == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LNumber(locker.ID))
 	return 1
 }
 
@@ -1561,7 +1577,12 @@ func playerGetidletime(L *lua.LState) int {
 }
 
 func playerGetinbox(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil || p.Inbox == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LNumber(p.Inbox.ID))
 	return 1
 }
 
