@@ -67,8 +67,15 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 // sendStashRefresh atualiza stash + inventário + containers abertos.
 func (g *GameProtocol) sendStashRefresh() {
 	g.SendOpenStash()
-	if g.player.Session != nil {
-		g.player.Session.SendInventoryIds()
+	if g.player.Session == nil {
+		return
+	}
+	g.player.Session.SendInventoryIds()
+	// Refresh open containers (backpack, bag, etc.)
+	for cid, oc := range g.player.OpenContainersSnapshot() {
+		if oc.Container != nil {
+			g.sendContainer(uint8(cid), oc.Container, oc.Container.Parent != nil)
+		}
 	}
 }
 
