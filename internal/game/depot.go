@@ -45,7 +45,7 @@ func (dm *PlayerDepotManager) GetDepotChest(depotId uint16, autoCreate bool) *It
 		chestID = 22816 // ITEM_DEPOT_XX
 	}
 
-	chest := &Item{ID: chestID, Contents: make([]*Item, 0), Pagination: true}
+	chest := &Item{ID: chestID, Contents: make([]*Item, 0), Pagination: true, MaxSize: 36}
 	dm.Chests[depotId] = chest
 	return chest
 }
