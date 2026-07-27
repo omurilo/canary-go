@@ -1666,7 +1666,8 @@ func (e *Engine) playerGetlootpouch(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	// C++: Player::getLootPouch — search inventory for ITEM_GOLD_POUCH
+	// C++: Player::getLootPouch — search entire inventory tree for ITEM_GOLD_POUCH
+	// (getInventoryItemsFromId + getContainer)
 	for _, item := range p.Inventory {
 		if item == nil {
 			continue
@@ -1675,7 +1676,7 @@ func (e *Engine) playerGetlootpouch(L *lua.LState) int {
 			e.pushContainer(L, item)
 			return 1
 		}
-		if found := findLootPouchInContents(item); found != nil {
+		if found := findItemInTree(item, game.ItemGoldPouch); found != nil {
 			e.pushContainer(L, found)
 			return 1
 		}
@@ -1684,8 +1685,8 @@ func (e *Engine) playerGetlootpouch(L *lua.LState) int {
 	return 1
 }
 
-// findLootPouchInContents recursively searches an item's contents for a gold pouch.
-func findLootPouchInContents(parent *game.Item) *game.Item {
+// findItemInTree recursively searches an item's contents for a matching ID.
+func findItemInTree(parent *game.Item, id uint16) *game.Item {
 	if parent == nil {
 		return nil
 	}
@@ -1693,10 +1694,10 @@ func findLootPouchInContents(parent *game.Item) *game.Item {
 		if child == nil {
 			continue
 		}
-		if child.ID == game.ItemGoldPouch {
+		if child.ID == id {
 			return child
 		}
-		if found := findLootPouchInContents(child); found != nil {
+		if found := findItemInTree(child, id); found != nil {
 			return found
 		}
 	}
