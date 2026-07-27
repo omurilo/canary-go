@@ -213,14 +213,20 @@ func (w *World) GetHouseByPlayerID(playerID uint32) *House {
 	return nil
 }
 
-// GetHouseByClientID looks up a house by its door item client ID.
+// GetHouseByClientID looks up a house by its door item client ID,
+// falling back to the house ID if no door item match is found.
 func (w *World) GetHouseByClientID(clientID uint32) *House {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
+	// First try matching by door item client ID.
 	for _, h := range w.Houses {
 		if h != nil && h.ClientID == clientID {
 			return h
 		}
+	}
+	// Fallback: try matching by house ID (for houses with clientid="0" in XML).
+	if h, ok := w.Houses[clientID]; ok && h != nil {
+		return h
 	}
 	return nil
 }

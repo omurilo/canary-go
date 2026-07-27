@@ -193,6 +193,7 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 		g.player.WheelGemManager.ToggleGemLock(param)
 
 	case 4:
+g.deps.Log.Info("case4: entered")
 		catalog := g.deps.Items
 		if catalog == nil {
 			break
