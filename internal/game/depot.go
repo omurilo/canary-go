@@ -10,6 +10,7 @@ const (
 	ItemStoreInbox = 23396
 	ItemStash      = 28750
 	ItemStoreCoin  = 22118
+	ItemGoldPouch  = 23721
 )
 
 // PlayerDepotManager manages all depot lockers and chests for a player.

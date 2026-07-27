@@ -355,6 +355,12 @@ func (e *Engine) gameCreateItem(L *lua.LState) int {
 		Count: uint16(count),
 	}
 
+	// C++ Container constructor: pagination=true for gold pouch (ITEM_GOLD_POUCH)
+	if item.ID == game.ItemGoldPouch {
+		item.Pagination = true
+		item.Contents = make([]*game.Item, 0)
+	}
+
 	if L.GetTop() >= 3 {
 		if pos, ok := parsePosition(L, 3); ok && e.world != nil && e.world.Map != nil {
 			tile := e.world.Map.GetTile(pos)
