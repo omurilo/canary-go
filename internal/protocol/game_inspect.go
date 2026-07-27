@@ -392,15 +392,12 @@ func (g *GameProtocol) sendCyclopediaCharacterStoreSummary() {
 	w.AddByte(0) // hasCharmExpansion
 	w.AddByte(0) // hirelingsObtained
 
-	// In C++: msg.addByte(0x00) reserved; then msg.addByte(m_hSkills.size())
-	// The OTClient parser reads the reserved byte as hirelingSkillsCount
-	// C++ sequence: reserved(0x00) + hirelingSkillsCount(0) + hirelingOutfitsCount(0x00) + u16 houseItemsCount(0)
-	// OTClient reads: reserved→hirelingSkillsCount, skillCount→hirelingOutfitsCount,
-	// hirelingOutfitsCount→houseItemsCount LO, houseItemsCount LO→houseItemsCount HI.
-	w.AddByte(0) // reserved (OTClient reads as hirelingSkillsCount)
-	w.AddByte(0) // hirelingSkillsCount (OTClient reads as hirelingOutfitsCount)
-	w.AddByte(0) // hirelingOutfitsCount (OTClient reads as u16 houseItemsCount LO)
-	w.AddU16(0)  // houseItemsCount (OTClient reads LO byte as houseItemsCount HI; HI byte leftover)
+	// Aligned to OTClient parser — avoids a leftover 0x00 byte.
+	// C++ sends: reserved(1)+skillCount(1)+outfitsCount(1)+houseItems(2)=6 bytes
+	// OTClient reads: hirelingSkillsCount(1)+outfitsCount(1)+houseItems(2)=5 bytes
+	w.AddByte(0) // hirelingSkillsCount
+	w.AddByte(0) // hirelingOutfitsCount
+	w.AddU16(0)  // houseItemsCount
 
 	slog.Default().Info("store: sending summary",
 		"player", g.player.Name,
