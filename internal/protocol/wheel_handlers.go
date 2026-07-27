@@ -192,38 +192,31 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 	case 3: // ToggleLock
 		g.player.WheelGemManager.ToggleGemLock(param)
 
-	case 4: // ImproveGrade / Enhance — param = fragmentType (0=Lesser,1=Greater), pos = gem index
-		catalog := g.deps.Items
-		if catalog == nil {
-			break
-		}
-		fragmentType := param
-		gemIndex := uint16(pos)
-		if int(gemIndex) >= len(g.player.WheelGemManager.RevealedGems) {
-			break
-		}
-		gem := &g.player.WheelGemManager.RevealedGems[gemIndex]
-		if gem.Locked {
-			break
-		}
+		case 4: // ImproveGrade / Enhance - param = fragmentType, pos = modifier position
+			catalog := g.deps.Items
+			if catalog == nil {
+				break
+			}
+			wheel := g.player.GetWheel()
+			modPos := pos
+			fragmentType := byte(param)
 
-		var fragID uint16
-		var fragCount uint32
-		var goldCost uint64
-		switch fragmentType {
-		case 0: // Lesser fragment — improve basic grade
-			fragID = 46625
-			fragCount = 5
-			goldCost = 2000000
-		case 1: // Greater fragment — improve supreme grade
-			fragID = 46626
-			fragCount = 5
-			goldCost = 5000000
-		default:
-			break
-		}
-		if fragID == 0 {
-			break
+			var fragID uint16
+			var fragCount uint32
+			var goldCost uint64
+			switch fragmentType {
+			case 0:
+				fragID = 46625
+				fragCount = 5
+				goldCost = 2000000
+			case 1:
+				fragID = 46626
+				fragCount = 5
+				goldCost = 5000000
+			default:
+				break
+			}
+			if fragID == 0 {
 		}
 		if g.player.GetItemCount(fragID) < fragCount {
 			break
@@ -237,7 +230,7 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 		if !g.player.RemoveMoney(goldCost, true) {
 			break
 		}
-		if _, ok := g.player.WheelGemManager.ImproveGemGrade(gemIndex); !ok {
+		if !wheel.ImproveModGrade(fragmentType, modPos) {
 			break
 		}
 	}

@@ -77,9 +77,8 @@ func (g *GameProtocol) sendHouseAuctionMessage(houseID uint32, actionType uint8,
 	w.AddByte(0xC3)
 	w.AddU32(houseID)
 	w.AddByte(actionType)
-	// When bidSuccess is true and actionType is Bid (1), send extra 0x00 byte
-	if len(bidSuccess) > 0 && bidSuccess[0] && actionType == 1 {
-		w.AddByte(0x00)
+	if actionType == 1 {
+		w.AddByte(0x00) // OTClient expects extra 0x00 byte for bid actionType
 	}
 	w.AddByte(index)
 	slog.Default().Info("house: sent 0xC3", "houseId", houseID, "actionType", actionType, "index", index, "bidSuccess", len(bidSuccess) > 0 && bidSuccess[0])
