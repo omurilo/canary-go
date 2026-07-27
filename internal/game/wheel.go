@@ -202,89 +202,105 @@ type WheelBonusData struct {
 	Instants map[string]bool // unlocked wheel instants (inert until spells land)
 }
 
-// WheelGemPersistData holds serializable gem data for DB persistence.
-type WheelGemPersistData struct {
-	ActiveGems   [4]*PlayerWheelGem
-	RevealedGems []PlayerWheelGem
-}
 // WheelOfDestiny models the character progression tree.
 type WheelOfDestiny struct {
 	mu           sync.RWMutex
 	BonusPoints  uint16            // extra points from quests/scrolls (gated ≥ level 51 in C++)
 	ActivePreset uint8             // current preset (0-2)
 	SlotPoints   map[uint16]uint16 // slot id (1..36) -> allocated points
-	// GemData serialized gem persistence for DB save/load.
-	GemData WheelGemPersistData
 
-	// Gem Atelier — ActiveGems are placed in the 4 wheel slots (indexed by affinity).
-	ActiveGems   [4]*PlayerWheelGem // nil = empty slot
-	RevealedGems []PlayerWheelGem   // all revealed gems
-
-	// Fragment resources for gem enhance.
-	LesserFragments  uint16
-	RegularFragments uint16
-	GreaterFragments uint16
+	// UsedScrolls tracks which promotion scrolls have been consumed.
+	UsedScrolls map[string]bool
+	// RevelationStages tracks spell upgrade grades by spell name.
+	RevelationStages map[string]uint8
+	// RevelationPoints tracks accumulated revelation points per spell (threshold model).
+	RevelationPoints map[string]uint16
 
 	cip   uint8          // cached CIP vocation, drives the per-vocation bonuses
 	bonus WheelBonusData // cached, recomputed lazily
 	dirty bool
 }
 
-// GetActiveGemCount returns the number of non-nil active gem slots.
-func (w *WheelOfDestiny) GetActiveGemCount() int {
-	count := 0
-	for _, g := range w.ActiveGems {
-		if g != nil {
-			count++
-		}
+// NewWheelOfDestiny returns an empty wheel.
+func NewWheelOfDestiny() *WheelOfDestiny {
+	return &WheelOfDestiny{
+		SlotPoints:       make(map[uint16]uint16),
+		RevelationPoints: make(map[string]uint16),
+		dirty:            true,
 	}
-	return count
 }
 
-// DestroyGem removes a revealed gem by index.
-func (w *WheelOfDestiny) DestroyGem(index uint16) {
-	if int(index) >= len(w.RevealedGems) {
-		return
+// AddScrollPoints grants additional wheel points from a promotion scroll.
+// Returns false if the scroll type was already used.
+func (w *WheelOfDestiny) AddScrollPoints(name string, points uint16) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.UsedScrolls == nil {
+		w.UsedScrolls = make(map[string]bool)
 	}
-	// Also remove from active slots if present
-	for i, g := range w.ActiveGems {
-		if g != nil && g.UUID == w.RevealedGems[index].UUID {
-			w.ActiveGems[i] = nil
+	if w.UsedScrolls[name] {
+		return false
+	}
+	w.UsedScrolls[name] = true
+	w.BonusPoints += points
+	w.dirty = true
+	return true
+}
+
+// GetRevelationStage returns the upgrade grade (0-3) for a wheel spell.
+func (w *WheelOfDestiny) GetRevelationStage(spellName string) uint8 {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.RevelationStages == nil {
+		return 0
+	}
+	return w.RevelationStages[spellName]
+}
+
+// revelationStageThresholds defines the accumulated points needed per grade.
+// Index 0 = points to reach stage 1, 1 = stage 2, 2 = stage 3.
+// These mirror the C++ per-spell threshold tables (simplified to a single tier here).
+var revelationStageThresholds = [3]uint16{10, 30, 60}
+
+// AddRevelationBonus adds points toward a spell's revelation stage and returns
+// the new grade (0-3). Stage upgrades happen when accumulated points cross a
+// threshold. Mirrors C++ PlayerWheel::addRevelationBonus + stage-from-points.
+func (w *WheelOfDestiny) AddRevelationBonus(spellName string, points uint16) uint8 {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.RevelationStages == nil {
+		w.RevelationStages = make(map[string]uint8)
+	}
+	if w.RevelationPoints == nil {
+		w.RevelationPoints = make(map[string]uint16)
+	}
+	w.RevelationPoints[spellName] += points
+	total := w.RevelationPoints[spellName]
+
+	var newGrade uint8
+	for i := 2; i >= 0; i-- {
+		if total >= revelationStageThresholds[i] {
+			newGrade = uint8(i) + 1
 			break
 		}
 	}
-	w.RevealedGems = append(w.RevealedGems[:index], w.RevealedGems[index+1:]...)
-}
-
-// SwitchGemDomain cycles the affinity of a revealed gem.
-func (w *WheelOfDestiny) SwitchGemDomain(index uint16) {
-	if int(index) >= len(w.RevealedGems) {
-		return
+	if newGrade > w.RevelationStages[spellName] {
+		w.RevelationStages[spellName] = newGrade
+		w.dirty = true
 	}
-	w.RevealedGems[index].Affinity = WheelGemAffinity((w.RevealedGems[index].Affinity + 1) % 4)
+	return w.RevelationStages[spellName]
 }
 
-// ToggleGemLock toggles the lock state of a revealed gem.
-func (w *WheelOfDestiny) ToggleGemLock(index uint16) {
-	if int(index) >= len(w.RevealedGems) {
-		return
+// GetUnlockedInstants returns a snapshot of which wheel instants are active.
+func (w *WheelOfDestiny) GetUnlockedInstants() map[string]bool {
+	w.ensureFresh()
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	out := make(map[string]bool, len(w.bonus.Instants))
+	for k, v := range w.bonus.Instants {
+		out[k] = v
 	}
-	w.RevealedGems[index].Locked = !w.RevealedGems[index].Locked
-}
-
-// GetRevealedGemIndexByUUID returns the index of a revealed gem by UUID.
-func (w *WheelOfDestiny) GetRevealedGemIndexByUUID(uuid string) int {
-	for i, g := range w.RevealedGems {
-		if g.UUID == uuid {
-			return i
-		}
-	}
-	return -1
-}
-
-// NewWheelOfDestiny returns an empty wheel.
-func NewWheelOfDestiny() *WheelOfDestiny {
-	return &WheelOfDestiny{SlotPoints: make(map[uint16]uint16), dirty: true}
+	return out
 }
 
 // SetVocation sets the CIP vocation used to compute per-vocation bonuses.

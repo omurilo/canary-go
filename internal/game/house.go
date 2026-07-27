@@ -25,6 +25,14 @@ type House struct {
 	DoorList     []HouseDoor
 	AccessList   AccessList
 	HouseTiles   []Position // all tiles that belong to this house
+
+	// Auction/bid fields
+	BidderName    string
+	HighestBid    uint64
+	InternalBid   uint64
+	BidHolderLimit uint64
+	BidEndDate    uint32
+	Bidder        uint32 // player GUID who bid
 }
 
 // HouseDoor represents a lockable door in a house.
@@ -199,6 +207,18 @@ func (w *World) GetHouseByPlayerID(playerID uint32) *House {
 	defer w.mu.RUnlock()
 	for _, h := range w.Houses {
 		if h.OwnerID == playerID {
+			return h
+		}
+	}
+	return nil
+}
+
+// GetHouseByClientID looks up a house by its door item client ID.
+func (w *World) GetHouseByClientID(clientID uint32) *House {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	for _, h := range w.Houses {
+		if h != nil && h.ClientID == clientID {
 			return h
 		}
 	}

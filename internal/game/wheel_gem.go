@@ -98,6 +98,12 @@ func NewRevealedGem(quality WheelGemQuality) PlayerWheelGem {
 	return gem
 }
 
+// WheelGemPersistData holds serializable gem data for DB persistence.
+type WheelGemPersistData struct {
+	ActiveGems   [4]*PlayerWheelGem
+	RevealedGems []PlayerWheelGem
+}
+
 // WheelGemCollection holds gem data separate from WheelOfDestiny.
 type WheelGemCollection struct {
 	ActiveGems   [4]*PlayerWheelGem
@@ -139,4 +145,34 @@ func (gc *WheelGemCollection) ToggleGemLock(index uint16) {
 		return
 	}
 	gc.RevealedGems[index].Locked = !gc.RevealedGems[index].Locked
+}
+
+// ImproveGemGrade upgrades a gem by one quality tier.
+// Returns the new quality (or current if already max) and whether it succeeded.
+func (gc *WheelGemCollection) ImproveGemGrade(index uint16) (WheelGemQuality, bool) {
+	if int(index) >= len(gc.RevealedGems) {
+		return 0, false
+	}
+	gem := &gc.RevealedGems[index]
+	if gem.Locked {
+		return 0, false
+	}
+
+	switch gem.Quality {
+	case GemQualityLesser:
+		gem.Quality = GemQualityRegular
+		bm2 := selectBasicModifier2(gem.BasicModifier1)
+		gem.BasicModifier2 = &bm2
+		return GemQualityRegular, true
+
+	case GemQualityRegular:
+		gem.Quality = GemQualityGreater
+		sm := WheelGemSupremeModifier(randomInt(23))
+		gem.SupremeModifier = &sm
+		return GemQualityGreater, true
+
+	case GemQualityGreater:
+		return GemQualityGreater, false
+	}
+	return 0, false
 }

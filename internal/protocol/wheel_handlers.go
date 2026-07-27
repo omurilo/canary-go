@@ -198,7 +198,52 @@ func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
 		g.player.WheelGemManager.ToggleGemLock(param)
 
 	case 4: // ImproveGrade / Enhance
-		// not fully implemented
+		catalog := g.deps.Items
+		if catalog == nil {
+			break
+		}
+		gemIndex := param
+		if int(gemIndex) >= len(g.player.WheelGemManager.RevealedGems) {
+			break
+		}
+		gem := &g.player.WheelGemManager.RevealedGems[gemIndex]
+		if gem.Locked {
+			break
+		}
+
+		var fragID uint16
+		var fragCount uint32
+		var goldCost uint64
+		switch gem.Quality {
+		case game.GemQualityLesser:
+			fragID = 46625
+			fragCount = 50
+			goldCost = 500000
+		case game.GemQualityRegular:
+			fragID = 46626
+			fragCount = 25
+			goldCost = 2000000
+		default:
+			break
+		}
+		if fragID == 0 {
+			break
+		}
+		if g.player.GetItemCount(fragID) < fragCount {
+			break
+		}
+		if g.player.GetMoney() < goldCost {
+			break
+		}
+		if !g.player.RemoveItemOfType(catalog, fragID, fragCount, -1, false) {
+			break
+		}
+		if !g.player.RemoveMoney(goldCost, true) {
+			break
+		}
+		if _, ok := g.player.WheelGemManager.ImproveGemGrade(gemIndex); !ok {
+			break
+		}
 	}
 	g.SendWheelOfDestiny()
 }

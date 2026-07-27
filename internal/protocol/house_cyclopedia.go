@@ -41,7 +41,7 @@ func (g *GameProtocol) parseCyclopediaHouseAuction(r *netmsg.Reader) {
 		slog.Default().Info("house: bid request", "houseId", houseID, "bidValue", bidValue,
 			"player", g.player.Name)
 		// Send bid error response (0xC3) so the client doesn't hang.
-		g.sendHouseAuctionMessage(houseID, 1, 24) // Bid, Internal error
+			g.processHouseBid(houseID, bidValue)
 	case 2:
 		houseID := r.GetU32()
 		_ = r.GetU32() // timestamp
@@ -71,18 +71,61 @@ func (g *GameProtocol) parseCyclopediaHouseAuction(r *netmsg.Reader) {
 
 // sendHouseAuctionMessage sends 0xC3 (auction result message).
 // Mirrors C++ ProtocolGame::sendHouseAuctionMessage.
-func (g *GameProtocol) sendHouseAuctionMessage(houseID uint32, actionType uint8, index uint8) {
+func (g *GameProtocol) sendHouseAuctionMessage(houseID uint32, actionType uint8, index uint8, bidSuccess ...bool) {
 	w := netmsg.NewWriter()
 	w.AddByte(0xC3)
 	w.AddU32(houseID)
 	w.AddByte(actionType)
+	// When bidSuccess is true and actionType is Bid (1), send extra 0x00 byte
+	if len(bidSuccess) > 0 && bidSuccess[0] && actionType == 1 {
+		w.AddByte(0x00)
+	}
 	w.AddByte(index)
-	slog.Default().Info("house: sent 0xC3", "houseId", houseID, "actionType", actionType, "index", index)
+	slog.Default().Info("house: sent 0xC3", "houseId", houseID, "actionType", actionType, "index", index, "bidSuccess", len(bidSuccess) > 0 && bidSuccess[0])
 	g.SendToClient(w)
 }
 
 // sendCyclopediaHouseList sends the house list for a town (opcode 0xC7).
 // Mirrors C++ ProtocolGame::sendCyclopediaHouseList exactly.
+
+func (g *GameProtocol) processHouseBid(clientID uint32, bidValue uint64) {
+	if g.player == nil || g.deps.World == nil {
+		return
+	}
+	world := g.deps.World
+	house := world.GetHouseByClientID(clientID)
+	if house == nil {
+		slog.Default().Info("house: bid failed - house not found", "clientId", clientID)
+		g.sendHouseAuctionMessage(clientID, 1, 24) // Internal error
+		return
+	}
+	p := g.player
+	// Check if player has enough balance (bid + rent)
+	if p.BankBalance < uint64(house.Rent) + bidValue {
+		slog.Default().Info("house: bid failed - not enough money",
+			"balance", p.BankBalance, "rent", house.Rent, "bid", bidValue)
+		g.sendHouseAuctionMessage(clientID, 1, 17) // NotEnoughMoney
+		return
+	}
+	// Deduct rent + bid from bank balance
+	newBalance := p.BankBalance - (uint64(house.Rent) + bidValue)
+	p.BankBalance = newBalance
+	// TODO: persist to DB
+	// Update house bid info
+	house.BidderName = p.Name
+	house.HighestBid = 0
+	house.InternalBid = bidValue
+	house.BidHolderLimit = bidValue
+	house.Bidder = p.DBID
+	// Send success
+	g.sendHouseAuctionMessage(clientID, 1, 0, true) // BidSuccess
+	slog.Default().Info("house: bid successful", "clientId", clientID,
+		"bidValue", bidValue, "newBalance", newBalance)
+	// Refresh house list for the player
+	g.sendCyclopediaHouseList("")
+	g.sendResourceBalances()
+}
+
 func (g *GameProtocol) sendCyclopediaHouseList(townName string) {
 	if g.player == nil || g.deps.World == nil {
 		return
@@ -132,9 +175,24 @@ func (g *GameProtocol) sendCyclopediaHouseList(townName string) {
 
 		if h.OwnerID == 0 {
 			w.AddByte(HouseStateAvailable)
-			w.AddString("") // bidderName
-			w.AddByte(0)    // isBidder (false)
-			w.AddByte(0)    // disableIndex (canBidHouse return, 0 = NoError = allow bid)
+			if h.BidderName != "" {
+				w.AddString(h.BidderName)
+				isBidder := byte(0)
+				if h.BidderName == g.player.Name {
+					isBidder = 1
+				}
+				w.AddByte(isBidder)
+				w.AddByte(0) // disableIndex
+				w.AddU32(h.BidEndDate)
+				w.AddU64(h.HighestBid)
+				if isBidder == 1 {
+					w.AddU64(h.BidHolderLimit)
+				}
+			} else {
+				w.AddString("")
+				w.AddByte(0)
+				w.AddByte(0)
+			}
 		} else {
 			w.AddByte(HouseStateRented)
 			w.AddString("") // ownerName
@@ -213,4 +271,5 @@ func (g *GameProtocol) sendHousesInfo() {
 	// Also proactively send the full house list (0xC7) for ALL houses.
 	// This bypasses the need for the client to send 0xAD first.
 	g.sendCyclopediaHouseList("")
+	g.sendResourceBalances()
 }

@@ -237,7 +237,16 @@ func (d *DB) LoadPlayerWheel(ctx context.Context, p *game.Player) error {
 		return nil
 	}
 
-	ps := propstream.NewPropStream(slotBlob)
+	// Find where propstream ends and possible JSON begins
+	propEnd := len(slotBlob)
+	for i := 0; i < len(slotBlob)-1; i++ {
+		if slotBlob[i] == '{' {
+			propEnd = i
+			break
+		}
+	}
+
+	ps := propstream.NewPropStream(slotBlob[:propEnd])
 	pointsMap := make(map[uint16]uint16)
 	for ps.Size() >= 3 {
 		slotID, err1 := ps.ReadUint8()
@@ -252,6 +261,34 @@ func (d *DB) LoadPlayerWheel(ctx context.Context, p *game.Player) error {
 	wheel := p.GetWheel()
 	wheel.SetVocation(game.CIPVocation(p.Vocation))
 	wheel.SaveSlotPoints(pointsMap)
+
+	// Parse JSON payload (gems, revelation stages, scrolls)
+	if propEnd < len(slotBlob) {
+		var extra struct {
+			Gems              *game.WheelGemPersistData `json:"gems"`
+			RevelationStages  map[string]uint8          `json:"revelationStages"`
+			RevelationPoints  map[string]uint16         `json:"revelationPoints"`
+			UsedScrolls       map[string]bool           `json:"usedScrolls"`
+		}
+		if err := json.Unmarshal(slotBlob[propEnd:], &extra); err == nil {
+			if extra.Gems != nil {
+				if p.WheelGemManager == nil {
+					p.WheelGemManager = &game.WheelGemCollection{}
+				}
+				p.WheelGemManager.ActiveGems = extra.Gems.ActiveGems
+				p.WheelGemManager.RevealedGems = extra.Gems.RevealedGems
+			}
+			if len(extra.RevelationStages) > 0 {
+				wheel.RevelationStages = extra.RevelationStages
+			}
+			if len(extra.RevelationPoints) > 0 {
+				wheel.RevelationPoints = extra.RevelationPoints
+			}
+			if len(extra.UsedScrolls) > 0 {
+				wheel.UsedScrolls = extra.UsedScrolls
+			}
+		}
+	}
 	return nil
 }
 
@@ -269,14 +306,27 @@ func (d *DB) SavePlayerWheel(ctx context.Context, p *game.Player) error {
 	}
 	blob := ws.GetStream()
 
-	// Append JSON gem data after slot points
-	gemPersist := game.WheelGemPersistData{}
+	// Append JSON data after slot points: gems + revelation stages + scrolls.
+	extra := map[string]interface{}{}
 	if p.WheelGemManager != nil {
-		gemPersist.ActiveGems = p.WheelGemManager.ActiveGems
-		gemPersist.RevealedGems = p.WheelGemManager.RevealedGems
+		extra["gems"] = game.WheelGemPersistData{
+			ActiveGems:   p.WheelGemManager.ActiveGems,
+			RevealedGems: p.WheelGemManager.RevealedGems,
+		}
 	}
-	if gemJSON, err := json.Marshal(gemPersist); err == nil && len(gemJSON) > 2 {
-		blob = append(blob, gemJSON...)
+	if len(p.Wheel.RevelationStages) > 0 {
+		extra["revelationStages"] = p.Wheel.RevelationStages
+	}
+	if len(p.Wheel.UsedScrolls) > 0 {
+		extra["usedScrolls"] = p.Wheel.UsedScrolls
+	}
+	if len(p.Wheel.RevelationPoints) > 0 {
+		extra["revelationPoints"] = p.Wheel.RevelationPoints
+	}
+	if len(extra) > 0 {
+		if js, err := json.Marshal(extra); err == nil {
+			blob = append(blob, js...)
+		}
 	}
 
 	const q = `INSERT INTO player_wheeldata (player_id, slot) VALUES (?, ?)

@@ -856,10 +856,10 @@ func playerAddweaponexperience(L *lua.LState) int {
 func playerAvatartimer(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LNumber(0)) // avatar cooldown not yet tracked
 	return 1
 }
 
@@ -1381,12 +1381,11 @@ func playerGetfightmode(L *lua.LState) int {
 func playerGetforgecores(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	// Cores are inventory items; this free binding has no catalog handle, so it
-	// reports 0. The core forge flow reads the real count via the protocol layer.
-	L.Push(lua.LNumber(0))
+	count := p.GetItemCount(game.ItemForgeCore)
+	L.Push(lua.LNumber(count))
 	return 1
 }
 
@@ -1413,12 +1412,11 @@ func playerGetforgedusts(L *lua.LState) int {
 func playerGetforgeslivers(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	// Slivers are inventory items; this free binding has no catalog handle, so it
-	// reports 0. The core forge flow reads the real count via the protocol layer.
-	L.Push(lua.LNumber(0))
+	count := p.GetItemCount(game.ItemForgeSliver)
+	L.Push(lua.LNumber(count))
 	return 1
 }
 
@@ -2235,50 +2233,56 @@ func playerGetfinalbaserateexperience(L *lua.LState) int {
 func playerGetvoucherxpboost(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LNumber(0)) // voucher system not yet ported
 	return 1
 }
 
 func playerGetwheelspelladditionalarea(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LFalse)
+	spellName := L.CheckString(2)
+	_ = spellName
+	L.Push(lua.LNumber(0))
 	return 1
 }
 
 func playerGetwheelspelladditionalduration(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	spellName := L.CheckString(2)
+	_ = spellName
+	L.Push(lua.LNumber(0))
 	return 1
 }
 
 func playerGetwheelspelladditionaltarget(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	spellName := L.CheckString(2)
+	_ = spellName
+	L.Push(lua.LNumber(0))
 	return 1
 }
 
 func playerGetxpboostpercent(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LNumber(0)) // XP boost system not yet ported
 	return 1
 }
 
@@ -2421,10 +2425,13 @@ func playerHassecuremode(L *lua.LState) int {
 func playerInstantskillwod(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LFalse)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	skillName := L.CheckString(2)
+	wheel := p.GetWheel()
+	instants := wheel.GetUnlockedInstants()
+	L.Push(lua.LBool(instants[skillName]))
 	return 1
 }
 
@@ -2807,10 +2814,9 @@ func playerOnthinkwheelofdestiny(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
-	return 1
+	// Wheel think events (cooldown ticks, avatar expiration, etc.)
+	// Not yet ported from C++ — safe no-op for now.
+	return 0
 }
 
 func playerOpenchannel(L *lua.LState) int {
@@ -2818,10 +2824,8 @@ func playerOpenchannel(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
-	return 1
+	_ = L.CheckString(2) // channel name
+	return 0
 }
 
 // playerCanreceivestoreitems reports whether the player can receive store items
@@ -3309,10 +3313,12 @@ func playerResetoldcharms(L *lua.LState) int {
 func playerRevelationstagewod(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	spellName := L.CheckString(2)
+	wheel := p.GetWheel()
+	L.Push(lua.LNumber(wheel.GetRevelationStage(spellName)))
 	return 1
 }
 
@@ -3344,7 +3350,19 @@ func playerGetwheelspells(L *lua.LState) int {
 		L.Push(L.NewTable())
 		return 1
 	}
+	wheel := p.GetWheel()
+	instants := wheel.GetUnlockedInstants()
+
 	tbl := L.NewTable()
+	i := 1
+	for spellName, unlocked := range instants {
+		spellTbl := L.NewTable()
+		spellTbl.RawSetString("name", lua.LString(spellName))
+		spellTbl.RawSetString("unlocked", lua.LBool(unlocked))
+		spellTbl.RawSetString("grade", lua.LNumber(wheel.GetRevelationStage(spellName)))
+		L.RawSetInt(tbl, i, spellTbl)
+		i++
+	}
 	L.Push(tbl)
 	return 1
 }
@@ -3365,11 +3383,12 @@ func playerAddwheelpoints(L *lua.LState) int {
 func playerSave(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LFalse)
+		return 1
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	// Save triggers a DB flush for the player. The DB layer handles this
+	// on its own schedule via SavePlayer; this Lua binding is a no-op.
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4227,21 +4246,40 @@ func playerUpdateuiexhausted(L *lua.LState) int {
 func playerUpgradespellswod(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LNumber(0))
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	spellName := L.CheckString(2)
+	wheel := p.GetWheel()
+	L.Push(lua.LNumber(wheel.GetRevelationStage(spellName)))
 	return 1
 }
 
 func playerWheelunlockscroll(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LFalse)
+		return 1
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	scrollName := L.CheckString(2)
+	wheel := p.GetWheel()
+
+	// Scroll name → bonus points (mirrors wheel_scrolls.lua table).
+	pointsMap := map[string]uint16{
+		"abridged": 3, "basic": 5, "revised": 9,
+		"extended": 13, "advanced": 20,
+	}
+	points, ok := pointsMap[scrollName]
+	if !ok {
+		L.Push(lua.LFalse)
+		return 1
+	}
+
+	if wheel.AddScrollPoints(scrollName, points) {
+		L.Push(lua.LTrue)
+	} else {
+		L.Push(lua.LFalse)
+	}
 	return 1
 }
 

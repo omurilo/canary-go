@@ -444,6 +444,19 @@ func (g *GameProtocol) sendCoinBalance() {
 	g.SendToClient(w2)
 }
 
+func (g *GameProtocol) sendResourceBalances() {
+	if g.player == nil {
+		return
+	}
+	// RESOURCE_BANK (0x00) - send as u64
+	w := netmsg.NewWriter()
+	w.AddByte(0xEE)
+	w.AddByte(0x00)
+	w.AddU64(g.player.BankBalance)
+	g.SendToClient(w)
+}
+
+
 // dispatchStore forwards a store packet's payload (bytes after the opcode) to
 // the gamestore Lua module.
 func (g *GameProtocol) dispatchDailyReward(op byte, r *netmsg.Reader) {
@@ -569,6 +582,7 @@ func (g *GameProtocol) enterWorld() {
 
 	// Store / Tibia Coins balance (shown on the store button).
 	g.sendCoinBalance()
+	g.sendResourceBalances()
 
 	// Send Prey data & prices
 	g.SendPreyPrices()
