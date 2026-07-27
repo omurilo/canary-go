@@ -88,11 +88,16 @@ func (p *Player) OpenContainerAt(cid uint8, c *Item) {
 }
 
 // OpenContainerAtWithPos registers c as open under an explicit client cid, with explicit position / IsOnMap metadata.
+// C++: reseta o scroll index ao abrir um container diferente (evita que
+// o Index paginado do container anterior seja herdado pelo novo).
 func (p *Player) OpenContainerAtWithPos(cid uint8, c *Item, pos Position, isOnMap bool) {
 	if p.openContainers == nil {
 		p.openContainers = make(map[uint8]OpenContainer)
 	}
 	oc := p.openContainers[cid]
+	if oc.Container != c {
+		oc.Index = 0
+	}
 	oc.Container = c
 	oc.Position = pos
 	oc.IsOnMap = isOnMap
