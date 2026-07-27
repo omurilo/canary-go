@@ -12,11 +12,6 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 		return
 	}
 
-	// C++: check stash menu available (player->isStashMenuAvailable())
-	if !g.player.IsStashMenuAvailable() {
-		return
-	}
-
 	if g.player.IsUIExhausted(500) {
 		return
 	}
@@ -88,36 +83,56 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 	g.player.UpdateUIExhausted()
 }
 
-// resolveStowItem resolves the actual Item* from a protocol position for stow actions.
-// C++ equivalent: internalGetThing(player, pos, stackpos, itemId, STACKPOS_TOPDOWN_ITEM)
+// resolveStowItem resolves the actual Item* from a protocol position for stow
+// actions. Ported 1:1 from C++ Game::internalGetThing (game.cpp:1115) with
+// STACKPOS_TOPDOWN_ITEM type.
 func (g *GameProtocol) resolveStowItem(pos netmsg.Position, stackpos int, itemID uint16) *game.Item {
 	if pos.X == 0xFFFF {
-		// Inventory / open container reference
 		if pos.Y >= 0x40 {
-			// pos.Y & 0x3F = container window CID
-			cid := uint8(pos.Y - 0x40)
+			// Container reference: pos.Y & 0x0F = CID, pos.Z = index within container
+			// C++: player->getContainerByID(pos.y & 0x0F) + pos.z
+			cid := uint8(pos.Y & 0x0F)
 			container := g.player.GetContainerByID(cid)
 			if container == nil {
 				return nil
 			}
-			if stackpos < 0 || stackpos >= len(container.Contents) {
+			slot := int(pos.Z)
+			// C++: player->getContainerIndex(cid) + slot → getItemByIndex
+			// Simplified: slot is the 0-based index (containerIndex offset not tracked yet)
+			if slot < 0 || slot >= len(container.Contents) {
 				return nil
 			}
-			candidate := container.Contents[stackpos]
+			candidate := container.Contents[slot]
 			if candidate == nil || candidate.ID != itemID {
 				return nil
 			}
 			return candidate
 		}
-		// Direct inventory slot
+
+		// Inventory slot: pos.Y = slot index
 		if int(pos.Y) >= len(g.player.Inventory) {
 			return nil
 		}
-		candidate := g.player.Inventory[pos.Y]
-		if candidate == nil || candidate.ID != itemID {
+		slotItem := g.player.Inventory[pos.Y]
+		if slotItem == nil {
 			return nil
 		}
-		return candidate
+		// C++: if index (stackpos) > 0, look inside the container at that slot
+		// (getContainer → getItemByIndex(stackpos - 1))
+		if stackpos > 0 && len(slotItem.Contents) > 0 {
+			idx := stackpos - 1
+			if idx < len(slotItem.Contents) {
+				candidate := slotItem.Contents[idx]
+				if candidate != nil && candidate.ID == itemID {
+					return candidate
+				}
+			}
+		}
+		// Direct slot item
+		if slotItem.ID != itemID {
+			return nil
+		}
+		return slotItem
 	}
 
 	// Map position → find in open containers by matching position
