@@ -325,12 +325,16 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 
 				if !merged {
 					moveItem.Parent = toContainer
-					// Append ao final (prepend quebra indices em containers paginados)
-					toContainer.Contents = append(toContainer.Contents, moveItem)
+					// Insert at the beginning (prepend) — C++ comportamento padrao
+					toContainer.Contents = append([]*game.Item{moveItem}, toContainer.Contents...)
 					if len(toContainer.Contents) > 0xFF {
 						toContainer.Contents = toContainer.Contents[:0xFF] // simple truncation
 					}
-					g.sendAddContainerItem(cid, 0, moveItem)
+					// Skip sendAddContainerItem para containers paginados
+					// (slot 0 na pagina atual nao e o indice absoluto 0)
+					if !toContainer.Pagination {
+						g.sendAddContainerItem(cid, 0, moveItem)
+					}
 				}
 				g.RefreshContainer(toContainer)
 			}
@@ -383,7 +387,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 				if fromContainer != nil {
 					swapItem.Parent = fromContainer
 					fromContainer.Contents = append([]*game.Item{swapItem}, fromContainer.Contents...)
-					g.sendAddContainerItem(cid, 0, swapItem)
+					if !fromContainer.Pagination {
+						g.sendAddContainerItem(cid, 0, swapItem)
+					}
 				}
 			} else {
 				fSlot := uint8(fromPos.Y)
