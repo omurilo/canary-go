@@ -12,9 +12,15 @@ import (
 const (
 	cyclopediaCharacterInfoBaseInformation = 0
 	cyclopediaCharacterInfoGeneralStats    = 1
-	cyclopediaCharacterInfoOutfitsMounts   = 7
-	cyclopediaCharacterInfoInspection      = 9
 	cyclopediaCharacterInfoAchievements    = 5
+	cyclopediaCharacterInfoOutfitsMounts   = 7
+	cyclopediaCharacterInfoStoreSummary    = 8
+	cyclopediaCharacterInfoInspection      = 9
+	cyclopediaCharacterInfoBadges          = 10
+	cyclopediaCharacterInfoTitles          = 11
+	cyclopediaCharacterInfoOffenceStats    = 13
+	cyclopediaCharacterInfoDefenceStats    = 14
+	cyclopediaCharacterInfoMiscStats       = 15
 )
 
 func (g *GameProtocol) parseInspectPlayer(r *netmsg.Reader) {
@@ -59,8 +65,20 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 		g.sendCyclopediaCharacterAchievements(g.player)
 	case cyclopediaCharacterInfoOutfitsMounts: // 7
 		g.sendCyclopediaCharacterOutfitsMounts()
+	case cyclopediaCharacterInfoStoreSummary: // 8
+		g.sendCyclopediaCharacterStoreSummary()
 	case cyclopediaCharacterInfoInspection: // 9
 		g.sendCyclopediaCharacterInspection(g.player)
+	case cyclopediaCharacterInfoBadges: // 10
+		g.sendCyclopediaCharacterBadges()
+	case cyclopediaCharacterInfoTitles: // 11
+		g.sendCyclopediaCharacterTitles()
+	case cyclopediaCharacterInfoOffenceStats: // 13
+		g.sendCyclopediaCharacterOffenceStats()
+	case cyclopediaCharacterInfoDefenceStats: // 14
+		g.sendCyclopediaCharacterDefenceStats()
+	case cyclopediaCharacterInfoMiscStats: // 15
+		g.sendCyclopediaCharacterMiscStats()
 	default:
 		g.sendCyclopediaNoData(characterInfoType, 1)
 	}
@@ -226,10 +244,7 @@ func (g *GameProtocol) sendCyclopediaCharacterGeneralStats() {
 	// Experience & level
 	w.AddU64(p.Experience)
 	w.AddU16(p.Level)
-	levelPercent := p.GetLevelPercent() * 100
-	if levelPercent > 10000 {
-		levelPercent = 10000
-	}
+	levelPercent := p.GetLevelPercent()
 	w.AddU16(levelPercent)
 
 	// XP gain rates (defaults — stamina/boosts not yet implemented)
@@ -285,7 +300,7 @@ func (g *GameProtocol) sendCyclopediaCharacterGeneralStats() {
 	w.AddU16(p.GetEffectiveMagLevel())
 	w.AddU16(p.MagLevel) // base magic level
 	w.AddU16(0)          // loyalty magic level (not implemented)
-	magPct := p.GetMagLevelPercent() * 100
+	magPct := p.GetMagLevelPercent()
 	w.AddU16(magPct)
 
 	// Skills: Fist, Club, Sword, Axe, Distance, Shielding, Fishing
@@ -297,7 +312,7 @@ func (g *GameProtocol) sendCyclopediaCharacterGeneralStats() {
 		w.AddU16(p.GetEffectiveSkill(sk))
 		w.AddU16(p.Skills[sk]) // base skill
 		w.AddU16(0)            // loyalty skill (not implemented)
-		skPct := p.GetSkillPercent(sk) * 100
+		skPct := p.GetSkillPercent(sk)
 		w.AddU16(skPct)
 	}
 
@@ -325,6 +340,292 @@ func (g *GameProtocol) sendCyclopediaCharacterOutfitsMounts() {
 	w.AddU16(0)
 	// Familiars — empty list
 	w.AddU16(0)
+
+	g.SendToClient(w)
+}
+
+// sendCyclopediaCharacterStoreSummary sends the store summary (type 8).
+// Matches C++ ProtocolGame::sendCyclopediaCharacterStoreSummary.
+// Sends all zeros since store/blessings/prey/hirelings not implemented yet.
+func (g *GameProtocol) sendCyclopediaCharacterStoreSummary() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoStoreSummary)
+	w.AddByte(0x00) // no error
+
+	// Store Xp Boost
+	w.AddU32(0) // xpBoostTime remaining
+	w.AddU32(0) // dailyRewardXpBoostTime (deprecated)
+
+	// Blessings — send 0 count (skip blessing names)
+	w.AddByte(0)
+
+	// Prey
+	w.AddByte(0) // preySlotsUnlocked
+	w.AddByte(0) // preyWildcards
+
+	// Rewards / expansion flags
+	w.AddByte(0) // hasPermanentWeeklyTaskExpansion (gated by GameTaskboard)
+	w.AddByte(0) // instantRewards
+	w.AddByte(0) // hasCharmExpansion
+	w.AddByte(0) // hirelingsObtained
+	w.AddByte(0) // reserved current-client store summary field
+
+	// Hireling skills
+	w.AddByte(0) // hirelingSkillsCount
+	// Hireling outfits
+	w.AddByte(0) // hirelingOutfitsCount
+
+	// House items
+	w.AddU16(0) // houseItemsCount
+
+	g.SendToClient(w)
+}
+
+// sendCyclopediaCharacterBadges sends the character badges (type 10).
+// Matches C++ ProtocolGame::sendCyclopediaCharacterBadges.
+func (g *GameProtocol) sendCyclopediaCharacterBadges() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoBadges)
+	w.AddByte(0x00) // no error
+
+	w.AddByte(0x01) // showAccountInformation (1 = yes)
+
+	// isOnline — we are inspecting ourselves, so 1
+	w.AddByte(0x01)
+
+	// isPremium — stub with 1 for now
+	w.AddByte(0x01)
+
+	// Loyalty title (empty)
+	w.AddString("")
+
+	// Badges count (0 for now)
+	w.AddByte(0)
+
+	g.SendToClient(w)
+}
+
+// sendCyclopediaCharacterTitles sends the character titles (type 11).
+// Matches C++ ProtocolGame::sendCyclopediaCharacterTitles.
+func (g *GameProtocol) sendCyclopediaCharacterTitles() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoTitles)
+	w.AddByte(0x00) // no error
+
+	w.AddByte(0) // currentTitle (0 = none)
+	w.AddByte(0) // titlesCount (0 for now)
+
+	g.SendToClient(w)
+}
+
+// sendCyclopediaCharacterOffenceStats sends offence stats (type 13).
+// Matches C++ ProtocolGame::sendCyclopediaCharacterOffenceStats.
+// All values are zero/stubs — full stat tracking not implemented yet.
+func (g *GameProtocol) sendCyclopediaCharacterOffenceStats() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoOffenceStats)
+	w.AddByte(0x00) // no error
+
+	// — Critical Hit Chance (addCyclopediaCriticalSkill: 6 doubles) —
+	for i := 0; i < 6; i++ {
+		w.AddDouble(0.0, 4)
+	}
+
+	// — Critical Hit Damage (addCyclopediaCriticalSkill: 6 doubles) —
+	for i := 0; i < 6; i++ {
+		w.AddDouble(0.0, 4)
+	}
+
+	// — Life Leech Amount (addCyclopediaSkills: 5 doubles) —
+	for i := 0; i < 5; i++ {
+		w.AddDouble(0.0, 4)
+	}
+
+	// — Mana Leech Amount (addCyclopediaSkills: 5 doubles) —
+	for i := 0; i < 5; i++ {
+		w.AddDouble(0.0, 4)
+	}
+
+	// — Onslaught (4 doubles) —
+	for i := 0; i < 4; i++ {
+		w.AddDouble(0.0, 4)
+	}
+
+	// — Cleave (1 double) —
+	w.AddDouble(0.0, 4)
+
+	// — Perfect shot damage (7 u16, one per range 1-7) —
+	for i := 0; i < 7; i++ {
+		w.AddU16(0)
+	}
+
+	// — Flat damage/healing (3 u16) —
+	w.AddU16(0) // flatBonus total
+	w.AddU16(0) // flatBonus (equipment)
+	w.AddU16(0) // unknown flat
+
+	// — Weapon section: no weapon → fist path (matching C++ default) —
+	w.AddU16(0) // attackTotal
+	w.AddU16(0) // flatBonus
+	w.AddU16(0) // attackValue
+	w.AddByte(11) // CIPBIA_SKILL_FIST
+	w.AddU16(0) // attackSkill
+	w.AddU16(0) // attackTotal - attackRawTotal
+	w.AddByte(0) // CIPBIA_ELEMENTAL_PHYSICAL
+	w.AddDouble(0.0, 4) // elemental conversion
+	w.AddByte(0) // element type
+	w.AddByte(0) // accuracy count
+
+	// — Influenced / Bosses damage (1 double) —
+	w.AddDouble(0.0, 4)
+
+	// — Bestiary damages count (u16, 0 entries) —
+	w.AddU16(0)
+
+	// — Element Critical Chance —
+	w.AddByte(0) // hasElementCriticalChance (0 = no)
+
+	// — Runes & Auto Attack Critical Chance (2 doubles) —
+	w.AddDouble(0.0, 4) // runesCritical.chance
+	w.AddDouble(0.0, 4) // autoAttackCritical.chance
+
+	// — Element Critical Damage —
+	w.AddByte(0) // hasElementCriticalDamage (0 = no)
+
+	// — Runes & Auto Attack Critical Damage (2 doubles) —
+	w.AddDouble(0.0, 4) // runesCritical.damage
+	w.AddDouble(0.0, 4) // autoAttackCritical.damage
+
+	// — Life/Mana Gain on Hit/Kill (4 u16) —
+	w.AddU16(0) // lifeGainOnHit
+	w.AddU16(0) // manaGainOnHit
+	w.AddU16(0) // lifeGainOnKill
+	w.AddU16(0) // manaGainOnKill
+
+	// — Skill percentages (all stubbed: has=false) —
+	w.AddByte(0) // hasAutoAttackSkill
+	w.AddByte(0) // hasSpellDamage
+	w.AddByte(0) // hasSpellHealing
+
+	// — Final three doubles + elemental pierces count —
+	w.AddDouble(0.0, 4) // fullHpExtraDamage
+	w.AddDouble(0.0, 4) // lowHpExtraDamage
+	w.AddDouble(0.0, 4) // armorPenetration
+	w.AddByte(0) // elementalPiercesCount
+
+	g.SendToClient(w)
+}
+
+// sendCyclopediaCharacterDefenceStats sends defence stats (type 14).
+// Matches C++ ProtocolGame::sendCyclopediaCharacterDefenceStats.
+// All values are zero/stubs.
+func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoDefenceStats)
+	w.AddByte(0x00) // no error
+
+	// — Dodge (5 doubles) —
+	for i := 0; i < 5; i++ {
+		w.AddDouble(0.0, 4)
+	}
+
+	// — Magic shield capacity —
+	w.AddU32(0) // total capacity
+	w.AddU16(0) // flat bonus
+	w.AddDouble(0.0, 4) // percent bonus
+
+	// — Reflect physical flat —
+	w.AddU16(0)
+
+	// — Armor —
+	w.AddU16(0)
+
+	// — Mantra —
+	w.AddU16(0)
+
+	// — Defense total, defense equipment (2 u16) —
+	w.AddU16(0) // defense total
+	w.AddU16(0) // defense equipment
+	w.AddByte(0x06) // shield count (hardcoded, matching C++)
+	w.AddU16(0) // shielding skill
+	w.AddU16(0) // defense wheel
+
+	// — Mitigation (5 doubles) —
+	for i := 0; i < 5; i++ {
+		w.AddDouble(0.0, 4)
+	}
+
+	// — Combat absorbs (0 combats) —
+	w.AddByte(0) // combats count
+
+	g.SendToClient(w)
+}
+
+// sendCyclopediaCharacterMiscStats sends misc stats (type 15).
+// Matches C++ ProtocolGame::sendCyclopediaCharacterMiscStats.
+// All values are zero/stubs.
+func (g *GameProtocol) sendCyclopediaCharacterMiscStats() {
+	if g.player == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0xDA)
+	w.AddByte(cyclopediaCharacterInfoMiscStats)
+	w.AddByte(0x00) // no error
+
+	// — Momentum (5 doubles) —
+	for i := 0; i < 5; i++ {
+		w.AddDouble(0.0, 4)
+	}
+
+	// — Forge Legs (4 doubles) —
+	for i := 0; i < 4; i++ {
+		w.AddDouble(0.0, 4)
+	}
+
+	// — Forge Feet (3 doubles) —
+	for i := 0; i < 3; i++ {
+		w.AddDouble(0.0, 4)
+	}
+
+	// — Blessings —
+	w.AddByte(0) // haveBlesses
+	w.AddByte(0) // totalBlesses
+
+	// — Active concoctions —
+	w.AddByte(0) // count
+
+	// — Active foods —
+	w.AddByte(0) // count
+
+	// — Weapon proficiency augments —
+	w.AddByte(0) // count
+
+	// — Wheel augments —
+	w.AddByte(0) // count
+
+	// — Equipped augments —
+	w.AddByte(0) // count
 
 	g.SendToClient(w)
 }
