@@ -29,9 +29,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		if fromPos.Y >= 0x40 {
 			// Container
 			cid := uint8(fromPos.Y - 0x40)
-			if cont, ok := g.openContainerByCID(cid); ok {
+			if cont, offset, ok := g.openContainerByCID(cid); ok {
 				fromContainer = cont
-				fromSlot = uint8(fromPos.Z) // Client sends slot index as Z
+				fromSlot = uint8(fromPos.Z + uint8(offset)) // Client sends slot index as Z
 				if int(fromSlot) < len(cont.Contents) {
 					item = cont.Contents[fromSlot]
 				}
@@ -135,8 +135,8 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			}
 		} else {
 			cid := uint8(toPos.Y - 0x40)
-			if openCont, ok := g.openContainerByCID(cid); ok {
-				slotIdx := int(toPos.Z)
+			if openCont, offset, ok := g.openContainerByCID(cid); ok {
+				slotIdx := int(toPos.Z) + offset
 				if slotIdx >= 0 && slotIdx < len(openCont.Contents) {
 					targetItem := openCont.Contents[slotIdx]
 					if targetItem != nil && targetItem.IsContainer(g.deps.Items) && targetItem != item {
@@ -301,7 +301,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	} else {
 		if toPos.Y >= 0x40 {
 			cid := uint8(toPos.Y - 0x40)
-			if toContainer, ok := g.openContainerByCID(cid); ok {
+			if toContainer, _, ok := g.openContainerByCID(cid); ok {
 				var merged bool
 				if it != nil && it.Stackable {
 					// Search container for any non-full matching stacks first
@@ -428,7 +428,7 @@ func (g *GameProtocol) revertMove(fromPos netmsg.Position, toPos netmsg.Position
 		if fromPos.Y >= 0x40 {
 			cid := uint8(fromPos.Y - 0x40)
 			fromSlot := uint8(fromPos.Z)
-			if cont, ok := g.openContainerByCID(cid); ok {
+			if cont, _, ok := g.openContainerByCID(cid); ok {
 				var oldItem *game.Item
 				if int(fromSlot) < len(cont.Contents) {
 					oldItem = cont.Contents[fromSlot]
@@ -459,7 +459,7 @@ func (g *GameProtocol) revertMove(fromPos netmsg.Position, toPos netmsg.Position
 			// Wait, the client doesn't specify a to-slot for containers (it goes to index 0).
 			// If it was reverted, we just resend the container or it might be OK since we didn't add it yet.
 			// Actually, sending the full container updates it.
-			if cont, ok := g.openContainerByCID(cid); ok {
+			if cont, _, ok := g.openContainerByCID(cid); ok {
 				g.sendContainer(cid, cont, cont.Parent != nil)
 			}
 		} else {

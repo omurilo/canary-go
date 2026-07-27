@@ -145,12 +145,16 @@ func (g *GameProtocol) setKnown(id uint32, known bool) {
 // openContainerByCID returns the container open under a client cid, preserving
 // the (item, ok) shape callers expect. The open-container state is the single
 // source of truth on game.Player (see Player.openContainers).
-func (g *GameProtocol) openContainerByCID(cid uint8) (*game.Item, bool) {
+func (g *GameProtocol) openContainerByCID(cid uint8) (*game.Item, int, bool) {
 	if g.player == nil {
-		return nil, false
+		return nil, 0, false
 	}
 	c := g.player.GetContainerByID(cid)
-	return c, c != nil
+	if c == nil {
+		return nil, 0, false
+	}
+	offset := int(g.player.GetContainerIndex(cid))
+	return c, offset, true
 }
 
 // rangeContainers returns a snapshot of the open containers as cid->item for

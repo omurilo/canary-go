@@ -252,7 +252,7 @@ func (g *GameProtocol) reconcileUsedItem(item *game.Item, pos netmsg.Position, s
 				foundCID := uint8(255)
 				foundContSlot := uint8(0)
 				for cid := uint8(0); cid < 16; cid++ {
-					if cont, ok := g.openContainerByCID(cid); ok {
+					if cont, _, ok := g.openContainerByCID(cid); ok {
 						for i, contItem := range cont.Contents {
 							if contItem == item {
 								foundCID = cid
@@ -273,8 +273,11 @@ func (g *GameProtocol) reconcileUsedItem(item *game.Item, pos netmsg.Position, s
 		}
 		if pos.Y >= 0x40 { // inside a container
 			cid := uint8(pos.Y - 0x40)
-			slot := uint8(pos.Z)
-			cont, ok := g.openContainerByCID(cid)
+		cont, offset, ok := g.openContainerByCID(cid)
+		if !ok {
+			return
+		}
+		slot := uint8(int(pos.Z) + offset)
 			if !ok {
 				return
 			}
@@ -362,7 +365,7 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 	}
 	contents := item.Contents
 	// Force pagination for items C++ marks in Container constructor
-	if item.ID == game.ItemStoreInbox {
+	if item.ID == game.ItemGoldPouch || item.ID == game.ItemStoreInbox {
 		item.Pagination = true
 		if item.MaxSize == 0 {
 			item.MaxSize = 32
@@ -712,8 +715,8 @@ func (g *GameProtocol) getItemAt(pos netmsg.Position, itemID uint16, stackpos ui
 			}
 		} else if pos.Y >= 0x40 {
 			cid := uint8(pos.Y - 0x40)
-			if cont, ok := g.openContainerByCID(cid); ok {
-				fromSlot := int(pos.Z)
+			if cont, offset, ok := g.openContainerByCID(cid); ok {
+				fromSlot := int(pos.Z) + offset
 				if fromSlot < len(cont.Contents) {
 					item = cont.Contents[fromSlot]
 				}

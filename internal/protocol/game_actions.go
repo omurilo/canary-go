@@ -739,8 +739,8 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 		if pos.Y >= 0x40 {
 			// Container
 			cid := uint8(pos.Y - 0x40)
-			if cont, ok := g.openContainerByCID(cid); ok {
-				fromSlot := int(pos.Z)
+			if cont, offset, ok := g.openContainerByCID(cid); ok {
+				fromSlot := int(pos.Z) + offset
 				if fromSlot < len(cont.Contents) {
 					item = cont.Contents[fromSlot]
 				}
