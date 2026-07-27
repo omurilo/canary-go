@@ -31,6 +31,11 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 	}
 }
 
+// SendOpenStash is the Session entry point used by player:openStash().
+func (g *GameProtocol) SendOpenStash() {
+	g.sendOpenStash()
+}
+
 // sendOpenStash sends the stash contents (opcode 0x29).
 // Mirrors C++ ProtocolGame::sendOpenStash.
 func (g *GameProtocol) sendOpenStash() {

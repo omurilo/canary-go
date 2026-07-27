@@ -45,6 +45,9 @@ type Session interface {
 	// Exaltation Forge. Opens the forge window (0x87 + 0x86) for the player.
 	SendOpenForge()
 
+	// Supply Stash. Opens the stash container (0x29).
+	SendOpenStash()
+
 	// Market (B11). Opens the market window showing depot contents and bank balance.
 	SendOpenMarket()
 }

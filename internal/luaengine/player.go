@@ -2925,8 +2925,9 @@ func playerOpenstash(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	// openStash called from Lua (NPC dialogue). The protocol layer handles
-	// the actual stash window; this Lua binding is informational.
+	if p.Session != nil {
+		p.Session.SendOpenStash()
+	}
 	L.Push(lua.LTrue)
 	return 1
 }

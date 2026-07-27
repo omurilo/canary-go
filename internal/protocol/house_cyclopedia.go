@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
@@ -136,6 +138,12 @@ func (g *GameProtocol) processHouseBid(clientID uint32, bidValue uint64) {
 	house.Bidder = p.DBID
 	house.BidEndDate = uint32(time.Now().Add(7 * 24 * time.Hour).Unix())
 
+	if g.deps.DB != nil {
+		if err := g.deps.DB.SaveHouseBid(context.Background(), house); err != nil {
+			slog.Default().Info("house: failed to persist bid", "error", err)
+		}
+	}
+
 	g.sendHouseAuctionMessage(clientID, 1, 0)
 	slog.Default().Info("house: bid successful", "clientId", clientID,
 		"bidValue", bidValue, "newBalance", newBalance)
@@ -170,6 +178,12 @@ func (g *GameProtocol) processHouseMoveOut(houseID uint32, timestamp uint32) {
 	house.TransferPrice = 0
 	house.TransferAccept = 0
 
+	if g.deps.DB != nil {
+		if err := g.deps.DB.SaveHouseOwner(context.Background(), house.ID, 0); err != nil {
+			slog.Default().Info("house: failed to persist moveout owner", "error", err)
+		}
+	}
+
 	g.sendHouseAuctionMessage(houseID, 2, 0)
 	slog.Default().Info("house: moveout successful", "houseId", houseID, "player", g.player.Name)
 }
@@ -198,6 +212,12 @@ func (g *GameProtocol) processHouseTransfer(houseID uint32, timestamp uint32, ne
 	house.TransferToName = newOwner
 	house.TransferPrice = price
 	house.TransferAccept = 0
+
+	if g.deps.DB != nil {
+		if err := g.deps.DB.SaveHouseTransfer(context.Background(), house); err != nil {
+			slog.Default().Info("house: failed to persist transfer", "error", err)
+		}
+	}
 
 	g.sendHouseAuctionMessage(houseID, 3, 0)
 	slog.Default().Info("house: transfer initiated", "houseId", houseID,
