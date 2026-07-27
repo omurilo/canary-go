@@ -19,7 +19,8 @@ func (g *GameProtocol) parseStashAction(r *netmsg.Reader) {
 		if int(pos) < len(g.player.Inventory) {
 			item := g.player.Inventory[pos]
 			if item != nil {
-				stowed := g.player.StowItem(item.ID, uint32(count), false)
+				allItems := (count == 0)
+					stowed := g.player.StowItem(item.ID, uint32(count), allItems)
 				if stowed > 0 {
 					g.player.Inventory[pos] = nil
 					g.sendStashAndInventory()
