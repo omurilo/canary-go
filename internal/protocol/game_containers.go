@@ -148,12 +148,6 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		slog.Default().Info("parseUseItem CALLED FOR REWARD CHEST", "pos", pos, "index", index)
 	}
 
-		// Stash icon in depot — cliente oficial nao reconhece 0x29.
-		// Desabilitado temporariamente. Stash continua via 0x28.
-		if item.ID == game.ItemStash {
-			return
-		}
-
 		// Gold pouch (ITEM_GOLD_POUCH = 23721) pode nao ser marcado como container no protobuf
 		// Tratar explicitamente como container (C++ Container subclass)
 		if item.ID == game.ItemGoldPouch || t.IsContainer() {
