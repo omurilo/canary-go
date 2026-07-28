@@ -21,6 +21,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/actions"
 	"github.com/opentibiabr/canary-go/internal/config"
 	"github.com/opentibiabr/canary-go/internal/creatures"
+	"github.com/opentibiabr/canary-go/internal/datapack"
 	"github.com/opentibiabr/canary-go/internal/db"
 	"github.com/opentibiabr/canary-go/internal/events"
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -246,6 +247,12 @@ func run(o runOpts, log *slog.Logger) error {
 	mapFilePath := o.mapFile
 	if mapFilePath == "" && cfg.WorldFile != "" {
 		mapFilePath = cfg.WorldFile
+	}
+
+	// Auto-download the OTBM map if it doesn't exist locally (mirrors the
+	// CANARY_MAP_URL / CANARY_DATA_PACK behaviour from the C++ docker stack).
+	if err := datapack.EnsureMap(log, mapFilePath, cfg.MapDownloadURL, cfg.MapDownloadEnabled); err != nil {
+		log.Warn("map auto-download failed; will fall back to synthetic spawn field", "err", err)
 	}
 
 	// generateSyntheticField is the playable fallback used when no OTBM map is

@@ -418,7 +418,11 @@ func AddItemToContainer(catalog *items.Catalog, container *Item, item *Item) boo
 	}
 
 	// 2. If item still has count > 0, append to container if capacity allows
-	cap := container.ContainerCapacity(catalog)
+	// C++: usa MaxItems (limite), nao ContainerCapacity (pagina)
+	cap := container.MaxItems
+	if cap == 0 {
+		cap = container.ContainerCapacity(catalog)
+	}
 	if cap < 1 {
 		cap = 20
 	}

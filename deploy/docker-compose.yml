@@ -31,50 +31,6 @@ services:
       timeout: 5s
       retries: 12
 
-  server:
-    image: "${CANARY_IMAGE:-ghcr.io/opentibiabr/canary:latest}"
-    restart: unless-stopped
-    environment:
-      CANARY_DB_HOST: "${CANARY_DB_HOST:-db}"
-      CANARY_DB_PORT: "${CANARY_DB_PORT:-3306}"
-      CANARY_DB_NAME: "${CANARY_DB_NAME:-canary}"
-      CANARY_DB_USER: "${CANARY_DB_USER:-canary}"
-      CANARY_DB_PASSWORD: "${CANARY_DB_PASSWORD:-canary}"
-      CANARY_SERVER_NAME: "${CANARY_SERVER_NAME:-OpenTibiaBR Canary}"
-      CANARY_SERVER_IP: "${CANARY_SERVER_IP:-0.0.0.0}"
-      CANARY_LOGIN_PORT: "${CANARY_LOGIN_PORT:-7171}"
-      CANARY_GAME_PORT: "${CANARY_GAME_PORT:-7172}"
-      CANARY_LEGACY_1100_GAME_PORT: "${CANARY_LEGACY_1100_GAME_PORT:-7174}"
-      CANARY_LEGACY_860_GAME_PORT: "${CANARY_LEGACY_860_GAME_PORT:-7175}"
-      CANARY_STATUS_PORT: "${CANARY_STATUS_PORT:-7173}"
-      CANARY_STATUS_TIMEOUT: "${CANARY_STATUS_TIMEOUT:-5000}"
-      CANARY_TEST_ACCOUNTS: "${CANARY_TEST_ACCOUNTS:-true}"
-      CANARY_DATA_PACK: "${CANARY_DATA_PACK:-data-otservbr-global}"
-      CANARY_MAP_URL: "${CANARY_MAP_URL:-https://github.com/opentibiabr/canary/releases/download/v3.6.1/otservbr.otbm}"
-      # Keep the published runtime image compatible while CANARY_* remains the
-      # public quickstart contract.
-      OT_DB_HOST: "${CANARY_DB_HOST:-db}"
-      OT_DB_PORT: "${CANARY_DB_PORT:-3306}"
-      OT_DB_DATABASE: "${CANARY_DB_NAME:-canary}"
-      OT_DB_USER: "${CANARY_DB_USER:-canary}"
-      OT_DB_PASSWORD: "${CANARY_DB_PASSWORD:-canary}"
-      OT_SERVER_IP: "${CANARY_SERVER_IP:-127.0.0.1}"
-      OT_SERVER_LOGIN_PORT: "${CANARY_LOGIN_PORT:-7171}"
-      OT_SERVER_GAME_PORT: "${CANARY_GAME_PORT:-7172}"
-      OT_SERVER_STATUS_PORT: "${CANARY_STATUS_PORT:-7173}"
-      OT_SERVER_TEST_ACCOUNTS: "${CANARY_TEST_ACCOUNTS:-true}"
-      OT_SERVER_DATA: "${CANARY_DATA_PACK:-data-otservbr-global}"
-      OT_SERVER_MAP: "${CANARY_MAP_URL:-https://github.com/opentibiabr/canary/releases/download/v3.6.1/otservbr.otbm}"
-    ports:
-      - '${CANARY_LOGIN_PORT:-7171}:${CANARY_LOGIN_PORT:-7171}'
-      - '${CANARY_GAME_PORT:-7172}:${CANARY_GAME_PORT:-7172}'
-      - '${CANARY_LEGACY_1100_GAME_PORT:-7174}:${CANARY_LEGACY_1100_GAME_PORT:-7174}'
-      - '${CANARY_LEGACY_860_GAME_PORT:-7175}:${CANARY_LEGACY_860_GAME_PORT:-7175}'
-      - '${CANARY_STATUS_PORT:-7173}:${CANARY_STATUS_PORT:-7173}'
-    depends_on:
-      db:
-        condition: service_healthy
-
   canary-go:
     build:
       context: ..
@@ -90,6 +46,7 @@ services:
     ports:
       - "7171:7171"
       - "7172:7172"
+      - "7173:7173"
     volumes:
       - ../config.lua:/app/config.lua:ro
       - ../data:/app/data:ro
@@ -118,6 +75,7 @@ services:
       CANARY_SERVER_IP: "${CANARY_SERVER_IP:-0.0.0.0}"
       CANARY_GAME_PORT: "7172"
       CANARY_LOGIN_PORT: "7171"
+      CANARY_STATUS_PORT: "7173"
       MYAAC_ADMIN_ACCOUNT: "${MYAAC_ADMIN_ACCOUNT:-myaacadmin}"
       MYAAC_ADMIN_PASSWORD: "${MYAAC_ADMIN_PASSWORD:-admin123}"
       MYAAC_CLIENT_VERSION: "${MYAAC_CLIENT_VERSION:-1525}"
@@ -126,7 +84,7 @@ services:
       - "8080:80"
     volumes:
       - ../ip.txt:/var/www/html/install/ip.txt
-      - ../config.lua:/canary/config.lua:ro
+      - ../config.lua.dist:/canary/config.lua
       - ../data/items:/canary/data/items
       - ../data/XML:/canary/data/XML
       - ../data-otservbr-global/monsters:/canary/data/monsters

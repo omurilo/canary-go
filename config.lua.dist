@@ -1,0 +1,14 @@
+serverName = "Canary-Go"
+ip = "127.0.0.1"
+loginProtocolPort = 7171
+gameProtocolPort = 7172
+statusProtocolPort = 7173
+statusTimeout = 5000
+worldType = "pvp"
+dataPackDirectory = "data-otservbr-global"
+mysqlHost = "db"
+mysqlPort = 3306
+mysqlUser = "canary"
+mysqlPass = "canary"
+mysqlDatabase = "canary"
+passwordType = "sha1"

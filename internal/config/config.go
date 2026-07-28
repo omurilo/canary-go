@@ -80,6 +80,15 @@ type Config struct {
 	RSAKeyFile string
 	WorldFile  string
 
+	// MapDownloadURL is the URL to download the OTBM map file from when it
+	// is not found locally. Mirrors CANARY_MAP_URL from the C++ docker stack.
+	// Default: "https://github.com/opentibiabr/canary/releases/download/v3.6.1/otservbr.otbm"
+	MapDownloadURL string
+
+	// MapDownloadEnabled controls whether the server auto-downloads a missing
+	// OTBM map file on startup. Default true.
+	MapDownloadEnabled bool
+
 	Custom map[string]lua.LValue
 }
 
@@ -98,10 +107,12 @@ func Default() *Config {
 		DBPassword:    "canary",
 		DBName:        "canary",
 		DBPort:        3306,
-		MOTD:          "Welcome to Canary-Go!",
-		AllowOldProto: true,
-		RSAKeyFile:    "key.pem",
-		Custom:        make(map[string]lua.LValue),
+		MOTD:               "Welcome to Canary-Go!",
+		AllowOldProto:      true,
+		RSAKeyFile:         "key.pem",
+		MapDownloadURL:     "https://github.com/opentibiabr/canary/releases/download/v3.6.1/otservbr.otbm",
+		MapDownloadEnabled: true,
+		Custom:             make(map[string]lua.LValue),
 	}
 }
 
@@ -173,14 +184,19 @@ func Load(path string) (*Config, error) {
 	cfg.AutoBank = boolean("autoBank", cfg.AutoBank)
 	cfg.RSAKeyFile = str("rsaKeyFile", cfg.RSAKeyFile)
 
-	// Fallback to constructing the world path from dataPackDirectory + mapName
+	// Map download settings (matches CANARY_MAP_URL in the docker stack).
+	cfg.MapDownloadURL = str("mapDownloadUrl", cfg.MapDownloadURL)
+	cfg.MapDownloadEnabled = boolean("mapDownloadEnabled", cfg.MapDownloadEnabled)
+
+	applyEnv(cfg)
+
+	// Build the world file path after env overrides so that CANARY_DATA_PACK
+	// takes effect on the derived path when worldFile is not explicitly set.
 	cfg.WorldFile = str("worldFile", "")
 	if cfg.WorldFile == "" {
 		mapName := str("mapName", "otservbr")
 		cfg.WorldFile = fmt.Sprintf("%s/world/%s.otbm", cfg.DataPack, mapName)
 	}
-
-	applyEnv(cfg)
 
 	cfg.Custom = make(map[string]lua.LValue)
 	g.ForEach(func(k, v lua.LValue) {
@@ -217,5 +233,14 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("CANARY_SERVER_NAME"); v != "" {
 		cfg.ServerName = v
+	}
+	if v := os.Getenv("CANARY_DATA_PACK"); v != "" {
+		cfg.DataPack = v
+	}
+	if v := os.Getenv("CANARY_MAP_URL"); v != "" {
+		cfg.MapDownloadURL = v
+	}
+	if v := os.Getenv("CANARY_MAP_DOWNLOAD"); v != "" {
+		cfg.MapDownloadEnabled = v == "true" || v == "1"
 	}
 }
