@@ -21,6 +21,7 @@ type VocationSkill struct {
 type Vocation struct {
 	ID             uint32          `xml:"id,attr"`
 	Name           string          `xml:"name,attr"`
+	FromVoc        uint32          `xml:"fromvoc,attr"`
 	GainHP         uint32          `xml:"gainhp,attr"`
 	GainMana       uint32          `xml:"gainmana,attr"`
 	GainCap        uint32          `xml:"gaincap,attr"`
@@ -70,4 +71,14 @@ func LoadVocations(path string) error {
 
 func GetVocation(id uint32) *Vocation {
 	return vocationsMap[id]
+}
+
+// FindByFromVoc returns the promoted vocation for a given fromvoc.
+func FindByFromVoc(fromVoc uint32) *Vocation {
+	for _, voc := range vocationsMap {
+		if voc.FromVoc == fromVoc && voc.ID != fromVoc {
+			return voc
+		}
+	}
+	return nil
 }

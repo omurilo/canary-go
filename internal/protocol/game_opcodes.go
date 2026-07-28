@@ -116,6 +116,9 @@ func (g *GameProtocol) parseSetVocation(r *netmsg.Reader) {
 		return
 	}
 	vocationID := r.GetByte()
+	if vocationID == 0 && g.player.Vocation != 0 {
+		return
+	}
 	g.deps.World.PlayerSetVocation(g.player.ID, vocationID)
 }
 

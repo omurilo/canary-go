@@ -188,17 +188,37 @@ func vocationGetSoulGainTicks(L *lua.LState) int {
 	return 1
 }
 
-// Vocation:getDemotion()
+// Vocation:getDemotion() returns the base vocation (fromvoc).
+// E.g. Elite Knight → Knight, Master Sorcerer → Sorcerer.
 func vocationGetDemotion(L *lua.LState) int {
-	// Not implemented, return nil for now
-	L.Push(lua.LNil)
+	v := checkVocation(L)
+	if v == nil || v.FromVoc == v.ID {
+		L.Push(lua.LNil)
+		return 1
+	}
+	voc := vocations.GetVocation(v.FromVoc)
+	if voc == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pushVocation(L, voc)
 	return 1
 }
 
-// Vocation:getPromotion()
+// Vocation:getPromotion() returns the promoted vocation (where fromvoc matches this id).
+// E.g. Knight → Elite Knight, Sorcerer → Master Sorcerer.
 func vocationGetPromotion(L *lua.LState) int {
-	// Not implemented, return nil for now
-	L.Push(lua.LNil)
+	v := checkVocation(L)
+	if v == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	voc := vocations.FindByFromVoc(v.ID)
+	if voc == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pushVocation(L, voc)
 	return 1
 }
 

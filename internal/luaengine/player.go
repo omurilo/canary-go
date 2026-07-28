@@ -4122,7 +4122,12 @@ func playerSetvocation(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	p.Vocation = uint16(luaOptInt(L, 2))
+	newVoc := uint16(luaOptInt(L, 2))
+	if newVoc == 0 && p.Vocation != 0 {
+		L.Push(lua.LTrue)
+		return 1
+	}
+	p.Vocation = newVoc
 	L.Push(lua.LTrue)
 	return 1
 }
