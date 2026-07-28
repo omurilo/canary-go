@@ -4223,6 +4223,9 @@ func playerUpdatefood(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
+	itemID := uint16(luaOptInt(L, 2))
+	timeLeft := uint32(luaOptInt(L, 3))
+	p.UpdateFoodItem(itemID, timeLeft)
 	L.Push(lua.LTrue)
 	return 1
 }

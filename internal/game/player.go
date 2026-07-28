@@ -245,6 +245,11 @@ type Player struct {
 	// Concoctions (B18) — active concoctions stored as KV.
 	Concoctions map[string]int64 // concoction_name -> expiry timestamp
 
+	// ActiveFoodItems tracks consumed food items keyed by itemID with remaining
+	// time in seconds. Managed via UpdateFoodItem / Lua binding, drained by the
+	// regen ticker. Persisted for cyclopedia display.
+	ActiveFoodItems map[uint16]uint32 // itemID -> remaining time in seconds
+
 	// Animus Mastery (B16) — unlocked animus masteries (blob from DB).
 	AnimusMastery []byte
 

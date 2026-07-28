@@ -284,38 +284,13 @@ func (g *GameProtocol) isCipsoft860() bool {
 
 func (g *GameProtocol) Player() *game.Player { return g.player }
 
-// storeSendOpcodes are the server->client opcodes the gamestore module emits;
-// used only for temporary debug logging of the store wire.
-var storeSendOpcodes = map[byte]string{
-	0xDF: "CoinBalance", 0xE0: "StoreError", 0xE1: "RequestPurchaseData",
-	0xEA: "OfferDescription", 0xF2: "CoinBalanceUpdating",
-	0xFB: "OpenStore", 0xFC: "StoreOffers", 0xFD: "TransactionHistory", 0xFE: "CompletePurchase",
-}
-
-var sendSeq atomic.Int32
-
 // SendToClient implements game.Session.
 func (g *GameProtocol) SendToClient(w *netmsg.Writer) {
 	if g.conn != nil {
 		b := w.Bytes()
-		seq := sendSeq.Add(1)
-		if g.deps != nil && g.deps.Log != nil {
-			if len(b) == 0 {
-				g.deps.Log.Warn(fmt.Sprintf("[SEND #%d] EMPTY PACKET (len=0)", seq))
-			} else {
-				if name, ok := storeSendOpcodes[b[0]]; ok {
-					dump := b
-					if len(dump) > 96 {
-						dump = dump[:96]
-					}
-					g.deps.Log.Info(fmt.Sprintf("[SEND #%d] store packet", seq),
-						"opcode", fmt.Sprintf("0x%02X", b[0]), "name", name,
-						"len", len(b), "hex", fmt.Sprintf("%x", dump))
-				} else {
-					g.deps.Log.Info(fmt.Sprintf("[SEND #%d] other packet", seq),
-						"opcode", fmt.Sprintf("0x%02X", b[0]), "len", len(b))
-				}
-			}
+		if len(b) == 0 {
+			g.deps.Log.Warn("empty packet discarded")
+			return
 		}
 		_ = g.conn.Send(w)
 	}

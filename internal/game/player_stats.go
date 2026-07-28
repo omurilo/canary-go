@@ -1,8 +1,13 @@
 package game
 
 import (
+	"fmt"
+	"math"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/opentibiabr/canary-go/internal/game/vocations"
 )
 
 
@@ -26,7 +31,49 @@ type SkillsEquipment struct {
 
 
 func (p *Player) GetForgeSkillStat(slot uint8) float64 {
-	return 0.0
+	// Map cyclopedia forge slot to inventory slot + forge type.
+	// Slot mapping from C++ ExaltationForge:
+	//   1 = head (Momentum)
+	//   3 = weapon (Onslaught)
+	//   5 = armor (Dodge)
+	//   7 = legs
+	//   8 = feet
+	inventorySlot := mapSlotToInventory(slot)
+	if inventorySlot < 0 || int(inventorySlot) >= len(p.Inventory) || p.Inventory[inventorySlot] == nil {
+		return 0.0
+	}
+	item := p.Inventory[inventorySlot]
+	tier := item.GetTier()
+	if tier == 0 {
+		return 0.0
+	}
+	// Forge bonus = tier * dustLevelFactor
+	// Each forge tier provides a bonus that scales with the player's dust level cap.
+	dustLevel := float64(p.ForgeDustLevel)
+	if dustLevel <= 0 {
+		dustLevel = 100 // default cap
+	}
+	// Simplified forge formula: each tier gives (dustLevel/100) bonus
+	return float64(tier) * (dustLevel / 100.0)
+}
+
+// mapSlotForgeToInventory maps the cyclopedia forge skill slot number to its
+// corresponding inventory slot constant.
+func mapSlotToInventory(slot uint8) int {
+	switch slot {
+	case 1: // Head (Momentum)
+		return int(ConstSlotHead)
+	case 3: // Weapon (Onslaught)
+		return int(ConstSlotLeft)
+	case 5: // Armor (Dodge)
+		return int(ConstSlotArmor)
+	case 7: // Legs
+		return int(ConstSlotLegs)
+	case 8: // Feet
+		return int(ConstSlotFeet)
+	default:
+		return -1
+	}
 }
 
 // ============================================================================
@@ -149,7 +196,34 @@ func (p *Player) CalculateFlatDamageHealing() uint16 {
 }
 
 func (p *Player) GetDamageAccuracy(item *Item) []float64 {
-	return nil
+	if item == nil {
+		return nil
+	}
+
+	distanceSkill := float64(p.GetEffectiveSkill(SkillDistance))
+	ammoType := item.AmmoType(p.World.Items)
+
+	if ammoType == "bolt" || ammoType == "arrow" {
+		return []float64{
+			math.Min(90, 1.20*(distanceSkill+1)),
+			math.Min(90, 3.20*distanceSkill),
+			math.Min(90, 2.00*distanceSkill),
+			math.Min(90, 1.55*distanceSkill),
+			math.Min(90, 1.20*(distanceSkill+1)),
+			math.Min(90, distanceSkill),
+		}
+	}
+
+	// Other distance weapons (spear, throwing star, throwing knife, stone, etc.)
+	return []float64{
+		math.Min(75, distanceSkill+1),
+		math.Min(75, 2.40*(distanceSkill+8)),
+		math.Min(75, 1.55*(distanceSkill+6)),
+		math.Min(75, 1.25*(distanceSkill+3)),
+		math.Min(75, distanceSkill+1),
+		math.Min(75, 0.80*(distanceSkill+3)),
+		math.Min(75, 0.70*(distanceSkill+2)),
+	}
 }
 
 // ============================================================================
@@ -211,7 +285,62 @@ func (p *Player) GetDefenseEquipment() uint16 {
 }
 
 func (p *Player) GetMitigation() float64 {
-	return 0.0
+	voc := vocations.GetVocation(uint32(p.Vocation))
+	if voc == nil {
+		return 0.0
+	}
+
+	skill := int32(p.GetEffectiveSkill(SkillShielding))
+	defenseValue := int32(0)
+	fightFactor := 1.0
+	shieldFactor := voc.Mitigation.PrimaryShield
+	distanceFactor := 1.0
+
+	switch p.FightMode {
+	case 1: // attack
+		fightFactor = 0.8
+	case 2: // balanced
+		fightFactor = 1.0
+	case 3: // defense
+		fightFactor = 1.2
+	}
+
+	// Right slot: shield/spellbook/quiver
+	if int(ConstSlotRight) < len(p.Inventory) && p.Inventory[ConstSlotRight] != nil {
+		shield := p.Inventory[ConstSlotRight]
+		wt := shield.WeaponType(p.World.Items)
+		isShield := wt == "shield" && !shield.IsQuiver(p.World.Items)
+		if isShield {
+			shieldFactor = voc.Mitigation.PrimaryShield
+			defenseValue = shield.Defense(p.World.Items)
+		} else {
+			// Spellbook or quiver in right slot
+			distanceFactor = voc.Mitigation.SecondaryShield
+		}
+	}
+
+	// Left slot: weapon
+	if int(ConstSlotLeft) < len(p.Inventory) && p.Inventory[ConstSlotLeft] != nil {
+		weapon := p.Inventory[ConstSlotLeft]
+		ammoType := weapon.AmmoType(p.World.Items)
+		if ammoType == "bolt" || ammoType == "arrow" {
+			distanceFactor = voc.Mitigation.SecondaryShield
+		} else if p.World.Items != nil {
+			it := p.World.Items.Get(weapon.ID)
+			if it != nil && it.SlotPosition == "two-handed" {
+				defenseValue = weapon.Defense(p.World.Items) + weapon.ExtraDefense(p.World.Items)
+				shieldFactor = voc.Mitigation.SecondaryShield
+			} else {
+				defenseValue += weapon.ExtraDefense(p.World.Items)
+				shieldFactor = voc.Mitigation.PrimaryShield
+			}
+		}
+	}
+
+	base := (float64(skill)*voc.Mitigation.Multiplier + shieldFactor*float64(defenseValue)) / 100.0
+	mitigation := math.Ceil(base*fightFactor*distanceFactor*100.0) / 100.0
+
+	return mitigation
 }
 
 func (p *Player) GetSkillsEquipment() [SkillCount]SkillsEquipment {
@@ -263,21 +392,41 @@ var elementKeyMap = []struct {
 	{1, "absorbpercentfire"},
 	{2, "absorbpercentearth"},
 	{3, "absorbpercentenergy"},
-	{4, "absorbpercentice"},
-	{5, "absorbpercentholy"},
-	{6, "absorbpercentdeath"},
-	{7, "absorbpercentlifedrain"}, // healing (C++ COMBAT_HEALING)
-	{8, "absorbpercentdrown"},
-	{9, "absorbpercentlifedrain"}, // lifedrain (same key in OTB, different combat type)
-	{10, "absorbpercentmanadrain"},
+	{4, "absorbpercentundefined"}, // COMBAT_UNDEFINEDDAMAGE (4)
+	{5, "absorbpercentlifedrain"}, // COMBAT_LIFEDRAIN (5)
+	{6, "absorbpercentmanadrain"}, // COMBAT_MANADRAIN (6)
+	{7, "absorbpercentlifedrain"}, // COMBAT_HEALING (7) — same OTB key
+	{8, "absorbpercentdrown"},     // COMBAT_DROWNDAMAGE (8)
+	{9, "absorbpercentice"},       // COMBAT_ICEDAMAGE (9)
+	{10, "absorbpercentholy"},     // COMBAT_HOLYDAMAGE (10)
+	{11, "absorbpercentdeath"},    // COMBAT_DEATHDAMAGE (11)
+	{12, "absorbpercentagony"},    // COMBAT_AGONYDAMAGE (12)
+	{13, "absorbpercentneutral"},  // COMBAT_NEUTRALDAMAGE (13)
 }
 
-// GetCombatAbsorbs computes multiplicative absorb per combat type from all
+// combatTypeToCipbia maps C++ combat type index (0-13) to CIPBIA element byte.
+// C++ calculateAbsorbValues writes getCipbiaElement(indexToCombatType(i)).
+var combatTypeToCipbia = [14]uint8{
+	0,  // 0: COMBAT_PHYSICAL → CIPBIA_PHYSICAL
+	1,  // 1: COMBAT_FIRE     → CIPBIA_FIRE
+	2,  // 2: COMBAT_EARTH    → CIPBIA_EARTH
+	3,  // 3: COMBAT_ENERGY   → CIPBIA_ENERGY
+	12, // 4: COMBAT_UNDEFINED→ CIPBIA_UNDEFINED
+	9,  // 5: COMBAT_LIFEDRAIN→ CIPBIA_LIFEDRAIN
+	10, // 6: COMBAT_MANADRAIN→ CIPBIA_MANADRAIN
+	7,  // 7: COMBAT_HEALING  → CIPBIA_HEALING
+	8,  // 8: COMBAT_DROWN    → CIPBIA_DROWN
+	4,  // 9: COMBAT_ICE      → CIPBIA_ICE
+	5,  // 10: COMBAT_HOLY    → CIPBIA_HOLY
+	6,  // 11: COMBAT_DEATH   → CIPBIA_DEATH
+	11, // 12: COMBAT_AGONY   → CIPBIA_AGONY
+	12, // 13: COMBAT_NEUTRAL → CIPBIA_UNDEFINED
+}
 // equipped items (matching C++ calculateAbsorbValues). It also applies the
 // player's base AbsorbPercent. Imbuement and wheel contributions are stubbed
 // (0) until those systems expose per-element absorb data.
 func (p *Player) GetCombatAbsorbs() []CombatAbsorb {
-	const combatCount = 11 // match elementKeyMap length
+	const combatCount = 14 // match C++ COMBAT_COUNT
 	// Start at 10000 (no reduction)
 	var mods [combatCount]int32
 	for i := range mods {
@@ -312,7 +461,7 @@ func (p *Player) GetCombatAbsorbs() []CombatAbsorb {
 		if mods[i] != 10000 {
 			clientModifier := float64(10000-mods[i]) / 10000.0
 			result = append(result, CombatAbsorb{
-				Element: uint8(i),
+				Element: combatTypeToCipbia[i],
 				Absorb:  clientModifier,
 			})
 		}
@@ -457,7 +606,41 @@ type ActiveFood struct {
 }
 
 func (p *Player) GetActiveFoods() []ActiveFood {
-	return nil
+	if p.ActiveFoodItems == nil {
+		return nil
+	}
+	var result []ActiveFood
+	for itemID, timeLeft := range p.ActiveFoodItems {
+		if timeLeft > 0 {
+			result = append(result, ActiveFood{
+				ItemID:   itemID,
+				TimeLeft: timeLeft,
+			})
+		}
+	}
+	return result
+}
+
+// UpdateFoodItem adds or updates a food item's remaining time. If timeLeft is 0
+// the entry is removed. Matches C++ Player::updateFood().
+func (p *Player) UpdateFoodItem(itemID uint16, timeLeft uint32) {
+	if timeLeft == 0 {
+		delete(p.ActiveFoodItems, itemID)
+	} else {
+		if p.ActiveFoodItems == nil {
+			p.ActiveFoodItems = make(map[uint16]uint32)
+		}
+		p.ActiveFoodItems[itemID] = timeLeft
+	}
+}
+
+// IsFoodActive returns true if the given food item ID has remaining time > 0.
+func (p *Player) IsFoodActive(itemID uint16) bool {
+	if p.ActiveFoodItems == nil {
+		return false
+	}
+	remaining, ok := p.ActiveFoodItems[itemID]
+	return ok && remaining > 0
 }
 
 type WeaponProficiencyAugment struct {
@@ -468,11 +651,173 @@ type WeaponProficiencyAugment struct {
 
 
 func (p *Player) GetWheelAugments() []WeaponProfAugment {
-	return nil
+	if p.Wheel == nil {
+		return nil
+	}
+
+	var result []WeaponProfAugment
+
+	// Unlocked instants — spells granted by maxing wheel slots
+	instants := p.Wheel.GetUnlockedInstants()
+	for name := range instants {
+		spellID := wheelInstantSpellID(name)
+		if spellID > 0 {
+			result = append(result, WeaponProfAugment{
+				SpellID: spellID,
+				Id:      0, // augment type: instant unlocked
+				Data:    1.0,
+			})
+		}
+	}
+
+	// Revelation stages — per-spell upgrades
+	for spellName, stage := range p.Wheel.RevelationStages {
+		if stage > 0 {
+			spellID := wheelRevelationSpellID(spellName)
+			if spellID > 0 {
+				result = append(result, WeaponProfAugment{
+					SpellID: spellID,
+					Id:      1, // augment type: revelation upgrade
+					Data:    float64(stage),
+				})
+			}
+		}
+	}
+
+	// Revelation points progress
+	for spellName, pts := range p.Wheel.RevelationPoints {
+		if pts > 0 {
+			spellID := wheelRevelationSpellID(spellName)
+			if spellID > 0 {
+				stage := p.Wheel.RevelationStages[spellName]
+				result = append(result, WeaponProfAugment{
+					SpellID: spellID,
+					Id:      2, // augment type: revelation points
+					Data:    float64(pts) - float64(stage)*250.0,
+				})
+			}
+		}
+	}
+
+	return result
+}
+
+// wheelInstantSpellID maps wheel instant names to spell IDs for cyclopedia use.
+func wheelInstantSpellID(name string) uint16 {
+	switch name {
+	case "green":
+		return 1
+	case "purple":
+		return 2
+	default:
+		return 0
+	}
+}
+
+// wheelRevelationSpellID maps revelation spell names to spell IDs.
+func wheelRevelationSpellID(name string) uint16 {
+	switch name {
+	case "inflict_wound", "Inflict Wound":
+		return 230
+	case "curse", "Curse":
+		return 231
+	case "blood_rage", "Blood Rage":
+		return 232
+	case "divine_caldera", "Divine Caldera", "divinecaldera":
+		return 235
+	case "groundshaker", "Groundshaker":
+		return 240
+	case "berserk", "Berserk":
+		return 241
+	case "fierce_berserk", "Fierce Berserk":
+		return 242
+	case "whirlwind_throw", "Whirlwind Throw":
+		return 245
+	case "ethereal_spear", "Ethereal Spear":
+		return 246
+	case "annihilation", "Annihilation":
+		return 247
+	case "expose_weakness", "Expose Weakness":
+		return 248
+	case "executioner_throw", "Executioner Throw":
+		return 249
+	case "revelation_magic":
+		return 250
+	case "divine_missile", "Divine Missile":
+		return 251
+	default:
+		return 0
+	}
 }
 
 func (p *Player) GetEquippedAugments() []WeaponProfAugment {
-	return nil
+	var result []WeaponProfAugment
+	seen := make(map[string]bool) // dedup by "spellID:id"
+
+	for s := ConstSlotFirst; s <= ConstSlotLast; s++ {
+		if int(s) >= len(p.Inventory) || p.Inventory[s] == nil {
+			continue
+		}
+		item := p.Inventory[s]
+
+		// Check weapon proficiency augments for this item's weapon type
+		if p.WeaponProficiency != nil {
+			augs := p.WeaponProficiency.GetAugments(item.ID)
+			for _, a := range augs {
+				key := fmt.Sprintf("%d:%d", a.SpellID, a.Id)
+				if !seen[key] {
+					seen[key] = true
+					result = append(result, a)
+				}
+			}
+		}
+
+		// Check item type Stats for augment-like attributes
+		t := p.World.Items.Get(item.ID)
+		if t != nil && t.Stats != nil {
+			for key, val := range t.Stats {
+				if !strings.HasPrefix(key, "augment") {
+					continue
+				}
+				// Parse augment data from stat key: "augment_<spellID>_<id>"
+				aug := parseAugmentStat(key, val)
+				if aug != nil {
+					dup := fmt.Sprintf("%d:%d", aug.SpellID, aug.Id)
+					if !seen[dup] {
+						seen[dup] = true
+						result = append(result, *aug)
+					}
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+// parseAugmentStat attempts to extract a WeaponProfAugment from a stat key like
+// "augment_<spellID>_<id>". Returns nil if the key doesn't match the pattern.
+func parseAugmentStat(key string, val int32) *WeaponProfAugment {
+	parts := strings.Split(key, "_")
+	if len(parts) < 3 {
+		return nil
+	}
+	if parts[0] != "augment" {
+		return nil
+	}
+	spellID, err := strconv.ParseUint(parts[1], 10, 16)
+	if err != nil {
+		return nil
+	}
+	augID, err := strconv.ParseUint(parts[2], 10, 8)
+	if err != nil {
+		return nil
+	}
+	return &WeaponProfAugment{
+		SpellID: uint16(spellID),
+		Id:      uint8(augID),
+		Data:    float64(val),
+	}
 }
 
 // ============================================================================
@@ -504,6 +849,17 @@ const (
 	CipbiaElementAgony     = 11
 	CipbiaElementUndefined = 12
 )
+
+// ShieldSkillMitigationFactor returns the base mitigation factor contribution from
+// shield skill: shieldSkill * vocation.mitigationFactor / 10000.
+// Used in cyclopedia DefenceStats to match C++ protocol output.
+func (p *Player) ShieldSkillMitigationFactor() float64 {
+	voc := vocations.GetVocation(uint32(p.Vocation))
+	if voc == nil {
+		return 0.0
+	}
+	return float64(p.GetEffectiveSkill(SkillShielding)) * voc.Mitigation.Multiplier / 10000.0
+}
 
 func GetCipbiaElement(idx int) uint8 {
 	switch idx {

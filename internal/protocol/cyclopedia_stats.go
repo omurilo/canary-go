@@ -320,7 +320,7 @@ func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
 	w.AddDouble(p.GetMitigation()/100.0, 4)        // mitigation
 	w.AddDouble(0.0, 4)                              // (unused)
 	w.AddDouble(float64(p.GetDefenseEquipment())/10000.0, 4) // shield def from equipment
-	w.AddDouble(0.0, 4)                              // shield skill * mitigationFactor (TBD)
+	w.AddDouble(p.ShieldSkillMitigationFactor(), 4)  // shield skill * mitigationFactor / 10000
 	w.AddDouble(0.0, 4)                              // wheel mitigation multiplier (TBD)
 
 	absorbs := p.GetCombatAbsorbs()

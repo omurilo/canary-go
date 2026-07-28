@@ -18,24 +18,31 @@ type VocationSkill struct {
 	Multiplier float64 `xml:"multiplier,attr"`
 }
 
+type VocationMitigation struct {
+	Multiplier      float64 `xml:"multiplier,attr"`
+	PrimaryShield   float64 `xml:"primaryShield,attr"`
+	SecondaryShield float64 `xml:"secondaryShield,attr"`
+}
+
 type Vocation struct {
-	ID             uint32          `xml:"id,attr"`
-	Name           string          `xml:"name,attr"`
-	FromVoc        uint32          `xml:"fromvoc,attr"`
-	GainHP         uint32          `xml:"gainhp,attr"`
-	GainMana       uint32          `xml:"gainmana,attr"`
-	GainCap        uint32          `xml:"gaincap,attr"`
-	GainHPTicks    int             `xml:"gainhpticks,attr"`
-	GainHPAmount   int             `xml:"gainhpamount,attr"`
-	GainManaTicks  int             `xml:"gainmanaticks,attr"`
-	GainManaAmount int             `xml:"gainmanaamount,attr"`
-	AttackSpeed    int             `xml:"attackspeed,attr"`
-	ManaMultiplier float64         `xml:"manamultiplier,attr"`
-	BaseSpeed      int             `xml:"basespeed,attr"`
-	SoulMax        uint8           `xml:"soulmax,attr"`
-	GainSoulTicks  uint32          `xml:"gainsoulticks,attr"`
-	Formula        VocationFormula `xml:"formula"`
-	Skills         []VocationSkill `xml:"skill"`
+	ID             uint32             `xml:"id,attr"`
+	Name           string             `xml:"name,attr"`
+	FromVoc        uint32             `xml:"fromvoc,attr"`
+	GainHP         uint32             `xml:"gainhp,attr"`
+	GainMana       uint32             `xml:"gainmana,attr"`
+	GainCap        uint32             `xml:"gaincap,attr"`
+	GainHPTicks    int                `xml:"gainhpticks,attr"`
+	GainHPAmount   int                `xml:"gainhpamount,attr"`
+	GainManaTicks  int                `xml:"gainmanaticks,attr"`
+	GainManaAmount int                `xml:"gainmanaamount,attr"`
+	AttackSpeed    int                `xml:"attackspeed,attr"`
+	ManaMultiplier float64            `xml:"manamultiplier,attr"`
+	BaseSpeed      int                `xml:"basespeed,attr"`
+	SoulMax        uint8              `xml:"soulmax,attr"`
+	GainSoulTicks  uint32             `xml:"gainsoulticks,attr"`
+	Formula        VocationFormula    `xml:"formula"`
+	Mitigation     VocationMitigation `xml:"mitigation"`
+	Skills         []VocationSkill    `xml:"skill"`
 }
 
 type VocationsList struct {
