@@ -84,7 +84,7 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 	case cyclopediaCharacterInfoTitles: // 11
 		g.sendCyclopediaCharacterTitles()
 	case cyclopediaCharacterInfoWheel: // 12
-		g.sendCyclopediaCharacterWheel()
+		g.SendWheelOfDestiny()
 	case cyclopediaCharacterInfoOffenceStats: // 13
 		g.sendCyclopediaCharacterOffenceStats()
 	case cyclopediaCharacterInfoDefenceStats: // 14

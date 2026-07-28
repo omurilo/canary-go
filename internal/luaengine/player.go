@@ -846,14 +846,12 @@ func playerAddtitle(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	title := L.CheckString(2)
-	for _, t := range p.TitleStrings {
-		if t == title {
-			L.Push(lua.LFalse)
-			return 1
-		}
+	id := uint8(luaOptInt(L, 2))
+	if p.GetTitles().IsUnlocked(id) {
+		L.Push(lua.LFalse)
+		return 1
 	}
-	p.TitleStrings = append(p.TitleStrings, title)
+	p.GetTitles().Unlock(id)
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -3755,6 +3753,8 @@ func playerSetcurrenttitle(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
+	id := uint8(luaOptInt(L, 2))
+	p.GetTitles().CurrentID = id
 	L.Push(lua.LTrue)
 	return 1
 }
