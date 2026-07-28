@@ -88,7 +88,7 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		"getItemByType": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			itemID := uint16(L.CheckInt(2))
-			
+
 			if t.tile.Ground != nil && t.tile.Ground.ID == itemID {
 				e.pushItem(L, t.tile.Ground)
 				return 1
@@ -105,7 +105,7 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		"getItemById": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			itemID := uint16(L.CheckInt(2))
-			
+
 			if t.tile.Ground != nil && t.tile.Ground.ID == itemID {
 				e.pushItem(L, t.tile.Ground)
 				return 1
@@ -307,7 +307,15 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		"getFieldItem": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			if t.tile == nil { L.Push(lua.LNil); return 1 }
-			// Find magic field item
+			cat := e.itemCatalog()
+			for _, it := range t.tile.Items {
+				if cat != nil {
+					if typ := cat.Get(it.ID); typ != nil && typ.TypeName == "magicfield" {
+						e.pushItem(L, it)
+						return 1
+					}
+				}
+			}
 			L.Push(lua.LNil)
 			return 1
 		},
@@ -315,31 +323,84 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			t := checkTile(L, 1)
 			if t.tile == nil { L.Push(lua.LNil); return 1 }
 			order := L.CheckInt(2)
-			_ = order
+			cat := e.itemCatalog()
+			for _, it := range t.tile.Items {
+				if cat != nil {
+					if typ := cat.Get(it.ID); typ != nil && int(typ.AlwaysOnTopOrder) == order {
+						e.pushItem(L, it)
+						return 1
+					}
+				}
+			}
 			L.Push(lua.LNil)
 			return 1
 		},
 		"getBottomVisibleCreature": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			if t.tile == nil { L.Push(lua.LNil); return 1 }
+			if len(t.tile.Creatures) > 0 {
+				e.pushCreature(L, t.tile.Creatures[len(t.tile.Creatures)-1])
+				return 1
+			}
 			L.Push(lua.LNil)
 			return 1
 		},
 		"getDownItemCount": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			if t.tile == nil { L.Push(lua.LNumber(0)); return 1 }
-			L.Push(lua.LNumber(0))
+			count := 0
+			cat := e.itemCatalog()
+			for _, it := range t.tile.Items {
+				if cat != nil {
+					if typ := cat.Get(it.ID); typ != nil && typ.AlwaysOnTopOrder == 0 {
+						count++
+					}
+				}
+			}
+			L.Push(lua.LNumber(count))
 			return 1
 		},
 		"getTopItemCount": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			if t.tile == nil { L.Push(lua.LNumber(0)); return 1 }
-			L.Push(lua.LNumber(0))
+			count := 0
+			cat := e.itemCatalog()
+			for _, it := range t.tile.Items {
+				if cat != nil {
+					if typ := cat.Get(it.ID); typ != nil && typ.AlwaysOnTopOrder > 0 {
+						count++
+					}
+				}
+			}
+			L.Push(lua.LNumber(count))
 			return 1
 		},
 		"getThingIndex": func(L *lua.LState) int {
 			t := checkTile(L, 1)
 			if t.tile == nil { L.Push(lua.LNumber(0)); return 1 }
+			if L.GetTop() < 2 { L.Push(lua.LNumber(0)); return 1 }
+			ud, ok := L.Get(2).(*lua.LUserData)
+			if !ok { L.Push(lua.LNumber(0)); return 1 }
+			// Check for creature
+			for i, cr := range t.tile.Creatures {
+				if ud.Value == cr {
+					L.Push(lua.LNumber(i + 1))
+					return 1
+				}
+			}
+			// Check for luaItem
+			if li, ok := ud.Value.(luaItem); ok {
+				if t.tile.Ground != nil && t.tile.Ground == li.item {
+					L.Push(lua.LNumber(0))
+					return 1
+				}
+				for i, it := range t.tile.Items {
+					if it == li.item {
+						L.Push(lua.LNumber(i + 1))
+						return 1
+					}
+				}
+			}
 			L.Push(lua.LNumber(0))
 			return 1
 		},
