@@ -22,6 +22,9 @@ const (
 // the "open a container" outcome are supported, mirroring the container branch of
 // Game::playerUseItem. Layout: position, itemId u16, stackpos u8, index u8.
 func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	pos := r.GetPosition()
 	itemID := r.GetU16()
 	stackpos := r.GetByte() // stackpos
@@ -30,6 +33,12 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	item := g.getItemAt(pos, itemID, stackpos)
 	if item == nil {
 		return
+	}
+	gamePos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
+	if pos.X != 0xFFFF {
+		if dist := g.player.Pos.MaxDistance(gamePos); dist < 0 || dist > 8 {
+			return
+		}
 	}
 
 	t := g.deps.Items.Get(item.ID)
@@ -448,10 +457,11 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 
 // parseCloseContainer handles a close-container request (0x87) and confirms it.
 func (g *GameProtocol) parseCloseContainer(r *netmsg.Reader) {
-	cid := r.GetByte()
-	if g.player != nil {
-		g.player.CloseContainer(cid)
+	if g.player == nil {
+		return
 	}
+	cid := r.GetByte()
+	g.player.CloseContainer(cid)
 	w := netmsg.NewWriter()
 	w.AddByte(opContainerClose)
 	w.AddByte(cid)
@@ -598,6 +608,9 @@ func absDiffByte(a, b uint8) uint8 {
 
 // parseUseItemWith handles a use-item-with request (0x83).
 func (g *GameProtocol) parseUseItemWith(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	fromPos := r.GetPosition()
 	fromItemID := r.GetU16()
 	fromStackPos := r.GetByte()
@@ -611,6 +624,16 @@ func (g *GameProtocol) parseUseItemWith(r *netmsg.Reader) {
 	if fromItem == nil {
 		g.deps.Log.Debug("parseUseItemWith: fromItem is nil")
 		return
+	}
+	fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+	toGamePos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
+	if dist := g.player.Pos.MaxDistance(fromGamePos); dist < 0 || dist > 8 {
+		return
+	}
+	if fromPos.X != 0xFFFF && toPos.X != 0xFFFF {
+		if dist := g.player.Pos.MaxDistance(toGamePos); dist < 0 || dist > 8 {
+			return
+		}
 	}
 
 	toItem := g.getItemAt(toPos, toItemID, toStackPos)
@@ -653,6 +676,9 @@ func (g *GameProtocol) parseUseItemWith(r *netmsg.Reader) {
 
 // parseUseWithCreature handles a use-item-with-creature request (0x84).
 func (g *GameProtocol) parseUseWithCreature(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	fromPos := r.GetPosition()
 	fromItemID := r.GetU16()
 	fromStackPos := r.GetByte()
@@ -665,10 +691,19 @@ func (g *GameProtocol) parseUseWithCreature(r *netmsg.Reader) {
 		g.deps.Log.Debug("parseUseWithCreature: fromItem is nil")
 		return
 	}
+	fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+	if fromPos.X != 0xFFFF {
+		if dist := g.player.Pos.MaxDistance(fromGamePos); dist < 0 || dist > 8 {
+			return
+		}
+	}
 
 	targetCreature := g.deps.World.CreatureByID(creatureID)
 	if targetCreature == nil {
 		g.deps.Log.Debug("parseUseWithCreature: targetCreature is nil", "creatureID", creatureID)
+		return
+	}
+	if dist := g.player.Pos.MaxDistance(targetCreature.GetPosition()); dist < 0 || dist > 8 {
 		return
 	}
 

@@ -8,11 +8,19 @@ import (
 
 // parseItemMove handles an item move/throw request (0x78)
 func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	fromPos := r.GetPosition()
 	spriteID := r.GetU16()
 	fromStack := r.GetByte()
 	toPos := r.GetPosition()
 	count := r.GetByte()
+
+	// Reject moves where source and destination are the same position on the map
+	if fromPos.X != 0xFFFF && toPos.X != 0xFFFF && fromPos.X == toPos.X && fromPos.Y == toPos.Y && fromPos.Z == toPos.Z {
+		return
+	}
 
 	var item *game.Item
 	var fromContainer *game.Item
@@ -47,6 +55,20 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 
 	if item == nil || item.ID != spriteID {
 		return // Invalid move (item not found or ID mismatch)
+	}
+
+	// Distance check: player must be within range of both source and destination
+	if fromPos.X != 0xFFFF {
+		fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+		if dist := g.player.Pos.MaxDistance(fromGamePos); dist < 0 || dist > 8 {
+			return
+		}
+	}
+	if toPos.X != 0xFFFF {
+		toGamePos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
+		if dist := g.player.Pos.MaxDistance(toGamePos); dist < 0 || dist > 8 {
+			return
+		}
 	}
 
 	if g.deps.Events != nil {

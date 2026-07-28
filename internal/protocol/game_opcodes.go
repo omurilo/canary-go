@@ -8,6 +8,9 @@ import (
 
 // parseRetrieveDepotSearch handles 0x29 — depot search item request.
 func (g *GameProtocol) parseRetrieveDepotSearch(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	_ = r.GetU16() // itemId
 	g.deps.Log.Debug("depot search", "player", g.player.Name)
 }
@@ -19,6 +22,9 @@ func (g *GameProtocol) parseCyclopediaMonsterTracker(r *netmsg.Reader) {
 
 // parsePartyAnalyzerAction handles 0x2B — party analyzer action.
 func (g *GameProtocol) parsePartyAnalyzerAction(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	action := r.GetByte()
 	_ = action
 	g.deps.Log.Debug("party analyzer action", "player", g.player.Name, "action", action)
@@ -26,6 +32,9 @@ func (g *GameProtocol) parsePartyAnalyzerAction(r *netmsg.Reader) {
 
 // parseLeaderFinderWindow handles 0x2C — Team Finder leader window actions.
 func (g *GameProtocol) parseLeaderFinderWindow(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	action := r.GetByte()
 	switch action {
 	case 0: // refresh
@@ -51,6 +60,9 @@ func (g *GameProtocol) parseLeaderFinderWindow(r *netmsg.Reader) {
 
 // parseMemberFinderWindow handles 0x2D — Team Finder member window actions.
 func (g *GameProtocol) parseMemberFinderWindow(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	action := r.GetByte()
 	if action == 0 {
 		g.deps.World.SendTeamFinderList(g.player.ID)
@@ -66,16 +78,25 @@ func (g *GameProtocol) parseMemberFinderWindow(r *netmsg.Reader) {
 
 // parseSetClientOptions handles 0x2E — client display options.
 func (g *GameProtocol) parseSetClientOptions(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	g.deps.Log.Debug("client options", "player", g.player.Name, "len", r.Remaining())
 }
 
 // parsePlayerTyping handles 0x38 — player typing status.
 func (g *GameProtocol) parsePlayerTyping(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	_ = r.GetByte() // 1 = typing, 0 = stopped
 }
 
 // parseInventoryImbuements handles 0x60 — inventory imbuement data from client.
 func (g *GameProtocol) parseInventoryImbuements(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	g.deps.Log.Debug("inventory imbuements", "player", g.player.Name)
 }
 
@@ -91,12 +112,18 @@ func (g *GameProtocol) parseClientCheck(r *netmsg.Reader) {
 
 // parseSetVocation handles 0x6E — Dawnport vocation selection.
 func (g *GameProtocol) parseSetVocation(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	vocationID := r.GetByte()
 	g.deps.World.PlayerSetVocation(g.player.ID, vocationID)
 }
 
 // parseTeleport handles 0x73 — GM teleport command.
 func (g *GameProtocol) parseTeleport(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	pos := r.GetPosition()
 	gamePos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
 	g.deps.World.PlayerTeleport(g.player.ID, gamePos)
@@ -104,6 +131,9 @@ func (g *GameProtocol) parseTeleport(r *netmsg.Reader) {
 
 // parseStartOfflineTraining handles 0x74 — start offline training.
 func (g *GameProtocol) parseStartOfflineTraining(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	skillID := r.GetByte()
 	if skillID >= 0 && skillID <= 6 {
 		g.player.OfflineTrainingSkill = int8(skillID)
@@ -113,6 +143,9 @@ func (g *GameProtocol) parseStartOfflineTraining(r *netmsg.Reader) {
 
 // parseContainerAction handles 0x75 — container action.
 func (g *GameProtocol) parseContainerAction(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	action := r.GetByte()
 	containerID := r.GetByte()
 	_ = containerID
@@ -127,6 +160,9 @@ func (g *GameProtocol) parseHotkeyEquip(r *netmsg.Reader) {
 
 // parseLookInShop handles 0x79 — look at an item in the shop window.
 func (g *GameProtocol) parseLookInShop(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	itemID := r.GetU16()
 	count := r.GetByte()
 	_ = count
@@ -144,6 +180,9 @@ func (g *GameProtocol) parseLookInShop(r *netmsg.Reader) {
 
 // parseRequestTrade handles 0x7D — player requests trade with another player.
 func (g *GameProtocol) parseRequestTrade(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	pos := r.GetPosition()
 	itemID := r.GetU16()
 	stackPos := r.GetByte()
@@ -161,11 +200,17 @@ func (g *GameProtocol) parseLookInTrade(r *netmsg.Reader) {
 
 // parseAcceptTrade handles 0x7F — accept the current trade.
 func (g *GameProtocol) parseAcceptTrade(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	g.deps.World.PlayerAcceptTrade(g.player.ID)
 }
 
 // parseCloseTrade handles 0x80 — close/cancel the current trade.
 func (g *GameProtocol) parseCloseTrade(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	g.deps.World.PlayerCloseTrade(g.player.ID)
 }
 
@@ -177,6 +222,9 @@ func (g *GameProtocol) parseFriendSystemAction(r *netmsg.Reader) {
 
 // parseRotateItem handles 0x85 — rotate an item on the map.
 func (g *GameProtocol) parseRotateItem(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	pos := r.GetPosition()
 	itemID := r.GetU16()
 	stackPos := r.GetByte()
@@ -218,6 +266,9 @@ func (g *GameProtocol) parseLookInBattleList(r *netmsg.Reader) {
 
 // parseJoinAggression handles 0x8E — join aggression against a target.
 func (g *GameProtocol) parseJoinAggression(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	targetID := r.GetU32()
 	g.deps.World.PlayerJoinAggression(g.player.ID, targetID)
 }
@@ -258,6 +309,9 @@ func (g *GameProtocol) parseGetTextForReport(r *netmsg.Reader) {
 
 // parseCloseNpcChannel handles 0x9E — close NPC trade channel.
 func (g *GameProtocol) parseCloseNpcChannel(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	g.deps.World.PlayerCloseNpcChannel(g.player.ID)
 }
 
@@ -270,6 +324,9 @@ func (g *GameProtocol) parseSetMonsterPodium(r *netmsg.Reader) {
 
 // parseFollow handles 0xA2 — follow a creature.
 func (g *GameProtocol) parseFollow(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	targetID := r.GetU32()
 	g.deps.World.PlayerFollow(g.player.ID, targetID)
 }
@@ -289,3 +346,9 @@ func (g *GameProtocol) parseCyclopediaMapAction(r *netmsg.Reader) { if g.player 
 func (g *GameProtocol) parseBlessingWindowRequest(r *netmsg.Reader) { if g.player == nil { return }; g.sendStatusText("Blessings window.") }
 func (g *GameProtocol) parseRequestOutfit(r *netmsg.Reader) { if g.player == nil { return }; g.deps.Lua.Call("onPlayerRequestOutfit", g.player.Name) }
 func (g *GameProtocol) parseBugReport(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte(); _ = r.GetByte(); _ = r.GetString(); _ = r.GetString() }
+
+func (g *GameProtocol) parseMode(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte() }
+func (g *GameProtocol) parsePingBack(r *netmsg.Reader) { if g.player == nil { return } }
+func (g *GameProtocol) parseQuestTracker(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte() }
+func (g *GameProtocol) parseReceivePing(r *netmsg.Reader) { if g.player == nil { return } }
+func (g *GameProtocol) parseTrackAnalysis(r *netmsg.Reader) { if g.player == nil { return } }

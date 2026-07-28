@@ -95,28 +95,68 @@ func (g *GameProtocol) handleCommand(text string) bool {
 	case "pos", "position":
 		g.sendStatusText(fmt.Sprintf("Position: [%d, %d, %d]", p.Pos.X, p.Pos.Y, p.Pos.Z))
 	case "up":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.floorTeleport(-1)
 	case "down":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.floorTeleport(+1)
 	case "goto", "go", "cliport":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdGoto(args)
 	case "town", "t":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdTown(args)
 	case "i", "create":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdCreateItem(args)
 	case "addskill":
 		g.cmdAddSkill(args)
 	case "save":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdSave()
 	case "b", "broadcast":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdBroadcast(args)
 	case "outfit":
 		g.SendOutfitWindow()
 	case "addexp":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdAddExp(args)
 	case "addmoney":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdAddMoney(args)
 	case "level":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdSetLevel(args)
 	case "health", "hp":
 		g.cmdSetHealth(args)
@@ -129,12 +169,24 @@ func (g *GameProtocol) handleCommand(text string) bool {
 	case "info":
 		g.cmdInfo()
 	case "skull":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdSkull(args)
 	case "sex", "gender":
 		g.cmdToggleSex()
 	case "summon":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdSummon(args)
 	case "kick":
+		if p.AccountType < 5 {
+			g.sendStatusText("You don't have access to this command.")
+			return true
+		}
 		g.cmdKick(args)
 	case "commands", "help":
 		g.sendStatusText("Commands: /pos /goto /up /down /town /i /addexp /addmoney /level /health /mana /speed /online /info /skull /sex /summon /kick /b /save /addskill /outfit")

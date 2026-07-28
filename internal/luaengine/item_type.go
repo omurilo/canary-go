@@ -187,6 +187,306 @@ func (e *Engine) registerItemType() {
 			}
 			return 1
 		},
+		// -- boolean property checks --
+		"isDoor": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.IsDoor))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"isBlocking": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.BlockSolid))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"isGroundTile": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.IsGround()))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"isMagicField": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.TypeName == "magicfield"))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"isPickupable": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.Pickupable))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"isKey": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.TypeName == "key"))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"isWeapon": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.WeaponType != ""))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"isLadder": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.IsLadder))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"isForceUse": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.ForceUse))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"hasHeight": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.HasHeight))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"isPodium": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.Podium))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"getShowDuration": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.ShowDuration))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		"getShowCharges": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			if it.item != nil {
+				L.Push(lua.LBool(it.item.ShowCharges))
+			} else {
+				L.Push(lua.LBool(false))
+			}
+			return 1
+		},
+		// -- numeric getters --
+		"getAttack": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := int32(0)
+			if it.item != nil {
+				val = it.item.Attack
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getDefense": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := int32(0)
+			if it.item != nil {
+				val = it.item.Defense
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getExtraDefense": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := int32(0)
+			if it.item != nil {
+				val = it.item.ExtraDefense
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getArmor": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := int32(0)
+			if it.item != nil {
+				val = it.item.Armor
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getHitChance": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := int32(0)
+			if it.item != nil {
+				val = it.item.HitChance
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getShootRange": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := int32(0)
+			if it.item != nil {
+				val = it.item.Range
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getDecayTime": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := uint32(0)
+			if it.item != nil {
+				val = it.item.Duration
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getGroundSpeed": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := uint16(0)
+			if it.item != nil {
+				val = it.item.GroundSpeed
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getAlwaysOnTopOrder": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := uint8(0)
+			if it.item != nil {
+				val = it.item.AlwaysOnTopOrder
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getMaxHitChance": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := int32(0)
+			if it.item != nil {
+				val = it.item.MaxHitChance
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getCapacity": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := uint32(0)
+			if it.item != nil {
+				val = it.item.Capacity
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getUpgradeClassification": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := uint8(0)
+			if it.item != nil {
+				val = it.item.UpgradeClassification
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getTransformEquipId": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := uint16(0)
+			if it.item != nil {
+				val = it.item.TransformEquipTo
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		"getTransformDeEquipId": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := uint16(0)
+			if it.item != nil {
+				val = it.item.TransformDeEquipTo
+			}
+			L.Push(lua.LNumber(val))
+			return 1
+		},
+		// -- string getters --
+		"getDescription": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := ""
+			if it.item != nil {
+				val = it.item.Description
+			}
+			L.Push(lua.LString(val))
+			return 1
+		},
+		"getSlotPosition": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := ""
+			if it.item != nil {
+				val = it.item.SlotPosition
+			}
+			L.Push(lua.LString(val))
+			return 1
+		},
+		"getSlotType": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := ""
+			if it.item != nil {
+				val = it.item.SlotType
+			}
+			L.Push(lua.LString(val))
+			return 1
+		},
+		"getTypeName": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := ""
+			if it.item != nil {
+				val = it.item.TypeName
+			}
+			L.Push(lua.LString(val))
+			return 1
+		},
+		"getFloorChange": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := ""
+			if it.item != nil {
+				val = it.item.FloorChange
+			}
+			L.Push(lua.LString(val))
+			return 1
+		},
+		"getShootType": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			val := ""
+			if it.item != nil {
+				val = it.item.ShootType
+			}
+			L.Push(lua.LString(val))
+			return 1
+		},
 	}
 
 	e.L.SetFuncs(mt, methods)

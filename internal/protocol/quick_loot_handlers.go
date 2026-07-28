@@ -7,6 +7,9 @@ import (
 
 // parseQuickLoot handles opcode 0x8F (Quick Loot request).
 func (g *GameProtocol) parseQuickLoot(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	variant := r.GetByte()
 	if variant == 2 {
 		// Loot nearby corpses
@@ -25,6 +28,9 @@ func (g *GameProtocol) parseQuickLoot(r *netmsg.Reader) {
 
 // parseLootContainer handles opcode 0x90 (Manage Loot Containers / Categories).
 func (g *GameProtocol) parseLootContainer(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	action := r.GetByte()
 	switch action {
 	case 0: // Set managed container (Loot)
@@ -64,6 +70,9 @@ func (g *GameProtocol) parseLootContainer(r *netmsg.Reader) {
 
 // parseQuickLootBlackWhitelist handles opcode 0x91 (Set Skipped / Accepted items list).
 func (g *GameProtocol) parseQuickLootBlackWhitelist(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	filter := r.GetByte()
 	count := int(r.GetU16())
 	var listedItems []uint16

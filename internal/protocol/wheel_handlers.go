@@ -43,6 +43,9 @@ func (g *GameProtocol) sendGiftOfLifeCooldown() {
 
 // parseOpenWheel handles opcode 0x61 (Open Wheel of Destiny window).
 func (g *GameProtocol) parseOpenWheel(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	_ = r.GetU32() // ownerID
 	g.SendWheelOfDestiny()
 }
@@ -50,6 +53,9 @@ func (g *GameProtocol) parseOpenWheel(r *netmsg.Reader) {
 // parseSaveWheel handles opcode 0x62 (Save Wheel of Destiny allocations).
 // In Tibia 13.x protocol, the client sends 36 uint16 values representing allocated points for slots 1..36.
 func (g *GameProtocol) parseSaveWheel(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	g.applyWheelSave(r)
 }
 
@@ -118,6 +124,9 @@ func (g *GameProtocol) wheelOptions() byte {
 
 // parseWheelOfDestiny handles opcode 0xEC (Legacy / Alternative Wheel request).
 func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	if r.Remaining() < 1 {
 		return
 	}
@@ -133,6 +142,9 @@ func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
 // parseWheelGemAction handles opcode 0xE7 (Wheel of Destiny Gem actions / enhance mod grade).
 // Wire format (C++): [u8 action][u8 param][u8 pos] — param and pos are BOTH u8!
 func (g *GameProtocol) parseWheelGemAction(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	if r.Remaining() < 1 {
 		return
 	}

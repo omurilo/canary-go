@@ -166,6 +166,313 @@ func (e *Engine) registerMonsterType() {
 			L.Push(lua.LTrue)
 			return 1
 		},
+
+		// -- Boolean flag getters --
+
+		"isAttackable": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(mt.Flags.Attackable))
+			return 1
+		},
+		"isConvinceable": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(mt.Flags.Convinceable))
+			return 1
+		},
+		"isSummonable": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(mt.Flags.Summonable))
+			return 1
+		},
+		"isIllusionable": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(mt.Flags.Illusionable))
+			return 1
+		},
+		"isHostile": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(mt.Flags.Hostile))
+			return 1
+		},
+		"isPushable": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(mt.Flags.Pushable))
+			return 1
+		},
+		"isHealthHidden": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(mt.Flags.HealthHidden))
+			return 1
+		},
+		"isBlockable": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(true))
+			return 1
+		},
+		"isPreyable": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(true))
+			return 1
+		},
+		"isRewardBoss": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(mt.Flags.RewardBoss))
+			return 1
+		},
+		"canPushItems": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(mt.Flags.CanPushItems))
+			return 1
+		},
+		"canPushCreatures": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LBool(mt.Flags.CanPushCreatures))
+			return 1
+		},
+
+		// -- Numeric getters --
+
+		"health": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.MaxHealth))
+			return 1
+		},
+		"maxHealth": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.MaxHealth))
+			return 1
+		},
+		"experience": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.Experience))
+			return 1
+		},
+		"armor": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"defense": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"baseSpeed": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.Speed))
+			return 1
+		},
+		"manaCost": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"race": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"corpseId": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.Corpse))
+			return 1
+		},
+		"light": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"staticAttackChance": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.Flags.StaticAttackChance))
+			return 1
+		},
+		"yellChance": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"yellSpeedTicks": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"changeTargetChance": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"changeTargetSpeed": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+
+		// -- String getters --
+
+		"nameDescription": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LString(""))
+			return 1
+		},
+		"getTypeName": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LString(mt.Name))
+			return 1
+		},
+
+		// -- Bestiary methods --
+
+		"BestiaryClass": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LString(mt.BestiaryClass))
+			return 1
+		},
+		"BestiaryOccurrence": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.BestiaryOccurrence))
+			return 1
+		},
+		"BestiaryStars": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.BestiaryStars))
+			return 1
+		},
+		"BestiaryLocations": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(L.NewTable())
+			return 1
+		},
+		"BestiaryCharmsPoints": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.BestiaryCharmsPoints))
+			return 1
+		},
+		"BestiaryFirstUnlock": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.BestiaryFirstUnlock))
+			return 1
+		},
+		"BestiarySecondUnlock": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.BestiarySecondUnlock))
+			return 1
+		},
+		"BestiarytoKill": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.BestiaryToKill))
+			return 1
+		},
+		"Bestiaryrace": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(mt.BestiaryRace))
+			return 1
+		},
+
+		// -- Other methods --
+
+		"getAttackList": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			tbl := L.NewTable()
+			for i, atk := range mt.Attacks {
+				subTbl := L.NewTable()
+				subTbl.RawSetString("name", lua.LString(atk.Name))
+				subTbl.RawSetString("interval", lua.LNumber(atk.Interval))
+				subTbl.RawSetString("chance", lua.LNumber(atk.Chance))
+				subTbl.RawSetString("minDamage", lua.LNumber(atk.MinDamage))
+				subTbl.RawSetString("maxDamage", lua.LNumber(atk.MaxDamage))
+				subTbl.RawSetString("range", lua.LNumber(atk.Range))
+				subTbl.RawSetString("combatType", lua.LString(atk.CombatType))
+				tbl.RawSetInt(i+1, subTbl)
+			}
+			L.Push(tbl)
+			return 1
+		},
+		"getDefenseList": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(L.NewTable())
+			return 1
+		},
+		"getLoot": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			tbl := L.NewTable()
+			for i, loot := range mt.Loot {
+				subTbl := L.NewTable()
+				subTbl.RawSetString("id", lua.LNumber(loot.ID))
+				subTbl.RawSetString("name", lua.LString(loot.Name))
+				subTbl.RawSetString("chance", lua.LNumber(loot.Chance))
+				subTbl.RawSetString("maxCount", lua.LNumber(loot.CountMax))
+				subTbl.RawSetString("minCount", lua.LNumber(loot.CountMin))
+				tbl.RawSetInt(i+1, subTbl)
+			}
+			L.Push(tbl)
+			return 1
+		},
+		"getVoices": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(L.NewTable())
+			return 1
+		},
+		"getElementList": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(L.NewTable())
+			return 1
+		},
+		"getSummonList": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(L.NewTable())
+			return 1
+		},
+		"maxSummons": func(L *lua.LState) int {
+			mt := checkMonsterType(L)
+			if mt == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
 	}
 	
 	// Resilient __index fallback: if a method on MonsterType doesn't exist,

@@ -15,6 +15,27 @@ func checkMonster(L *lua.LState) *game.Monster {
 	return nil
 }
 
+// pushCreatureToLua pushes a Creature value as a Lua userdata with the correct
+// metatable (Player, Monster, or generic Creature). This is a standalone helper
+// for functions that do not have access to the Engine reference.
+func pushCreatureToLua(L *lua.LState, c game.Creature) {
+	if c == nil {
+		L.Push(lua.LNil)
+		return
+	}
+	ud := L.NewUserData()
+	ud.Value = c
+	switch c.(type) {
+	case *game.Player:
+		L.SetMetatable(ud, L.GetTypeMetatable("Player"))
+	case *game.Monster:
+		L.SetMetatable(ud, L.GetTypeMetatable("Monster"))
+	default:
+		L.SetMetatable(ud, L.GetTypeMetatable("Creature"))
+	}
+	L.Push(ud)
+}
+
 // registerMonster registers the Monster userdata type.
 func (e *Engine) registerMonster() {
 	mt := e.L.NewTypeMetatable("Monster")
@@ -86,14 +107,37 @@ var monsterMethods = map[string]lua.LGFunction{
 }
 
 func monsterAddattackspell(L *lua.LState) int {
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	ud := L.CheckUserData(2)
+	if s, ok := ud.Value.(*luaMonsterSpell); ok {
+		spell := game.MonsterSpellFromAttack(s.Attack)
+		m.AttackSpells = append(m.AttackSpells, spell)
+	}
 	return 0
 }
 
 func monsterAdddefense(L *lua.LState) int {
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	m.Defense = int32(L.CheckInt(2))
 	return 0
 }
 
 func monsterAdddefensespell(L *lua.LState) int {
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	ud := L.CheckUserData(2)
+	if s, ok := ud.Value.(*luaMonsterSpell); ok {
+		spell := game.MonsterSpellFromAttack(s.Attack)
+		m.DefenseSpells = append(m.DefenseSpells, spell)
+	}
 	return 0
 }
 
@@ -114,6 +158,16 @@ func monsterAddfriend(L *lua.LState) int {
 }
 
 func monsterAddreflectelement(L *lua.LState) int {
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	combatType := uint32(L.CheckInt(2))
+	percent := int16(L.CheckInt(3))
+	if m.ReflectElements == nil {
+		m.ReflectElements = make(map[uint32]int16)
+	}
+	m.ReflectElements[combatType] = percent
 	return 0
 }
 
@@ -165,17 +219,32 @@ func monsterConfigureforgesystem(L *lua.LState) int {
 }
 
 func monsterCriticalchance(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	L.Push(lua.LNumber(m.CritChance))
 	return 1
 }
 
 func monsterCriticaldamage(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	L.Push(lua.LNumber(m.CritDamage))
 	return 1
 }
 
 func monsterGetdefense(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	L.Push(lua.LNumber(m.Defense))
 	return 1
 }
 
@@ -198,7 +267,16 @@ func monsterGetfriendcount(L *lua.LState) int {
 }
 
 func monsterGetfriendlist(L *lua.LState) int {
-	L.Push(L.NewTable())
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(L.NewTable())
+		return 1
+	}
+	tbl := L.NewTable()
+	for id := range m.Friends {
+		tbl.Append(lua.LNumber(id))
+	}
+	L.Push(tbl)
 	return 1
 }
 
@@ -219,7 +297,12 @@ func monsterGetname(L *lua.LState) int {
 }
 
 func monsterGetrespawntype(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	L.Push(lua.LNumber(m.RespawnType))
 	return 1
 }
 
@@ -244,7 +327,16 @@ func monsterGettargetcount(L *lua.LState) int {
 }
 
 func monsterGettargetlist(L *lua.LState) int {
-	L.Push(L.NewTable())
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(L.NewTable())
+		return 1
+	}
+	tbl := L.NewTable()
+	for id := range m.Targets {
+		tbl.Append(lua.LNumber(id))
+	}
+	L.Push(tbl)
 	return 1
 }
 
@@ -274,7 +366,12 @@ func monsterGettype(L *lua.LState) int {
 }
 
 func monsterHazard(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNumber(0))
+		return 1
+	}
+	L.Push(lua.LNumber(m.HazardPoints))
 	return 1
 }
 
@@ -299,12 +396,33 @@ func monsterHazarddodge(L *lua.LState) int {
 }
 
 func monsterImmune(L *lua.LState) int {
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	combatType := uint32(L.CheckInt(2))
+	if m.Type != nil {
+		for _, imm := range m.Type.Immunities {
+			if imm == combatType {
+				L.Push(lua.LTrue)
+				return 1
+			}
+		}
+	}
 	L.Push(lua.LFalse)
 	return 1
 }
 
 func monsterIschallenged(L *lua.LState) int {
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	// No challenged mechanism implemented yet; always return false.
+	L.Push(lua.LFalse)
+	return 1
 }
 
 func monsterIsdead(L *lua.LState) int {
@@ -420,13 +538,64 @@ func monsterRemovetarget(L *lua.LState) int {
 }
 
 func monsterSearchtarget(L *lua.LState) int {
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	// If the monster already has a target, return it.
+	if target := m.GetTarget(); target != nil {
+		pushCreatureToLua(L, target)
+		return 1
+	}
+
+	// Need a world reference to search for targets.
+	world := m.GetWorld()
+	if world == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	// Find the closest valid player target via Spectators.
+	players := world.Spectators(m.GetPosition(), m.GetID())
+	var closest game.Creature
+	minDist := 100
+	for _, p := range players {
+		if p.CannotBeAttacked() {
+			continue
+		}
+		dist := m.GetPosition().MaxDistance(p.GetPosition())
+		if dist < minDist {
+			minDist = dist
+			closest = p
+		}
+	}
+
+	if closest != nil {
+		m.SetTarget(closest)
+		pushCreatureToLua(L, closest)
+		return 1
+	}
+
 	L.Push(lua.LNil)
 	return 1
 }
 
 func monsterSelecttarget(L *lua.LState) int {
-	// Stub selection logic
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	target := getCreature(L, 2)
+	if target == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	m.SetTarget(target)
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func monsterSetforgestack(L *lua.LState) int {
@@ -440,6 +609,11 @@ func monsterSetforgestack(L *lua.LState) int {
 }
 
 func monsterSetidle(L *lua.LState) int {
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	m.Idle = L.CheckBool(2)
 	return 0
 }
 
@@ -453,10 +627,24 @@ func monsterSetmonsterforgeclassification(L *lua.LState) int {
 }
 
 func monsterSetname(L *lua.LState) int {
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	m.Name = L.CheckString(2)
 	return 0
 }
 
 func monsterSetspawnposition(L *lua.LState) int {
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	pos, ok := parsePosition(L, 2)
+	if !ok {
+		return 0
+	}
+	m.SpawnPosition = pos
 	return 0
 }
 
@@ -470,10 +658,19 @@ func monsterSettimetochangefiendish(L *lua.LState) int {
 }
 
 func monsterSettype(L *lua.LState) int {
+	m := checkMonster(L)
+	if m == nil {
+		return 0
+	}
+	ud := L.CheckUserData(2)
+	if mt, ok := ud.Value.(*creatures.MonsterType); ok {
+		m.Type = mt
+	}
 	return 0
 }
 
 func monsterSoulpit(L *lua.LState) int {
-	return 0
+	L.Push(lua.LNumber(0))
+	return 1
 }
 

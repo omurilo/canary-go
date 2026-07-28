@@ -44,6 +44,30 @@ type Monster struct {
 	// MonsterSpell converted from Type.Attacks is tracked independently so the
 	// AI engine can respect per-attack intervals.
 	spellCooldowns map[string]int64
+
+	// Defense is the monster's base defense value (armor/damage reduction).
+	Defense int32
+
+	// AttackSpells holds runtime-added attack spells registered via Lua.
+	AttackSpells []MonsterSpell
+
+	// DefenseSpells holds runtime-added defense spells registered via Lua.
+	DefenseSpells []MonsterSpell
+
+	// RespawnType indicates the monster's respawn category (normal, raid, script).
+	RespawnType int32
+
+	// HazardPoints is the hazard system tier value.
+	HazardPoints int32
+
+	// CritChance is the critical hit chance (0-100).
+	CritChance uint8
+
+	// CritDamage is the critical hit damage multiplier percentage.
+	CritDamage uint8
+
+	// ReflectElements maps combat type to reflection percentage.
+	ReflectElements map[uint32]int16
 }
 
 func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {

@@ -71,6 +71,10 @@ type MonsterType struct {
 
 	Flags MonsterFlags
 	Elements map[uint32]int16
+
+	// Immunities lists combat type enum values (Lua COMBAT_* constants) that
+	// this monster type is immune to. Populated from monster XML immunities.
+	Immunities []uint32
 }
 
 type MonsterAttack struct {

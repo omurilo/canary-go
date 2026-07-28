@@ -515,6 +515,9 @@ const (
 
 // handleSay parses a chat message and broadcasts it.
 func (g *GameProtocol) handleSay(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	talkType := r.GetByte()
 	receiver := ""
 	channelID := uint16(0)
@@ -525,6 +528,9 @@ func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 		channelID = r.GetU16() // channel ID
 	}
 	text := r.GetString()
+	if len(text) > 255 {
+		text = text[:255]
+	}
 	if text == "" {
 		return
 	}
@@ -732,6 +738,9 @@ func (g *GameProtocol) SendRemoveCreatureAt(pos game.Position, stack uint8) {
 }
 
 func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	pos := r.GetPosition()
 	spriteID := r.GetU16()
 	stackPos := r.GetByte() // stackPos
@@ -1032,6 +1041,11 @@ func (g *GameProtocol) parseAttack(r *netmsg.Reader) {
 		return
 	}
 
+	if target.GetID() == g.player.ID {
+		g.sendCancelTarget()
+		p.SetAttackTarget(0)
+		return
+	}
 	if _, isNpc := target.(*game.Npc); isNpc {
 		w := netmsg.NewWriter()
 		w.AddByte(opTextMessage)
@@ -1055,10 +1069,16 @@ func (g *GameProtocol) sendCancelTarget() {
 }
 
 func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	// Modern (13.x) layout: itemId U16, count(subType) U8, amount U16,
 	// ignoreCap U8, inBackpacks U8. Reading amount as a byte (the old bug)
 	// desynced every subsequent packet.
 	itemID := r.GetU16()
+	if itemID == 0 {
+		return
+	}
 	subType := r.GetByte()
 	amount := r.GetU16()
 	_ = r.GetByte() // ignoreCapacity (capacity is not gated yet)
@@ -1249,8 +1269,14 @@ func (g *GameProtocol) refreshContainerIfOpen(container *game.Item) {
 }
 
 func (g *GameProtocol) parseSellItem(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
 	// Modern layout: itemId U16, count(subType) U8, amount U16, ignoreEquipped U8.
 	itemID := r.GetU16()
+	if itemID == 0 {
+		return
+	}
 	subType := r.GetByte()
 	amount := r.GetU16()
 	_ = r.GetByte() // ignoreEquipped
