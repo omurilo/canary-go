@@ -204,6 +204,8 @@ type Player struct {
 
 	// WheelGemManager holds the player gem Atelier data (separate from Wheel).
 	WheelGemManager *WheelGemCollection
+		// WeaponProficiency tracks per-weapon bonus stats.
+		WeaponProficiency *WeaponProficiency
 
 	// Prey & Task Hunting systems. PreyCards is the wildcard/prey-card resource
 	// (schema players.prey_wildcard) spent on bonus rerolls and list selection.

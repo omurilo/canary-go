@@ -299,7 +299,7 @@ func (p *Player) GetSpecializedMagicLevel(combatTypeIndex int) int32 {
 }
 
 // ============================================================================
-// Bestiary, critical, proficiency — all need weapon proficiency system
+// Bestiary, critical, proficiency — from WeaponProficiency
 // ============================================================================
 
 type ActiveBestiaryDamage struct {
@@ -308,7 +308,10 @@ type ActiveBestiaryDamage struct {
 }
 
 func (p *Player) GetActiveBestiariesDamage() []ActiveBestiaryDamage {
-	return nil
+	if p.WeaponProficiency == nil {
+		return nil
+	}
+	return p.WeaponProficiency.GetActiveBestiariesDamage()
 }
 
 type CriticalHit struct {
@@ -317,11 +320,19 @@ type CriticalHit struct {
 }
 
 func (p *Player) GetRunesCritical() CriticalHit {
-	return CriticalHit{}
+	if p.WeaponProficiency == nil {
+		return CriticalHit{}
+	}
+	c := p.WeaponProficiency.GetRunesCritical()
+	return CriticalHit{Chance: c.Chance, Damage: c.Damage}
 }
 
 func (p *Player) GetAutoAttackCritical() CriticalHit {
-	return CriticalHit{}
+	if p.WeaponProficiency == nil {
+		return CriticalHit{}
+	}
+	c := p.WeaponProficiency.GetAutoAttackCritical()
+	return CriticalHit{Chance: c.Chance, Damage: c.Damage}
 }
 
 type SkillPercentage struct {
@@ -332,11 +343,26 @@ type SkillPercentage struct {
 }
 
 func (p *Player) GetSkillPercentage(skill Skill) SkillPercentage {
-	return SkillPercentage{}
+	if p.WeaponProficiency == nil {
+		return SkillPercentage{}
+	}
+	return p.WeaponProficiency.GetSkillPercentage(skill)
 }
 
 func (p *Player) HasCharmExpansion() bool {
 	return false
+}
+
+func (p *Player) GetWeaponProficiencyAugments() []WeaponProficiencyAugment {
+	if p.WeaponProficiency == nil {
+		return nil
+	}
+	augs := p.WeaponProficiency.GetAllAugments()
+	var result []WeaponProficiencyAugment
+	for _, a := range augs {
+		result = append(result, WeaponProficiencyAugment{Id: a.Id, Data: a.Data})
+	}
+	return result
 }
 
 // ============================================================================
@@ -405,9 +431,6 @@ type WeaponProficiencyAugment struct {
 	Data float64
 }
 
-func (p *Player) GetWeaponProficiencyAugments() []WeaponProficiencyAugment {
-	return nil
-}
 
 func (p *Player) GetWheelAugments() []uint8 {
 	return nil
