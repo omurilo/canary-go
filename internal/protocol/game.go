@@ -101,6 +101,18 @@ const (
 	inMarketCreate   = 0xF6
 	inMarketCancel   = 0xF7
 	inMarketAccept   = 0xF8
+	inRewardChestCollect         = 0xD1
+	inCharacterTradeConfig       = 0x76
+	inExivaRestrictions          = 0xCA
+	inBrowseField                = 0xCB
+	inClientDetails              = 0xC1
+	inBossDifficultySelection    = 0xC2
+	inAimAtTarget                = 0xC8
+	inGetTransactionDetails      = 0xC9
+	inCyclopediaMapAction        = 0xDB
+	inBlessingWindowRequest      = 0xCF
+	inRequestOutfit              = 0xD2
+	inBugReport                  = 0xE6
 )
 
 // GameProtocol is one game-server session.
@@ -981,12 +993,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseInspectionObject(r)
 	case 0xCE:
 		g.parseVIPAdd(r)
-	case 0xCF:
-		g.parseVIPRemove(r)
 	case 0xD0:
 		g.parseOpenRewardChest(r)
-	case 0xD2:
-		g.SendOutfitWindow()
 	case 0xD3:
 		g.parseBuyBlessing(r) // Buy blessing request  
 	case 0xD4:
@@ -1061,6 +1069,28 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.dispatchStore(op, r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
+	case inCharacterTradeConfig:
+		g.parseCharacterTradeConfig(r)
+	case inExivaRestrictions:
+		g.parseExivaRestrictions(r)
+	case inBrowseField:
+		g.parseBrowseField(r)
+	case inClientDetails:
+		g.parseClientDetails(r)
+	case inBossDifficultySelection:
+		g.parseBossDifficultySelection(r)
+	case inAimAtTarget:
+		g.parseAimAtTarget(r)
+	case inGetTransactionDetails:
+		g.parseGetTransactionDetails(r)
+	case inCyclopediaMapAction:
+		g.parseCyclopediaMapAction(r)
+	case inBlessingWindowRequest:
+		g.parseBlessingWindowRequest(r)
+	case inRequestOutfit:
+		g.parseRequestOutfit(r)
+	case inBugReport:
+		g.parseBugReport(r)
 	default:
 		// Log the remaining payload so each not-yet-migrated action can be
 		// mapped to its C++ parse* handler from the exact wire bytes.

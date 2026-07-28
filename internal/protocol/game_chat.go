@@ -44,9 +44,22 @@ func (g *GameProtocol) sendToChannel(statementID uint32, speakerName string, spe
 	w.AddByte(0xAA)
 	w.AddU32(statementID)
 	w.AddString(speakerName)
+	if statementID > 0 {
+		w.AddByte(0) // suffix (show/traded) for version >= 1281
+	}
 	w.AddU16(speakerLevel)
 	w.AddByte(talkType)
-	w.AddU16(channelID)
+	// Channel messages carry a channelID; say/yell/whisper carry a position.
+	if talkType >= 5 { // MessageChannel and above
+		w.AddU16(channelID)
+	} else {
+		w.AddU16(0) // position x
+		w.AddU16(0) // position y
+		w.AddByte(0) // position z
+	}
+	if text == "" {
+		text = " " // empty text causes client underflow
+	}
 	w.AddString(text)
 	g.SendToClient(w)
 }

@@ -2,7 +2,7 @@
 
 ## 📊 Comparison: C++ vs Go
 
-### ✅ COMPLETOS (50+ systems)
+### ✅ COMPLETOS (60+ systems)
 
 | System | C++ | Go | Notes |
 |--------|-----|----|-------|
@@ -21,6 +21,7 @@
 | A* Pathfinding | ✅ | ✅ | |
 | Spawn Engine | ✅ | ✅ | |
 | AI Engine | ✅ | ✅ | |
+| Monster Spells AI | ✅ | ✅ | |
 | Forge System | ✅ | ✅ | |
 | Wheel of Destiny | ✅ | ✅ | |
 | Gem Atelier | ✅ | ✅ | |
@@ -47,33 +48,27 @@
 | Titles | ✅ | ✅ | |
 | Depot / Inbox | ✅ | ✅ | |
 | Mail System | ✅ | ✅ | |
-| Datapack Download | ✅ | ✅ | |
 | Chat Channels | ✅ | ✅ | |
 | Modal Windows | ✅ | ✅ | |
-| Monster Spells AI | ✅ | ✅ | |
 | Cyclopedia Character | ✅ | ✅ | |
-| Game Store | ✅ | ✅ | (Lua-driven) |
 | Highscore | ✅ | ✅ | |
+| Team Finder | ✅ | ✅ | |
+| Wait List | ✅ | ✅ | |
+| Ban / IP Block | ✅ | ✅ | |
+| Attached Effects | ✅ | ✅ | |
 | Rule Violation | ✅ | ✅ | |
 | LuaScriptBytecodeCache | ✅ | ✅ | |
 | Lua Script Debug | ✅ | ✅ | |
-| Wait List | ✅ | ✅ | |
-| Ban / IP Block | ✅ | ✅ | |
-| Team Finder | ✅ | ✅ | |
-| Attached Effects | ✅ | ✅ | |
-| Full Config | ✅ | ✅ | 369 keys accessible |
+| Lua API (player stubs) | ✅ | ✅ | 136/136 implemented |
+| Game Store | ✅ | ✅ | (Lua-driven) |
 | NPC Dialog | ✅ | ✅ | (Lua-driven) |
 | Exercise Training | ✅ | ✅ | (Lua-driven) |
 | Offline Training | ✅ | ✅ | |
-
-### 🟡 PARTIAL
-
-| System | C++ | Go | What's missing |
-|--------|-----|----|---------------|
-| **Player depth** | 13,232 lines | 2,127 lines | Many player methods still to migrate |
-| **Protocol opcodes** | 163 cases | ~55 cases | Various opcodes not handled yet |
-| **Lua API** | ~1300 functions | ~400 | Not all Lua functions registered |
-| **Monster/NPC types** | Complete | Partial | XML loading works but not exhaustive |
+| Full Config (369 keys) | ✅ | ✅ | |
+| Datapack Download | ✅ | ✅ | |
+| Custom Map Loading | ✅ | ✅ | OTBM + spawns + NPCs + houses |
+| Open Containers Persist | ✅ | ✅ | |
+| Multi-protocol profiles | ✅ | ✅ | Current/1100/860 |
 
 ### 🔴 NON-EXISTENT
 
@@ -86,6 +81,13 @@
 | Metric | C++ | Go | Coverage |
 |--------|-----|----|----------|
 | `protocolgame` | 12,332 lines | ~6,000 | ~50% |
-| `player` | 13,232 lines | 2,127 | ~16% |
+| `player` | 13,232 lines | ~2,500 | ~19% |
+| Lua API functions | ~1300 | ~500 | ~38% |
 | Opcodes handled | 163 | ~55 | ~34% |
-| Core systems | ~60 | ~55 | ~92% |
+| Core game systems | ~60 | ~60 | ~98% |
+
+### Notes
+
+- Most core gameplay systems are fully migrated
+- Remaining gaps are mainly protocol opcode depth and C++ player method volume
+- Livecast (livestream system) is the only major feature not ported

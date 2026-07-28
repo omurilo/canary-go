@@ -69,14 +69,6 @@ local function openStore(playerId)
 		for _, category in ipairs(GameStoreCategories) do
 			addCategory(category)
 		end
-		-- Protocol >= 1332 clients read two trailing bytes after the category
-		-- list (otclient ProtocolGame::parseStore). Without them the client
-		-- underruns the message and aborts parsing, leaving the category tree
-		-- empty (the home page renders separately, so it still shows).
-		if not oldProtocol and player:getClient().version >= 1332 then
-			msg:addByte(0) -- reserved
-			msg:addByte(0) -- reserved
-		end
 		msg:sendToPlayer(player)
 		sendStoreBalanceUpdating(playerId, true)
 	end

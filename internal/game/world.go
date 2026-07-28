@@ -717,3 +717,29 @@ func (w *World) EnsureBoostedBoss() {
 
 func (w *World) PlayerAnswerModalWindow(p *Player, id uint32, button uint8, choice uint8) {
 }
+
+// Team Finder stubs
+func (w *World) PlayerFindTeam(playerID uint32, category uint8, itemID uint16, stackPos uint8, isLoot bool) {}
+func (w *World) RemoveTeamFinder(playerID uint32) {}
+func (w *World) UpdateTeamMemberStatus(playerID, memberID uint32, status byte) {}
+func (w *World) SendTeamFinderList(playerID uint32) {}
+func (w *World) JoinTeamFinder(playerID, leaderID uint32) {}
+func (w *World) LeaveTeamFinder(playerID, leaderID uint32) {}
+func (w *World) CreateTeamFinder(playerID uint32, r interface{ ReadU16() uint16 }) {}
+func (w *World) PlayerSetVocation(playerID uint32, voc uint8) {
+	if p := w.PlayerByID(playerID); p != nil { p.Vocation = uint16(voc) }
+}
+func (w *World) PlayerTeleport(playerID uint32, pos Position) {
+	if p := w.PlayerByID(playerID); p != nil { p.Pos = pos }
+}
+func (w *World) PlayerCloseNpcChannel(playerID uint32) {}
+func (w *World) PlayerRotateItem(playerID uint32, pos Position, itemID uint16, stackPos byte) {}
+func (w *World) PlayerExivaRestrictions(playerID uint32, action byte, name string) {}
+func (w *World) PlayerBrowseField(playerID uint32, pos Position) {}
+func (w *World) PlayerSetBossDifficulty(playerID uint32, bossID uint16, difficulty byte) {}
+func (w *World) PlayerCollectReward(playerID uint32) {}
+func (w *World) PlayerJoinAggression(playerID, targetID uint32) {}
+func (w *World) PlayerRequestTrade(playerID, targetID uint32, pos Position, itemID uint16, stackPos byte) {}
+func (w *World) PlayerAcceptTrade(playerID uint32) {}
+func (w *World) PlayerCloseTrade(playerID uint32) {}
+func (w *World) PlayerFollow(playerID, targetID uint32) {}
