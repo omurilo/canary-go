@@ -90,8 +90,7 @@ services:
     volumes:
       - ../ip.txt:/var/www/html/install/ip.txt
       - ../config.lua.dist:/canary/config.lua
-      - ../data/items:/canary/data/items
-      - ../data/XML:/canary/data/XML
+      - ./data:/canary/data
       - ../data-otservbr-global/monsters:/canary/data/monsters
       - ../data/scripts:/canary/data/scripts
 
@@ -101,7 +100,7 @@ services:
     # networks: [canary-net]
 
   login-server:
-    profiles: ["full"]
+    profiles: ["login"]
     image: "${LOGIN_SERVER_IMAGE:-opentibiabr/login-server:latest}"
     container_name: canary-go-login
     restart: unless-stopped

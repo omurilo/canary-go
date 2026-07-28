@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<groups>
+	<group id="1" name="player" access="0" maxdepotitems="0" maxvipentries="0" />
+	<group id="6" name="god" access="1" maxdepotitems="0" maxvipentries="200" />
+</groups>

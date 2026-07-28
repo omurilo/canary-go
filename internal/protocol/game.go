@@ -101,60 +101,44 @@ const (
 	inMarketCreate   = 0xF6
 	inMarketCancel   = 0xF7
 	inMarketAccept   = 0xF8
-	inRewardChestCollect         = 0xD1
-	inRetrieveDepotSearch       = 0x29
-	inCyclopediaMonsterTracker  = 0x2A
-	inPartyAnalyzerAction       = 0x2B
-	inLeaderFinderWindow        = 0x2C
-	inMemberFinderWindow        = 0x2D
-	inSetClientOptions          = 0x2E
-	inPlayerTyping              = 0x38
-	inInventoryImbuements       = 0x60
-	inClientCheck               = 0x63
-	inSetVocation               = 0x6E
-	inTeleport                  = 0x73
-	inStartOfflineTraining      = 0x74
-	inContainerAction           = 0x75
-	inHotkeyEquip               = 0x77
-	inLookInShop                = 0x79
-	inRequestTrade              = 0x7D
-	inLookInTrade               = 0x7E
-	inAcceptTrade               = 0x7F
-	inCloseTrade                = 0x80
-	inFriendSystemAction        = 0x81
-	inRotateItem                = 0x85
-	inConfigureShowOffSocket    = 0x86
-	inTextWindow                = 0x89
-	inHouseWindow               = 0x8A
-	inWrapableItem              = 0x8B
-	inLookInBattleList          = 0x8D
-	inJoinAggression            = 0x8E
-	inOpenDepotSearch           = 0x92
-	inCloseDepotSearch          = 0x93
-	inDepotSearchItemRequest    = 0x94
-	inOpenParentContainer       = 0x95
-	inEditGuildMessage          = 0x9C
-	inGetTextForReport          = 0x9D
-	inCloseNpcChannel           = 0x9E
-	inSetMonsterPodium          = 0x9F
-	inFollow                    = 0xA2
-	inQuestLog                  = 0xF0
-	inQuestLine                 = 0xF1
-	inCharacterTradeConfig       = 0x76
-	inExivaRestrictions          = 0xCA
-	inBrowseField                = 0xCB
-	inClientDetails              = 0xC1
-	inBossDifficultySelection    = 0xC2
-	inAimAtTarget                = 0xC8
-	inGetTransactionDetails      = 0xC9
-	inCyclopediaMapAction        = 0xDB
-	inBlessingWindowRequest      = 0xCF
-	inRequestOutfit              = 0xD2
-	inBugReport                  = 0xE6
-	inChannelInvite           = 0xAB
-	inChannelExclude           = 0xAC
-	inVIPAdd                   = 0xDC
-	inVIPRemove                = 0xDD
+
+	// Batch 1: additional inbound opcodes.
+	inRetrieveDepotSearch      = 0x29
+	inCyclopediaMonsterTracker = 0x2A
+	inPartyAnalyzerAction      = 0x2B
+	inLeaderFinderWindow       = 0x2C
+	inMemberFinderWindow       = 0x2D
+	inSetClientOptions         = 0x2E
+	inPlayerTyping             = 0x38
+	inInventoryImbuements      = 0x60
+	inClientCheck              = 0x63
+	inSetVocation              = 0x6E
+	inTeleport                 = 0x73
+	inStartOfflineTraining     = 0x74
+	inContainerAction          = 0x75
+	inHotkeyEquip              = 0x77
+	inLookInShop               = 0x79
+	inRequestTrade             = 0x7D
+	inLookInTrade              = 0x7E
+	inAcceptTrade              = 0x7F
+	inCloseTrade               = 0x80
+	inFriendSystemAction       = 0x81
+	inRotateItem               = 0x85
+	inConfigureShowOffSocket   = 0x86
+	inTextWindow               = 0x89
+	inHouseWindow              = 0x8A
+	inWrapableItem             = 0x8B
+	inLookInBattleList         = 0x8D
+	inJoinAggression           = 0x8E
+	inOpenDepotSearch          = 0x92
+	inCloseDepotSearch         = 0x93
+	inDepotSearchItemRequest   = 0x94
+	inOpenParentContainer      = 0x95
+	inEditGuildMessage         = 0x9C
+	inGetTextForReport         = 0x9D
+	inCloseNpcChannel          = 0x9E
+	inSetMonsterPodium         = 0x9F
+	inFollow                   = 0xA2
 )
 
 // GameProtocol is one game-server session.
@@ -767,8 +751,8 @@ func (g *GameProtocol) enterWorld() {
 
 	// Boss Cyclopedia fight cooldowns (empty when the player has none).
 	g.SendBosstiaryCooldownTimer()
-		// Outfit window data for character customization.
-		g.SendOutfitWindow()
+
+	// Keep-alive pings start once the player is in the world.
 	g.startPingLoop()
 
 	// Notify other spectators that we appeared.
@@ -938,8 +922,10 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.SendToClient(w)
 	case 0x28: // Stash action (stow/withdraw)
 		g.parseStashAction(r)
-		case inPong, 0x60, 0xBE:
-		// Reply to our own keep-alive ping, or safely ignored opcodes (imbuements/cancel attack).
+	case inPong, 0xBE:
+		// Reply to our own keep-alive ping, or safely ignored opcodes (cancel attack).
+	case inInventoryImbuements:
+		g.parseInventoryImbuements(r)
 	case inWalkNorth:
 		g.manualWalk(game.DirNorth)
 	case inWalkEast:
@@ -997,9 +983,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case inCloseShop:
 		g.parseCloseShop(r)
 	case inCloseChannel:
-		g.parseCloseChannel(r)
 	case inHighscore:
-		g.parseHighscores(r)
+		g.parseCloseChannel(r)
 	case inNpcGreet:
 		g.parseNpcGreet(r)
 	case inInviteToParty:
@@ -1034,8 +1019,12 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseInspectionObject(r)
 	case 0xCE:
 		g.parseVIPAdd(r)
+	case 0xCF:
+		g.parseVIPRemove(r)
 	case 0xD0:
 		g.parseOpenRewardChest(r)
+	case 0xD2:
+		g.SendOutfitWindow()
 	case 0xD3:
 		g.parseBuyBlessing(r) // Buy blessing request  
 	case 0xD4:
@@ -1110,70 +1099,76 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.dispatchStore(op, r)
 	case inExtendedOpcode:
 		// [u8 opcode][str buffer] — ignore for now.
-	case inCharacterTradeConfig:
-		g.parseCharacterTradeConfig(r)
-	case inExivaRestrictions:
-		g.parseExivaRestrictions(r)
-	case inBrowseField:
-		g.parseBrowseField(r)
-	case inClientDetails:
-		g.parseClientDetails(r)
-	case inBossDifficultySelection:
-		g.parseBossDifficultySelection(r)
-	case inAimAtTarget:
-		g.parseAimAtTarget(r)
-	case inGetTransactionDetails:
-		g.parseGetTransactionDetails(r)
-	case inCyclopediaMapAction:
-		g.parseCyclopediaMapAction(r)
-	case inBlessingWindowRequest:
-		g.parseBlessingWindowRequest(r)
-	case inRequestOutfit:
-		g.SendOutfitWindow()
-	case inBugReport:
-		g.parseBugReport(r)
-	case inChannelInvite: g.parseChannelInvite(r)
-	case inChannelExclude: g.parseChannelExclude(r)
-	case inVIPAdd: g.parseVIPAdd(r)
-	case inVIPRemove: g.parseVIPRemove(r)
-	case inRetrieveDepotSearch: g.parseRetrieveDepotSearch(r)
-	case inCyclopediaMonsterTracker: g.parseCyclopediaMonsterTracker(r)
-	case inPartyAnalyzerAction: g.parsePartyAnalyzerAction(r)
-	case inLeaderFinderWindow: g.parseLeaderFinderWindow(r)
-	case inMemberFinderWindow: g.parseMemberFinderWindow(r)
-	case inSetClientOptions: g.parseSetClientOptions(r)
-	case inPlayerTyping: g.parsePlayerTyping(r)
-	case inClientCheck: g.parseClientCheck(r)
-	case inSetVocation: g.parseSetVocation(r)
-	case inTeleport: g.parseTeleport(r)
-	case inStartOfflineTraining: g.parseStartOfflineTraining(r)
-	case inContainerAction: g.parseContainerAction(r)
-	case inHotkeyEquip: g.parseHotkeyEquip(r)
-	case inLookInShop: g.parseLookInShop(r)
-	case inRequestTrade: g.parseRequestTrade(r)
-	case inLookInTrade: g.parseLookInTrade(r)
-	case inAcceptTrade: g.parseAcceptTrade(r)
-	case inCloseTrade: g.parseCloseTrade(r)
-	case inFriendSystemAction: g.parseFriendSystemAction(r)
-	case inRotateItem: g.parseRotateItem(r)
-	case inConfigureShowOffSocket: g.parseConfigureShowOffSocket(r)
-	case inTextWindow: g.parseTextWindow(r)
-	case inHouseWindow: g.parseHouseWindow(r)
-	case inWrapableItem: g.parseWrapableItem(r)
-	case inLookInBattleList: g.parseLookInBattleList(r)
-	case inJoinAggression: g.parseJoinAggression(r)
-	case inOpenDepotSearch: g.parseOpenDepotSearch(r)
-	case inCloseDepotSearch: g.parseCloseDepotSearch(r)
-	case inDepotSearchItemRequest: g.parseDepotSearchItemRequest(r)
-	case inOpenParentContainer: g.parseOpenParentContainer(r)
-	case inEditGuildMessage: g.parseEditGuildMessage(r)
-	case inGetTextForReport: g.parseGetTextForReport(r)
-	case inCloseNpcChannel: g.parseCloseNpcChannel(r)
-	case inSetMonsterPodium: g.parseSetMonsterPodium(r)
-	case inFollow: g.parseFollow(r)
-	case inRewardChestCollect: g.parseRewardChestCollect(r)
-	case inQuestLog: g.parseQuestLog(r)
-	case inQuestLine: g.parseQuestLine(r)
+	case inRetrieveDepotSearch:
+		g.parseRetrieveDepotSearch(r)
+	case inCyclopediaMonsterTracker:
+		g.parseCyclopediaMonsterTracker(r)
+	case inPartyAnalyzerAction:
+		g.parsePartyAnalyzerAction(r)
+	case inLeaderFinderWindow:
+		g.parseLeaderFinderWindow(r)
+	case inMemberFinderWindow:
+		g.parseMemberFinderWindow(r)
+	case inSetClientOptions:
+		g.parseSetClientOptions(r)
+	case inPlayerTyping:
+		g.parsePlayerTyping(r)
+	case inClientCheck:
+		g.parseClientCheck(r)
+	case inSetVocation:
+		g.parseSetVocation(r)
+	case inTeleport:
+		g.parseTeleport(r)
+	case inStartOfflineTraining:
+		g.parseStartOfflineTraining(r)
+	case inContainerAction:
+		g.parseContainerAction(r)
+	case inHotkeyEquip:
+		g.parseHotkeyEquip(r)
+	case inLookInShop:
+		g.parseLookInShop(r)
+	case inRequestTrade:
+		g.parseRequestTrade(r)
+	case inLookInTrade:
+		g.parseLookInTrade(r)
+	case inAcceptTrade:
+		g.parseAcceptTrade(r)
+	case inCloseTrade:
+		g.parseCloseTrade(r)
+	case inFriendSystemAction:
+		g.parseFriendSystemAction(r)
+	case inRotateItem:
+		g.parseRotateItem(r)
+	case inConfigureShowOffSocket:
+		g.parseConfigureShowOffSocket(r)
+	case inTextWindow:
+		g.parseTextWindow(r)
+	case inHouseWindow:
+		g.parseHouseWindow(r)
+	case inWrapableItem:
+		g.parseWrapableItem(r)
+	case inLookInBattleList:
+		g.parseLookInBattleList(r)
+	case inJoinAggression:
+		g.parseJoinAggression(r)
+	case inOpenDepotSearch:
+		g.parseOpenDepotSearch(r)
+	case inCloseDepotSearch:
+		g.parseCloseDepotSearch(r)
+	case inDepotSearchItemRequest:
+		g.parseDepotSearchItemRequest(r)
+	case inOpenParentContainer:
+		g.parseOpenParentContainer(r)
+	case inEditGuildMessage:
+		g.parseEditGuildMessage(r)
+	case inGetTextForReport:
+		g.parseGetTextForReport(r)
+	case inCloseNpcChannel:
+		g.parseCloseNpcChannel(r)
+	case inSetMonsterPodium:
+		g.parseSetMonsterPodium(r)
+	case inFollow:
+		g.parseFollow(r)
 	default:
 		// Log the remaining payload so each not-yet-migrated action can be
 		// mapped to its C++ parse* handler from the exact wire bytes.
