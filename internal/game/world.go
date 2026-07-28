@@ -69,6 +69,7 @@ type World struct {
 	// and refreshes the client (the model-side penalty is applied before this
 	// callback runs).
 	OnPlayerDeath func(p *Player, killer Creature)
+	OnCreatureDied func(c Creature) // monster/NPC death, fires before RemoveCreature
 	OnGainExperience func(p *Player, source Creature, exp uint64, rawExp uint64) uint64
 
 	// OnShieldUpdate asks the protocol layer to send `viewer` a party-shield

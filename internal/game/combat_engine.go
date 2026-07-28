@@ -895,6 +895,10 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 		}
 	}
 
+	if e.world.OnCreatureDied != nil {
+		e.world.OnCreatureDied(victim)
+	}
+
 	// Drop the corpse first (as in dropCorpse, which adds the corpse while the
 	// creature is still on the tile), then remove the creature. The corpse is a
 	// container whose Contents are the rolled loot table.
