@@ -51,6 +51,11 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 	characterID := r.GetU32()
 	characterInfoType := r.GetByte()
 	slog.Default().Info("parseCyclopediaCharacterInfo", "charID", characterID, "infoType", characterInfoType)
+		
+		if characterInfoType == 3 || characterInfoType == 4 {
+			r.GetU16()
+			r.GetU16()
+		}
 	if characterID == 0 {
 		characterID = g.player.ID
 	}
@@ -350,7 +355,11 @@ func (g *GameProtocol) sendCyclopediaCharacterItemSummary() {
 			if t != nil && t.UpgradeClassification > 0 {
 				w.AddByte(tier)
 			} else if t == nil {
-				// Unknown item, still check classification from ID range
+				} else if t == nil && tier > 0 {
+					// Item not in registry but has tier — send it to keep alignment.
+					w.AddByte(tier)
+				} else if t == nil {
+					// Unknown item, no tier info — skip
 			}
 			w.AddU32(cnt)
 			written++
@@ -539,39 +548,56 @@ func (g *GameProtocol) sendCyclopediaCharacterWheel() {
 }
 
 // sendCyclopediaCharacterStoreSummary sends the store summary (type 8).
-// Exact match of C++ ProtocolGame::sendCyclopediaCharacterStoreSummary.
 func (g *GameProtocol) sendCyclopediaCharacterStoreSummary() {
 	if g.player == nil {
 		return
 	}
+	p := g.player
 	w := netmsg.NewWriter()
 	w.AddByte(0xDA)
 	w.AddByte(cyclopediaCharacterInfoStoreSummary)
-	w.AddByte(0x00) // no error
+	w.AddByte(0x00)
 
-	w.AddU32(0) // xpBoostTime remaining
-	w.AddU32(0) // dailyRewardXpBoostTime (deprecated)
-	w.AddByte(0) // blessingCount
+	w.AddU32(0) // xpBoostTime
+	w.AddU32(0) // dailyRewardXpBoostTime
 
-	// preySlotsUnlocked
-	w.AddByte(0)
-	// preyWildcards
-	w.AddByte(0)
-	// hasPermanentWeeklyTaskExpansion (GameTaskboard feature)
-	w.AddByte(0)
+	blessings := []struct {
+		name  string
+		value uint8
+	}{
+		{"Twist Of Fate", 1},
+		{"The Wisdom Of Solitude", 2},
+		{"The Spark Of The Phoenix", 3},
+		{"The Fire Of The Suns", 4},
+		{"The Spiritual Shielding", 5},
+		{"The Embrace Of Tibia", 6},
+		{"Hearth Of The Mountain", 7},
+		{"Blood Of The Mountain", 8},
+	}
+	w.AddByte(uint8(len(blessings)))
+	for _, b := range blessings {
+		w.AddString(b.name)
+		idx := int(b.value) - 1
+		if idx >= 0 && idx < len(p.Blessings) && p.Blessings[idx] > 0 {
+			w.AddByte(p.Blessings[idx])
+		} else {
+			w.AddByte(0)
+		}
+	}
+
+	w.AddByte(0) // preySlotsUnlocked
+	w.AddByte(0) // preyWildcards
 	w.AddByte(0) // instantRewards
 	w.AddByte(0) // hasCharmExpansion
 	w.AddByte(0) // hirelingsObtained
+	w.AddByte(0) // reserved
 
-	// Aligned to OTClient parser — avoids a leftover 0x00 byte.
-	// C++ sends: reserved(1)+skillCount(1)+outfitsCount(1)+houseItems(2)=6 bytes
-	// OTClient reads: hirelingSkillsCount(1)+outfitsCount(1)+houseItems(2)=5 bytes
 	w.AddByte(0) // hirelingSkillsCount
 	w.AddByte(0) // hirelingOutfitsCount
 	w.AddU16(0)  // houseItemsCount
 
 	slog.Default().Info("store: sending summary",
-		"player", g.player.Name,
+		"player", p.Name,
 		"packetHex", fmt.Sprintf("%x", w.Bytes()),
 		"packetLen", len(w.Bytes()))
 	g.SendToClient(w)
@@ -630,35 +656,29 @@ func (g *GameProtocol) sendCyclopediaCharacterTitles() {
 	w.AddByte(0x00) // no error
 
 	titles := p.GetTitles()
-	w.AddByte(titles.CurrentID) // current title ID
+	w.AddByte(titles.CurrentID)
 
-	// Count unlocked titles.
-	count := uint8(0)
-	var unlocked []game.TitleInfo
-	for _, t := range game.DefaultTitles {
-		if titles.IsUnlocked(t.ID) {
-			unlocked = append(unlocked, t)
-			count++
-		}
-	}
-
-	slog.Default().Info("titles: sending",
-		"player", p.Name,
-		"unlockedCount", count)
-
-	w.AddByte(count)
-	for _, t := range unlocked {
-		w.AddByte(t.ID) // u8 id — required by official client
+	allTitles := game.DefaultTitles
+	w.AddByte(uint8(len(allTitles)))
+	for _, t := range allTitles {
+		w.AddByte(t.ID)
 		name := t.MaleName
 		if p.Sex == 0 && t.FemaleName != "" {
 			name = t.FemaleName
 		}
 		w.AddString(name)
 		w.AddString(t.Description)
-		w.AddByte(1) // permanent
-		w.AddByte(1) // unlocked (we only send unlocked)
+		if t.Permanent {
+			w.AddByte(1)
+		} else {
+			w.AddByte(0)
+		}
+		if titles.IsUnlocked(t.ID) {
+			w.AddByte(1)
+		} else {
+			w.AddByte(0)
+		}
 	}
-
 	g.SendToClient(w)
 }
 
