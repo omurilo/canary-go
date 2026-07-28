@@ -146,6 +146,41 @@ func (e *Engine) registerParty() {
 			L.Push(lua.LTrue)
 			return 1
 		},
+		"getId": func(L *lua.LState) int {
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"getInvitations": func(L *lua.LState) int {
+			L.Push(L.NewTable())
+			return 1
+		},
+		"isMember": func(L *lua.LState) int {
+			L.Push(lua.LFalse)
+			return 1
+		},
+		"isLeader": func(L *lua.LState) int {
+			L.Push(lua.LFalse)
+			return 1
+		},
+		"addInvitation": func(L *lua.LState) int {
+			L.Push(lua.LTrue)
+			return 1
+		},
+		"removeInvitation": func(L *lua.LState) int {
+			return 0
+		},
+		"revokeInvitation": func(L *lua.LState) int {
+			return 0
+		},
+		"passLeadership": func(L *lua.LState) int {
+			return 0
+		},
+		"join": func(L *lua.LState) int {
+			return 0
+		},
+		"leave": func(L *lua.LState) int {
+			return 0
+		},
 	}
 
 	mt := e.L.NewTypeMetatable(partyTypeName)

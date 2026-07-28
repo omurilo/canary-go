@@ -134,6 +134,69 @@ var networkMessageMethods = map[string]lua.LGFunction{
 		}
 		return 0
 	},
+	// getU64 reads an unsigned 64-bit integer from the message buffer.
+	"getU64": func(L *lua.LState) int {
+		m := checkNetworkMessage(L)
+		if m == nil || m.r == nil || m.r.Remaining() < 8 {
+			L.Push(lua.LNumber(0))
+			return 1
+		}
+		L.Push(lua.LNumber(m.r.GetU64()))
+		return 1
+	},
+	// getPosition reads a Position (u16 x, u16 y, u8 z) from the message.
+	"getPosition": func(L *lua.LState) int {
+		m := checkNetworkMessage(L)
+		if m == nil || m.r == nil {
+			L.Push(lua.LNil)
+			return 1
+		}
+		p := m.r.GetPosition()
+		PushPosition(L, game.Position{X: p.X, Y: p.Y, Z: p.Z})
+		return 1
+	},
+	// add8 is an alias for addByte.
+	"add8": func(L *lua.LState) int {
+		if m := checkNetworkMessage(L); m != nil {
+			m.w.AddByte(byte(luaOptInt(L, 2)))
+		}
+		return 0
+	},
+	// add16 is an alias for addU16.
+	"add16": networkMessageAddU16,
+	// add32 is an alias for addU32.
+	"add32": networkMessageAddU32,
+	// add64 is an alias for addU64.
+	"add64": func(L *lua.LState) int {
+		if m := checkNetworkMessage(L); m != nil {
+			m.w.AddU64(uint64(L.CheckNumber(2)))
+		}
+		return 0
+	},
+	// addDouble writes a double with optional precision (default 0).
+	"addDouble": func(L *lua.LState) int {
+		m := checkNetworkMessage(L)
+		if m == nil {
+			return 0
+		}
+		value := L.CheckNumber(2)
+		precision := uint8(luaOptInt(L, 3))
+		m.w.AddDouble(float64(value), precision)
+		return 0
+	},
+	// addItem writes an item id (u16) and count (byte) to the message.
+	"addItem": func(L *lua.LState) int {
+		m := checkNetworkMessage(L)
+		if m == nil {
+			return 0
+		}
+		it := checkItemAt(L, 2)
+		if it.item != nil {
+			m.w.AddU16(it.item.ID)
+			m.w.AddByte(byte(it.item.Count))
+		}
+		return 0
+	},
 }
 
 func networkMessageAddByte8(L *lua.LState) int {

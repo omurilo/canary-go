@@ -271,7 +271,16 @@ func (e *Engine) gameLoadMap(L *lua.LState) int {
 func (e *Engine) gameLoadMapChunk(L *lua.LState) int {
 	return e.gameLoadMap(L)
 }
-func (e *Engine) gameGetExperienceForLevel(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
+func (e *Engine) gameGetExperienceForLevel(L *lua.LState) int {
+	level := L.CheckInt(1)
+	// Formula: 50/3 * level^3 - 100 * level^2 + 850/3 * level - 200
+	exp := (50 * level * level * level / 3) - (100 * level * level) + (850 * level / 3) - 200
+	if exp < 0 {
+		exp = 0
+	}
+	L.Push(lua.LNumber(exp))
+	return 1
+}
 func (e *Engine) gameGetMonsterCount(L *lua.LState) int {
 	count := 0
 	if e.world != nil {
@@ -284,7 +293,14 @@ func (e *Engine) gameGetMonsterCount(L *lua.LState) int {
 	L.Push(lua.LNumber(count))
 	return 1
 }
-func (e *Engine) gameGetPlayerCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
+func (e *Engine) gameGetPlayerCount(L *lua.LState) int {
+	if e.world != nil {
+		L.Push(lua.LNumber(e.world.OnlineCount()))
+	} else {
+		L.Push(lua.LNumber(0))
+	}
+	return 1
+}
 func (e *Engine) gameGetNpcCount(L *lua.LState) int {
 	count := 0
 	if e.world != nil {

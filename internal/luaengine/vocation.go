@@ -43,6 +43,11 @@ var vocationMethods = map[string]lua.LGFunction{
 	"getSoulGainTicks":       vocationGetSoulGainTicks,
 	"getDemotion":            vocationGetDemotion,
 	"getPromotion":           vocationGetPromotion,
+	"getDescription":         vocationGetDescription,
+	"getBaseSkill":           vocationGetBaseSkill,
+	"getBaseMagicLevel":      vocationGetBaseMagicLevel,
+	"getCapacity":            vocationGetCapacity,
+	"getSoulGain":            vocationGetSoulGain,
 }
 
 func checkVocation(L *lua.LState) *vocations.Vocation {
@@ -194,6 +199,44 @@ func vocationGetDemotion(L *lua.LState) int {
 func vocationGetPromotion(L *lua.LState) int {
 	// Not implemented, return nil for now
 	L.Push(lua.LNil)
+	return 1
+}
+
+// Vocation:getDescription()
+func vocationGetDescription(L *lua.LState) int {
+	L.Push(lua.LString(""))
+	return 1
+}
+
+// Vocation:getBaseSkill()
+func vocationGetBaseSkill(L *lua.LState) int {
+	v := checkVocation(L)
+	_ = v
+	L.Push(lua.LNumber(0))
+	return 1
+}
+
+// Vocation:getBaseMagicLevel()
+func vocationGetBaseMagicLevel(L *lua.LState) int {
+	v := checkVocation(L)
+	_ = v
+	L.Push(lua.LNumber(0))
+	return 1
+}
+
+// Vocation:getCapacity()
+func vocationGetCapacity(L *lua.LState) int {
+	v := checkVocation(L)
+	_ = v
+	L.Push(lua.LNumber(400))
+	return 1
+}
+
+// Vocation:getSoulGain()
+func vocationGetSoulGain(L *lua.LState) int {
+	v := checkVocation(L)
+	_ = v
+	L.Push(lua.LNumber(1))
 	return 1
 }
 

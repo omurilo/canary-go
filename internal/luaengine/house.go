@@ -8,6 +8,23 @@ import (
 
 const houseTypeName = "House"
 
+// checkHouse returns the *game.House from L.Get(1) or nil.
+func checkHouse(L *lua.LState) *game.House {
+	if ud, ok := L.Get(1).(*lua.LUserData); ok {
+		if h, ok := ud.Value.(*game.House); ok {
+			return h
+		}
+	}
+	return nil
+}
+
+func pushHouse(L *lua.LState, h *game.House) {
+	ud := L.NewUserData()
+	ud.Value = h
+	L.SetMetatable(ud, L.GetTypeMetatable("House"))
+	L.Push(ud)
+}
+
 func checkHouseArg(L *lua.LState, n int) *game.House {
 	ud := L.CheckUserData(n)
 	if h, ok := ud.Value.(*game.House); ok {
@@ -133,6 +150,31 @@ func (e *Engine) registerHouseMetatable() {
 		"getName":         houseGetName,
 		"getSize":         houseGetSize,
 		"canEditAccessList": houseCanEditAccessList,
+		"getId": func(L *lua.LState) int {
+			h := checkHouse(L)
+			if h == nil {
+				L.Push(lua.LNumber(0))
+				return 1
+			}
+			L.Push(lua.LNumber(h.ID))
+			return 1
+		},
+		"getOwnerName": func(L *lua.LState) int {
+			L.Push(lua.LString(""))
+			return 1
+		},
+		"getDoors": func(L *lua.LState) int {
+			L.Push(L.NewTable())
+			return 1
+		},
+		"getTiles": func(L *lua.LState) int {
+			L.Push(L.NewTable())
+			return 1
+		},
+		"getItems": func(L *lua.LState) int {
+			L.Push(L.NewTable())
+			return 1
+		},
 		"hasItemOnTile": func(L *lua.LState) int {
 			h := checkHouseArg(L, 1)
 			if h == nil || len(h.HouseTiles) == 0 {
