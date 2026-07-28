@@ -161,6 +161,7 @@ func run(o runOpts, log *slog.Logger) error {
 	// World: real OTBM map if provided, else a synthetic spawn field.
 	world := game.NewWorld()
 	world.Items = catalog
+	world.Achievements = game.NewAchievementRegistry()
 
 	if bc, err := database.GetBoostedCreature(ctx); err == nil && bc != "" && bc != "default" {
 		world.BoostedCreature = bc

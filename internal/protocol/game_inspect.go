@@ -50,8 +50,6 @@ func (g *GameProtocol) parseCyclopediaCharacterInfo(r *netmsg.Reader) {
 	}
 	characterID := r.GetU32()
 	characterInfoType := r.GetByte()
-	slog.Default().Info("parseCyclopediaCharacterInfo", "charID", characterID, "infoType", characterInfoType)
-		
 		if characterInfoType == 3 || characterInfoType == 4 {
 			r.GetU16()
 			r.GetU16()
