@@ -64,11 +64,10 @@ allowOldProtocol = true
 bindOnlyGlobalAddress = false
 loginProtocolPort = 7171
 gameProtocolPort = 7172
--- Set legacy game ports to 0 to auto-select the next available ports after
--- gameProtocolPort while avoiding loginProtocolPort and statusProtocolPort.
-legacy1100GameProtocolPort = 0
-legacy860GameProtocolPort = 0
-statusProtocolPort = 7171
+-- Legacy game protocol ports (0 = disabled). Docker defaults: 7174 / 7175.
+legacy1100GameProtocolPort = 7174
+legacy860GameProtocolPort = 7175
+statusProtocolPort = 7173
 maxPlayers = 0
 serverName = "Canary-Go"
 serverMotd = "Welcome to the OTServBR-Global!"

@@ -91,37 +91,6 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 	return nil
 }
 
-// restoreOpenContainers re-opens container windows that were open on last
-// logout by scanning items for the OpenContainer attribute set during save.
-func (d *DB) restoreOpenContainers(p *game.Player) {
-	var walk func(item *game.Item)
-	walk = func(item *game.Item) {
-		if item == nil {
-			return
-		}
-		if item.Attr != nil && item.Attr.OpenContainer != nil {
-			cid := uint8(*item.Attr.OpenContainer)
-			if cid > 0 {
-				p.OpenContainerAt(cid-1, item)
-			}
-		}
-		for _, child := range item.Contents {
-			walk(child)
-		}
-	}
-	for _, item := range p.Inventory {
-		walk(item)
-	}
-	walk(p.StoreInbox)
-	if p.DepotManager != nil {
-		for _, locker := range p.DepotManager.Lockers {
-			walk(locker)
-		}
-	}
-	walk(p.Inbox)
-	walk(p.RewardChest)
-}
-
 // SavePlayerItems saves the player's items into the database.
 func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 	tx, err := d.SQL.BeginTx(ctx, nil)
@@ -130,10 +99,9 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 	}
 	defer tx.Rollback()
 
-	// Prepare open containers state: clear all then re-set for currently open.
-	// Matches C++ IOLoginDataSavePlayer: stores OPENCONTAINER = cid+1.
-	var clearOC func(item *game.Item)
-	clearOC = func(item *game.Item) {
+	// Prepare open containers state
+	var traverse func(item *game.Item)
+	traverse = func(item *game.Item) {
 		if item == nil {
 			return
 		}
@@ -141,28 +109,23 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 			item.Attr.OpenContainer = nil
 		}
 		for _, child := range item.Contents {
-			clearOC(child)
+			traverse(child)
 		}
 	}
 	for _, item := range p.Inventory {
-		clearOC(item)
+		traverse(item)
 	}
-	clearOC(p.StoreInbox)
+	traverse(p.StoreInbox)
 	if p.DepotManager != nil {
 		for _, locker := range p.DepotManager.Lockers {
-			clearOC(locker)
+			traverse(locker)
 		}
 	}
-	clearOC(p.Inbox)
-	clearOC(p.RewardChest)
+	traverse(p.Inbox)
+	traverse(p.RewardChest)
 
-	// Set OpenContainer on currently-open container items.
-	for cid, oc := range p.OpenContainersSnapshot() {
-		if oc.Container != nil && oc.Container.Attr != nil {
-			v := uint8(cid + 1) // cid+1 because 0 = "not open"
-			oc.Container.Attr.OpenContainer = &v
-		}
-	}
+	// Persistence of open containers is disabled to avoid ghost container issues.
+	// The traverse logic above will naturally clear the OpenContainer tag from all items in the database.
 
 	// Helper to save a tree of items to a table
 	saveTree := func(tableName string, rootItems []itemRow) error {

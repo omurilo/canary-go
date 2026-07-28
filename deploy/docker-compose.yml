@@ -35,17 +35,22 @@ services:
     build:
       context: ..
       dockerfile: ./Dockerfile
+    user: "1000:1000"
     container_name: canary-go-server
     restart: unless-stopped
     environment:
       # config.lua reads these via the mysql* keys; overriding here keeps the
       # image generic. (canary-go also accepts the mysql* config.lua values.)
       CANARY_DB_HOST: db
+      CANARY_LEGACY_1100_GAME_PORT: "7174"
+      CANARY_LEGACY_860_GAME_PORT: "7175"
     command: >
       -config config.lua -schema schema/mysql.sql -scripts scripts -appearances data/items/appearances.dat -migrate -seed
     ports:
       - "7171:7171"
       - "7172:7172"
+      - "7174:7174"
+      - "7175:7175"
       - "7173:7173"
     volumes:
       - ../config.lua:/app/config.lua:ro

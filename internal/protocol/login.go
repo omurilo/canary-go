@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
 	"github.com/opentibiabr/canary-go/internal/db"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 	"github.com/opentibiabr/canary-go/internal/network"
 	"github.com/opentibiabr/canary-go/internal/tibcrypto"
 	"github.com/opentibiabr/canary-go/internal/transport"
+	"strings"
+	"time"
 )
+
 // Login opcodes (outbound).
 const (
 	opLoginError      = 0x0B
@@ -19,15 +20,18 @@ const (
 	opLoginSessionKey = 0x28
 	opLoginCharList   = 0x64
 )
+
 // LoginProtocol serves the account login / character-list flow (port 7171).
 type LoginProtocol struct {
 	deps *Deps
 }
+
 // NewLoginFactory returns a factory that builds LoginProtocol instances.
 func NewLoginFactory(deps *Deps) network.ProtocolFactory {
 	return func() network.Protocol { return &LoginProtocol{deps: deps} }
 }
-func (p *LoginProtocol) OnConnect(c *network.Connection) { c.RawFirstPacket = true;  }
+func (p *LoginProtocol) OnConnect(c *network.Connection) { c.RawFirstPacket = true }
+
 // sendStatusString sends XML server status matching C++ ProtocolStatus::sendStatusString.
 func (p *LoginProtocol) sendStatusString(c *network.Connection) {
 	uptime := uint64(time.Since(serverStartTime).Seconds())
@@ -80,7 +84,7 @@ func (p *LoginProtocol) sendStatusString(c *network.Connection) {
 	b.WriteString("\r\n")
 	b.WriteString("<?xml version=\"1.0\"?>\n")
 	b.WriteString("<tsqp version=\"1.0\">\n")
-	fmt.Fprintf(&b, "\t<serverinfo uptime=\"%d\" ip=\"%s\" servername=\"%s\" port=\"%d\" location=\"%s\" url=\"%s\" server=\"%s\" version=\"1.0\" client=\"13.15\"/>\n",
+	fmt.Fprintf(&b, "\t<serverinfo uptime=\"%d\" ip=\"%s\" servername=\"%s\" port=\"%d\" location=\"%s\" url=\"%s\" server=\"%s\" version=\"1.0\" client=\"15.25\"/>\n",
 		uptime, serverIP, serverName, serverPort, location, url, serverName)
 	fmt.Fprintf(&b, "\t<boostedCreature name=\"%s\"/>\n", boostedCreature)
 	fmt.Fprintf(&b, "\t<boostedBoss name=\"%s\"/>\n", boostedBoss)
@@ -109,7 +113,10 @@ func (p *LoginProtocol) sendMyAACStatus(c *network.Connection) {
 	uniqueIPs := uint32(0)
 	if p.deps != nil {
 		cfg := p.deps.Cfg
-		if cfg != nil { serverName = cfg.ServerName; serverIP = cfg.IP }
+		if cfg != nil {
+			serverName = cfg.ServerName
+			serverIP = cfg.IP
+		}
 		if p.deps.World != nil {
 			onlineCount = uint32(p.deps.World.OnlineCount())
 			uniqueIPs = onlineCount
@@ -118,7 +125,7 @@ func (p *LoginProtocol) sendMyAACStatus(c *network.Connection) {
 	var b strings.Builder
 	b.WriteString("<?xml version=\"1.0\"?>\n")
 	b.WriteString("<tsqp version=\"1.0\">\n")
-	fmt.Fprintf(&b, "\t<serverinfo uptime=\"%d\" ip=\"%s\" servername=\"%s\" port=\"%d\" server=\"Canary\" version=\"1.0\" client=\"13.15\"/>\n",
+	fmt.Fprintf(&b, "\t<serverinfo uptime=\"%d\" ip=\"%s\" servername=\"%s\" port=\"%d\" server=\"Canary\" version=\"1.0\" client=\"15.25\"/>\n",
 		uptime, serverIP, serverName, 7171)
 	fmt.Fprintf(&b, "\t<owner name=\"\" email=\"\"/>\n")
 	fmt.Fprintf(&b, "\t<players online=\"%d\" unique=\"%d\" max=\"2000\" peak=\"0\"/>\n", onlineCount, uniqueIPs)
@@ -129,11 +136,12 @@ func (p *LoginProtocol) sendMyAACStatus(c *network.Connection) {
 	c.WriteRaw([]byte(b.String()))
 }
 
-func (p *LoginProtocol) OnDisconnect(c *network.Connection) {  }
+func (p *LoginProtocol) OnDisconnect(c *network.Connection)               {}
 func (p *LoginProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {}
+
 // handleHTTPRequest parses an HTTP request body and returns the appropriate JSON response.
 func (p *LoginProtocol) handleHTTPRequest(c *network.Connection, body []byte) {
-	
+
 	var req struct {
 		Type string `json:"type"`
 	}
@@ -157,7 +165,7 @@ func (p *LoginProtocol) handleHTTPRequest(c *network.Connection, body []byte) {
 		jsonEmpty(c) // not implemented
 	case "showoff":
 		jsonEmpty(c) // not implemented
-		default:
+	default:
 		jsonError(c, "Unknown type: "+req.Type)
 	}
 }
@@ -180,12 +188,12 @@ func jsonCacheInfo(c *network.Connection, p *LoginProtocol) {
 		online = uint32(p.deps.World.OnlineCount())
 	}
 	resp, _ := json.Marshal(map[string]interface{}{
-		"playersonline":          online,
-		"discord_online":         0,
-		"gamingyoutubestreams":   0,
-		"gamingyoutubeviewer":    0,
-		"youtube_link":           "",
-		"discord_link":           "",
+		"playersonline":        online,
+		"discord_online":       0,
+		"gamingyoutubestreams": 0,
+		"gamingyoutubeviewer":  0,
+		"youtube_link":         "",
+		"discord_link":         "",
 	})
 	sendJSON(c, resp)
 }
@@ -229,21 +237,22 @@ func jsonBoostedCreature(c *network.Connection, p *LoginProtocol) {
 	//   data.creatureraceid (or data.raceid for backwards compat)
 	//   data.bossraceid
 	resp, _ := json.Marshal(map[string]interface{}{
-		"boostedCreature":  boostedCreature,
-		"boostedBoss":      boostedBoss,
-		"raceId":           creatureRaceID, // backwards compat
-		"creatureraceid":   creatureRaceID,
-		"bossraceid":       bossRaceID,
-		"bonus":            "",
-		"bonusXp":          0,
-		"bonusLoot":        0,
-		"bonusSkill":       0,
+		"boostedCreature": boostedCreature,
+		"boostedBoss":     boostedBoss,
+		"raceId":          creatureRaceID, // backwards compat
+		"creatureraceid":  creatureRaceID,
+		"bossraceid":      bossRaceID,
+		"bonus":           "",
+		"bonusXp":         0,
+		"bonusLoot":       0,
+		"bonusSkill":      0,
 	})
 	sendJSON(c, resp)
 }
+
 // OnFirstPacket parses the login request, authenticates and replies.
 func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
-	
+
 	// MyAAC binary status: [2-byte len] + FF FF "info"
 	if len(body) >= 8 && body[0] == 0x06 && body[1] == 0x00 && body[2] == 0xFF && body[3] == 0xFF && string(body[4:8]) == "info" {
 		p.sendMyAACStatus(c)

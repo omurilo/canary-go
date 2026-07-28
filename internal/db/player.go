@@ -112,6 +112,9 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	// attributes now that the inventory is loaded.
 	p.RebuildManagedContainers()
 
+	// Restore open containers from persisted attributes.
+	d.restoreOpenContainers(p)
+
 	// Load player storages
 	p.Storages = make(map[uint32]int32)
 	sRows, err := d.SQL.QueryContext(ctx, "SELECT `key`, `value` FROM player_storage WHERE player_id = ?", p.DBID)

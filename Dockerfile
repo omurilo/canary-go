@@ -17,7 +17,7 @@ RUN ./scripts/generate_appearances.sh
 RUN CGO_ENABLED=0 go build -trimpath -o /out/canary ./cmd/canary
 
 FROM alpine:3.20
-RUN adduser -D -u 10001canary
+RUN adduser -D -u 10001 canary
 WORKDIR /app
 COPY --from=build /out/canary /app/canary
 COPY config.lua /app/config.lua
