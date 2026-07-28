@@ -34,7 +34,8 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	                  p.boss_points,
 	                  p.lastlogin, p.lastlogout,
 	                  p.blessings1, p.blessings2, p.blessings3, p.blessings4,
-	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8
+	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8,
+	                  p.weapon_proficiency
 	           FROM players p JOIN accounts a ON a.id = p.account_id WHERE p.name = ? LIMIT 1`
 
 	p := &game.Player{}
@@ -46,6 +47,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	var offlineTimeSeconds int32
 	var taskPoints uint32
 	var quickLootFallback bool
+	var weaponProfBlob sql.NullString
 	err := d.SQL.QueryRowContext(ctx, q, name).Scan(
 		&p.DBID, &p.AccountID, &p.AccountType, &p.CoinBalance, &p.CoinTransferable, &p.TournamentBalance, &p.GroupID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
 		&p.Health, &p.MaxHealth, &p.Mana, &p.MaxMana, &p.Experience,
@@ -67,6 +69,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		&p.LastLogin, &p.LastLogout,
 		&p.Blessings[0], &p.Blessings[1], &p.Blessings[2], &p.Blessings[3],
 		&p.Blessings[4], &p.Blessings[5], &p.Blessings[6], &p.Blessings[7],
+		&weaponProfBlob,
 	)
 	p.OfflineTrainingTime = offlineTimeSeconds * 1000
 	if errors.Is(err, sql.ErrNoRows) {
@@ -76,6 +79,12 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		return nil, err
 	}
 
+	if weaponProfBlob.Valid && weaponProfBlob.String != "" {
+		p.WeaponProficiency = game.NewWeaponProficiency()
+		if err := json.Unmarshal([]byte(weaponProfBlob.String), p.WeaponProficiency); err != nil {
+			p.WeaponProficiency = game.NewWeaponProficiency()
+		}
+	}
 	p.Capacity = capValue * 100
 	if minExp := game.ExpForLevel(uint64(p.Level)); p.Experience < minExp {
 		p.Experience = minExp
@@ -362,6 +371,13 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	              blessings1=?, blessings2=?, blessings3=?, blessings4=?,
 	              blessings5=?, blessings6=?, blessings7=?, blessings8=?
 	           WHERE id=?`
+	// Serialize weapon proficiency.
+	var weaponProfJSON = []byte("")
+	if p.WeaponProficiency != nil {
+		if data, err := json.Marshal(p.WeaponProficiency); err == nil {
+			weaponProfJSON = data
+		}
+	}
 	_, err := d.SQL.ExecContext(ctx, q,
 		p.Level, p.Experience, p.Health, p.MaxHealth,
 		p.Mana, p.MaxMana, p.Soul, p.Capacity/100, p.BankBalance,
@@ -384,6 +400,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		p.Skull, p.SkullTime, p.ConditionsBlob,
 		p.Blessings[0], p.Blessings[1], p.Blessings[2], p.Blessings[3],
 		p.Blessings[4], p.Blessings[5], p.Blessings[6], p.Blessings[7],
+		weaponProfJSON,
 		p.DBID,
 	)
 	if err != nil {
