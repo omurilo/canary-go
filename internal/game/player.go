@@ -1091,6 +1091,14 @@ func (p *Player) NotifyIconsChange() {
 	}
 }
 
+// AddInFightTicks applies or extends the CONDITION_INFIGHT (crossed swords icon)
+// for the standard PZ lock duration. Mirrors C++ Player::addInFightTicks.
+func (p *Player) AddInFightTicks() {
+	const fightTicks = 10 * 1000 // 10 seconds, matching C++ PZ_LOCKED default
+	cond := combat.CreateCondition(0, combat.ConditionInFight, fightTicks, 0, false)
+	p.AddCondition(cond)
+}
+
 func (p *Player) TickConditions(interval int32) {
 	p.conditionStore.ExecuteConditions(adaptCreature(p), interval)
 }

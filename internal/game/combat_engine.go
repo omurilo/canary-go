@@ -297,6 +297,13 @@ func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 		return
 	}
 
+	if p, ok := attacker.(*Player); ok {
+		p.AddInFightTicks()
+	}
+	if p, ok := target.(*Player); ok {
+		p.AddInFightTicks()
+	}
+
 	effect := uint16(effectDrawBlood)
 	if dmg <= 0 {
 		effect = effectPoff
@@ -381,6 +388,11 @@ func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item, lau
 		return
 	}
 
+	p.AddInFightTicks()
+	if tp, ok := target.(*Player); ok {
+		tp.AddInFightTicks()
+	}
+
 	// Dispatch distance shoot effect
 	shootStr := ammo.ShootType(e.world.Items)
 	if shootStr == "" {
@@ -450,6 +462,11 @@ func (e *CombatEngine) doWandHit(p *Player, target Creature, wand *Item) {
 		Origin:       combat.OriginRanged,
 	}) {
 		return
+	}
+
+	p.AddInFightTicks()
+	if tp, ok := target.(*Player); ok {
+		tp.AddInFightTicks()
 	}
 
 	// Dispatch distance projectile effect
