@@ -19,6 +19,7 @@ services:
       MARIADB_PASSWORD: "${CANARY_DB_PASSWORD:-canary}"
       MARIADB_ROOT_PASSWORD: "${CANARY_DB_ROOT_PASSWORD:-root}"
     ports:
+      - "3306:3306"
       - "3307:3306"
     volumes:
       - db-volume:/var/lib/mysql
