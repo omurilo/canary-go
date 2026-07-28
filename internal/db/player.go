@@ -369,7 +369,8 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	              boss_points=?,
 	              skull=?, skulltime=?, conditions=?,
 	              blessings1=?, blessings2=?, blessings3=?, blessings4=?,
-	              blessings5=?, blessings6=?, blessings7=?, blessings8=?
+	              blessings5=?, blessings6=?, blessings7=?, blessings8=?,
+	              weapon_proficiency=?
 	           WHERE id=?`
 	// Serialize weapon proficiency.
 	var weaponProfJSON = []byte("")

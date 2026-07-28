@@ -113,12 +113,8 @@ func (e *SpawnEngine) LoadSpawns(data *spawns.SpawnsData) {
 		}
 		for _, nn := range sn.NPCs {
 			pos := e.resolveSpawnPos(sn, nn.X, nn.Y, nn.Z)
-			interval := time.Duration(nn.SpawnTime) * time.Second
-			if interval <= 0 {
-				interval = defaultSpawnInterval
-			}
 			dir := Direction(nn.Direction)
-			block.addMonster(nn.Name, pos, dir, interval)
+			e.spawnNPC(nn.Name, pos, dir)
 		}
 		if len(block.blocks) > 0 {
 			e.mu.Lock()
@@ -288,6 +284,21 @@ func (e *SpawnEngine) spawnCreatureInBlock(block *SpawnBlock, id uint32, sb *spa
 	e.mu.Unlock()
 
 	return monster
+}
+
+// spawnNPC creates and places an NPC in the world immediately (C++ SpawnNpc startup behavior).
+func (e *SpawnEngine) spawnNPC(name string, pos Position, dir Direction) {
+	nType := e.Types.Npcs[strings.ToLower(name)]
+	if nType == nil {
+		slog.Debug("spawn: npc type not found", "name", name)
+		return
+	}
+	nid := e.world.nextCreatureID.Add(1)
+	npc := NewNpc(nid, name, nType)
+	npc.SetPosition(pos)
+	npc.SetDirection(dir)
+	e.world.AddCreature(npc)
+	slog.Debug("spawned npc", "name", name, "pos", pos)
 }
 
 func (e *SpawnEngine) randomSpawnPos(center Position, radius int) Position {

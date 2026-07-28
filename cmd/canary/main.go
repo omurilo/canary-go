@@ -217,9 +217,21 @@ func run(o runOpts, log *slog.Logger) error {
 			log.Info("loaded monster types (xml fallback)", "count", n)
 		}
 		if err := creatureTypes.LoadNpcs(filepath.Join(cfg.DataPack, "npc")); err != nil {
-			log.Warn("loading npc types", "err", err)
-		} else {
-			log.Info("loaded npc types", "count", len(creatureTypes.Npcs))
+			log.Warn("loading npc types (xml) from datapack", "err", err)
+		} else if n := len(creatureTypes.Npcs); n > 0 {
+			log.Info("loaded npc types (xml) from datapack", "count", n)
+		}
+	}
+
+	// Also load NPC XML types from core data/npc/ (standard C++ location).
+	if cfg.Core != "" {
+		coreNpcDir := filepath.Join(cfg.Core, "npc")
+		if _, err := os.Stat(coreNpcDir); err == nil {
+			if err := creatureTypes.LoadNpcs(coreNpcDir); err != nil {
+				log.Warn("loading npc types (xml) from core", "err", err)
+			} else if n := len(creatureTypes.Npcs); n > 0 {
+				log.Info("loaded npc types (xml) from core", "count", n)
+			}
 		}
 	}
 
@@ -351,6 +363,9 @@ func run(o runOpts, log *slog.Logger) error {
 		}
 	}
 	// Load custom OTBM maps from world/<datapack>/custom/ when toggleMapCustom is enabled.
+	// Collect custom spawn file paths during map loading but defer spawn loading
+	// until after Lua scripts have populated the type registries (matching C++ order).
+	var customSpawnBases []string
 	if loadedMap && cfg.ToggleMapCustom {
 		customDir := filepath.Join(mapDir, "custom")
 		entries, err := os.ReadDir(customDir)
@@ -369,16 +384,8 @@ func run(o runOpts, log *slog.Logger) error {
 				}
 				customBase := strings.TrimSuffix(customPath, filepath.Ext(customPath))
 
-				// Custom monster spawns
-				if sd, err := spawns.LoadSpawnFile(customBase + "-monster.xml"); err == nil {
-					spawnEngine.LoadSpawns(sd)
-					log.Info("loaded custom monster spawns", "map", entry.Name())
-				}
-				// Custom NPC spawns
-				if sd, err := spawns.LoadSpawnFile(customBase + "-npc.xml"); err == nil {
-					spawnEngine.LoadSpawns(sd)
-					log.Info("loaded custom npc spawns", "map", entry.Name())
-				}
+				// Custom NPC & monster spawns are loaded later (after Lua type registries).
+				customSpawnBases = append(customSpawnBases, customBase)
 				// Custom houses
 				if houses, err := database.ParseHouseFile(customBase + "-house.xml"); err == nil {
 					for i := range houses {
@@ -678,6 +685,18 @@ func run(o runOpts, log *slog.Logger) error {
 				log.Info("loaded npc spawns", "file", npcSpawnFile)
 			} else {
 				log.Warn("npc spawn file not loaded", "file", npcSpawnFile, "err", err)
+			}
+		}
+		// Custom spawns: loaded after Lua scripts have registered all types, matching C++
+		// order (types first, then spawns with immediate creature creation).
+		for _, customBase := range customSpawnBases {
+			if sd, err := spawns.LoadSpawnFile(customBase + "-monster.xml"); err == nil {
+				spawnEngine.LoadSpawns(sd)
+				log.Info("loaded custom monster spawns", "base", customBase)
+			}
+			if sd, err := spawns.LoadSpawnFile(customBase + "-npc.xml"); err == nil {
+				spawnEngine.LoadSpawns(sd)
+				log.Info("loaded custom npc spawns", "base", customBase)
 			}
 		}
 	}
