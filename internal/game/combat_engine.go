@@ -75,11 +75,13 @@ const regenInterval = 1 * time.Second
 func (e *CombatEngine) Start() {
 	GlobalDispatcher.AddEvent(combatTickInterval, e.tick)
 	GlobalDispatcher.AddEvent(regenInterval, e.regenTick)
+	GlobalDispatcher.AddEvent(1*time.Second, e.imbuementDecayTick)
 }
 
 // regenTick drains active food (CONDITION_REGENERATION) and regenerates a small
 // amount of HP/mana while it lasts, mirroring the regeneration condition. It is
 // a simplified fixed-rate gain (per-vocation gain amounts are a later milestone).
+// Also decays equipped imbuements while the player is in combat.
 func (e *CombatEngine) regenTick() {
 	for _, p := range e.world.Players() {
 		if p.RegenTicks <= 0 {
@@ -108,6 +110,44 @@ func (e *CombatEngine) regenTick() {
 		}
 	}
 	GlobalDispatcher.AddEvent(regenInterval, e.regenTick)
+}
+
+// imbuementDecayTick runs every second and decays equipped imbuements for
+// players who are in combat (CONDITION_INFIGHT) and outside protection zones.
+// Mirrors C++ ImbuementDecay::checkImbuementDecay.
+func (e *CombatEngine) imbuementDecayTick() {
+	for _, p := range e.world.Players() {
+		if p.IsInProtectionZone() {
+			continue
+		}
+		if !p.HasCondition(combat.ConditionInFight) {
+			continue
+		}
+		for s := ConstSlotFirst; s <= ConstSlotLast; s++ {
+			if int(s) >= len(p.Inventory) || p.Inventory[s] == nil {
+				continue
+			}
+			item := p.Inventory[s]
+			if !item.HasImbuements() {
+				continue
+			}
+			for slotID, info := range item.Imbuements {
+				if info.Duration == 0 {
+					continue
+				}
+				newDuration := info.Duration - 1
+				if newDuration > info.Duration {
+					newDuration = 0 // safety: prevent underflow
+				}
+				if newDuration == 0 {
+					delete(item.Imbuements, slotID)
+				} else {
+					item.Imbuements[slotID] = ImbuementInfo{ID: info.ID, Duration: newDuration}
+				}
+			}
+		}
+	}
+	GlobalDispatcher.AddEvent(1*time.Second, e.imbuementDecayTick)
 }
 
 func (e *CombatEngine) tick() {
