@@ -113,6 +113,10 @@ const (
 	inBlessingWindowRequest      = 0xCF
 	inRequestOutfit              = 0xD2
 	inBugReport                  = 0xE6
+	inChannelInvite           = 0xAB
+	inChannelExclude           = 0xAC
+	inVIPAdd                   = 0xDC
+	inVIPRemove                = 0xDD
 )
 
 // GameProtocol is one game-server session.
@@ -955,10 +959,9 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case inCloseShop:
 		g.parseCloseShop(r)
 	case inCloseChannel:
+		g.parseCloseChannel(r)
 	case inHighscore:
 		g.parseHighscores(r)
-		g.parseHighscores(r)
-		g.parseCloseChannel(r)
 	case inNpcGreet:
 		g.parseNpcGreet(r)
 	case inInviteToParty:
@@ -1091,6 +1094,10 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseRequestOutfit(r)
 	case inBugReport:
 		g.parseBugReport(r)
+	case inChannelInvite: g.parseChannelInvite(r)
+	case inChannelExclude: g.parseChannelExclude(r)
+	case inVIPAdd: g.parseVIPAdd(r)
+	case inVIPRemove: g.parseVIPRemove(r)
 	default:
 		// Log the remaining payload so each not-yet-migrated action can be
 		// mapped to its C++ parse* handler from the exact wire bytes.

@@ -69,7 +69,7 @@ func (g *GameProtocol) SendVIPOffline(playerID uint32) {
 	g.SendToClient(w)
 }
 
-// parseVIPAdd handles client request to add a VIP entry (Opcode 0xCE).
+// parseVIPAdd handles client request to add a VIP entry (Opcode 0xDC).
 func (g *GameProtocol) parseVIPAdd(r *netmsg.Reader) {
 	if g.player == nil {
 		return
@@ -107,7 +107,7 @@ func (g *GameProtocol) parseVIPAdd(r *netmsg.Reader) {
 	g.SendVIPList()
 }
 
-// parseVIPRemove handles client request to remove a VIP entry (Opcode 0xCF).
+// parseVIPRemove handles client request to remove a VIP entry (Opcode 0xDD).
 func (g *GameProtocol) parseVIPRemove(r *netmsg.Reader) {
 	if g.player == nil {
 		return
