@@ -376,22 +376,63 @@ func monsterHazard(L *lua.LState) int {
 }
 
 func monsterHazardcrit(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	// get: monster:hazardCrit() ; set: monster:hazardCrit(value)
+	if L.GetTop() == 1 {
+		L.Push(lua.LBool(m.HazardCrit))
+	} else {
+		m.HazardCrit = L.CheckBool(2)
+		L.Push(lua.LBool(m.HazardCrit))
+	}
 	return 1
 }
 
 func monsterHazarddamageboost(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if L.GetTop() == 1 {
+		L.Push(lua.LBool(m.HazardDamageBoost))
+	} else {
+		m.HazardDamageBoost = L.CheckBool(2)
+		L.Push(lua.LBool(m.HazardDamageBoost))
+	}
 	return 1
 }
 
 func monsterHazarddefenseboost(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if L.GetTop() == 1 {
+		L.Push(lua.LBool(m.HazardDefenseBoost))
+	} else {
+		m.HazardDefenseBoost = L.CheckBool(2)
+		L.Push(lua.LBool(m.HazardDefenseBoost))
+	}
 	return 1
 }
 
 func monsterHazarddodge(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if L.GetTop() == 1 {
+		L.Push(lua.LBool(m.HazardDodge))
+	} else {
+		m.HazardDodge = L.CheckBool(2)
+		L.Push(lua.LBool(m.HazardDodge))
+	}
 	return 1
 }
 
@@ -415,14 +456,7 @@ func monsterImmune(L *lua.LState) int {
 }
 
 func monsterIschallenged(L *lua.LState) int {
-	m := checkMonster(L)
-	if m == nil {
-		L.Push(lua.LFalse)
-		return 1
-	}
-	// No challenged mechanism implemented yet; always return false.
-	L.Push(lua.LFalse)
-	return 1
+	return 0
 }
 
 func monsterIsdead(L *lua.LState) int {
@@ -670,7 +704,17 @@ func monsterSettype(L *lua.LState) int {
 }
 
 func monsterSoulpit(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if L.GetTop() == 1 {
+		L.Push(lua.LBool(m.SoulPit))
+	} else {
+		m.SoulPit = L.CheckBool(2)
+		L.Push(lua.LBool(m.SoulPit))
+	}
 	return 1
 }
 

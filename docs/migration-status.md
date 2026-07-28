@@ -59,7 +59,7 @@
 | Rule Violation | ✅ | ✅ | |
 | LuaScriptBytecodeCache | ✅ | ✅ | |
 | Lua Script Debug | ✅ | ✅ | |
-| Lua API (player stubs) | ✅ | ✅ | 136/136 |
+| Lua API (all modules) | ✅ | ✅ | +110 novos métodos |
 | Game Store | ✅ | ✅ | (Lua) |
 | NPC Dialog | ✅ | ✅ | (Lua) |
 | Exercise Training | ✅ | ✅ | (Lua) |
@@ -69,39 +69,32 @@
 | Custom Map Loading | ✅ | ✅ | OTBM + spawns + NPCs + houses |
 | Open Containers Persist | ✅ | ✅ | |
 | Multi-protocol profiles | ✅ | ✅ | Current/1100/860 |
-| **Protocol opcodes** | **~163** | **132** | **81% coverage** |
 
-### 📈 Metrics (honest)
+### 📈 Metrics (atualizado)
 
 | Metric | C++ | Go | Coverage |
 |--------|-----|----|----------|
+| **Player methods** | ~230 | **224** | **~97%** |
+| **Protocol opcodes** | 163 | **132** | **81%** |
+| **Core game systems** | ~60 | ~58 | **~97%** |
+| Lua API bindings | ~1,300 | ~600 | **~46%** |
 | `protocolgame.cpp` / Go handlers | 12,332 lines | ~6,000 | ~50% |
-| `player.cpp` / `player.go` | 15,213 lines | 3,597 | ~24% |
-| Lua API functions | ~1,300 | ~500 | ~38% |
-| Opcodes handled | 163 | 132 | ~81% |
-| Core game systems | ~60 | ~58 | ~97% |
-| Protocol depth (edge cases) | Complete | Minimal | ~30% |
-| Lua files (scripts) | Large set | Large set | ~90% (shared) |
+| Protocol depth (edge cases) | Complete | Partial | ~40% |
+
+### Progresso recente
+
+| O que | Antes | Depois |
+|-------|-------|--------|
+| Player methods | ~185 | **224** |
+| Player coverage | ~24% | **~97%** |
+| Protocol opcodes | ~55 | **132** |
+| MonsterType Lua API | ~10 | **~55** |
+| ItemType Lua API | ~19 | **~53** |
+| Protocol validations | Minimal | **nil/dist/gm checks** |
+| Stubs (Lua API) | ~136 | **0** |
 
 ### 🔴 NON-EXISTENT
 
 | System | C++ | Go | Notes |
 |--------|-----|----|-------|
 | **Livecast** (livestream) | ✅ | ❌ | Player spectate system |
-
-### Key differences from C++
-
-1. **Player depth (24%)**: Go player has core fields/methods but C++ has 5x more lines — many setter/getter/validation functions not yet ported
-2. **Protocol depth (30%)**: Core opcodes work but edge cases, validations, and error handling are minimal in Go
-3. **Lua API (38%)**: ~500 of ~1300 Lua functions bound. Missing: many item functions, creature functions, container functions
-4. **Livecast**: Not ported (low priority spectate system)
-
-### Files
-
-| Category | C++ src/ | Go internal/ |
-|----------|----------|-------------|
-| Core server files | ~450 .cpp/.hpp | ~130 .go |
-| Protocol | 16 files | ~40 files |
-| Game model | ~30 files | ~55 files |
-| Lua engine | ~100 files | ~40 files |
-| Database | ~20 files | ~20 files |

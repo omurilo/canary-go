@@ -767,8 +767,8 @@ func (g *GameProtocol) enterWorld() {
 
 	// Boss Cyclopedia fight cooldowns (empty when the player has none).
 	g.SendBosstiaryCooldownTimer()
-
-	// Keep-alive pings start once the player is in the world.
+		// Outfit window data for character customization.
+		g.SendOutfitWindow()
 	g.startPingLoop()
 
 	// Notify other spectators that we appeared.
@@ -938,7 +938,7 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.SendToClient(w)
 	case 0x28: // Stash action (stow/withdraw)
 		g.parseStashAction(r)
-	case inPong, 0x60, 0xBE:
+		case inPong, 0x60, 0xBE:
 		// Reply to our own keep-alive ping, or safely ignored opcodes (imbuements/cancel attack).
 	case inWalkNorth:
 		g.manualWalk(game.DirNorth)
@@ -1129,7 +1129,7 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case inBlessingWindowRequest:
 		g.parseBlessingWindowRequest(r)
 	case inRequestOutfit:
-		g.parseRequestOutfit(r)
+		g.SendOutfitWindow()
 	case inBugReport:
 		g.parseBugReport(r)
 	case inChannelInvite: g.parseChannelInvite(r)

@@ -30,6 +30,7 @@ const (
 type ItemType struct {
 	ID          uint16
 	Name        string
+	PluralName  string
 	Article     string
 	Description string
 	Group       Group
@@ -87,17 +88,31 @@ type ItemType struct {
 	ShowCharges  bool
 	Capacity     uint32
 
+	ElementType     uint8
+	ElementDamage   uint16
+	ImbuementSlot   uint8
+	MinReqLevel     uint16
+	MinReqMagicLevel uint16
+	DecayTime       uint32
+
 	MaxHitChance int32
 	HitChance    int32
 	Range        int32
+	ShootRange   uint8
 	ShootType    string
 	AmmoType     string
 
 	TransformEquipTo   uint16
 	TransformDeEquipTo uint16
+	WrapableTo         uint16
+	DestroyID          uint16
 
 	// Stats stores values like "skillsword", "absorbpercentfire", "elementice", "magiclevelpoints", etc.
 	Stats map[string]int32
+
+	Speed         int32
+	BaseSpeed     int32
+	VocationString string
 }
 
 // AlwaysOnTop reports whether the item stacks below creatures on a tile.

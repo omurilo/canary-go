@@ -116,4 +116,12 @@ func (e *Engine) registerBosstiaryPlayerMethods() {
 	e.L.SetField(tbl, "addBosstiaryKill", e.L.NewFunction(e.playerAddbosstiarykill))
 	e.L.SetField(tbl, "setBossPoints", e.L.NewFunction(e.playerSetbosspoints))
 	e.L.SetField(tbl, "getBossPoints", e.L.NewFunction(e.playerGetbosspoints))
+
+	e.L.SetField(tbl, "setRemoveBossTime", e.L.NewFunction(func(L *lua.LState) int {
+		p := checkPlayer(L)
+		if p == nil { return 0 }
+		p.BossRemoveTimes = uint8(L.CheckInt(2))
+		L.Push(lua.LTrue)
+		return 1
+	}))
 }

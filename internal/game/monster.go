@@ -68,6 +68,21 @@ type Monster struct {
 
 	// ReflectElements maps combat type to reflection percentage.
 	ReflectElements map[uint32]int16
+
+	// HazardCrit indicates the monster has hazard system crit enabled.
+	HazardCrit bool
+
+	// HazardDodge indicates the monster has hazard system dodge enabled.
+	HazardDodge bool
+
+	// HazardDamageBoost indicates the monster has hazard system damage boost enabled.
+	HazardDamageBoost bool
+
+	// HazardDefenseBoost indicates the monster has hazard system defense boost enabled.
+	HazardDefenseBoost bool
+
+	// SoulPit indicates the monster is affected by the soul pit system.
+	SoulPit bool
 }
 
 func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {
