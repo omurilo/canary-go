@@ -2,7 +2,6 @@ package luaengine
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
@@ -35,7 +34,7 @@ func (e *Engine) registerItem() {
 	e.L.SetField(mt, "__index", e.L.NewFunction(func(L *lua.LState) int {
 		it := checkItem(L)
 		key := L.CheckString(2)
-
+		
 		switch key {
 		case "itemid":
 			L.Push(lua.LNumber(it.item.ID))
@@ -58,7 +57,7 @@ func (e *Engine) registerItem() {
 			}
 			return 1
 		}
-
+		
 		// Fallback to method
 		val := methodTable.RawGetString(key)
 		L.Push(val)
@@ -148,10 +147,10 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			L.Push(lua.LBool(has))
 			return 1
 		},
-		"getId": func(L *lua.LState) int {
+		"getId": func(L *lua.LState) int { 
 			it := checkItem(L)
 			L.Push(lua.LNumber(it.item.ID))
-			return 1
+			return 1 
 		},
 		"getName": func(L *lua.LState) int {
 			it := checkItem(L)
@@ -266,12 +265,12 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			pushPosition(L, it.pos)
 			return 1
 		},
-		"getTile":      stubItemMethod,
+		"getTile": stubItemMethod,
 		"getContainer": stubItemMethod,
-		"getParent":    stubItemMethod,
-		"clone":        stubItemMethod,
-		"split":        stubItemMethod,
-		"remove":       itemRemove,
+		"getParent": stubItemMethod,
+		"clone": stubItemMethod,
+		"split": stubItemMethod,
+		"remove": itemRemove,
 		"addItem": func(L *lua.LState) int {
 			it := checkItem(L)
 			itemID, ok := e.resolveItemID(L, 2)
@@ -402,71 +401,6 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		},
 		"getAttribute": func(L *lua.LState) int {
 			it := checkItem(L)
-			// Support both string-keyed (e.g. "description", "text") and numeric attribute ID lookups
-			if L.Get(2).Type() == lua.LTString {
-				key := strings.ToLower(L.CheckString(2))
-				switch key {
-				case "description":
-					if it.item.Attr != nil && it.item.Attr.Description != nil {
-						L.Push(lua.LString(*it.item.Attr.Description))
-					} else {
-						L.Push(lua.LNil)
-					}
-				case "text":
-					if it.item.Attr != nil && it.item.Attr.Text != nil {
-						L.Push(lua.LString(*it.item.Attr.Text))
-					} else {
-						L.Push(lua.LNil)
-					}
-				case "writer", "writtenby":
-					if it.item.Attr != nil && it.item.Attr.WrittenBy != nil {
-						L.Push(lua.LString(*it.item.Attr.WrittenBy))
-					} else {
-						L.Push(lua.LNil)
-					}
-				case "date", "writtendate":
-					if it.item.Attr != nil && it.item.Attr.WrittenDate != nil {
-						L.Push(lua.LNumber(*it.item.Attr.WrittenDate))
-					} else {
-						L.Push(lua.LNil)
-					}
-				case "actionid", "aid":
-					if it.item.Attr != nil && it.item.Attr.ActionID != nil {
-						L.Push(lua.LNumber(*it.item.Attr.ActionID))
-					} else {
-						L.Push(lua.LNil)
-					}
-				case "uniqueid", "uid":
-					if it.item.Attr != nil && it.item.Attr.UniqueID != nil {
-						L.Push(lua.LNumber(*it.item.Attr.UniqueID))
-					} else {
-						L.Push(lua.LNil)
-					}
-				case "name":
-					if it.item.Attr != nil && it.item.Attr.Name != nil {
-						L.Push(lua.LString(*it.item.Attr.Name))
-					} else {
-						L.Push(lua.LNil)
-					}
-				case "amount":
-					if it.item.Attr != nil && it.item.Attr.Amount != nil {
-						L.Push(lua.LNumber(*it.item.Attr.Amount))
-					} else {
-						L.Push(lua.LNil)
-					}
-				case "count":
-					L.Push(lua.LNumber(it.item.Count))
-				case "duration":
-					if it.item.Attr != nil && it.item.Attr.Duration != nil {
-						L.Push(lua.LNumber(*it.item.Attr.Duration))
-					} else {
-						L.Push(lua.LNil)
-					}
-				default:
-					L.Push(lua.LNil)
-				}
-				return 1
-			}
 			attrId := L.CheckInt(2)
 			if it.item.Attr != nil {
 				switch attrId {
@@ -598,35 +532,6 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		},
 		"setAttribute": func(L *lua.LState) int {
 			it := checkItem(L)
-			// Support both string-keyed (e.g. "description", "text") and numeric attribute ID sets
-			if L.Get(2).Type() == lua.LTString {
-				key := strings.ToLower(L.CheckString(2))
-				val := L.Get(3)
-				if it.item.Attr == nil {
-					it.item.Attr = &game.ItemAttributes{}
-				}
-				switch key {
-				case "description":
-					s := val.String()
-					it.item.Attr.Description = &s
-				case "text":
-					s := val.String()
-					it.item.Attr.Text = &s
-				case "actionid", "aid":
-					n := uint16(lua.LVAsNumber(val))
-					it.item.Attr.ActionID = &n
-				case "uniqueid", "uid":
-					n := uint16(lua.LVAsNumber(val))
-					it.item.Attr.UniqueID = &n
-				case "count":
-					it.item.Count = uint16(lua.LVAsNumber(val))
-				case "duration":
-					n := int32(lua.LVAsNumber(val))
-					it.item.Attr.Duration = &n
-				}
-				L.Push(lua.LBool(true))
-				return 1
-			}
 			attrId := L.CheckInt(2)
 			if it.item.Attr == nil {
 				it.item.Attr = &game.ItemAttributes{}
@@ -742,48 +647,6 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		},
 		"removeAttribute": func(L *lua.LState) int {
 			it := checkItem(L)
-			// Support both string-keyed and numeric attribute ID removal
-			if L.Get(2).Type() == lua.LTString {
-				key := strings.ToLower(L.CheckString(2))
-				if it.item.Attr == nil {
-					L.Push(lua.LBool(false))
-					return 1
-				}
-				switch key {
-				case "description":
-					if it.item.Attr.Description != nil {
-						it.item.Attr.Description = nil
-						L.Push(lua.LBool(true))
-						return 1
-					}
-				case "text":
-					if it.item.Attr.Text != nil {
-						it.item.Attr.Text = nil
-						L.Push(lua.LBool(true))
-						return 1
-					}
-				case "actionid", "aid":
-					if it.item.Attr.ActionID != nil {
-						it.item.Attr.ActionID = nil
-						L.Push(lua.LBool(true))
-						return 1
-					}
-				case "uniqueid", "uid":
-					if it.item.Attr.UniqueID != nil {
-						it.item.Attr.UniqueID = nil
-						L.Push(lua.LBool(true))
-						return 1
-					}
-				case "duration":
-					if it.item.Attr.Duration != nil {
-						it.item.Attr.Duration = nil
-						L.Push(lua.LBool(true))
-						return 1
-					}
-				}
-				L.Push(lua.LBool(false))
-				return 1
-			}
 			attrId := L.CheckInt(2)
 			if it.item.Attr == nil {
 				L.Push(lua.LBool(false))
@@ -906,33 +769,13 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			return 1
 		},
 		"canBeMoved": stubItemMethod,
-		"transform":  e.itemTransform,
-		"decay":      stubItemMethod,
-		"setDuration": func(L *lua.LState) int {
-			it := checkItem(L)
-			dur := int32(L.CheckNumber(2))
-			if it.item.Attr == nil {
-				it.item.Attr = &game.ItemAttributes{}
-			}
-			it.item.Attr.Duration = &dur
-			return 0
-		},
+		"transform": e.itemTransform,
+		"decay": stubItemMethod,
+		"setDuration": stubItemMethod,
 		"stopDecay": stubItemMethod,
-		"getDescription": func(L *lua.LState) int {
-			it := checkItem(L)
-			if it.item.Attr != nil && it.item.Attr.Description != nil {
-				L.Push(lua.LString(*it.item.Attr.Description))
-				return 1
-			}
-			L.Push(lua.LString(""))
-			return 1
-		},
+		"getDescription": e.itemGetDescription,
 		"isInsideDepot": stubItemMethod,
-		"isContainer": func(L *lua.LState) int {
-			it := checkItem(L)
-			L.Push(lua.LBool(len(it.item.Contents) > 0))
-			return 1
-		},
+		"isContainer": stubItemMethod,
 		"actor": func(L *lua.LState) int {
 			it := checkItem(L)
 			if L.GetTop() == 1 {
@@ -943,37 +786,59 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			}
 			return 1
 		},
-		"getFluidType": func(L *lua.LState) int {
+		"getTopParent": func(L *lua.LState) int {
 			it := checkItem(L)
-			L.Push(lua.LNumber(it.item.Count))
+			_ = it
+			L.Push(lua.LNil)
 			return 1
 		},
-		"getCharges": func(L *lua.LState) int {
-			it := checkItem(L)
-			L.Push(lua.LNumber(it.item.Count))
+		"getPluralName": func(L *lua.LState) int {
+			L.Push(lua.LString(""))
 			return 1
 		},
-		"hasOwner": func(L *lua.LState) int {
-			it := checkItem(L)
-			L.Push(lua.LBool(it.item.Attr != nil && it.item.Attr.Owner != nil))
+		"getArticle": func(L *lua.LState) int {
+			L.Push(lua.LString(""))
 			return 1
 		},
-		"getOwnerId": func(L *lua.LState) int {
+		"getCustomAttribute": func(L *lua.LState) int {
+			L.Push(lua.LNil)
+			return 1
+		},
+		"setCustomAttribute": func(L *lua.LState) int { return 0 },
+		"removeCustomAttribute": func(L *lua.LState) int { return 0 },
+		"isOwner": func(L *lua.LState) int {
+			L.Push(lua.LFalse)
+			return 1
+		},
+		"getOwnerName": func(L *lua.LState) int {
+			L.Push(lua.LString(""))
+			return 1
+		},
+		"serializeAttributes": func(L *lua.LState) int {
+			L.Push(lua.LString(""))
+			return 1
+		},
+		"moveToSlot": func(L *lua.LState) int {
+			L.Push(lua.LTrue)
+			return 1
+		},
+		"getImbuementSlot": func(L *lua.LState) int {
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"getImbuement": func(L *lua.LState) int {
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getClassification": func(L *lua.LState) int {
 			it := checkItem(L)
-			if it.item.Attr != nil && it.item.Attr.Owner != nil {
-				L.Push(lua.LNumber(*it.item.Attr.Owner))
-			} else {
-				L.Push(lua.LNumber(0))
+			if cat := e.itemCatalog(); cat != nil {
+				if ct := cat.Get(it.item.ID); ct != nil {
+					L.Push(lua.LNumber(ct.UpgradeClassification))
+					return 1
+				}
 			}
-			return 1
-		},
-		"getWeight": func(L *lua.LState) int {
-			it := checkItem(L)
-			w := uint32(0)
-			if it.item.Attr != nil && it.item.Attr.Weight != nil {
-				w = *it.item.Attr.Weight
-			}
-			L.Push(lua.LNumber(w))
+			L.Push(lua.LNumber(0))
 			return 1
 		},
 	}
@@ -985,7 +850,7 @@ func (e *Engine) itemGetDescription(L *lua.LState) int {
 		L.Push(lua.LString(""))
 		return 1
 	}
-
+	
 	it := e.world.Items.Get(li.item.ID)
 	if it == nil {
 		L.Push(lua.LString("an item of type " + fmt.Sprint(li.item.ID)))

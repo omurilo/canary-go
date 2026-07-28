@@ -301,6 +301,8 @@ func (e *Engine) registerAPI() {
 	mockClass("BedItem")
 	mockClass("DropLoot")
 	mockClass("Charm")
+	mockClass("ItemClassification")
+	mockClass("Teleport")
 	mockClass("EventCallback")
 	mockClass("GemAtelier")
 	mockClass("Guild")
@@ -311,6 +313,7 @@ func (e *Engine) registerAPI() {
 	mockClass("ZoneEvent")
 	mockClass("HazardMonster")
 	mockClass("Party")
+	mockClass("Webhook")
 
 	L.SetGlobal("WEBHOOK_COLOR_GREEN", lua.LNumber(0x00FF00))
 	L.SetGlobal("WEBHOOK_COLOR_RED", lua.LNumber(0xFF0000))
@@ -548,11 +551,6 @@ func (e *Engine) registerAPI() {
 	// registerCharmType runs after the mockClass block so its real Charm type
 	// and Game.createBestiaryCharm override the mocks.
 	e.registerCharmType()
-	e.registerImbuementType()
-	e.registerItemClassificationType()
-	e.registerWebhookType()
-	e.registerMetrics()
-	e.registerTeleportType()
 
 	// addPlayerEvent global fallback function if modules.lua isn't loaded yet.
 	// Mirrors data/modules/lib/modules.lua: addPlayerEvent(callable, delay,
