@@ -65,7 +65,7 @@ func (g *GameProtocol) sendCyclopediaCharacterOffenceStats() {
 	weapon := p.GetWeapon(g.deps.Items, false)
 	writeOffenceWeapon(g, w, p, weapon, flatBonus)
 
-	w.AddDouble(0.0, 4)
+	w.AddDouble(p.WeaponProficiency.GetPowerfulFoeDamage(), 4)
 
 	bestiaries := p.GetActiveBestiariesDamage()
 	w.AddU16(uint16(len(bestiaries)))
@@ -83,75 +83,207 @@ func (g *GameProtocol) sendCyclopediaCharacterOffenceStats() {
 	w.AddDouble(runesCrit.Damage, 4)
 	w.AddDouble(autoCrit.Damage, 4)
 
-	w.AddU16(0)
-	w.AddU16(0)
-	w.AddU16(0)
-	w.AddU16(0)
+	w.AddU16(uint16(p.WeaponProficiency.GetStat(game.WpLifeGainOnHit)))
+	w.AddU16(uint16(p.WeaponProficiency.GetStat(game.WpManaGainOnHit)))
+	w.AddU16(uint16(p.WeaponProficiency.GetStat(game.WpLifeGainOnKill)))
+	w.AddU16(uint16(p.WeaponProficiency.GetStat(game.WpManaGainOnKill)))
 
-	w.AddByte(0)
-	w.AddByte(0)
-	w.AddByte(0)
+	// Skill percentage (auto attack, spell damage, spell healing)
+	var weaponSkill game.Skill
+	if weapon != nil {
+		switch weapon.WeaponType(g.deps.Items) {
+		case "sword":
+			weaponSkill = game.SkillSword
+		case "axe":
+			weaponSkill = game.SkillAxe
+		case "club":
+			weaponSkill = game.SkillClub
+		case "distance", "ammunition", "ammo", "missile":
+			weaponSkill = game.SkillDistance
+		}
+	}
 
-	w.AddDouble(0.0, 4)
-	w.AddDouble(0.0, 4)
-	w.AddDouble(0.0, 4)
-	w.AddByte(0)
+	skillPct := p.GetSkillPercentage(weaponSkill)
+	hasActiveSkill := skillPct.Skill != 0 || (skillPct.AutoAttack+skillPct.SpellDamage+skillPct.SpellHealing) > 0
+	var playerSkill float64
+	if hasActiveSkill {
+		playerSkill = float64(p.GetEffectiveSkill(skillPct.Skill))
+	}
+
+	// Auto Attack
+	hasAA := hasActiveSkill && skillPct.AutoAttack > 0
+	w.AddByte(boolToByte(hasAA))
+	if hasAA {
+		w.AddByte(game.GetWeaponCipbiaSkill(skillPct.Skill))
+		w.AddDouble(skillPct.AutoAttack, 4)
+		w.AddDouble(float64(int64(playerSkill*skillPct.AutoAttack+0.5)), 4) // round
+	}
+
+	// Spell Damage
+	hasSD := hasActiveSkill && skillPct.SpellDamage > 0
+	w.AddByte(boolToByte(hasSD))
+	if hasSD {
+		w.AddByte(game.GetWeaponCipbiaSkill(skillPct.Skill))
+		w.AddDouble(skillPct.SpellDamage, 4)
+		w.AddDouble(float64(int64(playerSkill*skillPct.SpellDamage+0.5)), 4)
+	}
+
+	// Spell Healing
+	hasSH := hasActiveSkill && skillPct.SpellHealing > 0
+	w.AddByte(boolToByte(hasSH))
+	if hasSH {
+		w.AddByte(game.GetWeaponCipbiaSkill(skillPct.Skill))
+		w.AddDouble(skillPct.SpellHealing, 4)
+		w.AddDouble(float64(int64(playerSkill*skillPct.SpellHealing+0.5)), 4)
+	}
+
+	w.AddDouble(0.0, 4) // Full hit points extra damage
+	w.AddDouble(0.0, 4) // Low hit points extra damage
+	w.AddDouble(0.0, 4) // Armor penetration
+	w.AddByte(0x00)     // Elemental pierces count
 
 	g.SendToClient(w)
 }
 
 func writeOffenceWeapon(g *GameProtocol, w *netmsg.Writer, p *game.Player, weapon *game.Item, flatBonus uint16) {
 	cat := g.deps.Items
-	attackValue := uint16(7)
-	skillLevel := p.GetEffectiveSkill(game.SkillFist)
-	skillID := uint8(game.CipbiaSkillFist)
 
-	if weapon != nil {
-		wt := weapon.WeaponType(cat)
-		skillID = game.GetWeaponSkillId(wt)
-		switch wt {
-		case "sword":
-			skillLevel = p.GetEffectiveSkill(game.SkillSword)
-		case "axe":
-			skillLevel = p.GetEffectiveSkill(game.SkillAxe)
-		case "club":
-			skillLevel = p.GetEffectiveSkill(game.SkillClub)
-		case "distance", "ammunition", "missile":
-			skillLevel = p.GetEffectiveSkill(game.SkillDistance)
+	if weapon == nil {
+		// FIST
+		attackValue := uint16(7)
+		skillLevel := p.GetEffectiveSkill(game.SkillFist)
+		skillID := uint8(game.CipbiaSkillFist)
+		attackSkill := p.GetDistanceAttackSkill(int32(skillLevel), int32(attackValue))
+		rawTotal := p.AttackRawTotal(flatBonus, attackValue, skillLevel)
+		total := p.AttackTotal(flatBonus, attackValue, skillLevel)
+
+		w.AddU16(total)
+		w.AddU16(flatBonus)
+		w.AddU16(attackValue)
+		w.AddByte(skillID)
+		w.AddU16(attackSkill)
+		w.AddU16(total - rawTotal)
+		w.AddByte(game.CipbiaElementPhysical)
+		w.AddDouble(0.0, 4)
+		w.AddByte(0)
+		w.AddByte(0)
+		return
+	}
+
+	wt := weapon.WeaponType(cat)
+	it := cat.Get(weapon.ID)
+
+	if wt == "wand" {
+		maxHit := uint16(it.MaxHitChance)
+		if maxHit == 0 {
+			maxHit = 100
 		}
-		if wt != "wand" && wt != "" {
-			attackValue = uint16(weapon.Attack(cat))
-			if attackValue == 0 {
-				attackValue = 7
+		elementByte := byte(game.CipbiaElementPhysical)
+		if it.ElementType != 0 {
+			elementByte = byte(game.GetCipbiaElement(int(it.ElementType)))
+		}
+		w.AddU16(maxHit)
+		w.AddU16(0)
+		w.AddU16(0)
+		w.AddByte(0x00)
+		w.AddU16(0)
+		w.AddU16(0)
+		w.AddByte(elementByte)
+		w.AddDouble(0.0, 4)
+		w.AddByte(0)
+		w.AddByte(0)
+		return
+	}
+
+	// MELEE or DISTANCE
+	physicalAttack := weapon.Attack(cat)
+	if physicalAttack < 0 {
+		physicalAttack = 0
+	}
+	physicalAttack += int32(p.WeaponProficiency.GetStat(game.WpAttackDamage))
+	if physicalAttack < 0 {
+		physicalAttack = 0
+	}
+
+	hasElement := false
+	elementType := uint8(0)
+	elementalAttack := int32(0)
+	if it.ElementType != 0 && it.ElementDamage > 0 {
+		hasElement = true
+		elementType = it.ElementType
+		elementalAttack = int32(it.ElementDamage)
+	}
+
+	attackValue := physicalAttack + elementalAttack
+	if attackValue < 0 {
+		attackValue = 0
+	}
+
+	isDist := wt == "distance" || wt == "ammunition" || wt == "ammo" || wt == "missile"
+	if wt == "ammunition" || wt == "ammo" {
+		if launcher := p.GetWeapon(cat, true); launcher != nil {
+			if launcherAtk := launcher.Attack(cat); launcherAtk > 0 {
+				attackValue += launcherAtk
 			}
 		}
 	}
 
-	var attackSkill uint16
-	if weapon != nil {
-		wt := weapon.WeaponType(cat)
-		if wt == "distance" || wt == "ammunition" || wt == "missile" {
-			attackSkill = p.GetDistanceAttackSkill(int32(skillLevel), int32(attackValue))
-		} else {
-			attackSkill = p.GetAttackSkill(weapon)
-		}
-	} else {
-		attackSkill = p.GetDistanceAttackSkill(int32(skillLevel), int32(attackValue))
+	skillID := game.GetWeaponSkillId(wt)
+	var skillLevel uint16
+	switch wt {
+	case "sword":
+		skillLevel = p.GetEffectiveSkill(game.SkillSword)
+	case "axe":
+		skillLevel = p.GetEffectiveSkill(game.SkillAxe)
+	case "club":
+		skillLevel = p.GetEffectiveSkill(game.SkillClub)
+	case "distance", "ammunition", "ammo", "missile":
+		skillLevel = p.GetEffectiveSkill(game.SkillDistance)
+	default:
+		skillLevel = p.GetEffectiveSkill(game.SkillFist)
 	}
 
-	rawTotal := p.AttackRawTotal(flatBonus, attackValue, skillLevel)
-	total := p.AttackTotal(flatBonus, attackValue, skillLevel)
+	var attackSkill uint16
+	if isDist {
+		attackSkill = p.GetDistanceAttackSkill(int32(skillLevel), attackValue)
+	} else {
+		attackSkill = p.GetAttackSkill(weapon)
+	}
+
+	rawTotal := p.AttackRawTotal(flatBonus, uint16(attackValue), skillLevel)
+	total := p.AttackTotal(flatBonus, uint16(attackValue), skillLevel)
 
 	w.AddU16(total)
 	w.AddU16(flatBonus)
-	w.AddU16(attackValue)
+	w.AddU16(uint16(attackValue))
 	w.AddByte(skillID)
 	w.AddU16(attackSkill)
 	w.AddU16(total - rawTotal)
 	w.AddByte(game.CipbiaElementPhysical)
-	w.AddDouble(0.0, 4)
-	w.AddByte(0)
-	w.AddByte(0)
+
+	// Converted Damage / Imbuement Damage
+	if hasElement {
+		if physicalAttack > 0 {
+			w.AddDouble(float64(elementalAttack)/float64(attackValue), 4)
+		} else {
+			w.AddDouble(0.0, 4)
+		}
+		w.AddByte(game.GetCipbiaElement(int(elementType)))
+	} else {
+		w.AddDouble(0, 4)
+		w.AddByte(0)
+	}
+
+	if isDist {
+		accuracy := p.GetDamageAccuracy(weapon)
+		w.AddByte(uint8(len(accuracy)))
+		for i, acc := range accuracy {
+			w.AddByte(uint8(i + 1))
+			w.AddDouble(acc/100.0, 4)
+		}
+	} else {
+		w.AddByte(0)
+	}
 }
 
 func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
@@ -164,11 +296,11 @@ func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
 	w.AddByte(cyclopediaCharacterInfoDefenceStats)
 	w.AddByte(0x00)
 
-	w.AddDouble(p.GetForgeSkillStat(5), 4)
-	w.AddDouble(p.GetForgeSkillStat(5), 4)
-	w.AddDouble(0.0, 4)
-	w.AddDouble(0.0, 4)
-	w.AddDouble(0.0, 4)
+	w.AddDouble(p.GetForgeSkillStat(5), 4) // dodge total (forge + wheel, wheel=0 for now)
+	w.AddDouble(p.GetForgeSkillStat(5), 4) // dodge equipment
+	w.AddDouble(0.0, 4)                    // dodge forge-only
+	w.AddDouble(0.0, 4)                    // (unused)
+	w.AddDouble(0.0, 4)                    // wheel dodge (TBD)
 
 	w.AddU32(uint32(max(0, p.GetMagicShieldCapacityFlat()) * (1 + p.GetMagicShieldCapacityPercent())))
 	w.AddU16(uint16(p.GetMagicShieldCapacityFlat()))
@@ -183,13 +315,13 @@ func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
 	w.AddU16(p.GetDefenseEquipment())
 	w.AddByte(0x06)
 	w.AddU16(uint16(shieldSkill))
-	w.AddU16(0)
+	w.AddU16(0) // defenseWheel from mastery (TBD)
 
-	w.AddDouble(p.GetMitigation(), 4)
-	w.AddDouble(0.0, 4)
-	w.AddDouble(0.0, 4)
-	w.AddDouble(0.0, 4)
-	w.AddDouble(0.0, 4)
+	w.AddDouble(p.GetMitigation()/100.0, 4)        // mitigation
+	w.AddDouble(0.0, 4)                              // (unused)
+	w.AddDouble(float64(p.GetDefenseEquipment())/10000.0, 4) // shield def from equipment
+	w.AddDouble(0.0, 4)                              // shield skill * mitigationFactor (TBD)
+	w.AddDouble(0.0, 4)                              // wheel mitigation multiplier (TBD)
 
 	absorbs := p.GetCombatAbsorbs()
 	w.AddByte(uint8(len(absorbs)))
@@ -249,9 +381,29 @@ func (g *GameProtocol) sendCyclopediaCharacterMiscStats() {
 		w.AddU32(f.TimeLeft)
 	}
 
-	w.AddByte(uint8(len(p.GetWeaponProficiencyAugments())))
-	w.AddByte(uint8(len(p.GetWheelAugments())))
-	w.AddByte(uint8(len(p.GetEquippedAugments())))
+	weaponAugments := p.GetWeaponProficiencyAugments()
+	w.AddByte(uint8(len(weaponAugments)))
+	for _, a := range weaponAugments {
+		w.AddU16(a.SpellID)
+		w.AddByte(a.Id)
+		w.AddDouble(a.Data, 4)
+	}
+
+	wheelAugments := p.GetWheelAugments()
+	w.AddByte(uint8(len(wheelAugments)))
+	for _, a := range wheelAugments {
+		w.AddU16(a.SpellID)
+		w.AddByte(a.Id)
+		w.AddDouble(a.Data, 4)
+	}
+
+	equippedAugments := p.GetEquippedAugments()
+	w.AddByte(uint8(len(equippedAugments)))
+	for _, a := range equippedAugments {
+		w.AddU16(a.SpellID)
+		w.AddByte(a.Id)
+		w.AddDouble(a.Data, 4)
+	}
 
 	g.SendToClient(w)
 }

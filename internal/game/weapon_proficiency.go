@@ -43,8 +43,9 @@ type WeaponProfCritical struct {
 }
 
 type WeaponProfAugment struct {
-	Id   uint8   `json:"id"`
-	Data float64 `json:"data"`
+	SpellID uint16  `json:"spellId"`
+	Id      uint8   `json:"id"`
+	Data    float64 `json:"data"`
 }
 
 func NewWeaponProficiency() *WeaponProficiency {

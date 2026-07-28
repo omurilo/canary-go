@@ -1,7 +1,6 @@
 package spells
 
 import (
-	"fmt"
 	"sync"
 )
 

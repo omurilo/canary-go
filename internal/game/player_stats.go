@@ -387,14 +387,14 @@ func (p *Player) HasCharmExpansion() bool {
 	return false
 }
 
-func (p *Player) GetWeaponProficiencyAugments() []WeaponProficiencyAugment {
+func (p *Player) GetWeaponProficiencyAugments() []WeaponProfAugment {
 	if p.WeaponProficiency == nil {
 		return nil
 	}
 	augs := p.WeaponProficiency.GetAllAugments()
-	var result []WeaponProficiencyAugment
+	var result []WeaponProfAugment
 	for _, a := range augs {
-		result = append(result, WeaponProficiencyAugment{Id: a.Id, Data: a.Data})
+		result = append(result, a)
 	}
 	return result
 }
@@ -461,16 +461,17 @@ func (p *Player) GetActiveFoods() []ActiveFood {
 }
 
 type WeaponProficiencyAugment struct {
-	Id   uint8
-	Data float64
+	SpellID uint16
+	Id      uint8
+	Data    float64
 }
 
 
-func (p *Player) GetWheelAugments() []uint8 {
+func (p *Player) GetWheelAugments() []WeaponProfAugment {
 	return nil
 }
 
-func (p *Player) GetEquippedAugments() []uint8 {
+func (p *Player) GetEquippedAugments() []WeaponProfAugment {
 	return nil
 }
 
@@ -532,5 +533,28 @@ func GetCipbiaElement(idx int) uint8 {
 		return CipbiaElementAgony
 	default:
 		return CipbiaElementUndefined
+	}
+}
+
+// GetWeaponCipbiaSkill maps a Skill type to the CIPBIA skill ID used in
+// cyclopedia packets. Returns CipbiaSkillFist for unrecognized skills.
+func GetWeaponCipbiaSkill(s Skill) uint8 {
+	switch s {
+	case SkillFist:
+		return CipbiaSkillFist
+	case SkillClub:
+		return CipbiaSkillClub
+	case SkillSword:
+		return CipbiaSkillSword
+	case SkillAxe:
+		return CipbiaSkillAxe
+	case SkillDistance:
+		return CipbiaSkillDistance
+	case SkillShielding:
+		return CipbiaSkillShield
+	case SkillFishing:
+		return CipbiaSkillFishing
+	default:
+		return CipbiaSkillFist
 	}
 }
