@@ -194,8 +194,9 @@ func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
 	absorbs := p.GetCombatAbsorbs()
 	w.AddByte(uint8(len(absorbs)))
 	for _, a := range absorbs {
+		w.AddByte(0x04)
 		w.AddByte(byte(a.Element))
-		w.AddU16(a.Absorb)
+		w.AddDouble(a.Absorb, 4)
 	}
 
 	g.SendToClient(w)

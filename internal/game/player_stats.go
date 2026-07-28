@@ -246,12 +246,12 @@ func (p *Player) GetSkillsEquipment() [SkillCount]SkillsEquipment {
 }
 
 // ============================================================================
-// Combat absorbs
+// Combat absorbs — multiplicative stacking matching C++ calculateAbsorbValues
 // ============================================================================
 
 type CombatAbsorb struct {
 	Element uint8
-	Absorb  uint16
+	Absorb  float64 // client modifier: (10000 - damageModifier) / 10000.
 }
 
 // elementKeyMap maps combat type index to the absorb stat key.
@@ -266,20 +266,54 @@ var elementKeyMap = []struct {
 	{4, "absorbpercentice"},
 	{5, "absorbpercentholy"},
 	{6, "absorbpercentdeath"},
-	{7, "absorbpercentlifedrain"}, // healing
+	{7, "absorbpercentlifedrain"}, // healing (C++ COMBAT_HEALING)
 	{8, "absorbpercentdrown"},
-	{9, "absorbpercentlifedrain"},
+	{9, "absorbpercentlifedrain"}, // lifedrain (same key in OTB, different combat type)
 	{10, "absorbpercentmanadrain"},
 }
 
+// GetCombatAbsorbs computes multiplicative absorb per combat type from all
+// equipped items (matching C++ calculateAbsorbValues). It also applies the
+// player's base AbsorbPercent. Imbuement and wheel contributions are stubbed
+// (0) until those systems expose per-element absorb data.
 func (p *Player) GetCombatAbsorbs() []CombatAbsorb {
+	const combatCount = 11 // match elementKeyMap length
+	// Start at 10000 (no reduction)
+	var mods [combatCount]int32
+	for i := range mods {
+		mods[i] = 10000
+	}
+
+	for slot := ConstSlotFirst; slot <= ConstSlotLast; slot++ {
+		if int(slot) >= len(p.Inventory) || p.Inventory[slot] == nil {
+			continue
+		}
+		t := p.World.Items.Get(p.Inventory[slot].ID)
+		if t == nil || t.Stats == nil {
+			continue
+		}
+		for _, ek := range elementKeyMap {
+			if v, ok := t.Stats[ek.key]; ok && v != 0 {
+				// Multiplicative stacking: mod *= (100 - absorb%) / 100
+				mods[ek.idx] = int32(float64(mods[ek.idx]) * (100.0 - float64(v)) / 100.0)
+			}
+		}
+		// Imbuement absorb contribution — stubbed until ImbuementType exposes per-element absorbs
+	}
+
+	// Player base absorb percent (applied as flat subtraction, matching C++)
+	baseAbsorb := int32(p.GetAbsorbPercent()) * 100
+	_ = baseAbsorb // reserved for when GetAbsorbPercent becomes per-type
+
+	// Wheel resistance — stubbed (0) until Wheel exposes GetResistance(combatType)
+
 	var result []CombatAbsorb
-	for _, ek := range elementKeyMap {
-		v := sumItemStat(p, ek.key)
-		if v > 0 {
+	for i := 0; i < combatCount; i++ {
+		if mods[i] != 10000 {
+			clientModifier := float64(10000-mods[i]) / 10000.0
 			result = append(result, CombatAbsorb{
-				Element: uint8(ek.idx),
-				Absorb:  uint16(v),
+				Element: uint8(i),
+				Absorb:  clientModifier,
 			})
 		}
 	}
