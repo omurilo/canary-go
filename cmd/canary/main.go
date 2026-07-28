@@ -655,9 +655,18 @@ func run(o runOpts, log *slog.Logger) error {
 		loginSvc := network.NewService("login", fmt.Sprintf(":%d", cfg.LoginPort),
 			cfg.ServerName, protocol.NewLoginFactory(deps), log)
 		gameSvc := network.NewService("game", fmt.Sprintf(":%d", cfg.GamePort),
-			cfg.ServerName, protocol.NewGameFactory(deps), log)
+			cfg.ServerName, protocol.NewGameFactory(deps, nil), log)
 
-		errCh := make(chan error, 3)
+		// Count expected services for the error channel.
+		svcCount := 3 // login + game + status (when separate)
+		if cfg.Legacy1100Port > 0 {
+			svcCount++
+		}
+		if cfg.Legacy860Port > 0 {
+			svcCount++
+		}
+		errCh := make(chan error, svcCount)
+
 		go func() { errCh <- loginSvc.Start(ctx) }()
 		go func() { errCh <- gameSvc.Start(ctx) }()
 		if cfg.StatusPort != cfg.LoginPort {
@@ -666,7 +675,24 @@ func run(o runOpts, log *slog.Logger) error {
 			go func() { errCh <- statusSvc.Start(ctx) }()
 		}
 
-	log.Info("canary-go is running", "login", cfg.LoginPort, "game", cfg.GamePort)
+		// Legacy game protocol services.
+		if cfg.Legacy1100Port > 0 {
+			legacy1100Svc := network.NewService("legacy-1100", fmt.Sprintf(":%d", cfg.Legacy1100Port),
+				cfg.ServerName, protocol.NewLegacy1100Factory(deps), log)
+			go func() { errCh <- legacy1100Svc.Start(ctx) }()
+			log.Info("legacy 11.00 protocol enabled", "port", cfg.Legacy1100Port)
+		}
+		if cfg.Legacy860Port > 0 {
+			legacy860Svc := network.NewService("legacy-860", fmt.Sprintf(":%d", cfg.Legacy860Port),
+				cfg.ServerName, protocol.NewLegacy860Factory(deps), log)
+			go func() { errCh <- legacy860Svc.Start(ctx) }()
+			log.Info("legacy 8.60 protocol enabled", "port", cfg.Legacy860Port)
+		}
+
+		log.Info("canary-go is running",
+			"login", cfg.LoginPort, "game", cfg.GamePort,
+			"legacy1100", cfg.Legacy1100Port,
+			"legacy860", cfg.Legacy860Port)
 
 	select {
 	case <-ctx.Done():

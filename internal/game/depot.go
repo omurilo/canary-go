@@ -11,6 +11,13 @@ const (
 	ItemStash      = 28750
 	ItemStoreCoin  = 22118
 	ItemGoldPouch  = 23721
+
+	// Mail item IDs.
+	ItemParcel        = 3503
+	ItemParcelStamped = 3504
+	ItemLetter        = 3505
+	ItemLetterStamped = 3506
+	ItemLabel         = 3507
 )
 
 // PlayerDepotManager manages all depot lockers and chests for a player.

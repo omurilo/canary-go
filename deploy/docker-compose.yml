@@ -50,7 +50,7 @@ services:
     volumes:
       - ../config.lua:/app/config.lua:ro
       - ../data:/app/data:ro
-      - ../data-otservbr-global:/app/data-otservbr-global:ro
+      - ../data-otservbr-global:/app/data-otservbr-global:rw
     depends_on:
       db:
         condition: service_healthy

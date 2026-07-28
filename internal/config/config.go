@@ -59,9 +59,11 @@ type Config struct {
 	ServerName string
 	IP         string
 
-	LoginPort  int
-	GamePort   int
-	StatusPort int
+	LoginPort    int
+	GamePort     int
+	StatusPort   int
+	Legacy1100Port int // legacy 11.00 game protocol port (0 = disabled)
+	Legacy860Port  int // legacy 8.60 game protocol port (0 = disabled)
 
 	DataPack string // dataPackDirectory
 	Core     string // coreDirectory
@@ -100,6 +102,8 @@ func Default() *Config {
 		LoginPort:     7171,
 		GamePort:      7172,
 		StatusPort:    7171,
+		Legacy1100Port: 0, // disabled by default; enable via config.lua or env
+		Legacy860Port:  0, // disabled by default; enable via config.lua or env
 		DataPack:      "data-otservbr-global",
 		Core:          "data",
 		DBHost:        "127.0.0.1",
@@ -169,6 +173,8 @@ func Load(path string) (*Config, error) {
 	cfg.LoginPort = num("loginProtocolPort", cfg.LoginPort)
 	cfg.GamePort = num("gameProtocolPort", cfg.GamePort)
 	cfg.StatusPort = num("statusProtocolPort", cfg.StatusPort)
+	cfg.Legacy1100Port = num("legacy1100GameProtocolPort", cfg.Legacy1100Port)
+	cfg.Legacy860Port = num("legacy860GameProtocolPort", cfg.Legacy860Port)
 	cfg.DataPack = str("dataPackDirectory", cfg.DataPack)
 	cfg.Core = str("coreDirectory", cfg.Core)
 
@@ -236,6 +242,16 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("CANARY_DATA_PACK"); v != "" {
 		cfg.DataPack = v
+	}
+	if v := os.Getenv("CANARY_LEGACY_1100_GAME_PORT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Legacy1100Port = n
+		}
+	}
+	if v := os.Getenv("CANARY_LEGACY_860_GAME_PORT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Legacy860Port = n
+		}
 	}
 	if v := os.Getenv("CANARY_MAP_URL"); v != "" {
 		cfg.MapDownloadURL = v

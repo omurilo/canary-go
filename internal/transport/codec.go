@@ -28,6 +28,26 @@ const (
 	ChecksumSequence
 )
 
+// CryptoMethod selects the XTEA + checksum combination for encrypted frames.
+type CryptoMethod uint8
+
+const (
+	CryptoNone   CryptoMethod = iota
+	CryptoAdler32              // Adler-32 checksum with legacy inner-length payload
+	CryptoSequence             // monotonic sequence checksum with modern padding payload
+)
+
+// ProfileID selects a complete transport framing profile matching the C++
+// TransportProfileId. Each profile bundles outer-length encoding, payload
+// layout, checksum method, and compression.
+type ProfileID uint8
+
+const (
+	ProfileCurrentModern ProfileID = iota // CurrentModern (13.x)
+	ProfileLegacyLogin                    // LegacyRawWithLoginHeader (login + 11.00 game)
+	ProfileLegacyClassic                  // LegacyClassic (8.60 game — no +1 header)
+)
+
 // PayloadLayout selects how the encrypted region is framed internally.
 type PayloadLayout uint8
 
@@ -59,6 +79,37 @@ type Codec struct {
 
 // New returns a codec in the initial (pre-encryption) state.
 func New() *Codec { return &Codec{Payload: PayloadModernPad} }
+
+// ApplyProfile configures the codec for the given transport profile. This sets
+// the initial pre-encryption framing; callers must also call EnableEncryption
+// (or the version-specific method) once the XTEA key is exchanged.
+func (c *Codec) ApplyProfile(profile ProfileID) {
+	switch profile {
+	case ProfileCurrentModern:
+		c.ModernOuterLength = true
+		c.Payload = PayloadModernPad
+	case ProfileLegacyLogin:
+		// 11.00: raw body length pre-encryption, then LegacyInner + Adler32
+		c.ModernOuterLength = false
+		c.Payload = PayloadLegacyInner
+	case ProfileLegacyClassic:
+		// 8.60: raw body length pre-encryption, then LegacyInner + Adler32,
+		// same as LegacyLogin but with no extra header byte.
+		c.ModernOuterLength = false
+		c.Payload = PayloadLegacyInner
+	}
+}
+
+// EnableLegacyGame flips the codec into legacy encrypted game framing with an
+// Adler-32 checksum and legacy inner-length payload (used by 11.00 and 8.60).
+func (c *Codec) EnableLegacyGame(key tibcrypto.XTEAKey) {
+	c.Key = key
+	c.Encryption = true
+	c.Checksum = ChecksumAdler32
+	c.Payload = PayloadLegacyInner
+	// After encryption, all profiles use block-count outer length.
+	c.ModernOuterLength = true
+}
 
 // EnableModernFraming switches the codec to the CurrentModern block-count outer
 // length for every packet (see ModernOuterLength). The game connection sets this

@@ -14,6 +14,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 	"github.com/opentibiabr/canary-go/internal/network"
 	"github.com/opentibiabr/canary-go/internal/tibcrypto"
+	"github.com/opentibiabr/canary-go/internal/transport"
 )
 
 // Outbound game opcodes.
@@ -105,6 +106,10 @@ const (
 type GameProtocol struct {
 	deps *Deps
 	conn *network.Connection
+	// profile is the protocol profile this session uses. It is set by the factory
+	// based on the listening port and determines wire-level behaviour differences
+	// (challenge format, login layout, feature flags).
+	profile *Profile
 
 	challengeTS   uint32
 	challengeRand uint8
@@ -172,15 +177,31 @@ func (g *GameProtocol) rangeContainers() map[uint8]*game.Item {
 	return out
 }
 
-// NewGameFactory returns a factory building GameProtocol instances.
-func NewGameFactory(deps *Deps) network.ProtocolFactory {
+// NewGameFactory returns a factory building GameProtocol instances for the
+// given protocol profile. Pass nil for the default current (1525) profile.
+func NewGameFactory(deps *Deps, profile *Profile) network.ProtocolFactory {
 	return func() network.Protocol {
+		p := profile
+		if p == nil {
+			p = currentProfile
+		}
 		return &GameProtocol{
-			deps:       deps,
-			known:      make(map[uint32]bool),
-			pingStop:   make(chan struct{}),
+			deps:     deps,
+			profile:  p,
+			known:   make(map[uint32]bool),
+			pingStop: make(chan struct{}),
 		}
 	}
+}
+
+// NewLegacy1100Factory returns a factory for the legacy 11.00 game protocol.
+func NewLegacy1100Factory(deps *Deps) network.ProtocolFactory {
+	return NewGameFactory(deps, tibia1100Profile)
+}
+
+// NewLegacy860Factory returns a factory for the legacy 8.60 game protocol.
+func NewLegacy860Factory(deps *Deps) network.ProtocolFactory {
+	return NewGameFactory(deps, cipsoft860Profile)
 }
 
 // pingInterval mirrors Player::sendPing: the reference server pings the client
@@ -212,6 +233,16 @@ func (g *GameProtocol) stopPingLoop() {
 }
 
 // Player implements game.Session.
+// isOldProtocol returns true for legacy protocol profiles (11.00 or 8.60).
+func (g *GameProtocol) isOldProtocol() bool {
+	return g.profile != nil && g.profile.Version != VersionCurrent
+}
+
+// isCipsoft860 returns true for the 8.60 protocol profile.
+func (g *GameProtocol) isCipsoft860() bool {
+	return g.profile != nil && g.profile.Version == VersionCipsoft860
+}
+
 func (g *GameProtocol) Player() *game.Player { return g.player }
 
 // storeSendOpcodes are the server->client opcodes the gamestore module emits;
@@ -250,31 +281,59 @@ func (g *GameProtocol) Disconnect() {
 // OnConnect sends the login challenge immediately.
 func (g *GameProtocol) OnConnect(c *network.Connection) {
 	g.conn = c
-	// The game connection uses the CurrentModern transport: block-count outer
-	// length for every packet, including the pre-encryption challenge and login.
-	c.Codec().EnableModernFraming()
+
+	// Apply transport profile based on protocol version.
+	switch g.profile.Version {
+	case VersionTibia1100:
+		c.Codec().ApplyProfile(transport.ProfileLegacyLogin)
+	case VersionCipsoft860:
+		c.Codec().ApplyProfile(transport.ProfileLegacyClassic)
+	default:
+		c.Codec().ApplyProfile(transport.ProfileCurrentModern)
+	}
 
 	// Deterministic-ish challenge derived from the clock; values are echoed back.
 	now := uint32(time.Now().Unix())
 	g.challengeTS = now
 	g.challengeRand = uint8(now & 0xFF)
 
-	// Modern challenge layout (ProtocolGame::sendLoginChallenge, CurrentLogin-
-	// Challenge): [adler32(payload)][0x01][0x1F][ts u32][rand u8][0x71]. The adler
-	// covers the 8 payload bytes; the codec prepends the u16 length (encryption is
-	// still off here). Real clients validate this checksum and the 0x01 marker.
+	if g.profile.HasChallengeResponse {
+		g.sendModernChallenge()
+	} else {
+		g.sendLegacyChallenge()
+	}
+}
+
+// sendModernChallenge sends the 1525 challenge:
+// [adler32(payload)][0x01][0x1F][ts u32][rand u8][0x71]
+func (g *GameProtocol) sendModernChallenge() {
 	payload := netmsg.NewWriter()
 	payload.AddByte(0x01)
 	payload.AddByte(opChallenge)
 	payload.AddU32(g.challengeTS)
 	payload.AddByte(g.challengeRand)
-	payload.AddByte(0x71) // trailing constant
+	payload.AddByte(0x71)
 	pb := payload.Bytes()
 
 	w := netmsg.NewWriter()
 	w.AddU32(tibcrypto.Adler32(pb))
 	w.AddBytes(pb)
-	_ = c.Send(w)
+	_ = g.conn.Send(w)
+}
+
+// sendLegacyChallenge sends the 860/1100 challenge:
+// [adler32(1+6)][0x1F][ts u32][rand u8] — no 0x01 marker, no 0x71 terminator.
+func (g *GameProtocol) sendLegacyChallenge() {
+	payload := netmsg.NewWriter()
+	payload.AddByte(opChallenge)
+	payload.AddU32(g.challengeTS)
+	payload.AddByte(g.challengeRand)
+	pb := payload.Bytes()
+
+	w := netmsg.NewWriter()
+	w.AddU32(tibcrypto.Adler32(pb))
+	w.AddBytes(pb)
+	_ = g.conn.Send(w)
 }
 
 // OnDisconnect saves and removes the player.
@@ -302,27 +361,54 @@ func (g *GameProtocol) OnDisconnect(c *network.Connection) {
 	g.player = nil
 }
 
-// firstGamePacketHeaderBytes mirrors CurrentModern's serverFirstPacketHeaderBytes
-// (CHECKSUM_LENGTH + 2): the first game packet leads with a 4-byte checksum slot
-// and 2 further bytes that the reference server skips before the login fields.
-const firstGamePacketHeaderBytes = 6
+// firstHeaderBytes returns the number of leading bytes to strip from the first
+// game packet before the client metadata. Differs per protocol profile.
+func (g *GameProtocol) firstHeaderBytes() int {
+	switch g.profile.Version {
+	case VersionCipsoft860:
+		return 4 // CHECKSUM_LENGTH (no extra marker byte)
+	case VersionTibia1100:
+		return 5 // CHECKSUM_LENGTH + 1
+	default:
+		return 6 // CHECKSUM_LENGTH + 2 (modern)
+	}
+}
 
-// OnFirstPacket parses the game login request. The wire layout mirrors
-// ProtocolGame::onRecvFirstMessage for the Current (1525) profile.
+// OnFirstPacket parses the game login request. The wire layout varies by
+// protocol profile (1525 current, 11.00 legacy, 8.60 legacy).
 func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	g.conn = c
-	if len(body) < firstGamePacketHeaderBytes {
+	skip := g.firstHeaderBytes()
+	if len(body) < skip {
 		c.Logger().Debug("game: short first packet", "len", len(body))
 		return
 	}
-	r := netmsg.NewReader(body[firstGamePacketHeaderBytes:])
+	r := netmsg.NewReader(body[skip:])
 
-	os := r.GetU16()
+	_ = r.GetU16() // OS
 	_ = r.GetU16() // protocol version
-	clientVersion := r.GetU32()
-	_ = r.GetString() // client version string
-	_ = r.GetString() // asset hash
-	_ = r.GetByte()   // preview state
+
+	var clientVersion uint32
+	var contentRevision uint16
+
+	switch g.profile.Version {
+	case VersionCipsoft860:
+		// 8.60: asset signatures before RSA
+		_ = r.GetU32() // dat signature
+		_ = r.GetU32() // spr signature
+		_ = r.GetU32() // pic signature
+	case VersionTibia1100:
+		// 11.00: client version u32 + content revision u16
+		clientVersion = r.GetU32()
+		contentRevision = r.GetU16()
+		_ = contentRevision
+	default:
+		// Current (1525): full metadata set
+		clientVersion = r.GetU32()
+		_ = r.GetString() // client version string
+		_ = r.GetString() // asset hash
+		_ = r.GetByte()   // preview state
+	}
 
 	if r.Remaining() < tibcrypto.BlockSize {
 		c.Logger().Debug("game: short packet, no RSA block")
@@ -333,30 +419,49 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 		c.Logger().Debug("game: rsa decrypt failed")
 		return
 	}
-	// Everything from here is inside the single 128-byte RSA block: XTEA key,
-	// gamemaster flag, session key, character name and the challenge echo.
-	br := netmsg.NewReader(block[1:])
-	key := tibcrypto.KeyFromBytes(br.GetBytes(16))
-	_ = br.GetByte() // is gamemaster
-	sessionKey := br.GetString()
-	charName := br.GetString()
-	echoTS := br.GetU32()
-	echoRand := br.GetByte()
 
-	// Enable encryption for everything from here on.
-	g.conn.Codec().EnableModernGame(key)
+	var key tibcrypto.XTEAKey
+	var account, password, charName string
 
-	if clientVersion != 0 && clientVersion != ClientVersion {
-		g.disconnect("Wrong client version. Please use a 13.x (protocol 1525) client.")
+	if g.profile.PasswordLogin {
+		// 8.60 password-based login: [XTEA key][account_num][char_name][password]
+		br := netmsg.NewReader(block[1:])
+		key = tibcrypto.KeyFromBytes(br.GetBytes(16))
+		accountNum := br.GetU32()
+		charName = br.GetString()
+		password = br.GetString()
+		account = fmt.Sprintf("%d", accountNum)
+	} else {
+		// Session-key auth (1525 & 1100): [XTEA key][gm][session_key][char_name][echo_ts][echo_rand]
+		br := netmsg.NewReader(block[1:])
+		key = tibcrypto.KeyFromBytes(br.GetBytes(16))
+		_ = br.GetByte() // is gamemaster
+		sessionKey := br.GetString()
+		charName = br.GetString()
+
+		if g.profile.HasChallengeResponse {
+			echoTS := br.GetU32()
+			echoRand := br.GetByte()
+			if echoTS != g.challengeTS || echoRand != g.challengeRand {
+				c.Logger().Debug("game: challenge mismatch")
+			}
+		}
+
+		account, password = splitSessionKey(sessionKey)
+	}
+
+	// Enable encryption with the correct profile.
+	if g.profile.Transport == transport.ProfileCurrentModern {
+		g.conn.Codec().EnableModernGame(key)
+	} else {
+		g.conn.Codec().EnableLegacyGame(key)
+	}
+
+	if clientVersion != 0 && clientVersion != uint32(g.profile.Version) {
+		msg := fmt.Sprintf("Wrong client version. Please use a %s client.", g.profile.Label)
+		g.disconnect(msg)
 		return
 	}
-	if echoTS != g.challengeTS || echoRand != g.challengeRand {
-		c.Logger().Debug("game: challenge mismatch", "gotTS", echoTS, "wantTS", g.challengeTS)
-		// Non-fatal for our own client; continue.
-	}
-
-	account, password := splitSessionKey(sessionKey)
-	c.Logger().Info("game login", "char", charName, "account", account, "os", os)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

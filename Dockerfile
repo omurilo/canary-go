@@ -17,13 +17,15 @@ RUN ./scripts/generate_appearances.sh
 RUN CGO_ENABLED=0 go build -trimpath -o /out/canary ./cmd/canary
 
 FROM alpine:3.20
-RUN adduser -D -u 10001 canary
+RUN adduser -D -u 10001canary
 WORKDIR /app
 COPY --from=build /out/canary /app/canary
 COPY config.lua /app/config.lua
 COPY key.pem /app/key.pem
 COPY schema /app/schema
 COPY scripts /app/scripts
+#COPY data /app/data
+#COPY data-otservbr-global /app/data-otservbr-global
 # data/, data-canary/, data-otservbr-global/ are mounted at runtime (see compose).
 USER canary
 EXPOSE 7171 7172

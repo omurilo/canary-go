@@ -46,6 +46,7 @@ func (e *Engine) registerPlayerType() {
 	e.L.SetField(mt, "getFreeBackpackSlots", e.L.NewFunction(e.playerGetfreebackpackslots))
 	// Container bindings (open-container state shared with the protocol layer).
 	e.L.SetField(mt, "getStoreInbox", e.L.NewFunction(e.playerGetstoreinbox))
+	e.L.SetField(mt, "getInbox", e.L.NewFunction(e.playerGetinbox))
 	e.L.SetField(mt, "getContainerId", e.L.NewFunction(e.playerGetcontainerid))
 	e.L.SetField(mt, "getContainerById", e.L.NewFunction(e.playerGetcontainerbyid))
 	e.L.SetField(mt, "getContainerIndex", e.L.NewFunction(e.playerGetcontainerindex))
@@ -118,7 +119,6 @@ var playerMethods = map[string]lua.LGFunction{
 	"updateKillTracker":              playerUpdatekilltracker,
 	"getDepotLocker":                 playerGetdepotlocker,
 	"getDepotChest":                  playerGetdepotchest,
-	"getInbox":                       playerGetinbox,
 	"getSkullTime":                   playerGetskulltime,
 	"setSkullTime":                   playerSetskulltime,
 	"getDeathPenalty":                playerGetdeathpenalty,
@@ -1560,8 +1560,16 @@ func playerGetidletime(L *lua.LState) int {
 	return 1
 }
 
-func playerGetinbox(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+func (e *Engine) playerGetinbox(L *lua.LState) int {
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if p.Inbox == nil {
+		p.Inbox = &game.Item{ID: game.ItemInbox, Contents: make([]*game.Item, 0), Pagination: true}
+	}
+	e.pushContainer(L, p.Inbox)
 	return 1
 }
 

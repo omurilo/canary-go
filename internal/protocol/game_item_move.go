@@ -259,7 +259,11 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 
 	// 4. Add to destination
 	if destContainer != nil {
-		game.AddItemToContainer(g.deps.Items, destContainer, moveItem)
+		if !game.AddItemToContainer(g.deps.Items, destContainer, moveItem) {
+			g.sendStatusText("There is not enough room.")
+			g.revertMove(fromPos, toPos, spriteID)
+			return
+		}
 		g.RefreshContainer(destContainer)
 		if fromContainer != nil && fromContainer != destContainer {
 			g.RefreshContainer(fromContainer)
@@ -270,6 +274,14 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		
 		// Map merging logic
 		tile := g.deps.World.Map.GetTile(pos)
+		// Mailbox check: if destination has a mailbox, process mail send.
+		if tile != nil && g.tileHasMailbox(tile) && g.processMailSend(moveItem) {
+			// Mail sent - item consumed. No tile placement.
+			if fromContainer != nil {
+				g.RefreshContainer(fromContainer)
+			}
+			return
+		}
 		var merged bool
 		if tile != nil && len(tile.Items) > 0 && it != nil && it.Stackable {
 			topItem := tile.Items[len(tile.Items)-1]

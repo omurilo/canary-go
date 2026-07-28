@@ -107,6 +107,7 @@ func (t *ItemType) IsContainer() bool      { return t.Group == GroupContainer }
 func (t *ItemType) IsGround() bool         { return t.Group == GroupGround }
 func (t *ItemType) IsFluidContainer() bool { return t.ID > 1 && t.Group == GroupFluid }
 func (t *ItemType) IsSplash() bool         { return t.Group == GroupSplash }
+func (t *ItemType) IsMailbox() bool        { return t.TypeName == "mailbox" }
 
 func (t *ItemType) GetWeight() uint32 {
 	if t == nil {
