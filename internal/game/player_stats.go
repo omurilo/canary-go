@@ -1,5 +1,10 @@
 package game
 
+
+// ============================================================================
+// Base types
+// ============================================================================
+
 type BaseCritical struct {
 	Chance uint16
 	Damage uint16
@@ -21,6 +26,10 @@ func (p *Player) GetSkillsEquipment() [SkillCount]SkillsEquipment {
 func (p *Player) GetForgeSkillStat(slot uint8) float64 {
 	return 0.0
 }
+
+// ============================================================================
+// Weapon attack helpers (catalog-independent)
+// ============================================================================
 
 func (p *Player) GetWeaponSkill(item *Item) int32 {
 	if item == nil {
@@ -97,8 +106,6 @@ func (p *Player) AttackTotal(flatBonus, equipment, skill uint16) uint16 {
 		fightFactor = 1.0
 	case 3:
 		fightFactor = 0.6
-	default:
-		fightFactor = 1.0
 	}
 	attack := float64(p.AttackRawTotal(flatBonus, equipment, skill))
 	total := uint16(attack * fightFactor)
@@ -106,14 +113,6 @@ func (p *Player) AttackTotal(flatBonus, equipment, skill uint16) uint16 {
 		total = 1
 	}
 	return total
-}
-
-func (p *Player) GetCleavePercent() int32 {
-	return 0
-}
-
-func (p *Player) GetPerfectShotDamage(range_ uint8) int32 {
-	return 0
 }
 
 func (p *Player) CalculateFlatDamageHealing() uint16 {
@@ -150,6 +149,125 @@ func (p *Player) CalculateFlatDamageHealing() uint16 {
 func (p *Player) GetDamageAccuracy(item *Item) []float64 {
 	return nil
 }
+
+// ============================================================================
+// Stat sum helpers — read from equipped item Stats map
+// ============================================================================
+
+// sumItemStat returns the sum of a numeric attribute across all equipment slots.
+func sumItemStat(p *Player, key string) int32 {
+	var total int32
+	for s := ConstSlotFirst; s <= ConstSlotLast; s++ {
+		if int(s) >= len(p.Inventory) || p.Inventory[s] == nil {
+			continue
+		}
+		t := p.World.Items.Get(p.Inventory[s].ID)
+		if t != nil && t.Stats != nil {
+			if v, ok := t.Stats[key]; ok {
+				total += v
+			}
+		}
+	}
+	return total
+}
+
+func (p *Player) GetCleavePercent() int32 {
+	return sumItemStat(p, "cleavepercent")
+}
+
+func (p *Player) GetPerfectShotDamage(range_ uint8) int32 {
+	return sumItemStat(p, "perfectshotdamage")
+}
+
+func (p *Player) GetMagicShieldCapacityFlat() int32 {
+	return sumItemStat(p, "magicshieldcapacityflat")
+}
+
+func (p *Player) GetMagicShieldCapacityPercent() int32 {
+	return sumItemStat(p, "magicshieldcapacitypercent")
+}
+
+func (p *Player) GetReflectFlat(combatType int) int32 {
+	return sumItemStat(p, "reflectdamage")
+}
+
+func (p *Player) GetMantra() int32 {
+	return sumItemStat(p, "mantra")
+}
+
+func (p *Player) GetDefenseEquipment() uint16 {
+	var total uint16
+	for s := ConstSlotFirst; s <= ConstSlotLast; s++ {
+		if int(s) >= len(p.Inventory) || p.Inventory[s] == nil {
+			continue
+		}
+		if d := p.Inventory[s].Defense(nil); d > 0 {
+			total += uint16(d)
+		}
+	}
+	return total
+}
+
+func (p *Player) GetMitigation() float64 {
+	return 0.0
+}
+
+// ============================================================================
+// Combat absorbs
+// ============================================================================
+
+type CombatAbsorb struct {
+	Element uint8
+	Absorb  uint16
+}
+
+// elementKeyMap maps combat type index to the absorb stat key.
+var elementKeyMap = []struct {
+	idx int
+	key string
+}{
+	{0, "absorbpercentphysical"},
+	{1, "absorbpercentfire"},
+	{2, "absorbpercentearth"},
+	{3, "absorbpercentenergy"},
+	{4, "absorbpercentice"},
+	{5, "absorbpercentholy"},
+	{6, "absorbpercentdeath"},
+	{7, "absorbpercentlifedrain"}, // healing
+	{8, "absorbpercentdrown"},
+	{9, "absorbpercentlifedrain"},
+	{10, "absorbpercentmanadrain"},
+}
+
+func (p *Player) GetCombatAbsorbs() []CombatAbsorb {
+	var result []CombatAbsorb
+	for _, ek := range elementKeyMap {
+		v := sumItemStat(p, ek.key)
+		if v > 0 {
+			result = append(result, CombatAbsorb{
+				Element: uint8(ek.idx),
+				Absorb:  uint16(v),
+			})
+		}
+	}
+	return result
+}
+
+func (p *Player) GetSpecializedMagicLevel(combatTypeIndex int) int32 {
+	// Element-specific magic level from equipment (e.g. elementfire, elementice)
+	elemKeys := []string{
+		"elementphysical", "elementfire", "elementearth", "elementenergy",
+		"elementice", "elementholy", "elementdeath",
+	}
+	if combatTypeIndex >= 0 && combatTypeIndex < len(elemKeys) {
+		return sumItemStat(p, elemKeys[combatTypeIndex])
+	}
+	return 0
+}
+
+// ============================================================================
+// Bestiary, critical, proficiency — all need weapon proficiency system
+// ============================================================================
 
 type ActiveBestiaryDamage struct {
 	Name   string
@@ -188,38 +306,9 @@ func (p *Player) HasCharmExpansion() bool {
 	return false
 }
 
-func (p *Player) GetMagicShieldCapacityFlat() int32 {
-	return 0
-}
-
-func (p *Player) GetMagicShieldCapacityPercent() int32 {
-	return 0
-}
-
-func (p *Player) GetReflectFlat(combatType int) int32 {
-	return 0
-}
-
-func (p *Player) GetDefenseEquipment() uint16 {
-	return 0
-}
-
-func (p *Player) GetMantra() int32 {
-	return 0
-}
-
-func (p *Player) GetMitigation() float64 {
-	return 0.0
-}
-
-type CombatAbsorb struct {
-	Element uint8
-	Absorb  uint16
-}
-
-func (p *Player) GetCombatAbsorbs() []CombatAbsorb {
-	return nil
-}
+// ============================================================================
+// Consumables / augments — need system support
+// ============================================================================
 
 type ActiveConcoction struct {
 	ItemID   uint16
@@ -256,9 +345,9 @@ func (p *Player) GetEquippedAugments() []uint8 {
 	return nil
 }
 
-func (p *Player) GetSpecializedMagicLevel(combatTypeIndex int) int32 {
-	return 0
-}
+// ============================================================================
+// CIPBIA constants
+// ============================================================================
 
 const (
 	CipbiaSkillFist     = 11
