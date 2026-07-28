@@ -4,63 +4,126 @@ import (
 	"log/slog"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/spawns"
 )
 
-// RespawnType controls how the spawn timer works after death.
-type RespawnType uint8
+// ---- C++ spawnBlock_t equivalent ----
+type spawnBlock struct {
+	pos          Position
+	monsterTypes map[*creatures.MonsterType]uint32 // type -> weight (for random)
+	lastSpawn    time.Time
+	interval     time.Duration
+	direction    Direction
+}
+
+// spawnState mirrors the C++ SpawnMonster spawned/not-spawned tracking
+type spawnState int
 
 const (
-	RespawnNormal   RespawnType = 0 // full spawnTime wait after death
-	RespawnPeriodic RespawnType = 1 // respawn at fixed intervals regardless
+	spawnStateIdle      spawnState = iota
+	spawnStateSpawning
+	spawnStateAlive
 )
 
-// Spawn represents a single creature spawn point.
-type Spawn struct {
+// SpawnData groups the parsed spawn info for one creature entry.
+type SpawnData struct {
 	Name      string
 	Pos       Position
 	Radius    int
-	SpawnTime time.Duration
+	Interval  time.Duration
 	IsNPC     bool
-	Type      RespawnType
-
-	creatureID uint32
-	lastDeath  time.Time
-	nextSpawn  time.Time
+	Direction Direction
 }
 
-// SpawnEngine manages all spawns in the world.
+// SpawnBlock groups creatures that share the same center+radius.
+type SpawnBlock struct {
+	centerPos Position
+	radius    int
+	interval  time.Duration
+	blocks    map[uint32]*spawnBlock // spawnId -> block
+	spawned   map[uint32]Creature    // spawnId -> creature
+	state     spawnState
+	stateMu   sync.Mutex
+
+	// Reference to parent engine
+	engine *SpawnEngine
+}
+
+// SpawnEngine manages all spawns in the world (C++ SpawnsMonster equivalent).
 type SpawnEngine struct {
-	world           *World
-	spawns          []*Spawn
-	Types           *creatures.TypeRegistry
-	creatureToSpawn map[uint32]*Spawn // creatureID -> spawn tracking
+	world         *World
+	Types         *creatures.TypeRegistry
+	blocks        []*SpawnBlock
+	nextSpawnID   uint32
+	creatureToSpawn map[uint32]*spawnBlock // creatureID -> block (fast death lookup)
+	mu            sync.RWMutex
 }
 
-// NewSpawnEngine creates a new SpawnEngine.
+const (
+	nonBlockableInterval = 1400 * time.Millisecond // C++ NONBLOCKABLE_SPAWN_MONSTER_INTERVAL
+	defaultSpawnInterval = 30 * time.Second        // C++ default
+)
+
 func NewSpawnEngine(w *World, types *creatures.TypeRegistry) *SpawnEngine {
 	return &SpawnEngine{
 		world:           w,
 		Types:           types,
-		creatureToSpawn: make(map[uint32]*Spawn),
+		creatureToSpawn: make(map[uint32]*spawnBlock),
 	}
 }
 
-// LoadSpawns loads spawns from parsed XML data.
+// RegisterHooks connects death tracking.
+func (e *SpawnEngine) RegisterHooks() {
+	if e.world == nil {
+		return
+	}
+	e.world.OnCreatureDied = func(c Creature) {
+		e.CreatureDied(c)
+	}
+}
+
+// LoadSpawns parses XML spawn data into blocks matching C++ structure.
 func (e *SpawnEngine) LoadSpawns(data *spawns.SpawnsData) {
 	allNodes := append(data.Spawns, data.Monsters...)
 	allNodes = append(allNodes, data.NPCs...)
 	for _, sn := range allNodes {
+		block := &SpawnBlock{
+			centerPos: Position{X: uint16(sn.CenterX), Y: uint16(sn.CenterY), Z: uint8(sn.CenterZ)},
+			radius:    sn.Radius,
+			interval:  defaultSpawnInterval,
+			blocks:    make(map[uint32]*spawnBlock),
+			spawned:   make(map[uint32]Creature),
+			engine:    e,
+		}
 		for _, mn := range sn.Monsters {
 			pos := e.resolveSpawnPos(sn, mn.X, mn.Y, mn.Z)
-			e.AddSpawn(mn.Name, pos, sn.Radius, time.Duration(mn.SpawnTime)*time.Second, false)
+			interval := time.Duration(mn.SpawnTime) * time.Second
+			if interval <= 0 {
+				interval = defaultSpawnInterval
+			}
+			if mn.SpawnTime > 0 {
+				block.interval = interval // first valid spawntime sets block interval
+			}
+			dir := Direction(mn.Direction)
+			block.addMonster(mn.Name, pos, dir, interval)
 		}
 		for _, nn := range sn.NPCs {
 			pos := e.resolveSpawnPos(sn, nn.X, nn.Y, nn.Z)
-			e.AddSpawn(nn.Name, pos, sn.Radius, time.Duration(nn.SpawnTime)*time.Second, true)
+			interval := time.Duration(nn.SpawnTime) * time.Second
+			if interval <= 0 {
+				interval = defaultSpawnInterval
+			}
+			dir := Direction(nn.Direction)
+			block.addMonster(nn.Name, pos, dir, interval)
+		}
+		if len(block.blocks) > 0 {
+			e.mu.Lock()
+			e.blocks = append(e.blocks, block)
+			e.mu.Unlock()
 		}
 	}
 }
@@ -83,147 +146,185 @@ func (e *SpawnEngine) resolveSpawnPos(sn spawns.SpawnNode, x, y, z int) Position
 	return pos
 }
 
-func (e *SpawnEngine) AddSpawn(name string, pos Position, radius int, spawnTime time.Duration, isNpc bool) {
-	e.spawns = append(e.spawns, &Spawn{
-		Name:      name,
-		Pos:       pos,
-		Radius:    radius,
-		SpawnTime: spawnTime,
-		IsNPC:     isNpc,
-		Type:      RespawnNormal,
-	})
-}
+// ---- SpawnBlock methods ----
 
-// CreatureDied is called by the combat engine when a creature dies.
-// It resets the spawn tracking so the respawn timer starts.
-func (e *SpawnEngine) CreatureDied(c Creature) {
-	if s, ok := e.creatureToSpawn[c.GetID()]; ok {
-		s.creatureID = 0
-		s.lastDeath = time.Now()
-		s.nextSpawn = s.lastDeath.Add(s.SpawnTime)
-		delete(e.creatureToSpawn, c.GetID())
-	}
-}
-
-// RegisterHooks connects the SpawnEngine to World death events.
-func (e *SpawnEngine) RegisterHooks() {
-	if e.world == nil {
+func (b *SpawnBlock) addMonster(name string, pos Position, dir Direction, interval time.Duration) {
+	e := b.engine
+	if e == nil {
 		return
 	}
-	e.world.OnCreatureDied = func(c Creature) {
-		e.CreatureDied(c)
+	var mType *creatures.MonsterType
+	if e.Types != nil {
+		mType = e.Types.Monsters[strings.ToLower(name)]
+	}
+	if mType == nil {
+		slog.Debug("spawn: monster type not found", "name", name)
+		return
+	}
+	id := e.nextID()
+	b.blocks[id] = &spawnBlock{
+		pos:          pos,
+		monsterTypes: map[*creatures.MonsterType]uint32{mType: 1},
+		lastSpawn:    time.Time{},
+		interval:     interval,
+		direction:    dir,
 	}
 }
 
-// Start begins the spawn checking loop.
+func (e *SpawnEngine) nextID() uint32 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.nextSpawnID++
+	return e.nextSpawnID
+}
+
+// CreatureDied handles death events (called from World.OnCreatureDied).
+func (e *SpawnEngine) CreatureDied(c Creature) {
+	e.mu.Lock()
+	sb, ok := e.creatureToSpawn[c.GetID()]
+	if ok {
+		sb.lastSpawn = time.Now()
+		delete(e.creatureToSpawn, c.GetID())
+	}
+	e.mu.Unlock()
+	if ok {
+		// Find parent block and remove from spawned map
+		for _, block := range e.blocks {
+			block.stateMu.Lock()
+			for id, cr := range block.spawned {
+				if cr.GetID() == c.GetID() {
+					delete(block.spawned, id)
+					block.state = spawnStateIdle
+					break
+				}
+			}
+			block.stateMu.Unlock()
+		}
+	}
+}
+
+// Start begins spawn checking.
 func (e *SpawnEngine) Start() {
 	GlobalDispatcher.AddEvent(1*time.Second, e.checkSpawns)
 }
 
+// checkSpawns runs every 1s, matching C++ SpawnMonster::checkSpawnMonster.
 func (e *SpawnEngine) checkSpawns() {
 	now := time.Now()
-	for _, s := range e.spawns {
-		if s.creatureID != 0 && e.world.CreatureByID(s.creatureID) != nil {
-			continue // still alive
-		}
-		if !s.lastDeath.IsZero() && now.Before(s.nextSpawn) {
-			continue // not time yet
-		}
-		if s.creatureID != 0 {
-			// creature died but we missed the death event; recover
-			s.creatureID = 0
-			s.lastDeath = now
-			s.nextSpawn = now.Add(s.SpawnTime)
+	for _, block := range e.blocks {
+		block.stateMu.Lock()
+		if block.state != spawnStateIdle {
+			block.stateMu.Unlock()
 			continue
 		}
-		e.spawnCreature(s)
+		// Check all spawn IDs in this block
+		for id, sb := range block.blocks {
+			if _, alive := block.spawned[id]; alive {
+				continue
+			}
+
+			// Find player nearby (C++ findPlayer)
+			if e.findPlayerNear(sb.pos) {
+				sb.lastSpawn = now
+				continue
+			}
+
+			// Check respawn timer (C++ lastSpawn + interval)
+			if !sb.lastSpawn.IsZero() && now.Before(sb.lastSpawn.Add(sb.interval)) {
+				continue
+			}
+
+			// Pick the monster type (first/only for now)
+			for mType := range sb.monsterTypes {
+				creature := e.spawnCreatureInBlock(block, id, sb, mType, now)
+				if creature != nil {
+					block.spawned[id] = creature
+					block.state = spawnStateAlive
+				}
+				break
+			}
+		}
+		block.stateMu.Unlock()
 	}
 	GlobalDispatcher.AddEvent(1*time.Second, e.checkSpawns)
 }
 
-func (e *SpawnEngine) spawnCreature(s *Spawn) {
-	pos := e.randomSpawnPos(s)
-
-	if s.IsNPC {
-		npc := e.spawnNPC(s, pos)
-		if npc == nil {
-			return
+func (e *SpawnEngine) findPlayerNear(pos Position) bool {
+	for _, p := range e.world.Players() {
+		if p.HasFlag(0) { // PlayerFlag_IgnoredByMonsters stub
+			continue
 		}
-		s.creatureID = npc.GetID()
-		e.creatureToSpawn[npc.GetID()] = s
-	} else {
-		monster := e.spawnMonster(s, pos)
-		if monster == nil {
-			return
+		if p.Pos.Z != pos.Z {
+			continue
 		}
-		s.creatureID = monster.GetID()
-		e.creatureToSpawn[monster.GetID()] = s
+		dx := int(p.Pos.X) - int(pos.X)
+		dy := int(p.Pos.Y) - int(pos.Y)
+		if dx*dx+dy*dy <= 100 { // ~10 tiles radius
+			return true
+		}
 	}
+	return false
 }
 
-func (e *SpawnEngine) randomSpawnPos(s *Spawn) Position {
-	if s.Radius <= 0 {
-		return s.Pos
-	}
-	// Random offset within radius, matching C++ Monster::randomWalk
-	dx := rand.Intn(s.Radius*2+1) - s.Radius
-	dy := rand.Intn(s.Radius*2+1) - s.Radius
-	pos := Position{
-		X: uint16(int(s.Pos.X) + dx),
-		Y: uint16(int(s.Pos.Y) + dy),
-		Z: s.Pos.Z,
-	}
-	// Fallback to center if outside map bounds
-	if e.world.Map != nil && e.world.Map.GetTile(pos) == nil {
-		return s.Pos
-	}
-	return pos
-}
-
-func (e *SpawnEngine) spawnNPC(s *Spawn, pos Position) *Npc {
-	var nType *creatures.NpcType
-	if e.Types != nil {
-		nType = e.Types.Npcs[strings.ToLower(s.Name)]
-	}
-	if nType == nil {
-		slog.Debug("spawned npc type not found in registry; skipping spawn", "name", s.Name)
-		return nil
-	}
-	id := e.world.nextCreatureID.Add(1)
-	npc := NewNpc(id, s.Name, nType)
-	npc.SetPosition(pos)
-	e.world.AddCreature(npc)
-	slog.Debug("spawned npc", "name", s.Name, "pos", pos)
-	return npc
-}
-
-func (e *SpawnEngine) spawnMonster(s *Spawn, pos Position) *Monster {
-	var mType *creatures.MonsterType
-	if e.Types != nil {
-		mType = e.Types.Monsters[strings.ToLower(s.Name)]
+func (e *SpawnEngine) spawnCreatureInBlock(block *SpawnBlock, id uint32, sb *spawnBlock, mType *creatures.MonsterType, now time.Time) Creature {
+	pos := sb.pos
+	if block.radius > 0 {
+		pos = e.randomSpawnPos(block.centerPos, block.radius)
 	}
 	if mType == nil {
-		slog.Debug("spawned monster type not found in registry; skipping spawn", "name", s.Name)
 		return nil
 	}
-	id := e.world.nextCreatureID.Add(1)
-	monster := NewMonster(id, s.Name, mType)
+
+	nid := e.world.nextCreatureID.Add(1)
+	monster := NewMonster(nid, mType.Name, mType)
 	monster.SetPosition(pos)
+	monster.SetDirection(sb.direction)
+
 	e.world.AddCreature(monster)
-	slog.Debug("spawned monster", "name", s.Name, "pos", pos)
+
+	sb.lastSpawn = now
+	e.mu.Lock()
+	e.creatureToSpawn[monster.GetID()] = sb
+	e.mu.Unlock()
+
 	return monster
 }
 
-// SpawnCount returns the number of managed spawn points.
-func (e *SpawnEngine) SpawnCount() int { return len(e.spawns) }
+func (e *SpawnEngine) randomSpawnPos(center Position, radius int) Position {
+	if radius <= 0 {
+		return center
+	}
+	dx := rand.Intn(radius*2+1) - radius
+	dy := rand.Intn(radius*2+1) - radius
+	return Position{
+		X: uint16(int(center.X) + dx),
+		Y: uint16(int(center.Y) + dy),
+		Z: center.Z,
+	}
+}
 
-// ActiveSpawnCount returns how many spawns are currently alive.
-func (e *SpawnEngine) ActiveSpawnCount() int {
-	count := 0
-	for _, s := range e.spawns {
-		if s.creatureID != 0 && e.world.CreatureByID(s.creatureID) != nil {
-			count++
+// Reload clears all spawns and reloads from parsed data.
+func (e *SpawnEngine) Reload(data *spawns.SpawnsData) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	// Remove all spawned creatures
+	for _, block := range e.blocks {
+		for _, cr := range block.spawned {
+			e.world.RemoveCreature(cr.GetID())
 		}
 	}
-	return count
+	e.blocks = nil
+	e.creatureToSpawn = make(map[uint32]*spawnBlock)
+	e.nextSpawnID = 0
+	e.LoadSpawns(data)
+	slog.Info("spawns reloaded", "count", len(e.blocks))
+}
+
+// Stats returns spawn system statistics.
+func (e *SpawnEngine) Stats() (total, alive int) {
+	for _, block := range e.blocks {
+		total += len(block.blocks)
+		alive += len(block.spawned)
+	}
+	return
 }
