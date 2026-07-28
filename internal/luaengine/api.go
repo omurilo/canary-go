@@ -227,6 +227,7 @@ func (e *Engine) registerAPI() {
 	e.registerGlobalEventClass()
 	e.registerVocation()
 	e.registerModalWindowType()
+	e.registerWeaponType()
 
 	// HirelingsInit is a no-op stub called by server_initialization.lua.
 	// The full hireling system is not ported to Go yet.
@@ -292,7 +293,6 @@ func (e *Engine) registerAPI() {
 
 	L.SetGlobal("AUTH_TYPE", lua.LString("password"))
 
-	mockClass("Weapon")
 	mockClass("Result")
 	mockClass("Achievement")
 	mockClass("BestiaryCharm")

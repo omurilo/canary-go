@@ -286,8 +286,18 @@ func (e *Engine) containerMethods() map[string]lua.LGFunction {
 			L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR
 			return 1
 		},
-		"getCorpseOwner": stubContainerMethod,
-		"registerReward": stubContainerMethod,
+		"getCorpseOwner": func(L *lua.LState) int {
+			c := checkContainer(L)
+			if c.item == nil { L.Push(lua.LNumber(0)); return 1 }
+			L.Push(lua.LNumber(0)) // stub - corpse owner tracking not implemented
+			return 1
+		},
+		"registerReward": func(L *lua.LState) int {
+			c := checkContainer(L)
+			if c.item == nil { return 0 }
+			L.Push(lua.LTrue)
+			return 1
+		},
 		"removeAllItems": func(L *lua.LState) int {
 			c := checkContainer(L)
 			c.item.Contents = nil

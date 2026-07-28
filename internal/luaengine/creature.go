@@ -295,6 +295,7 @@ var creatureMethods = map[string]lua.LGFunction{
 	"move": creatureMove,
 	"getZoneType": creatureGetzonetype,
 	"getZones": creatureGetzones,
+	"getZoneTypeAndZones": creatureGetzonetypeandzones,
 	"setIcon": creatureSeticon,
 	"getIcon": creatureGeticon,
 	"getIcons": creatureGeticons,
@@ -641,6 +642,14 @@ func creatureGetzonetype(L *lua.LState) int {
 func creatureGetzones(L *lua.LState) int {
 	L.Push(L.NewTable())
 	return 1
+}
+
+func creatureGetzonetypeandzones(L *lua.LState) int {
+	c := checkCreature(L)
+	if c == nil { L.Push(lua.LNumber(0)); L.Push(L.NewTable()); return 2 }
+	L.Push(lua.LNumber(0))
+	L.Push(L.NewTable())
+	return 2
 }
 
 func creatureHasbeensummoned(L *lua.LState) int {

@@ -24,6 +24,7 @@ func (e *Engine) registerNpcType() {
 			
 			if val := table.RawGetString("health"); val.Type() == lua.LTNumber {
 				n.MaxHealth = uint32(lua.LVAsNumber(val))
+				n.Health = n.MaxHealth
 			}
 			if val := table.RawGetString("maxHealth"); val.Type() == lua.LTNumber && n.MaxHealth == 0 {
 				n.MaxHealth = uint32(lua.LVAsNumber(val))
@@ -112,6 +113,24 @@ func (e *Engine) registerNpcType() {
 			L.Push(lua.LTrue)
 			return 1
 		},
+		"isPushable": func(L *lua.LState) int {
+			n := checkNpcType(L)
+			if n == nil { L.Push(lua.LFalse); return 1 }
+			L.Push(lua.LBool(n.IsPushable))
+			return 1
+		},
+		"health": func(L *lua.LState) int {
+			n := checkNpcType(L)
+			if n == nil { L.Push(lua.LNumber(0)); return 1 }
+			L.Push(lua.LNumber(n.Health))
+			return 1
+		},
+		"maxHealth": func(L *lua.LState) int {
+			n := checkNpcType(L)
+			if n == nil { L.Push(lua.LNumber(0)); return 1 }
+			L.Push(lua.LNumber(n.MaxHealth))
+			return 1
+		},
 	}
 
 	// Register event callbacks on NpcType
@@ -189,8 +208,9 @@ func (e *Engine) registerNpcType() {
 		e.L.SetField(gameTable, "createNpcType", e.L.NewFunction(func(L *lua.LState) int {
 			name := L.CheckString(1)
 			nType := &creatures.NpcType{
-				Name: name,
-				Speed: 200,
+				Name:      name,
+				Speed:     200,
+				Health:    100,
 				MaxHealth: 100,
 			}
 			ud := L.NewUserData()

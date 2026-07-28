@@ -304,5 +304,44 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			L.Push(ud)
 			return 1
 		},
+		"getFieldItem": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if t.tile == nil { L.Push(lua.LNil); return 1 }
+			// Find magic field item
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getItemByTopOrder": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if t.tile == nil { L.Push(lua.LNil); return 1 }
+			order := L.CheckInt(2)
+			_ = order
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getBottomVisibleCreature": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if t.tile == nil { L.Push(lua.LNil); return 1 }
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getDownItemCount": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if t.tile == nil { L.Push(lua.LNumber(0)); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"getTopItemCount": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if t.tile == nil { L.Push(lua.LNumber(0)); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
+		"getThingIndex": func(L *lua.LState) int {
+			t := checkTile(L, 1)
+			if t.tile == nil { L.Push(lua.LNumber(0)); return 1 }
+			L.Push(lua.LNumber(0))
+			return 1
+		},
 	}
 }

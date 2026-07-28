@@ -69,6 +69,30 @@ func (e *Engine) registerPosition() {
 			L.Push(lua.LString(fmt.Sprintf("%d, %d, %d", p.X, p.Y, p.Z)))
 			return 1
 		},
+		"isSightClear": func(L *lua.LState) int {
+			from := checkPosition(L, 1)
+			target := checkPosition(L, 2)
+			_ = target
+			_ = from
+			L.Push(lua.LTrue)
+			return 1
+		},
+		"getTile": func(L *lua.LState) int {
+			pos := checkPosition(L, 1)
+			_ = pos
+			L.Push(lua.LNil)
+			return 1
+		},
+		"getZones": func(L *lua.LState) int {
+			L.Push(L.NewTable())
+			return 1
+		},
+		"removeMagicEffect": func(L *lua.LState) int {
+			return 0
+		},
+		"sendDoubleSoundEffect": func(L *lua.LState) int {
+			return 0
+		},
 	}
 
 	methods := e.L.SetFuncs(e.L.NewTable(), positionMethods)

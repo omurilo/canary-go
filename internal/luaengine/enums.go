@@ -383,6 +383,28 @@ func RegisterEnums(L *lua.LState) {
 		"FLAG_IGNOREAUTOSTACK":     128,
 		"FLAG_DROPONMAP":           256,
 		"FLAG_LOOTPOUCH":           512,
+
+		// Weapon types (WeaponType_t)
+		"WEAPON_NONE":     0,
+		"WEAPON_SWORD":    1,
+		"WEAPON_CLUB":     2,
+		"WEAPON_AXE":      3,
+		"WEAPON_SHIELD":   4,
+		"WEAPON_DISTANCE": 5,
+		"WEAPON_WAND":     6,
+		"WEAPON_AMMO":     7,
+		"WEAPON_MISSILE":  8,
+		"WEAPON_FIST":     9,
+
+		// Ammo types (Ammo_t)
+		"AMMO_NONE":          0,
+		"AMMO_BOLT":          1,
+		"AMMO_ARROW":         2,
+		"AMMO_SPEAR":         3,
+		"AMMO_THROWINGSTAR":  4,
+		"AMMO_THROWINGKNIFE": 5,
+		"AMMO_STONE":         6,
+		"AMMO_SNOWBALL":      7,
 	}
 
 	for k, v := range enums {
