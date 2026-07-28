@@ -389,11 +389,19 @@ func playerAddachievement(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	name := L.CheckString(2)
 	var reg *game.AchievementRegistry
 	if p.World != nil {
 		reg = p.World.Achievements
 	}
+	// Lua calls addAchievement(id) or addAchievement(name)
+	if L.GetTop() >= 2 {
+		if L.Get(2).Type() == lua.LTNumber {
+			id := uint16(L.CheckInt(2))
+			L.Push(lua.LBool(p.AddAchievement(reg, id, time.Now().Unix())))
+			return 1
+		}
+	}
+	name := L.CheckString(2)
 	L.Push(lua.LBool(p.AddAchievementByName(reg, name)))
 	return 1
 }
