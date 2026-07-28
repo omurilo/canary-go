@@ -206,5 +206,4 @@ function wagons.onUse(player, item, fromPosition, target, toPosition, isHotkey)
 end
 
 wagons:aid(40023)
-wagons:id(7131, 7132)
 wagons:register()

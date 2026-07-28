@@ -9,12 +9,14 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/db"
+	"github.com/opentibiabr/canary-go/internal/config"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/globalevents"
 	"github.com/opentibiabr/canary-go/internal/spells"
@@ -47,8 +49,9 @@ type Engine struct {
 	eventSeq int
 	events   map[int]*time.Timer
 
-	creatureEventsOnLogin  []*lua.LFunction
-	creatureEventsOnLogout []*lua.LFunction
+	creatureEventsOnLogin       []*lua.LFunction
+	creatureEventsOnLogout      []*lua.LFunction
+	creatureEventsOnModalWindow []*lua.LFunction
 
 	// GlobalEvents is the scheduling engine for server-wide startup/think/time
 	// events. It is created alongside the Lua engine and started after all
@@ -343,19 +346,103 @@ func (e *Engine) StartGlobalEventScheduler(ctx context.Context) {
 // doesn't support, and names the chunk after its path so runtime tracebacks
 // point at the real file:line instead of an opaque "<string>".
 func (e *Engine) DoFile(path string) error {
+
 	data, err := os.ReadFile(path)
+
 	if err != nil {
+
 		return fmt.Errorf("read %s: %w", path, err)
+
 	}
+
+
+
+	// Bytecode cache support (config.lua: luaScriptBytecodeCache).
+
+	cacheEnabled := false
+
+	cacheDir := ""
+
+	if cfg := config.Active; cfg != nil {
+
+		if v, ok := cfg.Custom["luascriptbytecodecache"]; ok {
+
+			cacheEnabled = v == lua.LTrue
+
+		}
+
+		if v, ok := cfg.Custom["luascriptbytecodecachepath"]; ok {
+
+			cacheDir = v.String()
+
+		}
+
+	}
+
+
+
+	if cacheEnabled && cacheDir != "" {
+
+		cachePath := filepath.Join(cacheDir, path+".bc")
+
+		if cached, err := os.ReadFile(cachePath); err == nil && len(cached) > 0 {
+
+			e.mu.Lock()
+
+			defer e.mu.Unlock()
+
+			fn, err := e.L.Load(strings.NewReader(string(cached)), path)
+
+			if err == nil {
+
+				e.L.Push(fn)
+
+				return e.L.PCall(0, lua.MultRet, nil)
+
+			}
+
+		}
+
+	}
+
+
+
 	src := preprocessLuaSource(string(data))
+
 	e.mu.Lock()
+
 	defer e.mu.Unlock()
+
 	fn, err := e.L.Load(strings.NewReader(src), path)
+
 	if err != nil {
+
 		return err
+
 	}
+
+
+
+	// Save bytecode to cache when enabled.
+
+	if cacheEnabled && cacheDir != "" {
+
+		cachePath := filepath.Join(cacheDir, path+".bc")
+
+		if err := os.MkdirAll(filepath.Dir(cachePath), 0755); err == nil {
+
+			_ = os.WriteFile(cachePath, []byte(src), 0644)
+
+		}
+
+	}
+
+
+
 	e.L.Push(fn)
+
 	return e.L.PCall(0, lua.MultRet, nil)
+
 }
 
 // DoString executes a Lua chunk under the engine lock.

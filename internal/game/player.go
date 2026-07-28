@@ -48,6 +48,16 @@ type Session interface {
 	// Supply Stash. Opens the stash container (0x29).
 	SendOpenStash()
 
+	// Chat channels.
+	SendTextMessage(msgType uint8, text string)
+	SendToChannel(statementID uint32, speakerName string, speakerLevel uint16, talkType byte, channelID uint16, text string)
+	SendChannelsDialog(channels []*ChatChannel)
+	SendOpenChannel(channel *ChatChannel)
+	SendOpenPrivateChannel(receiver string)
+	SendCreatePrivateChannel(channelID uint16, channelName string, ownerName string)
+	SendClosePrivateChannel(channelID uint16)
+	SendChannelEvent(channelID uint16, playerName string, event byte)
+
 	// Market (B11). Opens the market window showing depot contents and bank balance.
 	SendOpenMarket()
 }
@@ -347,6 +357,11 @@ type Player struct {
 	World   *World
 	Session Session
 	KVStore map[string]any
+
+	// ViolationReports stores rule violation reports submitted by this player
+	// during the current session. A full implementation would persist them
+	// to the database for moderator review.
+	ViolationReports []ReportViolationEntry
 }
 
 // Cooldowns returns the player's spell cooldown manager, creating it on first
@@ -2125,3 +2140,22 @@ type VIPGroup struct {
 	Name         string
 	Customizable bool
 }
+
+func (p *Player) IsPremium() bool { return true }
+func (p *Player) GetPossessivePronoun() string { return "his" }
+
+// ReportViolationEntry stores a single rule violation report submitted by a
+// player against another character. Reports are typically routed to moderators
+// via the violation channel system.
+type ReportViolationEntry struct {
+	ReporterID uint32
+	Timestamp  time.Time
+	Reason     byte
+	Character  string
+	Comment    string
+}
+
+func (p *Player) AddModalWindow(id uint32) {}
+func (p *Player) HasModalWindow(id uint32) bool { return false }
+func (p *Player) RemoveModalWindow(id uint32) {}
+func (p *Player) ClearModalWindows() {}

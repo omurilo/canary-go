@@ -8,9 +8,10 @@ import (
 const luaCreatureEventTypeName = "CreatureEvent"
 
 type LuaCreatureEvent struct {
-	Name     string
-	OnLogin  *lua.LFunction
-	OnLogout *lua.LFunction
+	Name        string
+	OnLogin     *lua.LFunction
+	OnLogout    *lua.LFunction
+	OnModalWindow *lua.LFunction
 }
 
 // registerCreatureEvent registers the CreatureEvent global constructor and metatable
@@ -38,7 +39,13 @@ func (e *Engine) registerCreatureEvent() {
 		"onDeath":          func(L *lua.LState) int { return 0 },
 		"onKill":           func(L *lua.LState) int { return 0 },
 		"onAdvance":        func(L *lua.LState) int { return 0 },
-		"onModalWindow":    func(L *lua.LState) int { return 0 },
+		"onModalWindow": func(L *lua.LState) int {
+		ev := checkCreatureEvent(L)
+		if fn, ok := L.Get(2).(*lua.LFunction); ok {
+			ev.OnModalWindow = fn
+		}
+		return 0
+	},
 		"onTextEdit":       func(L *lua.LState) int { return 0 },
 		"onHealthChange":   func(L *lua.LState) int { return 0 },
 		"onManaChange":     func(L *lua.LState) int { return 0 },
@@ -83,6 +90,10 @@ func creatureEventNewIndex(L *lua.LState) int {
 		if fn, ok := val.(*lua.LFunction); ok {
 			ev.OnLogout = fn
 		}
+	} else if key == "onModalWindow" {
+		if fn, ok := val.(*lua.LFunction); ok {
+			ev.OnModalWindow = fn
+		}
 	}
 	return 0
 }
@@ -99,6 +110,9 @@ func (e *Engine) creatureEventRegister(L *lua.LState) int {
 	}
 	if ev.OnLogout != nil {
 		e.creatureEventsOnLogout = append(e.creatureEventsOnLogout, ev.OnLogout)
+	}
+	if ev.OnModalWindow != nil {
+		e.creatureEventsOnModalWindow = append(e.creatureEventsOnModalWindow, ev.OnModalWindow)
 	}
 	L.Push(lua.LTrue)
 	return 1
@@ -160,4 +174,27 @@ func (e *Engine) ExecuteCreatureOnLogout(player *game.Player) bool {
 		}
 	}
 	return true
+}
+
+// ExecuteCreatureOnModalWindow fires all registered creature-event onModalWindow
+// callbacks. Each receives (player, modalWindowId, buttonId, choiceId).
+func (e *Engine) ExecuteCreatureOnModalWindow(player *game.Player, modalWindowID uint32, buttonID uint8, choiceID uint8) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	for _, fn := range e.creatureEventsOnModalWindow {
+		pUd := e.L.NewUserData()
+		pUd.Value = player
+		e.L.SetMetatable(pUd, e.L.GetTypeMetatable("Player"))
+
+		e.L.Push(fn)
+		e.L.Push(pUd)
+		e.L.Push(lua.LNumber(modalWindowID))
+		e.L.Push(lua.LNumber(buttonID))
+		e.L.Push(lua.LNumber(choiceID))
+
+		if err := e.L.PCall(5, 0, nil); err != nil {
+			e.log.Warn("Error executing CreatureEvent onModalWindow", "err", err)
+		}
+	}
 }

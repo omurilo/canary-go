@@ -59,6 +59,12 @@ type MonsterType struct {
 	// MonsterType::info.attackSpells (src/creatures/monsters/monsters.hpp).
 	Attacks []MonsterAttack
 
+	// Spells is the XML-loaded representation of the monster's
+	// <attacks>/<defenses> blocks. Populated by LoadMonsters when the XML file
+	// contains attack/defense elements; each entry is also appended to Attacks
+	// as a MonsterAttack for backward compatibility with the combat engine.
+	Spells []MonsterSpellData
+
 	// Loot is the monster's loot table, rolled into the corpse on death. Mirrors
 	// MonsterType::info.lootItems (src/creatures/monsters/monsters.hpp).
 	Loot []LootBlock
@@ -207,6 +213,95 @@ func (r *TypeRegistry) BosstiaryMonsters() map[uint16]*MonsterType {
 	return out
 }
 
+// ---------------------------------------------------------------------------
+// MonsterSpellData — XML-loading representation of a monster attack/defense.
+// Populated from the <attacks> and <defenses> sections of XML monster files.
+// ---------------------------------------------------------------------------
+
+// MonsterSpellData holds the parsed attributes of one monster attack or defense
+// block. After loading it is also appended to the MonsterType.Attacks slice as
+// a MonsterAttack so the existing combat-engine path works unchanged.
+type MonsterSpellData struct {
+	Name       string `xml:"name,attr"`
+	Interval   int    `xml:"interval,attr"`
+	Chance     int    `xml:"chance,attr"`
+	Skill      int    `xml:"skill,attr"`
+	Attack     int    `xml:"attack,attr"`
+	MinDamage  int    `xml:"min,attr"`
+	MaxDamage  int    `xml:"max,attr"`
+	Range      int    `xml:"range,attr"`
+	Shoot      int    `xml:"shoot,attr"`
+	Effect     int    `xml:"effect,attr"`
+	Radius     int    `xml:"radius,attr"`
+	Length     int    `xml:"length,attr"`
+	Spread     int    `xml:"spread,attr"`
+	Fire       int    `xml:"fire,attr"`
+	Poison     int    `xml:"poison,attr"`
+	Energy     int    `xml:"energy,attr"`
+	Ice        int    `xml:"ice,attr"`
+	Holy       int    `xml:"holy,attr"`
+	Death      int    `xml:"death,attr"`
+	Earth      int    `xml:"earth,attr"`
+	Physical   int    `xml:"physical,attr"`
+	Duration   int    `xml:"duration,attr"`
+	SpeedChange int   `xml:"speedchange,attr"`
+	Condition  string `xml:"condition,attr"`
+}
+
+// xmlMonsterAttack is used to unmarshal a single <attack> element.
+type xmlMonsterAttack struct {
+	Name       string `xml:"name,attr"`
+	Interval   int    `xml:"interval,attr"`
+	Chance     int    `xml:"chance,attr"`
+	Skill      int    `xml:"skill,attr"`
+	Attack     int    `xml:"attack,attr"`
+	Min        int    `xml:"min,attr"`
+	Max        int    `xml:"max,attr"`
+	Range      int    `xml:"range,attr"`
+	Shoot      int    `xml:"shoot,attr"`
+	Effect     int    `xml:"effect,attr"`
+	Radius     int    `xml:"radius,attr"`
+	Length     int    `xml:"length,attr"`
+	Spread     int    `xml:"spread,attr"`
+	Fire       int    `xml:"fire,attr"`
+	Poison     int    `xml:"poison,attr"`
+	Energy     int    `xml:"energy,attr"`
+	Ice        int    `xml:"ice,attr"`
+	Holy       int    `xml:"holy,attr"`
+	Death      int    `xml:"death,attr"`
+	Earth      int    `xml:"earth,attr"`
+	Physical   int    `xml:"physical,attr"`
+	Duration   int    `xml:"duration,attr"`
+	SpeedChange int   `xml:"speedchange,attr"`
+	Condition  string `xml:"condition,attr"`
+	// Attributes key for complex spells
+	Attributes []xmlMonsterAttackAttribute `xml:"attribute"`
+}
+
+type xmlMonsterAttackAttribute struct {
+	Key   string `xml:"key,attr"`
+	Value string `xml:"value,attr"`
+}
+
+// xmlMonsterDefense is used to unmarshal a single <defense> element.
+type xmlMonsterDefense struct {
+	Name       string `xml:"name,attr"`
+	Interval   int    `xml:"interval,attr"`
+	Chance     int    `xml:"chance,attr"`
+	Min        int    `xml:"min,attr"`
+	Max        int    `xml:"max,attr"`
+	Effect     int    `xml:"effect,attr"`
+	Shoot      int    `xml:"shoot,attr"`
+	Duration   int    `xml:"duration,attr"`
+	SpeedChange int   `xml:"speedchange,attr"`
+	Condition  string `xml:"condition,attr"`
+	// Attributes key for complex spells
+	Attributes []xmlMonsterAttackAttribute `xml:"attribute"`
+}
+
+// ---------------------------------------------------------------------------
+// xmlMonster XML structures
+// ---------------------------------------------------------------------------
 type xmlMonster struct {
 	Name       string      `xml:"name,attr"`
 	Speed      uint32      `xml:"speed,attr"`
@@ -214,6 +309,8 @@ type xmlMonster struct {
 	Health     xmlHealth   `xml:"health"`
 	Look       xmlLook     `xml:"look"`
 	Elements   xmlElements `xml:"elements"`
+	Attacks    []xmlMonsterAttack  `xml:"attacks>attack"`
+	Defenses   []xmlMonsterDefense `xml:"defenses>defense"`
 }
 
 type xmlElements struct {
@@ -318,6 +415,82 @@ func (r *TypeRegistry) LoadMonsters(dataDir string) error {
 					mType.Elements[1024] = *el.LifeDrainPercent
 				}
 			}
+			// Parse <attacks> blocks into MonsterAttack entries.
+			for _, xa := range mon.Attacks {
+				atk := MonsterAttack{
+					Name:       xa.Name,
+					Interval:   xa.Interval,
+					Chance:     xa.Chance,
+					MinDamage:  xa.Min,
+					MaxDamage:  xa.Max,
+					Range:      xa.Range,
+					Effect:     uint16(xa.Effect),
+					ShootEffect: uint16(xa.Shoot),
+					Radius:     xa.Radius,
+					Length:     xa.Length,
+					Spread:     xa.Spread,
+					Duration:   xa.Duration,
+					SpeedChange: xa.SpeedChange,
+					ConditionType: xa.Condition,
+					NeedTarget: true,
+				}
+				// Infer combat type from the highest non-zero damage element.
+				atk.CombatType = inferCombatType(xa)
+				// Store as both MonsterAttack (old path) and MonsterSpellData.
+				mType.Attacks = append(mType.Attacks, atk)
+				mType.Spells = append(mType.Spells, MonsterSpellData{
+					Name:       atk.Name,
+					Interval:   atk.Interval,
+					Chance:     atk.Chance,
+					MinDamage:  atk.MinDamage,
+					MaxDamage:  atk.MaxDamage,
+					Range:      atk.Range,
+					Effect:     xa.Effect,
+					Shoot:      xa.Shoot,
+					Radius:     xa.Radius,
+					Length:     xa.Length,
+					Spread:     xa.Spread,
+					Duration:   xa.Duration,
+					SpeedChange: xa.SpeedChange,
+					Condition:  xa.Condition,
+				})
+			}
+
+			// Parse <defenses> blocks (healing spells etc.) into MonsterAttack entries.
+			for _, xd := range mon.Defenses {
+				atk := MonsterAttack{
+					Name:       xd.Name,
+					Interval:   xd.Interval,
+					Chance:     xd.Chance,
+					MinDamage:  xd.Min,
+					MaxDamage:  xd.Max,
+					Effect:     uint16(xd.Effect),
+					ShootEffect: uint16(xd.Shoot),
+					Duration:   xd.Duration,
+					SpeedChange: xd.SpeedChange,
+					ConditionType: xd.Condition,
+				}
+				if xd.Name == "healing" {
+					atk.CombatType = "healing"
+				} else if xd.Condition != "" {
+					atk.CombatType = xd.Condition
+				}
+				mType.Attacks = append(mType.Attacks, atk)
+				// Defenses are stored as MonsterSpellData with their raw attributes.
+				mType.Spells = append(mType.Spells, MonsterSpellData{
+					Name:       atk.Name,
+					Interval:   atk.Interval,
+					Chance:     atk.Chance,
+					MinDamage:  atk.MinDamage,
+					MaxDamage:  atk.MaxDamage,
+					Effect:     xd.Effect,
+					Shoot:      xd.Shoot,
+					Duration:   xd.Duration,
+					SpeedChange: xd.SpeedChange,
+					Condition:  xd.Condition,
+				})
+			}
+
 			if mType.MaxHealth == 0 {
 				mType.MaxHealth = mon.Health.Now
 			}
@@ -332,6 +505,30 @@ func (r *TypeRegistry) LoadMonsters(dataDir string) error {
 
 		return nil
 	})
+}
+
+// inferCombatType picks the combat-type string from the first non-zero damage
+// element attribute on the attack. Matches the C++ logic in
+// MonsterSpell::loadAttackFunc (src/creatures/monsters/monsters.cpp).
+func inferCombatType(xa xmlMonsterAttack) string {
+	switch {
+	case xa.Physical != 0:
+		return "physical"
+	case xa.Poison != 0, xa.Earth != 0:
+		return "poison"
+	case xa.Fire != 0:
+		return "fire"
+	case xa.Energy != 0:
+		return "energy"
+	case xa.Ice != 0:
+		return "ice"
+	case xa.Holy != 0:
+		return "holy"
+	case xa.Death != 0:
+		return "death"
+	default:
+		return "physical"
+	}
 }
 
 func (r *TypeRegistry) LoadNpcs(dataDir string) error {

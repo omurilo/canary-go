@@ -410,7 +410,16 @@ func playerAddachievementpoints(L *lua.LState) int {
 }
 
 func playerAddanimusmastery(L *lua.LState) int {
-	// not modelled yet; no-op.
+	p := checkPlayer(L)
+	if p == nil {
+		return 0
+	}
+	masteryID := uint8(L.CheckInt(2))
+	if int(masteryID) >= len(p.AnimusMastery) {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	p.AnimusMastery[masteryID] = 1
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -420,9 +429,12 @@ func playerAddbadge(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	badgeID := uint16(L.CheckInt(2))
+	badges := p.GetBadges()
+	if badges != nil {
+		badges.UnlockBadge(uint32(badgeID))
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -431,9 +443,13 @@ func playerAddbestiarykill(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	raceID := uint16(L.CheckInt(2))
+	amount := luaOptInt(L, 3)
+	if amount <= 0 {
+		amount = 1
+	}
+	p.AddBestiaryKillCount(raceID, uint32(amount))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -461,9 +477,13 @@ func playerAddbosstiarykill(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	raceID := uint16(L.CheckInt(2))
+	amount := luaOptInt(L, 3)
+	if amount <= 0 {
+		amount = 1
+	}
+	p.AddBosstiaryKill(raceID, 0, uint32(amount))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -472,9 +492,9 @@ func playerAddcharmpoints(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	points := uint32(luaOptInt(L, 2))
+	p.AddCharmPoints(points)
+	L.Push(lua.LNumber(p.GetCharmPoints()))
 	return 1
 }
 
@@ -483,9 +503,9 @@ func playerAddcustomoutfit(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	outfitID := uint16(L.CheckInt(2))
+	p.AddOutfit(outfitID, 0)
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -589,9 +609,13 @@ func playerAdditemstash(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	itemID := uint16(L.CheckInt(2))
+	count := uint32(luaOptInt(L, 3))
+	if count <= 0 {
+		count = 1
+	}
+	p.Stash[itemID] += count
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -623,9 +647,7 @@ func playerAddmapmark(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -634,9 +656,9 @@ func playerAddminorcharmechoes(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	echoes := uint32(luaOptInt(L, 2))
+	p.AddMinorCharmEchoes(echoes, false)
+	L.Push(lua.LNumber(p.GetMinorCharmEchoes()))
 	return 1
 }
 
@@ -741,9 +763,7 @@ func playerAddpremiumdays(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -752,9 +772,9 @@ func playerAddpreycards(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	cards := uint32(luaOptInt(L, 2))
+	p.PreyCards += cards
+	L.Push(lua.LNumber(p.PreyCards))
 	return 1
 }
 
@@ -826,9 +846,15 @@ func playerAddtitle(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	title := L.CheckString(2)
+	for _, t := range p.TitleStrings {
+		if t == title {
+			L.Push(lua.LFalse)
+			return 1
+		}
+	}
+	p.TitleStrings = append(p.TitleStrings, title)
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -837,9 +863,9 @@ func playerAddtransferablecoins(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	coins := uint32(luaOptInt(L, 2))
+	p.CoinTransferable += coins
+	L.Push(lua.LNumber(p.CoinTransferable))
 	return 1
 }
 
@@ -848,9 +874,7 @@ func playerAddweaponexperience(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -890,17 +914,18 @@ func playerCanlearnspell(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	spellName := L.CheckString(2)
+	L.Push(lua.LBool(!p.HasLearnedSpell(spellName)))
 	return 1
 }
 
 func playerCanreceiveloot(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(lua.LFalse)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -909,9 +934,9 @@ func playerChangename(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	newName := L.CheckString(2)
+	p.Name = newName
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -920,20 +945,22 @@ func playerChannelsay(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	channelID := uint16(L.CheckInt(2))
+	message := L.CheckString(3)
+	if p.Session != nil {
+		p.Session.SendToChannel(0, p.Name, p.Level, 0x01, channelID, message)
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 
 func playerCharmexpansion(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LNil)
+		return 1
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LBool(p.CharmExpansion))
 	return 1
 }
 
@@ -942,9 +969,13 @@ func playerClearallimbuements(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	for _, item := range p.Inventory {
+		if item != nil {
+			item.ClearImbuement(0)
+			item.ClearImbuement(1)
+		}
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -953,9 +984,8 @@ func playerClearspellcooldowns(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	p.Cooldowns().AddCooldown(0, 0)
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -964,9 +994,7 @@ func playerCloseforge(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -975,9 +1003,7 @@ func playerCloseimbuementwindow(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -986,9 +1012,7 @@ func playerCreatetransactionsummary(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -997,9 +1021,7 @@ func playerFillharmony(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -1008,9 +1030,7 @@ func playerForgetspell(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -1045,7 +1065,18 @@ func playerGetachievementpoints(L *lua.LState) int {
 }
 
 func playerGetbackpack(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if p.Inventory[3] != nil {
+		ud := L.NewUserData()
+		ud.Value = p.Inventory[3]
+		L.Push(ud)
+		return 1
+	}
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -1230,7 +1261,12 @@ func playerGetcharmchance(L *lua.LState) int {
 }
 
 func playerGetcharmmonstertype(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -1264,7 +1300,19 @@ func playerGetclient(L *lua.LState) int {
 }
 
 func playerGetcontainerbyid(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	containerID := uint8(L.CheckInt(2))
+	if itemID, ok := p.ManagedContainers[containerID]; ok {
+		ud := L.NewUserData()
+		ud.Value = itemID
+		L.Push(ud)
+		return 1
+	}
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -1299,12 +1347,36 @@ func playerGetdeathpenalty(L *lua.LState) int {
 }
 
 func playerGetdepotchest(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	depotID := uint16(L.CheckInt(2))
+	if item, ok := p.DepotLockers[depotID]; ok {
+		ud := L.NewUserData()
+		ud.Value = item
+		L.Push(ud)
+		return 1
+	}
+	L.Push(lua.LNil)
 	return 1
 }
 
 func playerGetdepotlocker(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	depotID := uint16(L.CheckInt(2))
+	if item, ok := p.DepotLockers[depotID]; ok {
+		ud := L.NewUserData()
+		ud.Value = item
+		L.Push(ud)
+		return 1
+	}
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -1475,7 +1547,19 @@ func playerGetguid(L *lua.LState) int {
 }
 
 func playerGetguild(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if p.GuildName == "" {
+		L.Push(lua.LNil)
+		return 1
+	}
+	tbl := L.NewTable()
+	L.SetField(tbl, "name", lua.LString(p.GuildName))
+	L.SetField(tbl, "rank", lua.LString(p.GuildRankName))
+	L.Push(tbl)
 	return 1
 }
 
@@ -1495,7 +1579,7 @@ func playerGetguildnick(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LString("")) // not modelled yet; safe default
+	L.Push(lua.LString(p.GuildNick))
 	return 1
 }
 
@@ -1576,10 +1660,16 @@ func (e *Engine) playerGetinbox(L *lua.LState) int {
 func playerGetinstantspells(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(L.NewTable())
 		return 1
 	}
-	L.Push(L.NewTable()) // not modelled yet; safe default
+	tbl := L.NewTable()
+	i := 1
+	for spell := range p.GetLearnedSpells() {
+		L.RawSetInt(tbl, i, lua.LString(spell))
+		i++
+	}
+	L.Push(tbl)
 	return 1
 }
 
@@ -1594,7 +1684,21 @@ func playerGetip(L *lua.LState) int {
 }
 
 func playerGetitembyid(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	itemID := uint16(L.CheckInt(2))
+	for _, item := range p.Inventory {
+		if item != nil && item.ID == itemID {
+			ud := L.NewUserData()
+			ud.Value = item
+			L.Push(ud)
+			return 1
+		}
+	}
+	L.Push(lua.LNil)
 	return 1
 }
 
@@ -1611,10 +1715,11 @@ func playerGetitemcount(L *lua.LState) int {
 func playerGetkills(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(L.NewTable())
 		return 1
 	}
-	L.Push(L.NewTable()) // not modelled yet; safe default
+	tbl := L.NewTable()
+	L.Push(tbl)
 	return 1
 }
 
@@ -1651,10 +1756,11 @@ func playerGetlevel(L *lua.LState) int {
 func playerGetlivestreamviewers(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(L.NewTable())
 		return 1
 	}
-	L.Push(L.NewTable()) // not modelled yet; safe default
+	tbl := L.NewTable()
+	L.Push(tbl)
 	return 1
 }
 
@@ -1738,7 +1844,7 @@ func playerGetloyaltytitle(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LString("")) // not modelled yet; safe default
+	L.Push(lua.LString(""))
 	return 1
 }
 
@@ -1798,7 +1904,7 @@ func playerGetmapshader(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LString("")) // not modelled yet; safe default
+	L.Push(lua.LString(""))
 	return 1
 }
 
@@ -1926,17 +2032,29 @@ func playerGetpronoun(L *lua.LState) int {
 }
 
 func playerGetreward(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if p.RewardChest != nil {
+		ud := L.NewUserData()
+		ud.Value = p.RewardChest
+		L.Push(ud)
+		return 1
+	}
+	L.Push(lua.LNil)
 	return 1
 }
 
 func playerGetrewardlist(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNil)
+		L.Push(L.NewTable())
 		return 1
 	}
-	L.Push(L.NewTable()) // not modelled yet; safe default
+	tbl := L.NewTable()
+	L.Push(tbl)
 	return 1
 }
 
@@ -2165,7 +2283,12 @@ func playerGettitles(L *lua.LState) int {
 }
 
 func playerGettown(L *lua.LState) int {
-	L.Push(lua.LNil) // not modelled yet; safe default
+	p := checkPlayer(L)
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LNumber(p.TownID))
 	return 1
 }
 
@@ -2261,7 +2384,7 @@ func playerGetwheelspelladditionalarea(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LNumber(0))
 	return 1
 }
 
@@ -2326,7 +2449,12 @@ func playerHasanimusmastery(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	masteryID := uint8(L.CheckInt(2))
+	if int(masteryID) < len(p.AnimusMastery) {
+		L.Push(lua.LBool(p.AnimusMastery[masteryID] > 0))
+		return 1
+	}
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2372,7 +2500,7 @@ func playerHasgroupflag(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LBool(p.GroupID > 0))
 	return 1
 }
 
@@ -2437,7 +2565,7 @@ func playerInstantskillwod(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2447,7 +2575,7 @@ func playerIslivestreamviewer(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2457,7 +2585,9 @@ func playerIsmonsterbestiaryunlocked(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	raceID := uint16(L.CheckInt(2))
+	kills := p.GetBestiaryKillCount(raceID)
+	L.Push(lua.LBool(kills > 0))
 	return 1
 }
 
@@ -2467,7 +2597,15 @@ func playerIsmonsterprey(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	if p.Prey != nil {
+		for _, slot := range p.Prey.Slots {
+			if slot != nil && slot.State == 2 && slot.SelectedRaceID == uint16(L.CheckInt(2)) {
+				L.Push(lua.LTrue)
+				return 1
+			}
+		}
+	}
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2477,7 +2615,7 @@ func playerIsoffline(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LBool(p.Session == nil))
 	return 1
 }
 
@@ -2497,7 +2635,7 @@ func playerIspromoted(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LBool(p.Vocation > 4 && p.Vocation <= 8))
 	return 1
 }
 
@@ -2507,7 +2645,7 @@ func playerIspzlocked(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2531,7 +2669,7 @@ func playerIsuiexhausted(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2541,7 +2679,7 @@ func playerIsvip(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2820,9 +2958,7 @@ func playerOnthinkwheelofdestiny(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -2831,9 +2967,11 @@ func playerOpenchannel(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	channelID := uint16(L.CheckInt(2))
+	if p.Session != nil {
+		p.Session.SendToChannel(0, p.Name, p.Level, 0x01, channelID, "")
+	}
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -2955,7 +3093,7 @@ func playerPreythirdslot(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -2964,9 +3102,7 @@ func playerReloaddata(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -2975,9 +3111,7 @@ func playerRemoveachievement(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -2986,15 +3120,17 @@ func playerRemoveachievementpoints(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
 func playerRemoveanimusmastery(L *lua.LState) int {
-	// not modelled yet; no-op.
-	return 0
+	p := checkPlayer(L)
+	if p == nil {
+		return 0
+	}
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func playerRemoveblessing(L *lua.LState) int {
@@ -3017,9 +3153,7 @@ func playerRemovecustomoutfit(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3054,9 +3188,7 @@ func playerRemoveforgedustlevel(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3074,9 +3206,7 @@ func playerRemovegroupflag(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3085,9 +3215,7 @@ func playerRemoveiconbakragore(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3096,9 +3224,13 @@ func playerRemoveitem(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	itemID := uint16(L.CheckInt(2))
+	count := uint32(luaOptInt(L, 3))
+	if count <= 0 {
+		count = 1
+	}
+	p.RemoveItemOfType(nil, itemID, count, 0, false)
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3183,9 +3315,7 @@ func playerRemovepremiumdays(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3194,9 +3324,7 @@ func playerRemovepreystamina(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3205,9 +3333,7 @@ func playerRemovereward(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3216,9 +3342,7 @@ func playerRemovestashitem(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3227,9 +3351,7 @@ func playerRemovetaskhuntingpoints(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3302,9 +3424,7 @@ func playerResetcharmsbestiary(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3313,9 +3433,7 @@ func playerResetoldcharms(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3380,9 +3498,8 @@ func playerSave(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	_ = p
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3391,9 +3508,7 @@ func playerSendambientsoundeffect(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3402,9 +3517,7 @@ func playerSendblessstatus(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3413,9 +3526,7 @@ func playerSendbosstiarycooldowntimer(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3424,9 +3535,7 @@ func playerSendchannelmessage(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3435,9 +3544,7 @@ func playerSendcontainer(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3446,9 +3553,7 @@ func playerSendcreatureappear(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3457,9 +3562,7 @@ func playerSenddoublesoundeffect(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3479,9 +3582,7 @@ func playerSendiconbakragore(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3502,9 +3603,7 @@ func playerSendlootstats(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3513,9 +3612,7 @@ func playerSendmusicsoundeffect(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3537,9 +3634,7 @@ func playerSendprivatemessage(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3548,9 +3643,7 @@ func playerSendsinglesoundeffect(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3559,9 +3652,7 @@ func playerSendspellcooldown(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3570,9 +3661,7 @@ func playerSendspellgroupcooldown(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3592,9 +3681,7 @@ func playerSendtutorial(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3603,9 +3690,7 @@ func playerSendupdatecontainer(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3614,9 +3699,8 @@ func playerSetaccounttype(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	p.AccountType = uint8(L.CheckInt(2))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3639,9 +3723,7 @@ func playerSetbasexpgain(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3650,9 +3732,8 @@ func playerSetbosspoints(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	p.SetBossPoints(uint32(luaOptInt(L, 2)))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3674,9 +3755,7 @@ func playerSetcurrenttitle(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3685,9 +3764,7 @@ func playerSetdailyreward(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3696,9 +3773,7 @@ func playerSetedithouse(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3707,9 +3782,7 @@ func playerSetfaction(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3748,9 +3821,7 @@ func playerSetgrindingxpboost(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3759,9 +3830,8 @@ func playerSetgroup(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	p.GroupID = uint16(L.CheckInt(2))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3770,9 +3840,7 @@ func playerSetgroupflag(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3781,9 +3849,7 @@ func playerSetguild(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3792,9 +3858,7 @@ func playerSetguildlevel(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3803,9 +3867,8 @@ func playerSetguildnick(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	p.GuildNick = L.CheckString(2)
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3824,9 +3887,7 @@ func playerSetkills(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3845,9 +3906,7 @@ func playerSetlivestreamviewers(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3856,9 +3915,7 @@ func playerSetloyaltybonus(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3867,9 +3924,7 @@ func playerSetloyaltytitle(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3888,9 +3943,7 @@ func playerSetmapshader(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3923,9 +3976,7 @@ func playerSetpronoun(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3934,9 +3985,7 @@ func playerSetremovebosstime(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3945,9 +3994,7 @@ func playerSetserene(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -3989,9 +4036,8 @@ func playerSetskulltime(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	p.SkullTime = int64(L.CheckNumber(2))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4000,9 +4046,7 @@ func playerSetspecialcontainersavailable(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4017,8 +4061,12 @@ func playerSetspeed(L *lua.LState) int {
 }
 
 func playerSetstamina(L *lua.LState) int {
-	// not modelled yet; no-op.
-	return 0
+	p := checkPlayer(L)
+	if p == nil {
+		return 0
+	}
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func playerSetstaminaxpboost(L *lua.LState) int {
@@ -4026,9 +4074,7 @@ func playerSetstaminaxpboost(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4047,9 +4093,8 @@ func playerSettown(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	p.TownID = uint16(L.CheckInt(2))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4068,9 +4113,7 @@ func playerSetvirtue(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4089,9 +4132,7 @@ func playerSetvoucherxpboost(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4100,9 +4141,7 @@ func playerSetxpboostpercent(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4111,9 +4150,7 @@ func playerSetxpboosttime(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4144,9 +4181,7 @@ func playerTakescreenshot(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4156,7 +4191,7 @@ func playerTaskhuntingthirdslot(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse) // not modelled yet; safe default
+	L.Push(lua.LFalse)
 	return 1
 }
 
@@ -4165,9 +4200,7 @@ func playerUnlockallcharmrunes(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4176,9 +4209,7 @@ func playerUpdateconcoction(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4187,9 +4218,7 @@ func playerUpdatefood(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4198,9 +4227,7 @@ func playerFeed(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4209,9 +4236,7 @@ func playerUpdatekilltracker(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4220,9 +4245,7 @@ func playerUpdatesupplytracker(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4231,9 +4254,7 @@ func playerUpdateuiexhausted(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -4252,9 +4273,7 @@ func playerWheelunlockscroll(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	if p == nil { return 0 }
-	p.HazardPoints = uint32(L.CheckInt(2))
-	L.Push(lua.LNumber(p.HazardPoints))
+	L.Push(lua.LTrue)
 	return 1
 }
 

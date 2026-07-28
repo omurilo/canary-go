@@ -117,12 +117,12 @@ func (c *Codec) EnableLegacyGame(key tibcrypto.XTEAKey) {
 // server before the XTEA key is exchanged.
 func (c *Codec) EnableModernFraming() { c.ModernOuterLength = true }
 
-// EnableModernGame flips the codec into the modern encrypted game framing with a
-// sequence checksum once the XTEA key has been exchanged.
+// EnableModernGame flips the codec into the modern encrypted game framing with an
+// Adler-32 checksum once the XTEA key has been exchanged.
 func (c *Codec) EnableModernGame(key tibcrypto.XTEAKey) {
 	c.Key = key
 	c.Encryption = true
-	c.Checksum = ChecksumSequence
+	c.Checksum = ChecksumAdler32
 	c.Payload = PayloadModernPad
 }
 

@@ -299,14 +299,17 @@ function dawnportVocationTrial.onStepIn(creature, item, position, fromPosition)
 		if player:getVocation():getId() == trial.vocation.id or player:getLevel() >= 20 then
 			return true
 		end
+		local firstTime = (player:getStorageValue(trial.storage) == -1)
 		-- On step in the tile
 		tileStep(player, trial)
 		-- Change to new vocation, convert magic level and skills and set proper stats
 		player:changeVocation(trial.vocation.id)
-		-- Remove vocation trial equipment items
-		removeItems(player)
-		-- Add player item
-		addItems(player, trial.items)
+		
+		-- Add player item only if first time
+		if firstTime then
+			addItems(player, trial.items)
+		end
+		
 		-- Change outfit
 		setOutfit(player, trial.vocation.outfit)
 		player:getPosition():sendMagicEffect(CONST_ME_BLOCKHIT)

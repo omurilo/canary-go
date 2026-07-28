@@ -120,6 +120,9 @@ var networkMessageMethods = map[string]lua.LGFunction{
 		if p != nil && p.Session != nil {
 			out := netmsg.NewWriter()
 			out.AddBytes(m.w.Bytes())
+			if out.Len() == 0 {
+				return 0
+			}
 			p.Session.SendToClient(out)
 		}
 		return 0

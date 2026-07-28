@@ -39,6 +39,11 @@ type Monster struct {
 	ForgeClassification ForgeClassification
 	ForgeStack          uint16
 	TimeToChangeFiendish int64
+
+	// spellCooldowns tracks per-spell cooldowns keyed by spell name. Each
+	// MonsterSpell converted from Type.Attacks is tracked independently so the
+	// AI engine can respect per-attack intervals.
+	spellCooldowns map[string]int64
 }
 
 func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {
@@ -71,8 +76,9 @@ func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {
 			Speed:     uint16(speed),
 			Outfit:    outfit,
 		},
-		CorpseID: corpse,
-		Type:     mType,
+		CorpseID:       corpse,
+		Type:           mType,
+		spellCooldowns: make(map[string]int64),
 	}
 }
 
@@ -151,4 +157,94 @@ func (m *Monster) ClearFiendishStatus() {
 	m.ForgeClassification = ForgeClassifications_None
 	m.ForgeStack = 0
 	m.TimeToChangeFiendish = 0
+}
+
+// ---------------------------------------------------------------------------
+// Monster spell helpers (for AI engine)
+// ---------------------------------------------------------------------------
+
+// Spells returns the monster's non-melee attacks as MonsterSpell objects that
+// the AI engine can attempt to cast.
+func (m *Monster) Spells() []MonsterSpell {
+	if m.Type == nil {
+		return nil
+	}
+	out := make([]MonsterSpell, 0, len(m.Type.Attacks))
+	for i := range m.Type.Attacks {
+		atk := m.Type.Attacks[i]
+		if atk.IsMelee() {
+			continue
+		}
+		spell := MonsterSpellFromAttack(atk)
+		// Restore per-spell cooldown from the monster's local tracker.
+		if lastUsed, ok := m.spellCooldowns[atk.Name]; ok {
+			spell.lastUsedMs = lastUsed
+		}
+		out = append(out, spell)
+	}
+	return out
+}
+
+// HasSpells returns true if the monster has at least one non-melee attack
+// configured.
+func (m *Monster) HasSpells() bool {
+	if m.Type == nil {
+		return false
+	}
+	for i := range m.Type.Attacks {
+		if !m.Type.Attacks[i].IsMelee() {
+			return true
+		}
+	}
+	return false
+}
+
+// MaxSpellRange returns the maximum range among all of the monster's
+// non-melee attacks. Returns 1 if no spells are configured (so the monster
+// defaults to adjacent melee range).
+func (m *Monster) MaxSpellRange() int {
+	if m.Type == nil {
+		return 1
+	}
+	maxR := 1
+	for i := range m.Type.Attacks {
+		atk := &m.Type.Attacks[i]
+		if atk.IsMelee() {
+			continue
+		}
+		if atk.Range > maxR {
+			maxR = atk.Range
+		}
+	}
+	return maxR
+}
+
+// MarkSpellUsed records the current time for the given spell name in the
+// monster's local cooldown tracker. Called by the AI engine after a
+// successful cast.
+func (m *Monster) MarkSpellUsed(name string) {
+	if m.spellCooldowns == nil {
+		m.spellCooldowns = make(map[string]int64)
+	}
+	m.spellCooldowns[name] = time.Now().UnixMilli()
+}
+
+// ResetSpellCooldowns clears all per-spell cooldown entries.
+func (m *Monster) ResetSpellCooldowns() {
+	m.spellCooldowns = make(map[string]int64)
+}
+
+// HealingSpells returns spells that have the IsHealing flag set.
+func (m *Monster) HealingSpells() []MonsterSpell {
+	all := m.Spells()
+	if len(all) == 0 {
+		return nil
+	}
+	out := make([]MonsterSpell, 0, len(all))
+	for _, s := range all {
+		if s.IsHealing {
+			out = append(out, s)
+		}
+	}
+	return out
 }

@@ -272,6 +272,7 @@ func run(o runOpts, log *slog.Logger) error {
 	var loadedMap bool
 	var monsterSpawnFile string
 	var npcSpawnFile string
+	var mapDir string
 	if mapFilePath != "" {
 		if catalog == nil {
 			return fmt.Errorf("map loading requires a valid appearances.dat (item metadata)")
@@ -303,7 +304,7 @@ func run(o runOpts, log *slog.Logger) error {
 				"items", res.ItemCount, "towns", len(res.Towns))
 
 			// Parse spawn files (use OTBM header attributes if present, otherwise mapBase fallback)
-			mapDir := filepath.Dir(mapFilePath)
+			mapDir = filepath.Dir(mapFilePath)
 			mapBase := strings.TrimSuffix(mapFilePath, filepath.Ext(mapFilePath))
 
 			monsterSpawnFile = mapBase + "-monster.xml"
@@ -345,6 +346,57 @@ func run(o runOpts, log *slog.Logger) error {
 				log.Info("spawn set to town temple", "town", res.Towns[0].Name, "pos", spawn)
 			} else {
 				spawn = game.Position{X: res.Width / 2, Y: res.Height / 2, Z: 7}
+			}
+		}
+	}
+	// Load custom OTBM maps from world/<datapack>/custom/ when toggleMapCustom is enabled.
+	if loadedMap && cfg.ToggleMapCustom {
+		customDir := filepath.Join(mapDir, "custom")
+		entries, err := os.ReadDir(customDir)
+		if err != nil {
+			log.Warn("custom map directory not found, skipping", "dir", customDir, "err", err)
+		} else {
+			for _, entry := range entries {
+				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".otbm") {
+					continue
+				}
+				customPath := filepath.Join(customDir, entry.Name())
+				customRes, err := otbm.Load(customPath, catalog, world.Map)
+				if err != nil {
+					log.Warn("custom OTBM not loaded", "file", entry.Name(), "err", err)
+					continue
+				}
+				customBase := strings.TrimSuffix(customPath, filepath.Ext(customPath))
+
+				// Custom monster spawns
+				if sd, err := spawns.LoadSpawnFile(customBase + "-monster.xml"); err == nil {
+					spawnEngine.LoadSpawns(sd)
+					log.Info("loaded custom monster spawns", "map", entry.Name())
+				}
+				// Custom NPC spawns
+				if sd, err := spawns.LoadSpawnFile(customBase + "-npc.xml"); err == nil {
+					spawnEngine.LoadSpawns(sd)
+					log.Info("loaded custom npc spawns", "map", entry.Name())
+				}
+				// Custom houses
+				if houses, err := database.ParseHouseFile(customBase + "-house.xml"); err == nil {
+					for i := range houses {
+						if err := database.SaveHouse(ctx, &houses[i]); err != nil {
+							log.Warn("save custom house", "err", err)
+						} else {
+							world.Houses[houses[i].ID] = &houses[i]
+						}
+					}
+					log.Info("loaded custom houses", "map", entry.Name(), "count", len(houses))
+				}
+
+				log.Info("loaded custom map", "file", entry.Name(),
+					"tiles", customRes.TileCount, "items", customRes.ItemCount)
+				for _, t := range customRes.Towns {
+					world.Towns[strings.ToLower(t.Name)] = t.Pos
+					world.TownsByID[uint16(t.ID)] = t.Pos
+					world.TownNames[uint16(t.ID)] = t.Name
+				}
 			}
 		}
 	}

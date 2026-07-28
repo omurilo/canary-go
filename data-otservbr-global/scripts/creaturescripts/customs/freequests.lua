@@ -361,14 +361,6 @@ local questTable = {
 	{ storageName = "TheWhiteRavenMonastery.Passage", storage = Storage.Quest.U7_24.TheWhiteRavenMonastery.Passage, storageValue = 1 },
 	{ storageName = "TheWhiteRavenMonastery.Diary", storage = Storage.Quest.U7_24.TheWhiteRavenMonastery.Diary, storageValue = 2 },
 	{ storageName = "TheWhiteRavenMonastery.Door", storage = Storage.Quest.U7_24.TheWhiteRavenMonastery.Door, storageValue = 1 },
-
-	-- Bosses & Areas Free Access
-	{ storageName = "TheSecretLibrary.FalconBastion.Questline", storage = Storage.Quest.U11_80.TheSecretLibrary.FalconBastion.Questline, storageValue = 2 },
-	{ storageName = "TheSecretLibrary.FalconBastion.KillingBosses", storage = Storage.Quest.U11_80.TheSecretLibrary.FalconBastion.KillingBosses, storageValue = 6 },
-	{ storageName = "TheSecretLibrary.FalconBastion.FalconBastionAccess", storage = Storage.Quest.U11_80.TheSecretLibrary.FalconBastion.FalconBastionAccess, storageValue = 1 },
-	{ storageName = "GraveDanger.GaffirKilled", storage = Storage.Quest.U12_20.GraveDanger.GaffirKilled, storageValue = 1 },
-	{ storageName = "PrimalOrdeal.QuestLine", storage = Storage.Quest.U12_90.PrimalOrdeal.QuestLine, storageValue = 1 },
-	{ storageName = "PrimalOrdeal.Bosses.MagmaBubbleKilled", storage = Storage.Quest.U12_90.PrimalOrdeal.Bosses.MagmaBubbleKilled, storageValue = 1 },
 }
 
 -- from Position: (33201, 31762, 1)

@@ -91,6 +91,11 @@ type Config struct {
 	// OTBM map file on startup. Default true.
 	MapDownloadEnabled bool
 
+	// ToggleMapCustom controls whether to load extra OTBM map files from the
+	// world/custom/ directory on top of the main map. Mirrors the C++ Canary
+	// toggleMapCustom config option.
+	ToggleMapCustom bool
+
 	Custom map[string]lua.LValue
 }
 
@@ -193,6 +198,9 @@ func Load(path string) (*Config, error) {
 	// Map download settings (matches CANARY_MAP_URL in the docker stack).
 	cfg.MapDownloadURL = str("mapDownloadUrl", cfg.MapDownloadURL)
 	cfg.MapDownloadEnabled = boolean("mapDownloadEnabled", cfg.MapDownloadEnabled)
+
+	// Custom map overlay (toggleMapCustom in config.lua).
+	cfg.ToggleMapCustom = boolean("toggleMapCustom", cfg.ToggleMapCustom)
 
 	applyEnv(cfg)
 

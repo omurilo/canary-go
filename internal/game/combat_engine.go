@@ -184,7 +184,18 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 	var launcher *Item
 	var weaponType string
 
-	if p, ok := attacker.(*Player); ok {
+	if m, ok := attacker.(*Monster); ok {
+		// Use the monster's maximum attack range so that ranged spells can
+		// reach targets beyond melee distance. Falls back to 1 (adjacent).
+		if m.Type != nil {
+			for _, atk := range m.Type.Attacks {
+				r := int32(atk.Range)
+				if r > maxRange {
+					maxRange = r
+				}
+			}
+		}
+	} else if p, ok := attacker.(*Player); ok {
 		weapon = p.GetWeapon(e.world.Items, false)
 		launcher = p.GetWeapon(e.world.Items, true)
 

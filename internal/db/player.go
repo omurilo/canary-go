@@ -2,9 +2,10 @@ package db
 
 import (
 	"context"
-	"encoding/json"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/io/propstream"
@@ -570,4 +571,81 @@ func (d *DB) TownTemple(ctx context.Context, townID int) (game.Position, error) 
 		return game.Position{}, err
 	}
 	return game.Position{X: x, Y: y, Z: z}, nil
+}
+
+// highscoreOrderBy maps categoryID to the players table column to ORDER BY.
+var highscoreOrderBy = map[uint8]string{
+	0: "experience",
+	1: "skill_fist",
+	2: "skill_club",
+	3: "skill_sword",
+	4: "skill_axe",
+	5: "skill_dist",
+	6: "skill_shielding",
+	7: "skill_fishing",
+	8: "maglevel",
+	9: "skill_fist", // loyalty — no dedicated column, use skill_fist
+}
+
+// LoadHighscore fetches a page of highscore entries from the players table.
+// It returns the entries ordered by the requested category, the total number of
+// pages available for the given perPage, or an error.
+func (d *DB) LoadHighscore(ctx context.Context, categoryID uint8, vocationID uint32, page uint16, perPage uint8) ([]game.HighscoreEntry, int, error) {
+	orderBy, ok := highscoreOrderBy[categoryID]
+	if !ok {
+		orderBy = "experience"
+	}
+
+	// Count total matching players for pagination.
+	var totalPlayers int
+	countQuery := "SELECT COUNT(*) FROM players WHERE group_id < 3" // exclude groups >= 3 (GMs, etc.)
+	countArgs := []any{}
+	if vocationID > 0 && vocationID <= 4 {
+		countQuery += " AND vocation = ?"
+		countArgs = append(countArgs, vocationID)
+	}
+	if err := d.SQL.QueryRowContext(ctx, countQuery, countArgs...).Scan(&totalPlayers); err != nil {
+		return nil, 0, fmt.Errorf("db: count highscore: %w", err)
+	}
+	if totalPlayers < 1 {
+		totalPlayers = 1
+	}
+	totalPages := (totalPlayers + int(perPage) - 1) / int(perPage)
+
+	// Fetch the requested page.
+	offset := int(page) * int(perPage)
+	baseQuery := fmt.Sprintf(
+		"SELECT name, level, vocation, %s, town_id FROM players WHERE group_id < 3",
+		orderBy,
+	)
+	queryArgs := []any{}
+	if vocationID > 0 && vocationID <= 4 {
+		baseQuery += " AND vocation = ?"
+		queryArgs = append(queryArgs, vocationID)
+	}
+	baseQuery += fmt.Sprintf(" ORDER BY %s DESC LIMIT ? OFFSET ?", orderBy)
+	queryArgs = append(queryArgs, perPage, offset)
+
+	rows, err := d.SQL.QueryContext(ctx, baseQuery, queryArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("db: query highscore: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []game.HighscoreEntry
+	rank := uint16(offset + 1)
+	for rows.Next() {
+		var e game.HighscoreEntry
+		if err := rows.Scan(&e.Name, &e.Level, &e.Vocation, &e.Value, &e.TownID); err != nil {
+			return nil, 0, fmt.Errorf("db: scan highscore row: %w", err)
+		}
+		e.Rank = rank
+		entries = append(entries, e)
+		rank++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("db: highscore rows iteration: %w", err)
+	}
+
+	return entries, totalPages, nil
 }

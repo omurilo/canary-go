@@ -25,6 +25,9 @@ type World struct {
 	DefaultSpawn   Position
 	WorldType      uint8 // 1 = WORLD_TYPE_NO_PVP, 2 = WORLD_TYPE_PVP, 3 = WORLD_TYPE_PVP_ENFORCED
 	AutoBank       bool
+	OnModalWindowAnswer func(p *Player, id uint32, button uint8, choice uint8)
+	ChatManager     *ChatManager
+	WaitingList     *WaitingList
 	BoostedCreature string
 	BoostedBoss     string
 	players        map[uint32]*Player
@@ -112,7 +115,8 @@ func (w *World) CreatureByName(name string) Creature {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	target := strings.ToLower(strings.TrimSpace(name))
-	if p, ok := w.byName[target]; ok {
+	if p, ok := w.byName[target]
+ ok {
 		return p
 	}
 	for _, c := range w.creatures {
@@ -192,7 +196,8 @@ func (w *World) AddItem(pos Position, it *Item) bool {
 		return false
 	}
 	if w.Items != nil && w.Decay != nil {
-		if itemType := w.Items.Get(it.ID); itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
+		if itemType := w.Items.Get(it.ID)
+ itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
 			w.Decay.StartDecaying(pos, it, itemType.Duration, itemType.DecayTo)
 		}
 	}
@@ -208,7 +213,8 @@ func (w *World) StartDecayingMap() {
 	defer w.Map.mu.RUnlock()
 	for pos, tile := range w.Map.tiles {
 		for _, it := range tile.Items {
-			if itemType := w.Items.Get(it.ID); itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
+			if itemType := w.Items.Get(it.ID)
+ itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
 				w.Decay.StartDecaying(pos, it, itemType.Duration, itemType.DecayTo)
 			}
 		}
@@ -266,7 +272,8 @@ func (w *World) GenerateCreatureID() uint32 {
 func (w *World) AddPlayer(p *Player, sess Session) bool {
 	w.mu.Lock()
 	key := strings.ToLower(p.Name)
-	if _, online := w.byName[key]; online {
+	if _, online := w.byName[key]
+ online {
 		w.mu.Unlock()
 		return false
 	}
@@ -287,7 +294,8 @@ func (w *World) AddPlayer(p *Player, sess Session) bool {
 // RemovePlayer unregisters a player by creature id.
 func (w *World) RemovePlayer(id uint32) {
 	w.mu.Lock()
-	if p, ok := w.players[id]; ok {
+	if p, ok := w.players[id]
+ ok {
 		delete(w.players, id)
 		delete(w.byName, strings.ToLower(p.Name))
 		w.removeCreatureFromTile(p)
@@ -323,10 +331,12 @@ func (w *World) PlayerByDBID(dbID uint32) *Player {
 func (w *World) CreatureByID(id uint32) Creature {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	if c, ok := w.creatures[id]; ok {
+	if c, ok := w.creatures[id]
+ ok {
 		return c
 	}
-	if p, ok := w.players[id]; ok {
+	if p, ok := w.players[id]
+ ok {
 		return p
 	}
 	return nil
@@ -421,7 +431,8 @@ func (w *World) SpectatingNpcs(pos Position) []*Npc {
 	defer w.mu.RUnlock()
 	var out []*Npc
 	for _, c := range w.creatures {
-		if npc, ok := c.(*Npc); ok {
+		if npc, ok := c.(*Npc)
+ ok {
 			if npc.Pos.InRangeOf(pos) {
 				out = append(out, npc)
 			}
@@ -498,7 +509,8 @@ func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 // not require the destination to be adjacent. Used by scripted travel/teleport.
 func (w *World) TeleportCreature(c Creature, dest Position) {
 	w.mu.Lock()
-	if player, ok := c.(*Player); ok {
+	if player, ok := c.(*Player)
+ ok {
 		player.IsTraining = false
 	}
 	oldPos := c.GetPosition()
@@ -525,7 +537,8 @@ func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 	}
 	dest = w.resolveFloorChangeDest(dest, destTile)
 	w.mu.Lock()
-	if player, ok := c.(*Player); ok {
+	if player, ok := c.(*Player)
+ ok {
 		player.IsTraining = false
 	}
 	oldPos := c.GetPosition()
@@ -548,13 +561,15 @@ func (w *World) resolveFloorChangeDest(dest Position, destTile *Tile) Position {
 	}
 	floorChange := ""
 	if destTile.Ground != nil {
-		if ct := w.Items.Get(destTile.Ground.ID); ct != nil && ct.FloorChange != "" {
+		if ct := w.Items.Get(destTile.Ground.ID)
+ ct != nil && ct.FloorChange != "" {
 			floorChange = ct.FloorChange
 		}
 	}
 	if floorChange == "" {
 		for _, it := range destTile.Items {
-			if ct := w.Items.Get(it.ID); ct != nil && ct.FloorChange != "" {
+			if ct := w.Items.Get(it.ID)
+ ct != nil && ct.FloorChange != "" {
 				floorChange = ct.FloorChange
 				break
 			}
@@ -566,10 +581,12 @@ func (w *World) resolveFloorChangeDest(dest Position, destTile *Tile) Position {
 		hasFC := func(t *Tile, expected string) bool {
 			if t == nil { return false }
 			if t.Ground != nil {
-				if ct := w.Items.Get(t.Ground.ID); ct != nil && ct.FloorChange == expected { return true }
+				if ct := w.Items.Get(t.Ground.ID)
+ ct != nil && ct.FloorChange == expected { return true }
 			}
 			for _, it := range t.Items {
-				if ct := w.Items.Get(it.ID); ct != nil && ct.FloorChange == expected { return true }
+				if ct := w.Items.Get(it.ID)
+ ct != nil && ct.FloorChange == expected { return true }
 			}
 			return false
 		}
@@ -579,7 +596,8 @@ func (w *World) resolveFloorChangeDest(dest Position, destTile *Tile) Position {
 				dy -= 2
 			} else if hasFC(w.Map.GetTile(Position{X: dx - 1, Y: dy, Z: dz}), "eastalt") {
 				dx -= 2
-			} else if downTile := w.Map.GetTile(Position{X: dx, Y: dy, Z: dz}); downTile != nil {
+			} else if downTile := w.Map.GetTile(Position{X: dx, Y: dy, Z: dz})
+ downTile != nil {
 				if hasFC(downTile, "north") { dy++ }
 				if hasFC(downTile, "south") { dy-- }
 				if hasFC(downTile, "southalt") { dy -= 2 }
@@ -642,7 +660,8 @@ func (w *World) GetBoostedCreature() string {
 		if w.BoostedCreature != "" && w.BoostedCreature != "default" {
 			return w.BoostedCreature
 		}
-		if m, ok := w.Monsters.Monsters["dragon"]; ok {
+		if m, ok := w.Monsters.Monsters["dragon"]
+ ok {
 			w.BoostedCreature = m.Name
 			return w.BoostedCreature
 		}
@@ -694,4 +713,7 @@ func (w *World) EnsureBoostedBoss() {
 		w.BoostedBoss = pick
 	}
 	w.mu.Unlock()
+}
+
+func (w *World) PlayerAnswerModalWindow(p *Player, id uint32, button uint8, choice uint8) {
 }

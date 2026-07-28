@@ -508,6 +508,7 @@ func (g *GameProtocol) turn(dir game.Direction) {
 const (
 	talkTypePrivateTo    = 5
 	talkTypeChannelY     = 7
+	talkTypeChannelO     = 8
 	talkTypeChannelR1    = 14
 	talkTypePrivateRedTo = 16
 )
@@ -516,11 +517,12 @@ const (
 func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 	talkType := r.GetByte()
 	receiver := ""
+	channelID := uint16(0)
 	switch talkType {
 	case talkTypePrivateTo, talkTypePrivateRedTo:
 		receiver = r.GetString() // receiver name
 	case talkTypeChannelY, talkTypeChannelR1:
-		_ = r.GetU16()    // channel ID
+		channelID = r.GetU16() // channel ID
 	}
 	text := r.GetString()
 	if text == "" {
@@ -538,6 +540,22 @@ func (g *GameProtocol) handleSay(r *netmsg.Reader) {
 	// broadcasts the words itself on success); the raw words are not chatted.
 	if g.tryCastSpell(talkType, text) {
 		return
+	}
+	// Route channel messages through the chat manager.
+	if talkType == talkTypeChannelY || talkType == talkTypeChannelR1 {
+		if g.deps.World.TalkToChannel(g.player, channelID, talkType, text) {
+			return
+		}
+	}
+	// Route private messages through the world.
+	if talkType == talkTypePrivateTo || talkType == talkTypePrivateRedTo {
+		if receiver != "" {
+			target := g.deps.World.PlayerByName(receiver)
+			if target != nil {
+				g.deps.World.SendPrivateMessage(g.player, target, talkType, text)
+				return
+			}
+		}
 	}
 	g.broadcastSay(g.player, talkType, text, receiver)
 	g.deps.Lua.Call("onPlayerSay", g.player.Name, text)
@@ -1300,7 +1318,14 @@ func (g *GameProtocol) parseCloseChannel(r *netmsg.Reader) {
 	if g.player == nil || g.deps == nil {
 		return
 	}
-	_ = r.GetU16() // channelId
+	channelID := r.GetU16()
+
+	// Remove player from the channel via ChatManager.
+	if g.deps.World != nil {
+		g.deps.World.RemoveUserFromChannel(g.player, channelID)
+	}
+
+	// Also handle NPC interaction close (existing behaviour).
 	if g.deps.World != nil {
 		for _, cr := range g.deps.World.Creatures() {
 			if npc, ok := cr.(*game.Npc); ok && npc.IsInteractingWithPlayer(g.player.ID) {

@@ -86,6 +86,7 @@ const (
 	inCloseShop      = 0x7C
 	inCloseChannel   = 0x97
 	inNpcGreet       = 0xEE
+	inHighscore          = 0xB9
 	// Inbound party opcodes (0xA3..0xA8). NOTE: 0xA3 collides with the OUTBOUND
 	// opCancelTarget const — these are a separate inbound namespace.
 	inInviteToParty        = 0xA3
@@ -253,18 +254,29 @@ var storeSendOpcodes = map[byte]string{
 	0xFB: "OpenStore", 0xFC: "StoreOffers", 0xFD: "TransactionHistory", 0xFE: "CompletePurchase",
 }
 
+var sendSeq atomic.Int32
+
 // SendToClient implements game.Session.
 func (g *GameProtocol) SendToClient(w *netmsg.Writer) {
 	if g.conn != nil {
-		if b := w.Bytes(); g.deps != nil && g.deps.Log != nil && len(b) > 0 {
-			if name, ok := storeSendOpcodes[b[0]]; ok {
-				dump := b
-				if len(dump) > 64 {
-					dump = dump[:64]
+		b := w.Bytes()
+		seq := sendSeq.Add(1)
+		if g.deps != nil && g.deps.Log != nil {
+			if len(b) == 0 {
+				g.deps.Log.Warn(fmt.Sprintf("[SEND #%d] EMPTY PACKET (len=0)", seq))
+			} else {
+				if name, ok := storeSendOpcodes[b[0]]; ok {
+					dump := b
+					if len(dump) > 96 {
+						dump = dump[:96]
+					}
+					g.deps.Log.Info(fmt.Sprintf("[SEND #%d] store packet", seq),
+						"opcode", fmt.Sprintf("0x%02X", b[0]), "name", name,
+						"len", len(b), "hex", fmt.Sprintf("%x", dump))
+				} else {
+					g.deps.Log.Info(fmt.Sprintf("[SEND #%d] other packet", seq),
+						"opcode", fmt.Sprintf("0x%02X", b[0]), "len", len(b))
 				}
-				g.deps.Log.Info("store packet -> client",
-					"opcode", fmt.Sprintf("0x%02X", b[0]), "name", name,
-					"len", len(b), "hex", fmt.Sprintf("%x", dump))
 			}
 		}
 		_ = g.conn.Send(w)
@@ -524,6 +536,7 @@ func (g *GameProtocol) disconnect(msg string) {
 	w := netmsg.NewWriter()
 	w.AddByte(opError)
 	w.AddString(msg)
+	w.AddByte(0x00) // reason flag (OTClient parseLoginError expects this for v>=1523)
 	_ = g.conn.Send(w)
 	g.conn.Close()
 }
@@ -930,6 +943,9 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case inCloseShop:
 		g.parseCloseShop(r)
 	case inCloseChannel:
+	case inHighscore:
+		g.parseHighscores(r)
+		g.parseHighscores(r)
 		g.parseCloseChannel(r)
 	case inNpcGreet:
 		g.parseNpcGreet(r)

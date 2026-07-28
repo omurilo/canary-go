@@ -226,6 +226,7 @@ func (e *Engine) registerAPI() {
 	e.registerCreatureEvent()
 	e.registerGlobalEventClass()
 	e.registerVocation()
+	e.registerModalWindowType()
 
 	// HirelingsInit is a no-op stub called by server_initialization.lua.
 	// The full hireling system is not ported to Go yet.
