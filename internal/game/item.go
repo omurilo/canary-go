@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/opentibiabr/canary-go/internal/io/propstream"
 	"github.com/opentibiabr/canary-go/internal/items"
@@ -48,6 +49,7 @@ type Item struct {
 	// Imbuements maps slot index to the applied imbuement on this item instance.
 	// The map is nil when no imbuements have ever been set on this item.
 	Imbuements map[uint8]ImbuementInfo
+	imbueMu sync.Mutex
 }
 
 // ImbuementInfo holds an applied imbuement's identity and remaining duration.
@@ -138,7 +140,9 @@ func (i *Item) GetImbuementInfo(slot uint8) (ImbuementInfo, bool) {
 	if i == nil || i.Imbuements == nil {
 		return ImbuementInfo{}, false
 	}
+	i.imbueMu.Lock()
 	info, ok := i.Imbuements[slot]
+	i.imbueMu.Unlock()
 	if !ok || info.Duration == 0 || info.ID == 0 {
 		return ImbuementInfo{}, false
 	}
@@ -149,6 +153,8 @@ func (i *Item) SetImbuement(slot uint8, id uint16, duration uint32) {
 	if i == nil {
 		return
 	}
+	i.imbueMu.Lock()
+	defer i.imbueMu.Unlock()
 	if i.Imbuements == nil {
 		i.Imbuements = make(map[uint8]ImbuementInfo)
 	}
@@ -159,13 +165,17 @@ func (i *Item) ClearImbuement(slot uint8) {
 	if i == nil || i.Imbuements == nil {
 		return
 	}
+	i.imbueMu.Lock()
 	delete(i.Imbuements, slot)
+	i.imbueMu.Unlock()
 }
 
 func (i *Item) HasImbuements() bool {
 	if i == nil || i.Imbuements == nil {
 		return false
 	}
+	i.imbueMu.Lock()
+	defer i.imbueMu.Unlock()
 	for _, info := range i.Imbuements {
 		if info.Duration > 0 && info.ID > 0 {
 			return true

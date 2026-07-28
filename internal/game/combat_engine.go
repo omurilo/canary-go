@@ -128,7 +128,9 @@ func (e *CombatEngine) imbuementDecayTick() {
 				continue
 			}
 			item := p.Inventory[s]
-			if !item.HasImbuements() {
+			item.imbueMu.Lock()
+			if item.Imbuements == nil {
+				item.imbueMu.Unlock()
 				continue
 			}
 			for slotID, info := range item.Imbuements {
@@ -137,7 +139,7 @@ func (e *CombatEngine) imbuementDecayTick() {
 				}
 				newDuration := info.Duration - 1
 				if newDuration > info.Duration {
-					newDuration = 0 // safety: prevent underflow
+					newDuration = 0
 				}
 				if newDuration == 0 {
 					delete(item.Imbuements, slotID)
@@ -145,6 +147,7 @@ func (e *CombatEngine) imbuementDecayTick() {
 					item.Imbuements[slotID] = ImbuementInfo{ID: info.ID, Duration: newDuration}
 				}
 			}
+			item.imbueMu.Unlock()
 		}
 	}
 	GlobalDispatcher.AddEvent(1*time.Second, e.imbuementDecayTick)
