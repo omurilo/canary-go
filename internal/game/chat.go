@@ -554,7 +554,7 @@ func (cm *ChatManager) talkToChannel(player *Player, talkType byte, text string,
 	}
 
 	if channelID == ChannelGuild {
-		rank := player.GetGuildLevel()
+		rank := player.GetGuildRankLevel()
 		if rank > 1 {
 			talkType = 8 // TALKTYPE_CHANNEL_O
 		} else if talkType != 7 {

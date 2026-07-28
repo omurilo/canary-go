@@ -57,7 +57,7 @@ func (p *Player) GetGuildNick() string {
 	return p.GuildNick
 }
 
-func (p *Player) GetGuildLevel() uint8 {
+func (p *Player) GetGuildRankLevel() uint8 {
 	guild := p.GetGuild()
 	if guild == nil {
 		return 0
@@ -71,5 +71,5 @@ func (p *Player) GetGuildLevel() uint8 {
 	return 0
 }
 
-func (p *Player) SetGuildLevel(level uint8) {
+func (p *Player) SetGuildRankLevel(level uint8) {
 }

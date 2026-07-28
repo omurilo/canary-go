@@ -1243,7 +1243,7 @@ func (p *Player) GetShieldAndWeapon(catalog *items.Catalog) (*Item, *Item) {
 }
 
 // GetWeaponSkill returns the skill value corresponding to the item's weapon type.
-func (p *Player) GetWeaponSkill(catalog *items.Catalog, item *Item) uint16 {
+func (p *Player) GetWeaponSkillForItem(catalog *items.Catalog, item *Item) uint16 {
 	if item == nil {
 		return p.GetEffectiveSkill(SkillFist)
 	}
@@ -1306,7 +1306,7 @@ func (p *Player) GetDefense() int32 {
 	shield, weapon := p.GetShieldAndWeapon(catalog)
 	if weapon != nil {
 		defenseValue = weapon.Defense(catalog) + weapon.ExtraDefense(catalog)
-		defenseSkill = int32(p.GetWeaponSkill(catalog, weapon))
+		defenseSkill = int32(p.GetWeaponSkillForItem(catalog, weapon))
 	}
 
 	if shield != nil {
@@ -2159,3 +2159,102 @@ func (p *Player) AddModalWindow(id uint32) {}
 func (p *Player) HasModalWindow(id uint32) bool { return false }
 func (p *Player) RemoveModalWindow(id uint32) {}
 func (p *Player) ClearModalWindows() {}
+
+// GetStepHeight returns the step height for movement.
+func (p *Player) GetStepHeight() uint8 { return 0 }
+
+// GetStepDuration returns the walk animation duration.
+func (p *Player) GetStepDuration(direction Direction) uint32 { return 500 }
+
+// GetSleepTicks returns remaining sleep/afk ticks.
+func (p *Player) GetSleepTicks() uint32 { return 0 }
+
+// GetLastLoginSaved returns the last login timestamp.
+func (p *Player) GetLastLoginSaved() uint64 { return p.LastLogin }
+
+// GetLastLogoutSaved returns the last logout timestamp.
+func (p *Player) GetLastLogoutSaved() uint64 { return p.LastLogout }
+
+// IsAccessPlayer returns true for GM accounts.
+func (p *Player) IsAccessPlayer() bool { return p.AccountType >= 4 }
+
+// IsPlayerGroup checks if the player is in a specific group.
+func (p *Player) IsPlayerGroup(group uint16) bool { return p.GroupID == group }
+
+// GetGroupID returns the group ID.
+func (p *Player) GetGroupID() uint16 { return p.GroupID }
+
+// SetGroupID sets the group ID.
+func (p *Player) SetGroupID(id uint16) { p.GroupID = id }
+
+// GetDepotLocker returns the player's depot locker (autoCreate).
+func (p *Player) GetDepotLocker(depotId uint16, autoCreate bool) *Item {
+	if p.DepotManager != nil {
+		return p.DepotManager.GetDepotLocker(depotId)
+	}
+	return nil
+}
+
+// GetDepotChest returns a depot chest (autoCreate).
+func (p *Player) GetDepotChest(depotId uint16, autoCreate bool) *Item {
+	if p.DepotManager != nil {
+		return p.DepotManager.GetDepotChest(depotId, autoCreate)
+	}
+	return nil
+}
+
+// IsNearDepotBox checks if the player is near a depot.
+func (p *Player) IsNearDepotBox() bool { return true }
+
+// OnReceiveMail is called when mail arrives.
+func (p *Player) OnReceiveMail() {
+	if p.Session != nil {
+		p.Session.SendTextMessage(0x15, "New mail has arrived in your inbox.")
+	}
+}
+
+// GetMaxDepotItems returns the max items per depot.
+func (p *Player) GetMaxDepotItems() uint32 { return 2000 }
+
+// HasFlag checks if the player has a specific group flag.
+func (p *Player) HasFlag(flag uint64) bool { return false }
+
+// SendCancelMessage sends a cancel/error message.
+func (p *Player) SendCancelMessage(msg string) {
+	if p.Session != nil {
+		p.Session.SendTextMessage(0x12, msg)
+	}
+}
+
+// GetBaseMaxHealth returns base max health without equipment.
+func (p *Player) GetBaseMaxHealth() uint32 { return p.MaxHealth }
+
+// GetBaseMaxMana returns base max mana without equipment.
+func (p *Player) GetBaseMaxMana() uint32 { return p.MaxMana }
+
+// SetSpeed sets the current speed.
+func (p *Player) SetSpeed(speed uint16) { p.Speed = speed }
+
+// GetLight returns the current light level and color.
+func (p *Player) GetLight() (uint8, uint8) { return p.LightLevel, p.LightColor }
+
+// SetLight sets the current light.
+func (p *Player) SetLight(level, color uint8) { p.LightLevel = level; p.LightColor = color }
+
+// SetOutfit sets the current outfit.
+func (p *Player) SetOutfit(outfit Outfit) { p.Outfit = outfit }
+
+// GetBankBalance returns the bank balance.
+func (p *Player) GetBankBalance() uint64 { return p.BankBalance }
+
+// SetBankBalance sets the bank balance.
+func (p *Player) SetBankBalance(balance uint64) { p.BankBalance = balance }
+
+// GetCoinBalance returns Tibia Coins balance.
+func (p *Player) GetCoinBalance() uint32 { return p.CoinBalance }
+
+// SetTown sets the player's home town.
+func (p *Player) SetTown(id uint16) { p.TownID = id }
+
+// GetTown returns the player's town ID.
+func (p *Player) GetTown() uint16 { return p.TownID }

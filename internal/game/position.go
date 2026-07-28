@@ -80,3 +80,9 @@ func abs(v int) int {
 	return v
 }
 
+// DistanceTo returns the Chebyshev distance to other on the same floor, or -1
+// for different floors (convenience alias for MaxDistance).
+func (p Position) DistanceTo(other Position) int {
+	return p.MaxDistance(other)
+}
+

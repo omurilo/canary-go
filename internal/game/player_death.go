@@ -1,6 +1,9 @@
 package game
 
-import "math"
+import (
+	"math"
+	"strings"
+)
 
 // This file ports a pragmatic subset of Player::death (src/creatures/players/
 // player.cpp:3982). Full parity needs the vocation registry (per-level HP/Mana/
@@ -120,4 +123,32 @@ func (p *Player) TemplePosition() Position {
 		return p.LoginPosition
 	}
 	return p.Pos
+}
+
+// DropBlessings removes blessings on death based on death type.
+func (p *Player) DropBlessings(deathType uint8) {
+	// In PvP, lose 1 blessing. In PvE, keep them.
+	if deathType == 1 { // PvP death
+		for i := range p.Blessings {
+			if p.Blessings[i] > 0 {
+				p.Blessings[i]--
+				break
+			}
+		}
+	}
+}
+
+// GetBlessingsName returns comma-separated blessing names.
+func (p *Player) GetBlessingsName() string {
+	names := []string{
+		"Wisdom of the Elderly", "Spark of the Phoenix",
+		"", "", "", "", "", "",
+	}
+	var active []string
+	for i, b := range p.Blessings {
+		if b > 0 && i < len(names) && names[i] != "" {
+			active = append(active, names[i])
+		}
+	}
+	return strings.Join(active, ", ")
 }

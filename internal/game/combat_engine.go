@@ -536,7 +536,7 @@ func (e *CombatEngine) meleeDamage(attacker Creature) int {
 			weaponType = weapon.WeaponType(e.world.Items)
 		}
 
-		skill := int(a.GetWeaponSkill(e.world.Items, weapon))
+		skill := int(a.GetWeaponSkillForItem(e.world.Items, weapon))
 		attackValue := fistAttackValue
 		if weapon != nil && weaponType != "distance" && weaponType != "missile" && weaponType != "wand" && weaponType != "ammunition" && weaponType != "ammo" {
 			attackValue = int(weapon.Attack(e.world.Items))

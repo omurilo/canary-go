@@ -297,12 +297,12 @@ func (e *Engine) combatExecute(L *lua.LState) int {
 									attack += launcher.Attack(catalog)
 								}
 							}
-							skill = int32(p.GetWeaponSkill(catalog, tool))
+							skill = int32(p.GetWeaponSkillForItem(catalog, tool))
 						} else {
-							skill = int32(p.GetWeaponSkill(catalog, nil))
+							skill = int32(p.GetWeaponSkillForItem(catalog, nil))
 						}
 					} else {
-						skill = int32(p.GetWeaponSkill(nil, nil))
+						skill = int32(p.GetWeaponSkillForItem(nil, nil))
 					}
 					factor = float32(p.GetAttackFactor())
 				}

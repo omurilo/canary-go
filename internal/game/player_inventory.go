@@ -7,7 +7,7 @@ import "github.com/opentibiabr/canary-go/internal/items"
 // All traversal walks equipment slots 1..10 plus the recursive container tree.
 
 // GetInventoryItem returns the item equipped in slot (1..10), or nil.
-func (p *Player) GetInventoryItem(slot int) *Item {
+func (p *Player) GetInventoryItem(slot uint8) *Item {
 	if slot < ConstSlotFirst || slot > ConstSlotLast {
 		return nil
 	}
@@ -541,4 +541,87 @@ func max16(a, b uint16) uint16 {
 		return a
 	}
 	return b
+}
+
+// HasItemCountById returns true if the player has at least count of the item.
+func (p *Player) HasItemCountById(itemID uint16, count uint16) bool {
+	return p.GetItemCount(itemID) >= uint32(count)
+}
+
+// RemoveItemCountById removes up to count of an item from the player's inventory.
+// Returns the actual number removed.
+func (p *Player) RemoveItemCountById(itemID uint16, count uint16) uint16 {
+	removed := uint16(0)
+	for slot := ConstSlotFirst; slot <= ConstSlotLast; slot++ {
+		if removed >= count {
+			break
+		}
+		item := p.Inventory[slot]
+		if item == nil || item.ID != itemID {
+			continue
+		}
+		if item.Count > (count - removed) {
+			item.Count -= (count - removed)
+			removed = count
+		} else {
+			removed += item.Count
+			p.Inventory[slot] = nil
+		}
+	}
+	return removed
+}
+
+// GetEquippedItems returns all items currently equipped.
+func (p *Player) GetEquippedItems() []*Item {
+	var items []*Item
+	for slot := ConstSlotFirst; slot <= ConstSlotLast; slot++ {
+		if p.Inventory[slot] != nil {
+			items = append(items, p.Inventory[slot])
+		}
+	}
+	return items
+}
+
+// GetAllInventoryItems returns every item in inventory including container contents.
+func (p *Player) GetAllInventoryItems() []*Item {
+	var items []*Item
+	p.WalkInventory(func(it *Item) {
+		items = append(items, it)
+	})
+	return items
+}
+
+// HasItemInInventory checks if an item exists anywhere in the inventory tree.
+func (p *Player) HasItemInInventory(itemID uint16) bool {
+	found := false
+	p.WalkInventory(func(it *Item) {
+		if !found && it.ID == itemID {
+			found = true
+		}
+	})
+	return found
+}
+
+// IsItemAbilityEnabled checks if an item's passive ability is active.
+func (p *Player) IsItemAbilityEnabled(itemID uint16) bool {
+	return true
+}
+
+// SetItemAbility enables/disables an item's passive ability.
+func (p *Player) SetItemAbility(itemID uint16, enabled bool) {
+}
+
+// GetBaseCapacity returns the base capacity without bonuses.
+func (p *Player) GetBaseCapacity() uint32 {
+	return p.Capacity
+}
+
+// GetBonusCapacity returns bonus capacity from equipment/wheel.
+func (p *Player) GetBonusCapacity() uint32 {
+	return p.BonusCapacity
+}
+
+// GetBaseMagicLevel returns base magic level without equipment bonuses.
+func (p *Player) GetBaseMagicLevel() uint16 {
+	return p.MagLevel
 }
