@@ -768,7 +768,10 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			L.Push(lua.LBool(removed))
 			return 1
 		},
-		"canBeMoved": stubItemMethod,
+		"canBeMoved": func(L *lua.LState) int {
+			L.Push(lua.LTrue)
+			return 1
+		},
 		"transform": e.itemTransform,
 		"decay": stubItemMethod,
 		"setDuration": stubItemMethod,
@@ -784,61 +787,6 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 				it.item.Actor = L.CheckBool(2)
 				L.Push(lua.LTrue)
 			}
-			return 1
-		},
-		"getTopParent": func(L *lua.LState) int {
-			it := checkItem(L)
-			_ = it
-			L.Push(lua.LNil)
-			return 1
-		},
-		"getPluralName": func(L *lua.LState) int {
-			L.Push(lua.LString(""))
-			return 1
-		},
-		"getArticle": func(L *lua.LState) int {
-			L.Push(lua.LString(""))
-			return 1
-		},
-		"getCustomAttribute": func(L *lua.LState) int {
-			L.Push(lua.LNil)
-			return 1
-		},
-		"setCustomAttribute": func(L *lua.LState) int { return 0 },
-		"removeCustomAttribute": func(L *lua.LState) int { return 0 },
-		"isOwner": func(L *lua.LState) int {
-			L.Push(lua.LFalse)
-			return 1
-		},
-		"getOwnerName": func(L *lua.LState) int {
-			L.Push(lua.LString(""))
-			return 1
-		},
-		"serializeAttributes": func(L *lua.LState) int {
-			L.Push(lua.LString(""))
-			return 1
-		},
-		"moveToSlot": func(L *lua.LState) int {
-			L.Push(lua.LTrue)
-			return 1
-		},
-		"getImbuementSlot": func(L *lua.LState) int {
-			L.Push(lua.LNumber(0))
-			return 1
-		},
-		"getImbuement": func(L *lua.LState) int {
-			L.Push(lua.LNil)
-			return 1
-		},
-		"getClassification": func(L *lua.LState) int {
-			it := checkItem(L)
-			if cat := e.itemCatalog(); cat != nil {
-				if ct := cat.Get(it.item.ID); ct != nil {
-					L.Push(lua.LNumber(ct.UpgradeClassification))
-					return 1
-				}
-			}
-			L.Push(lua.LNumber(0))
 			return 1
 		},
 	}

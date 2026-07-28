@@ -1,6 +1,7 @@
 package luaengine
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -208,6 +209,7 @@ func (e *Engine) registerCreatureType() {
 	e.L.SetField(mt, "getParent", e.L.NewFunction(e.creatureGetparent))
 	e.L.SetField(mt, "getTile", e.L.NewFunction(e.creatureGettile))
 	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
+	e.L.SetField(mt, "getZoneType", e.L.NewFunction(e.creatureGetzonetype))
 	e.L.SetField(mt, "__index", mt)
 }
 
@@ -293,9 +295,8 @@ var creatureMethods = map[string]lua.LGFunction{
 	"getDescription": creatureGetdescription,
 	"getPathTo": creatureGetpathto,
 	"move": creatureMove,
-	"getZoneType": creatureGetzonetype,
+	// getZoneType is registered as an engine method below in registerCreatureType()
 	"getZones": creatureGetzones,
-	"getZoneTypeAndZones": creatureGetzonetypeandzones,
 	"setIcon": creatureSeticon,
 	"getIcon": creatureGeticon,
 	"getIcons": creatureGeticons,
@@ -428,7 +429,13 @@ func creatureGetdamagemap(L *lua.LState) int {
 
 func creatureGetdescription(L *lua.LState) int {
 	if c := checkCreature(L); c != nil {
-		L.Push(lua.LString(c.GetName()))
+		desc := c.GetName()
+		health := c.GetHealth()
+		maxHealth := c.GetMaxHealth()
+		if maxHealth > 0 {
+			desc = fmt.Sprintf("%s (Health: %d/%d)", desc, health, maxHealth)
+		}
+		L.Push(lua.LString(desc))
 		return 1
 	}
 	L.Push(lua.LString(""))
@@ -634,22 +641,41 @@ func creatureGettypename(L *lua.LState) int {
 	return 1
 }
 
-func creatureGetzonetype(L *lua.LState) int {
-	L.Push(lua.LNumber(0))
+func (e *Engine) creatureGetzonetype(L *lua.LState) int {
+	c := checkCreature(L)
+	if c == nil || e.world == nil || e.world.Map == nil {
+		L.Push(lua.LNumber(4)) // ZONE_NORMAL
+		return 1
+	}
+	pos := c.GetPosition()
+	tile := e.world.Map.GetTile(pos)
+	if tile == nil {
+		L.Push(lua.LNumber(4)) // ZONE_NORMAL
+		return 1
+	}
+	if tile.IsProtectionZone() {
+		L.Push(lua.LNumber(0)) // ZONE_PROTECTION
+		return 1
+	}
+	if (tile.Flags & (1 << 4)) != 0 { // TILESTATE_PVPZONE
+		L.Push(lua.LNumber(2)) // ZONE_PVP
+		return 1
+	}
+	if (tile.Flags & (1 << 2)) != 0 { // TILESTATE_NOPVPZONE
+		L.Push(lua.LNumber(1)) // ZONE_NOPVP
+		return 1
+	}
+	if (tile.Flags & (1 << 3)) != 0 { // TILESTATE_NOLOGOUT
+		L.Push(lua.LNumber(3)) // ZONE_NOLOGOUT
+		return 1
+	}
+	L.Push(lua.LNumber(4)) // ZONE_NORMAL
 	return 1
 }
 
 func creatureGetzones(L *lua.LState) int {
 	L.Push(L.NewTable())
 	return 1
-}
-
-func creatureGetzonetypeandzones(L *lua.LState) int {
-	c := checkCreature(L)
-	if c == nil { L.Push(lua.LNumber(0)); L.Push(L.NewTable()); return 2 }
-	L.Push(lua.LNumber(0))
-	L.Push(L.NewTable())
-	return 2
 }
 
 func creatureHasbeensummoned(L *lua.LState) int {

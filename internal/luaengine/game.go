@@ -271,16 +271,7 @@ func (e *Engine) gameLoadMap(L *lua.LState) int {
 func (e *Engine) gameLoadMapChunk(L *lua.LState) int {
 	return e.gameLoadMap(L)
 }
-func (e *Engine) gameGetExperienceForLevel(L *lua.LState) int {
-	level := L.CheckInt(1)
-	// Formula: 50/3 * level^3 - 100 * level^2 + 850/3 * level - 200
-	exp := (50 * level * level * level / 3) - (100 * level * level) + (850 * level / 3) - 200
-	if exp < 0 {
-		exp = 0
-	}
-	L.Push(lua.LNumber(exp))
-	return 1
-}
+func (e *Engine) gameGetExperienceForLevel(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameGetMonsterCount(L *lua.LState) int {
 	count := 0
 	if e.world != nil {
@@ -293,14 +284,7 @@ func (e *Engine) gameGetMonsterCount(L *lua.LState) int {
 	L.Push(lua.LNumber(count))
 	return 1
 }
-func (e *Engine) gameGetPlayerCount(L *lua.LState) int {
-	if e.world != nil {
-		L.Push(lua.LNumber(e.world.OnlineCount()))
-	} else {
-		L.Push(lua.LNumber(0))
-	}
-	return 1
-}
+func (e *Engine) gameGetPlayerCount(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameGetNpcCount(L *lua.LState) int {
 	count := 0
 	if e.world != nil {
@@ -356,7 +340,22 @@ func (e *Engine) gameGetGameState(L *lua.LState) int { L.Push(lua.LNumber(0)); r
 func (e *Engine) gameSetGameState(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetWorldType(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameSetWorldType(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetReturnMessage(L *lua.LState) int { L.Push(lua.LString("")); return 1 }
+func (e *Engine) gameGetReturnMessage(L *lua.LState) int {
+	code := L.OptInt(1, 0)
+	switch code {
+	case 0:
+		L.Push(lua.LString("No error."))
+	case 1:
+		L.Push(lua.LString("Sorry, not possible."))
+	case 2:
+		L.Push(lua.LString("There is not enough room."))
+	case 3:
+		L.Push(lua.LString("You can not enter a protection zone after attacking another player."))
+	default:
+		L.Push(lua.LString("Unknown error."))
+	}
+	return 1
+}
 func (e *Engine) gameCreateItem(L *lua.LState) int {
 	id := L.CheckInt(1)
 	count := L.OptInt(2, 1)
