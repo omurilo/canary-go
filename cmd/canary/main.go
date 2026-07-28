@@ -454,8 +454,8 @@ func run(o runOpts, log *slog.Logger) error {
 	world.OnCreatureAppear = func(c game.Creature) {
 		protocol.BroadcastCreatureAppear(world, c)
 	}
-	world.OnCreatureRemove = func(c game.Creature) {
-		protocol.BroadcastCreatureRemove(world, c)
+	world.OnCreatureRemove = func(c game.Creature, oldTileIndex int) {
+		protocol.BroadcastCreatureRemove(world, c, oldTileIndex)
 	}
 	world.OnGhostModeChange = func(p *game.Player) {
 		protocol.BroadcastGhostModeChange(world, p)

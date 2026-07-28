@@ -87,10 +87,11 @@ func BroadcastCreatureAppear(w *game.World, c game.Creature) {
 }
 
 // BroadcastCreatureRemove tells spectators a creature was removed.
-func BroadcastCreatureRemove(w *game.World, c game.Creature) {
+// oldTileIndex is the creature's index in tile.Creatures before removal.
+func BroadcastCreatureRemove(w *game.World, c game.Creature, oldTileIndex int) {
 	for _, s := range w.Spectators(c.GetPosition(), c.GetID()) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
-			stack := gp.StackPosOf(c.GetPosition(), c.GetID())
+			stack := gp.StackPosWithIndex(c.GetPosition(), oldTileIndex)
 			gp.SendRemoveCreatureAt(c.GetPosition(), stack)
 		}
 	}

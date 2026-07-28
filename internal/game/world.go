@@ -47,7 +47,7 @@ type World struct {
 
 	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldTileIndex int)
 	OnCreatureAppear func(c Creature)
-	OnCreatureRemove func(c Creature)
+	OnCreatureRemove func(c Creature, oldTileIndex int)
 	OnGhostModeChange func(p *Player)
 
 	// Combat hooks, populated by the protocol layer so the combat engine can
@@ -298,10 +298,10 @@ func (w *World) RemovePlayer(id uint32) {
  ok {
 		delete(w.players, id)
 		delete(w.byName, strings.ToLower(p.Name))
-		w.removeCreatureFromTile(p)
+		oldIdx := w.removeCreatureFromTile(p)
 		w.mu.Unlock()
 		if w.OnCreatureRemove != nil {
-			w.OnCreatureRemove(p)
+			w.OnCreatureRemove(p, oldIdx)
 		}
 		return
 	}
@@ -379,13 +379,14 @@ func (w *World) removeCreatureFromTile(c Creature) int {
 func (w *World) RemoveCreature(id uint32) {
 	w.mu.Lock()
 	c, exists := w.creatures[id]
+	var oldIdx int
 	if exists {
 		delete(w.creatures, id)
-		w.removeCreatureFromTile(c)
+		oldIdx = w.removeCreatureFromTile(c)
 	}
 	w.mu.Unlock()
 	if exists && w.OnCreatureRemove != nil {
-		w.OnCreatureRemove(c)
+		w.OnCreatureRemove(c, oldIdx)
 	}
 }
 
