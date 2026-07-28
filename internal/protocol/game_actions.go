@@ -676,13 +676,7 @@ func (g *GameProtocol) broadcastSay(speaker *game.Player, talkType byte, text st
 		}
 	}
 	for _, n := range g.deps.World.SpectatingNpcs(speaker.Pos) {
-		tType := talkType
-		// TALKTYPE_SAY (1) should be treated as TALKTYPE_PRIVATE_PN (12) for interacting NPCs,
-		// allowing players to continue dialogue in the default channel.
-		if tType == 1 && n.IsInteractingWithPlayer(speaker.ID) {
-			tType = talkTypePrivatePN
-		}
-		g.deps.Lua.CallNpcOnCreatureSay(n, speaker, tType, text)
+		g.deps.Lua.CallNpcOnCreatureSay(n, speaker, talkType, text)
 	}
 }
 
