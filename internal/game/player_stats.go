@@ -1,5 +1,10 @@
 package game
 
+import (
+	"strconv"
+	"time"
+)
+
 
 // ============================================================================
 // Base types
@@ -19,9 +24,6 @@ type SkillsEquipment struct {
 	Imbuement float64
 }
 
-func (p *Player) GetSkillsEquipment() [SkillCount]SkillsEquipment {
-	return [SkillCount]SkillsEquipment{}
-}
 
 func (p *Player) GetForgeSkillStat(slot uint8) float64 {
 	return 0.0
@@ -212,6 +214,37 @@ func (p *Player) GetMitigation() float64 {
 	return 0.0
 }
 
+func (p *Player) GetSkillsEquipment() [SkillCount]SkillsEquipment {
+	var skills [SkillCount]SkillsEquipment
+	for s := ConstSlotFirst; s <= ConstSlotLast; s++ {
+		if int(s) >= len(p.Inventory) || p.Inventory[s] == nil || p.World == nil {
+			continue
+		}
+		t := p.World.Items.Get(p.Inventory[s].ID)
+		if t == nil || t.Stats == nil {
+			continue
+		}
+		skillKeys := []struct {
+			idx Skill
+			key string
+		}{
+			{SkillFist, "skillfist"},
+			{SkillClub, "skillclub"},
+			{SkillSword, "skillsword"},
+			{SkillAxe, "skillaxe"},
+			{SkillDistance, "skilldist"},
+			{SkillShielding, "skillshield"},
+			{SkillFishing, "skillfishing"},
+		}
+		for _, sk := range skillKeys {
+			if v, ok := t.Stats[sk.key]; ok && v > 0 {
+				skills[sk.idx].Equipment += float64(v)
+			}
+		}
+	}
+	return skills
+}
+
 // ============================================================================
 // Combat absorbs
 // ============================================================================
@@ -316,7 +349,46 @@ type ActiveConcoction struct {
 }
 
 func (p *Player) GetActiveConcoctions() []ActiveConcoction {
-	return nil
+	if p.Concoctions == nil {
+		return nil
+	}
+	now := time.Now().Unix()
+	var result []ActiveConcoction
+	for name, expiry := range p.Concoctions {
+		if expiry > now {
+			remaining := uint32(expiry - now)
+			// Map concoction name to item ID
+			id := concoctionNameToID(name)
+			if id > 0 {
+				result = append(result, ActiveConcoction{
+					ItemID:   id,
+					TimeLeft: remaining,
+				})
+			}
+		}
+	}
+	return result
+}
+
+func concoctionNameToID(name string) uint16 {
+	switch name {
+	case "bullseye":
+		return 26031
+	case "berserk":
+		return 26032
+	case "mastermind":
+		return 26033
+	case "fatal":
+		return 26034
+	case "relic":
+		return 26035
+	default:
+		// Try numeric ID from C++ naming like "24325"
+		if id, err := strconv.ParseUint(name, 10, 16); err == nil {
+			return uint16(id)
+		}
+		return 0
+	}
 }
 
 type ActiveFood struct {
