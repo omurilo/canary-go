@@ -360,6 +360,7 @@ func (e *Engine) gameCreateItem(L *lua.LState) int {
 		item.Pagination = true
 		item.Contents = make([]*game.Item, 0)
 		item.MaxSize = 32
+		item.MaxItems = 2000
 	}
 
 	if L.GetTop() >= 3 {

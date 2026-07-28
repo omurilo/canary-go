@@ -370,6 +370,9 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 		if item.MaxSize == 0 {
 			item.MaxSize = 32
 		}
+		if item.ID == game.ItemGoldPouch && item.MaxItems == 0 {
+			item.MaxItems = 2000
+		}
 	}
 	capacity := int(item.ContainerCapacity(g.deps.Items))
 	if capacity < 1 {
