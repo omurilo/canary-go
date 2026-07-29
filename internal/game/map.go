@@ -143,7 +143,7 @@ func (m *Map) SetTile(pos Position, t *Tile) {
 	m.mu.Unlock()
 }
 
-// AddItem inserts an item to the front of the tile stack at pos. Returns false if there is no
+// AddItem appends an item to the tile stack at pos. Returns false if there is no
 // tile there.
 func (m *Map) AddItem(pos Position, it *Item) bool {
 	m.mu.Lock()
@@ -152,7 +152,7 @@ func (m *Map) AddItem(pos Position, it *Item) bool {
 	if t == nil {
 		return false
 	}
-	t.Items = append([]*Item{it}, t.Items...)
+	t.Items = append(t.Items, it)
 	return true
 }
 
