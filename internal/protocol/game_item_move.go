@@ -171,29 +171,12 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 				}
 			}
 		}
-	} else {
-		pos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
-		tile := g.deps.World.Map.GetTile(pos)
-		if tile != nil && len(tile.Items) > 0 {
-			topItem := tile.Items[len(tile.Items)-1]
-			if topItem != nil && topItem.IsContainer(g.deps.Items) && topItem != item {
-				destContainer = topItem
-			}
-		}
 	}
-
-	if destContainer != nil {
-		if destContainer.ID == game.ItemLocker || destContainer.ID == game.ItemDepot {
-			g.sendStatusText("You cannot put an object there.")
-			g.revertMove(fromPos, toPos, spriteID)
-			return
-		}
-		if item.IsContainer(g.deps.Items) && isChildOf(item, destContainer) {
-			g.sendStatusText("You cannot put an object inside itself.")
-			g.revertMove(fromPos, toPos, spriteID)
-			return
-		}
-	}
+	// Map positions always target the tile, not containers on it.
+	// Only container-to-container moves (above) get a destContainer.
+	// This matches C++ behavior where Tile::queryDestination returns
+	// the tile itself for map-position moves — depot lockers, chests,
+	// and other containers on the floor never receive thrown items.
 
 	// 2. Determine move count
 	moveCount := uint16(count)
