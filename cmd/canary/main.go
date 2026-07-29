@@ -476,6 +476,9 @@ func run(o runOpts, log *slog.Logger) error {
 	world.OnItemAppear = func(pos game.Position, item *game.Item) {
 		protocol.BroadcastAddItem(world, pos, item)
 	}
+	world.OnItemDisappear = func(pos game.Position, stackPos uint8, item *game.Item) {
+		protocol.BroadcastRemoveTileThing(world, pos, stackPos)
+	}
 	world.OnItemDecay = func(pos game.Position, stackPos uint8, oldItem, newItem *game.Item) {
 		protocol.BroadcastItemDecay(world, pos, stackPos, oldItem, newItem)
 	}
