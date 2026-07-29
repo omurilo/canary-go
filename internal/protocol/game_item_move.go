@@ -254,12 +254,13 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			if fromPos.Y >= 0x40 {
 				fromContainer.Contents = append(fromContainer.Contents[:fromSlot], fromContainer.Contents[fromSlot+1:]...)
 				g.sendRemoveContainerItem(uint8(fromPos.Y-0x40), fromSlot, nil)
-				// Browse field: also remove from tile
+				// Browse field: also remove from tile (use tile stack pos)
 				if fromContainer.ID == game.ItemBrowseField {
 					for bfPos, bf := range g.deps.World.BrowseFields {
 						if bf == fromContainer {
+							tileStack := g.stackPosOfItem(bfPos, item)
 							g.deps.World.Map.RemoveItemPtr(bfPos, item)
-							g.broadcastRemoveTileThing(bfPos, fromStack)
+							g.broadcastRemoveTileThing(bfPos, tileStack)
 							break
 						}
 					}
