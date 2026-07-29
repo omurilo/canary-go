@@ -939,6 +939,8 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseCloseContainer(r)
 	case inContainerUp:
 		g.parseContainerUp(r)
+	case 0xCB: // Browse field
+		g.parseBrowseField(r)
 	case 0xCC: // Seek in paginated container
 		g.parseSeekContainer(r)
 	case inSay:
