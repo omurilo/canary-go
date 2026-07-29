@@ -40,8 +40,10 @@ type World struct {
 	Monsters *creatures.TypeRegistry
 	Charms *charms.Registry
 	Imbuements *imbuements.Registry
-	Achievements *AchievementRegistry
-	Houses       map[uint32]*House
+	Achievements    *AchievementRegistry
+	ItemClassifications map[uint8]*ItemClassification
+	Dispatcher      *WDRRDispatcher
+	Houses          map[uint32]*House
 	Market       *Market
 	Decay *DecayManager
 	BrowseFields map[Position]*Item
@@ -143,7 +145,8 @@ func NewWorld() *World {
 		guilds:       make(map[uint32]*Guild),
 		TypeRegistry: creatures.NewTypeRegistry(),
 		Charms:       charms.NewRegistry(),
-		Imbuements:   imbuements.NewRegistry(),
+		Imbuements:        imbuements.NewRegistry(),
+		ItemClassifications: make(map[uint8]*ItemClassification),
 			Market:       NewMarket(),
 		Fiendish:     NewFiendishManager(3),
 	}

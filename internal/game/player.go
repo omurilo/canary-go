@@ -241,6 +241,11 @@ type Player struct {
 
 	// Hazard (B17) — current hazard system points.
 	HazardPoints uint32
+	// LastHazardCriticalHit stores the unix-millis timestamp of the last hazard
+	// crit received. Used to enforce the hazard crit cooldown (10s).
+	LastHazardCriticalHit int64
+	// reloadHazardPointsCounter tracks hazard point reload timing.
+	reloadHazardPointsCounter int32
 
 	// Concoctions (B18) — active concoctions stored as KV.
 	Concoctions map[string]int64 // concoction_name -> expiry timestamp
@@ -1307,6 +1312,57 @@ func (p *Player) GetArmor() int32 {
 		armor = int32(float64(armor) * voc.Formula.Armor)
 	}
 	return armor
+}
+
+// GetEquippedAugmentItems returns all equipped items that have at least one
+// AugmentInfo entry in their ItemType. Scans inventory slots 1..10 (head to ammo).
+func (p *Player) GetEquippedAugmentItems(catalog *items.Catalog) []*Item {
+	if catalog == nil {
+		return nil
+	}
+	var result []*Item
+	for i := 1; i <= 10; i++ {
+		item := p.Inventory[i]
+		if item == nil {
+			continue
+		}
+		itemType := catalog.Get(item.ID)
+		if itemType != nil && len(itemType.Augments) > 0 {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// GetEquippedAugmentItemsByType returns equipped items whose ItemType has at
+// least one AugmentInfo matching the given type and optionally spellName.
+// If spellName is empty, all augments of the given type are matched.
+func (p *Player) GetEquippedAugmentItemsByType(catalog *items.Catalog, augType items.AugmentType, spellName string) []*Item {
+	if catalog == nil {
+		return nil
+	}
+	var result []*Item
+	for i := 1; i <= 10; i++ {
+		item := p.Inventory[i]
+		if item == nil {
+			continue
+		}
+		itemType := catalog.Get(item.ID)
+		if itemType == nil {
+			continue
+		}
+		for _, aug := range itemType.Augments {
+			if aug.Type != augType {
+				continue
+			}
+			if spellName != "" && !strings.EqualFold(aug.SpellName, spellName) {
+				continue
+			}
+			result = append(result, item)
+			break
+		}
+	}
+	return result
 }
 
 // GetDefense calculates the player's total defense, reflecting skills, shield, extra weapon defense, and vocation multipliers.

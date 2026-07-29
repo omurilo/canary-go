@@ -47,11 +47,27 @@ func (c *Config) Bool(key string, def bool) bool {
 	return def
 }
 
+// String returns the string value of a config.lua key, or def when absent.
+func (c *Config) String(key, def string) string {
+	if c == nil || c.Custom == nil {
+		return def
+	}
+	if v, ok := c.Custom[normalizeKey(key)]; ok {
+		if s, ok := v.(lua.LString); ok {
+			return string(s)
+		}
+	}
+	return def
+}
+
 // Number reads an integer config value from the active configuration.
 func Number(key string, def int64) int64 { return Active.Number(key, def) }
 
 // Bool reads a boolean config value from the active configuration.
 func Bool(key string, def bool) bool { return Active.Bool(key, def) }
+
+// Str reads a string config value from the active configuration.
+func Str(key, def string) string { return Active.String(key, def) }
 
 // Config holds the subset of settings the Go server currently uses. Unknown
 // keys in config.lua are simply ignored.

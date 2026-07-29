@@ -14,6 +14,29 @@ import (
 	"github.com/opentibiabr/canary-go/internal/appproto"
 )
 
+// AugmentType mirrors the C++ enum Augment_t (creatures_definitions.hpp).
+type AugmentType uint8
+
+const (
+	AugmentNone                AugmentType = 0
+	AugmentSpellDamage         AugmentType = 1
+	AugmentSpellCooldown       AugmentType = 2
+	AugmentSpellGroupCooldown  AugmentType = 3
+	AugmentSkill               AugmentType = 4
+	AugmentManaLeech           AugmentType = 5
+	AugmentLifeLeech           AugmentType = 6
+	AugmentCriticalChance      AugmentType = 7
+	AugmentCriticalDamage      AugmentType = 8
+	AugmentMagicLevel          AugmentType = 9
+)
+
+// AugmentInfo mirrors C++ struct AugmentInfo (items.hpp).
+type AugmentInfo struct {
+	SpellName string
+	Type      AugmentType
+	Value     int32
+}
+
 // Group is the single-valued item group derived from the appearance flags,
 // following the C++ precedence: container > ground > fluid-container > splash.
 type Group uint8
@@ -109,6 +132,9 @@ type ItemType struct {
 
 	// Stats stores values like "skillsword", "absorbpercentfire", "elementice", "magiclevelpoints", etc.
 	Stats map[string]int32
+
+	// Augments stores structured spell-modifier data from items.xml.
+	Augments []AugmentInfo
 
 	Speed         int32
 	BaseSpeed     int32

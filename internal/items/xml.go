@@ -168,6 +168,8 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 			fluidType = 18
 		}
 		it.FluidSource = fluidType
+	case "augments":
+		it.Augments = parseAugments(attr.Attributes)
 	default:
 		// Attempt to parse as int for Stats (e.g., skillSword, absorbpercentfire, elementice)
 		if v, err := strconv.ParseInt(attr.Value, 10, 32); err == nil {
@@ -180,6 +182,46 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 	for _, child := range attr.Attributes {
 		processAttr(it, child)
 	}
+}
+
+// parseAugments extracts structured augment data from nested XML attributes.
+// Expected XML format:
+//
+//	<attribute key="augments">
+//	  <attribute key="spellname" value="Spell Name" />
+//	  <attribute key="type" value="1" />
+//	  <attribute key="value" value="25" />
+//	</attribute>
+func parseAugments(attrs []xmlAttribute) []AugmentInfo {
+	var augments []AugmentInfo
+	for _, attr := range attrs {
+		var aug AugmentInfo
+		aug.SpellName = extractChildValue(attr.Attributes, "spellname")
+		if aug.SpellName == "" {
+			continue
+		}
+		typeVal := extractChildValue(attr.Attributes, "type")
+		if v, err := strconv.ParseUint(typeVal, 10, 8); err == nil {
+			aug.Type = AugmentType(v)
+		}
+		valueVal := extractChildValue(attr.Attributes, "value")
+		if v, err := strconv.ParseInt(valueVal, 10, 32); err == nil {
+			aug.Value = int32(v)
+		}
+		augments = append(augments, aug)
+	}
+	return augments
+}
+
+// extractChildValue searches a slice of xmlAttribute for one with the given key
+// and returns its Value.
+func extractChildValue(attrs []xmlAttribute, key string) string {
+	for _, a := range attrs {
+		if a.Key == key {
+			return a.Value
+		}
+	}
+	return ""
 }
 
 // LoadXML merges items.xml attributes (like SlotPosition, SlotType, WeaponType) into the catalog.

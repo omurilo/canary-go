@@ -495,14 +495,7 @@ func (e *Engine) gameCreateBestiaryCharm(L *lua.LState) int {
 	L.Push(ud)
 	return 1
 }
-func (e *Engine) gameCreateItemClassification(L *lua.LState) int {
-	mt := L.GetTypeMetatable("ItemClassification")
-	ud := L.NewUserData()
-	ud.Value = "ItemClassification"
-	L.SetMetatable(ud, mt)
-	L.Push(ud)
-	return 1
-}
+// gameCreateItemClassification is now defined in item_classification.go
 func (e *Engine) gameGetBestiaryCharm(L *lua.LState) int { return 0 }
 func (e *Engine) gameStartRaid(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetClientVersion(L *lua.LState) int { return 0 }

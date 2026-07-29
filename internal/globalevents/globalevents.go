@@ -59,15 +59,15 @@ type Event struct {
 
 // Engine owns the global event lifecycle and background scheduler.
 type Engine struct {
-	mu         sync.Mutex
-	events     []*Event
-	byType     map[EventType][]*Event // fast lookup by type
-	log        *slog.Logger
+	mu     sync.Mutex
+	events []*Event
+	byType map[EventType][]*Event // fast lookup by type
+	log    *slog.Logger
 
 	// scheduler state
-	ticker     *time.Ticker
-	stopCh     chan struct{}
-	running    bool
+	ticker  *time.Ticker
+	stopCh  chan struct{}
+	running bool
 
 	// record tracking
 	maxPlayers int // highest concurrent player count seen
@@ -273,7 +273,7 @@ func (e *Engine) tick() {
 		elapsed := nowNano - ev.lastExecution
 		if elapsed >= ev.Interval*1_000_000 { // Interval is in ms, convert to nanos
 			ev.lastExecution = nowNano
-			e.log.Debug("firing think event", "name", ev.Name)
+			// e.log.Debug("firing think event", "name", ev.Name)
 			if !ev.Callback() {
 				e.log.Warn("think event returned false", "name", ev.Name)
 			}

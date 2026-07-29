@@ -44,6 +44,10 @@ func (e *Engine) registerCombat() {
 			c.CallbackTargetTile = funcName
 		case 4: // CALLBACK_PARAM_TARGETCREATURE
 			c.CallbackTargetCreature = funcName
+		case 5: // CALLBACK_PARAM_CHAINVALUE
+			c.ChainCallback = funcName
+		case 6: // CALLBACK_PARAM_CHAINPICKER
+			c.ChainPickerCallback = funcName
 		}
 		L.Push(lua.LTrue)
 		return 1
@@ -156,6 +160,8 @@ func (e *Engine) combatMethods() map[string]lua.LGFunction {
 				c.Params.Aggressive = val != 0
 			case 8: // COMBAT_PARAM_DISPEL
 				c.Params.DispelType = combat.ConditionType(val)
+			case 12: // COMBAT_PARAM_CHAIN_EFFECT
+				c.Params.ChainEffect = uint16(val)
 			}
 			return 0
 		},
@@ -206,6 +212,10 @@ func (e *Engine) combatMethods() map[string]lua.LGFunction {
 				c.CallbackTargetTile = funcName
 			case 4: // CALLBACK_PARAM_TARGETCREATURE
 				c.CallbackTargetCreature = funcName
+			case 5: // CALLBACK_PARAM_CHAINVALUE
+				c.ChainCallback = funcName
+			case 6: // CALLBACK_PARAM_CHAINPICKER
+				c.ChainPickerCallback = funcName
 			}
 			L.Push(lua.LTrue)
 			return 1

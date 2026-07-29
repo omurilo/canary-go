@@ -1,7 +1,11 @@
 package game
 
 import (
+	"strings"
+	"time"
+
 	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/opentibiabr/canary-go/internal/items"
 )
 
 // This file drives Lua-defined spell combats through the same hit/death path as
@@ -22,6 +26,7 @@ func fromCombatPos(p combat.Position) Position {
 // DoCombatTarget applies a single-target combat, mirroring
 // Combat::doCombat(caster, target) -> doCombatHealth/doCombatMana
 // (src/creatures/combat/combat.cpp:1337,1345).
+// If the combat has chain configuration, additional targets are hit via BFS.
 func (e *CombatEngine) DoCombatTarget(c *combat.Combat, caster, target Creature) {
 	if target == nil {
 		return
@@ -34,6 +39,97 @@ func (e *CombatEngine) DoCombatTarget(c *combat.Combat, caster, target Creature)
 	}
 	dmg := e.rollSpellDamage(c, caster)
 	e.applySpellHit(c, caster, target, dmg)
+
+	// Chain combat: resolve additional targets via BFS and apply delayed hits.
+	e.doCombatChain(c, caster, target, dmg)
+}
+
+// combatChainDelay is the delay in ms between each chain jump.
+const combatChainDelay = 150
+
+// doCombatChain resolves chain targets from the initial target and applies
+// delayed spell hits to each, with visual effects between caster and target.
+func (e *CombatEngine) doCombatChain(c *combat.Combat, caster, initialTarget Creature, dmg combat.CombatDamage) {
+	if c.ChainCallback == "" {
+		return
+	}
+	if caster == nil || e.world == nil {
+		return
+	}
+
+	// Resolve chain targets via BFS. For now, use default chain params.
+	// The Lua callback (ChainCallback) can override these in a future pass.
+	maxTargets := 3
+	chainDistance := 5
+	backtracking := false
+
+	targets := combat.ResolveChainTargets(
+		initialTarget.GetID(),
+		toCombatPos(initialTarget.GetPosition()),
+		func(pos combat.Position, dist int) []combat.ChainTarget {
+			return e.getNearbyCreaturesForChain(pos, dist, initialTarget.GetID())
+		},
+		maxTargets, chainDistance,
+		backtracking,
+		nil, // pickerCallback — will be wired from Lua in future
+	)
+	if len(targets) == 0 {
+		return
+	}
+
+	// Apply delayed hits to each chain target.
+	for i, ct := range targets {
+		idx := i
+		targetID := ct.ID
+		delay := time.Duration(idx+1) * combatChainDelay * time.Millisecond
+
+		if c.Params.ChainEffect != 0 && e.world.OnDistanceEffect != nil {
+			GlobalDispatcher.AddEvent(delay, func() {
+				if t := e.world.CreatureByID(targetID); t != nil {
+					e.world.OnDistanceEffect(caster.GetPosition(), t.GetPosition(), c.Params.ChainEffect)
+				}
+			})
+		}
+
+		GlobalDispatcher.AddEvent(delay+50*time.Millisecond, func() {
+			if t := e.world.CreatureByID(targetID); t != nil {
+				e.applySpellHit(c, caster, t, dmg)
+				if c.Params.ImpactEffect != 0 && e.world.OnMagicEffect != nil {
+					e.world.OnMagicEffect(t.GetPosition(), c.Params.ImpactEffect)
+				}
+			}
+		})
+	}
+}
+
+// getNearbyCreaturesForChain returns creatures IDs and positions around pos
+// within Chebyshev distance, excluding excludeID.
+func (e *CombatEngine) getNearbyCreaturesForChain(pos combat.Position, distance int, excludeID uint32) []combat.ChainTarget {
+	gamePos := fromCombatPos(pos)
+	minX := int(gamePos.X) - distance
+	maxX := int(gamePos.X) + distance
+	minY := int(gamePos.Y) - distance
+	maxY := int(gamePos.Y) + distance
+	seen := make(map[uint32]bool)
+
+	var targets []combat.ChainTarget
+	for x := minX; x <= maxX; x++ {
+		for y := minY; y <= maxY; y++ {
+			checkPos := Position{X: uint16(x), Y: uint16(y), Z: gamePos.Z}
+			for _, c := range e.world.CreaturesAt(checkPos) {
+				id := c.GetID()
+				if id == excludeID || seen[id] {
+					continue
+				}
+				seen[id] = true
+				targets = append(targets, combat.ChainTarget{
+					ID:       id,
+					Position: toCombatPos(c.GetPosition()),
+				})
+			}
+		}
+	}
+	return targets
 }
 
 // DoCombatArea resolves the combat area around pos and applies the (single)
@@ -91,6 +187,7 @@ func (e *CombatEngine) DoCombatArea(c *combat.Combat, caster Creature, pos Posit
 // rollSpellDamage computes the combat value once, mirroring
 // Combat::getCombatDamage (combat.cpp:52). The value is stored as a positive
 // magnitude with the combat type; combat.DoCombatHealth negates it for damage.
+// Damage-boosting augments from the caster's equipment are applied here.
 func (e *CombatEngine) rollSpellDamage(c *combat.Combat, caster Creature) combat.CombatDamage {
 	level, magic := 0, 0
 	if p, ok := caster.(*Player); ok {
@@ -101,11 +198,67 @@ func (e *CombatEngine) rollSpellDamage(c *combat.Combat, caster Creature) combat
 	if raw < 0 {
 		raw = -raw
 	}
+
+	// Apply spell damage augments from equipped items.
+	if caster != nil && e.world != nil && c.InstantSpellName != "" {
+		if p, ok := caster.(*Player); ok {
+			augVal := getCombatDataAugment(p, e.world.Items, c.InstantSpellName, items.AugmentSpellDamage)
+			if augVal > 0 {
+				raw = int32(float64(raw) * (1.0 + float64(augVal)/100.0))
+			}
+		}
+	}
+
 	return combat.CombatDamage{
 		PrimaryType:  c.Params.CombatType,
 		PrimaryValue: raw,
 		Origin:       combat.OriginSpell,
 	}
+}
+
+// getCombatDataAugment searches the caster's equipped items for an augment matching
+// the given spell name and augment type. Returns the augment value, or 0 if not found.
+func getCombatDataAugment(p *Player, catalog *items.Catalog, spellName string, augType items.AugmentType) int32 {
+	if p == nil || catalog == nil || spellName == "" {
+		return 0
+	}
+	for _, item := range p.GetEquippedAugmentItemsByType(catalog, augType, spellName) {
+		itemType := catalog.Get(item.ID)
+		if itemType == nil {
+			continue
+		}
+		for _, aug := range itemType.Augments {
+			if aug.Type == augType && strings.EqualFold(aug.SpellName, spellName) {
+				return aug.Value
+			}
+		}
+	}
+	return 0
+}
+
+// calculateAugmentSpellCooldownReduction computes the total cooldown reduction (in ms)
+// from all equipped augments of type AugmentSpellCooldown for the given spell name.
+func calculateAugmentSpellCooldownReduction(p *Player, catalog *items.Catalog, spellName string, baseCooldownMs int64) int64 {
+	if p == nil || catalog == nil || spellName == "" || baseCooldownMs <= 0 {
+		return baseCooldownMs
+	}
+	var reduction int64
+	for _, item := range p.GetEquippedAugmentItemsByType(catalog, items.AugmentSpellCooldown, spellName) {
+		itemType := catalog.Get(item.ID)
+		if itemType == nil {
+			continue
+		}
+		for _, aug := range itemType.Augments {
+			if aug.Type == items.AugmentSpellCooldown && strings.EqualFold(aug.SpellName, spellName) {
+				reduction += int64(aug.Value)
+			}
+		}
+	}
+	reduced := baseCooldownMs - reduction
+	if reduced < 0 {
+		reduced = 0
+	}
+	return reduced
 }
 
 // applySpellHit applies one resolved hit/heal to target and fires the client

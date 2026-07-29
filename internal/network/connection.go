@@ -5,7 +5,6 @@ package network
 import (
 	"bufio"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -83,8 +82,8 @@ func (c *Connection) Send(w *netmsg.Writer) error {
 	defer c.writeMu.Unlock()
 	wire := c.codec.Wrap(w)
 	if len(wire) > 6 {
-		outer := uint16(wire[0]) | uint16(wire[1])<<8
-		slog.Debug("wire packet", "len", len(wire), "outer", outer, "first_enc", fmt.Sprintf("0x%02X", wire[6]))
+		_ = uint16(wire[0]) | uint16(wire[1])<<8
+		// slog.Debug("wire packet", "len", len(wire), "outer", outer, "first_enc", fmt.Sprintf("0x%02X", wire[6]))
 	}
 	_, err := c.conn.Write(wire)
 	return err

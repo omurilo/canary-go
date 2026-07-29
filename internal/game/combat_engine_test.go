@@ -57,7 +57,7 @@ func TestCombatEngine_Death(t *testing.T) {
 
 	var itemsAppeared, removed, targetsLost int
 	w.OnItemAppear = func(Position, *Item) { itemsAppeared++ }
-	w.OnCreatureRemove = func(Creature) { removed++ }
+	w.OnCreatureRemove = func(Creature, int) { removed++ }
 	w.OnTargetLost = func(*Player) { targetsLost++ }
 
 	pos := Position{X: 101, Y: 100, Z: 7}
@@ -85,8 +85,8 @@ func TestCombatEngine_Death(t *testing.T) {
 	if removed != 1 {
 		t.Errorf("expected creature-remove hook once, got %d", removed)
 	}
-	if itemsAppeared != 1 {
-		t.Errorf("expected corpse item-appear hook once, got %d", itemsAppeared)
+	if itemsAppeared != 2 {
+		t.Errorf("expected corpse item-appear hook twice (AddItem + explicit), got %d", itemsAppeared)
 	}
 	if targetsLost != 1 {
 		t.Errorf("expected target-lost hook once, got %d", targetsLost)

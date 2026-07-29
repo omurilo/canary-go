@@ -567,7 +567,30 @@ func applyDamageModifiers(attacker, target Creature, dmg int32) int32 {
 		}
 	}
 
-	// 2. Prey Bonuses
+	// 3. Hazard System modifiers
+	if m, ok := attacker.(*Monster); ok {
+		if m.HazardDamageBoost {
+			pct := float64(m.HazardPoints) * 2
+			if pct > 30 {
+				pct = 30
+			}
+			multiplier *= (100.0 + pct) / 100.0
+		}
+		if m.HazardDodge && hazardDodgeRoll(m) {
+			return 0
+		}
+	}
+	if m, ok := target.(*Monster); ok {
+		if m.HazardDefenseBoost {
+			pct := float64(m.HazardPoints) * 2
+			if pct > 30 {
+				pct = 30
+			}
+			multiplier *= (100.0 - pct) / 100.0
+		}
+	}
+
+	// 4. Prey Bonuses
 	if p, ok := attacker.(*Player); ok {
 		if m, ok := target.(*Monster); ok && m.Type != nil {
 			if bonus, ok := p.GetPrey().GetPreyBonus(m.Type.RaceID, PreyBonus_DamageBoost); ok {
@@ -584,6 +607,30 @@ func applyDamageModifiers(attacker, target Creature, dmg int32) int32 {
 	}
 
 	return int32(float64(dmg) * multiplier)
+}
+
+// hazardDodgeRoll rolls the dodge chance for a hazard monster.
+// Returns true if the attack should be completely dodged.
+func hazardDodgeRoll(m *Monster) bool {
+	if m == nil || !m.HazardDodge {
+		return false
+	}
+	// Base dodge chance: 5% + 2% per hazard point, max 20%
+	chance := 5 + int(m.HazardPoints)*2
+	if chance > 20 {
+		chance = 20
+	}
+	return rand.Intn(100) < chance
+}
+
+// hazardExpBonus calculates the experience bonus from hazard system.
+// Formula: 1.75 * points * multiplier / 100.0
+func hazardExpBonus(hazardPoints int32) float64 {
+	if hazardPoints <= 0 {
+		return 0
+	}
+	const hazardExpBonusMultiplier = 1.0
+	return 1.75 * float64(hazardPoints) * hazardExpBonusMultiplier / 100.0
 }
 
 func (e *CombatEngine) meleeDamage(attacker Creature) int {
@@ -852,6 +899,13 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 				}
 				if bonus, ok := p.GetPrey().GetPreyBonus(raceID, PreyBonus_XPBonus); ok {
 					finalExp = uint64(float64(exp) * float64(100+bonus) / 100.0)
+				}
+				// Hazard system experience bonus
+				if m, ok := victim.(*Monster); ok && m.HazardPoints > 0 {
+					bonus := hazardExpBonus(m.HazardPoints)
+					if bonus > 0 {
+						finalExp = uint64(float64(finalExp) * (1.0 + bonus))
+					}
 				}
 				p.AddExperience(finalExp)
 				if e.world.OnPlayerStatsChange != nil {

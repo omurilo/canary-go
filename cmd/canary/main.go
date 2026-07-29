@@ -40,9 +40,9 @@ import (
 
 func main() {
 	var (
-		configPath = flag.String("config", "config.lua", "path to the Lua config file")
-		schemaPath = flag.String("schema", "schema/mysql.sql", "path to the MySQL schema (canary-go extras)")
-		scriptsDir = flag.String("scripts", "scripts", "directory of Lua scripts to load at startup")
+		configPath  = flag.String("config", "config.lua", "path to the Lua config file")
+		schemaPath  = flag.String("schema", "schema/mysql.sql", "path to the MySQL schema (canary-go extras)")
+		scriptsDir  = flag.String("scripts", "scripts", "directory of Lua scripts to load at startup")
 		appearances = flag.String("appearances", "../data/items/appearances.dat", "path to appearances.dat (item metadata)")
 		mapFile     = flag.String("map", "", "path to an OTBM map file (empty = synthetic spawn field)")
 		migrate     = flag.Bool("migrate", true, "apply the schema on startup (idempotent)")
@@ -97,24 +97,22 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Warn("using default config", "err", err)
 	}
 
-	if v, ok := cfg.Custom["logLevel"]; ok {
-		if lv := v.String(); lv != "" {
-			var lvl slog.Level
-			switch strings.ToLower(lv) {
-			case "debug":
-				lvl = slog.LevelDebug
-			case "warn", "warning":
-				lvl = slog.LevelWarn
-			case "error":
-				lvl = slog.LevelError
-			default:
-				lvl = slog.LevelInfo
-			}
-			log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: lvl}))
-			slog.SetDefault(log)
+	if lv := cfg.String("logLevel", ""); lv != "" {
+		var lvl slog.Level
+		switch strings.ToLower(lv) {
+		case "debug":
+			lvl = slog.LevelDebug
+		case "warn", "warning":
+			lvl = slog.LevelWarn
+		case "error":
+			lvl = slog.LevelError
+		default:
+			lvl = slog.LevelInfo
 		}
+		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: lvl}))
+		slog.SetDefault(log)
 	}
-	
+
 	if scriptsDir == "scripts" && cfg.DataPack != "" {
 		scriptsDir = filepath.Join(cfg.DataPack, "scripts")
 	}
@@ -163,41 +161,46 @@ func run(o runOpts, log *slog.Logger) error {
 	world.Items = catalog
 	world.Achievements = game.NewAchievementRegistry()
 
+	// Initialize the WDRR dispatcher as the process-wide scheduler.
+	game.GlobalDispatcher.Start(ctx)
+	world.Dispatcher = game.GlobalDispatcher
+	log.Info("WDRR dispatcher started")
+
 	if bc, err := database.GetBoostedCreature(ctx); err == nil && bc != "" && bc != "default" {
 		world.BoostedCreature = bc
 	}
-		if bb, err := database.GetBoostedBoss(ctx); err == nil && bb != "" && bb != "default" {
-			world.BoostedBoss = bb
-		}
+	if bb, err := database.GetBoostedBoss(ctx); err == nil && bb != "" && bb != "default" {
+		world.BoostedBoss = bb
+	}
 
-		// Market table and pre-load existing offers.
-		if err := database.EnsureMarketTable(ctx); err != nil {
-			log.Warn("ensure market table", "err", err)
-		} else if err := database.LoadMarketOffers(ctx, world.Market); err != nil {
-			log.Warn("load market offers", "err", err)
-		}
+	// Market table and pre-load existing offers.
+	if err := database.EnsureMarketTable(ctx); err != nil {
+		log.Warn("ensure market table", "err", err)
+	} else if err := database.LoadMarketOffers(ctx, world.Market); err != nil {
+		log.Warn("load market offers", "err", err)
+	}
 
-		// Familiars table.
-		if err := database.EnsureFamiliarsTable(ctx); err != nil {
-			log.Warn("ensure familiars table", "err", err)
-		}
+	// Familiars table.
+	if err := database.EnsureFamiliarsTable(ctx); err != nil {
+		log.Warn("ensure familiars table", "err", err)
+	}
 
-		// Hazard system table.
-		if err := database.EnsureHazardTable(ctx); err != nil {
-			log.Warn("ensure hazard table", "err", err)
-		}
+	// Hazard system table.
+	if err := database.EnsureHazardTable(ctx); err != nil {
+		log.Warn("ensure hazard table", "err", err)
+	}
 
-		// Concoctions system table.
-		if err := database.EnsureConcoctionsTable(ctx); err != nil {
-			log.Warn("ensure concoctions table", "err", err)
-		}
+	// Concoctions system table.
+	if err := database.EnsureConcoctionsTable(ctx); err != nil {
+		log.Warn("ensure concoctions table", "err", err)
+	}
 
-			// Houses table.
-			if err := database.EnsureHousesTables(ctx); err != nil {
-				log.Warn("ensure houses table", "err", err)
-			}
+	// Houses table.
+	if err := database.EnsureHousesTables(ctx); err != nil {
+		log.Warn("ensure houses table", "err", err)
+	}
 
-		imbPath := filepath.Join(filepath.Dir(filepath.Dir(o.appearances)), "XML", "imbuements.xml")
+	imbPath := filepath.Join(filepath.Dir(filepath.Dir(o.appearances)), "XML", "imbuements.xml")
 	if imbReg, err := imbuements.LoadRegistry(imbPath); err != nil {
 		log.Warn("imbuements not loaded", "path", imbPath, "err", err)
 	} else {
@@ -422,7 +425,7 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Info("houses loaded and tiles registered", "count", len(world.Houses))
 	}
 
-		// Load houses from DB and register their map tiles.
+	// Load houses from DB and register their map tiles.
 
 	var lengine *luaengine.Engine
 
@@ -537,7 +540,6 @@ func run(o runOpts, log *slog.Logger) error {
 	// The spell system resolves spell damage/heal through the combat engine.
 	world.Combat = combatEngine
 
-
 	// Lua engine.
 	lengine = luaengine.New(world, log)
 	lengine.SetDB(database)
@@ -548,10 +550,10 @@ func run(o runOpts, log *slog.Logger) error {
 	})
 	// Core engine data lives in the base `data/` tree (not the world datapack):
 	// data/lib + data/npclib define framework classes (e.g. KeywordHandler) that
-	
+
 	world.OnCreatureSay = func(speaker game.Creature, talkType byte, text string) {
 		protocol.BroadcastCreatureSay(world, speaker, talkType, text)
-		
+
 		if player, ok := speaker.(*game.Player); ok {
 			spectators := world.SpectatorCreatures(speaker.GetPosition())
 			for _, spec := range spectators {
@@ -727,47 +729,47 @@ func run(o runOpts, log *slog.Logger) error {
 	}()
 
 	// Services.
-		loginSvc := network.NewService("login", fmt.Sprintf(":%d", cfg.LoginPort),
-			cfg.ServerName, protocol.NewLoginFactory(deps), log)
-		gameSvc := network.NewService("game", fmt.Sprintf(":%d", cfg.GamePort),
-			cfg.ServerName, protocol.NewGameFactory(deps, nil), log)
+	loginSvc := network.NewService("login", fmt.Sprintf(":%d", cfg.LoginPort),
+		cfg.ServerName, protocol.NewLoginFactory(deps), log)
+	gameSvc := network.NewService("game", fmt.Sprintf(":%d", cfg.GamePort),
+		cfg.ServerName, protocol.NewGameFactory(deps, nil), log)
 
-		// Count expected services for the error channel.
-		svcCount := 3 // login + game + status (when separate)
-		if cfg.Legacy1100Port > 0 {
-			svcCount++
-		}
-		if cfg.Legacy860Port > 0 {
-			svcCount++
-		}
-		errCh := make(chan error, svcCount)
+	// Count expected services for the error channel.
+	svcCount := 3 // login + game + status (when separate)
+	if cfg.Legacy1100Port > 0 {
+		svcCount++
+	}
+	if cfg.Legacy860Port > 0 {
+		svcCount++
+	}
+	errCh := make(chan error, svcCount)
 
-		go func() { errCh <- loginSvc.Start(ctx) }()
-		go func() { errCh <- gameSvc.Start(ctx) }()
-		if cfg.StatusPort != cfg.LoginPort {
-			statusSvc := network.NewService("status", fmt.Sprintf(":%d", cfg.StatusPort),
-				cfg.ServerName, protocol.NewStatusFactory(deps), log)
-			go func() { errCh <- statusSvc.Start(ctx) }()
-		}
+	go func() { errCh <- loginSvc.Start(ctx) }()
+	go func() { errCh <- gameSvc.Start(ctx) }()
+	if cfg.StatusPort != cfg.LoginPort {
+		statusSvc := network.NewService("status", fmt.Sprintf(":%d", cfg.StatusPort),
+			cfg.ServerName, protocol.NewStatusFactory(deps), log)
+		go func() { errCh <- statusSvc.Start(ctx) }()
+	}
 
-		// Legacy game protocol services.
-		if cfg.Legacy1100Port > 0 {
-			legacy1100Svc := network.NewService("legacy-1100", fmt.Sprintf(":%d", cfg.Legacy1100Port),
-				cfg.ServerName, protocol.NewLegacy1100Factory(deps), log)
-			go func() { errCh <- legacy1100Svc.Start(ctx) }()
-			log.Info("legacy 11.00 protocol enabled", "port", cfg.Legacy1100Port)
-		}
-		if cfg.Legacy860Port > 0 {
-			legacy860Svc := network.NewService("legacy-860", fmt.Sprintf(":%d", cfg.Legacy860Port),
-				cfg.ServerName, protocol.NewLegacy860Factory(deps), log)
-			go func() { errCh <- legacy860Svc.Start(ctx) }()
-			log.Info("legacy 8.60 protocol enabled", "port", cfg.Legacy860Port)
-		}
+	// Legacy game protocol services.
+	if cfg.Legacy1100Port > 0 {
+		legacy1100Svc := network.NewService("legacy-1100", fmt.Sprintf(":%d", cfg.Legacy1100Port),
+			cfg.ServerName, protocol.NewLegacy1100Factory(deps), log)
+		go func() { errCh <- legacy1100Svc.Start(ctx) }()
+		log.Info("legacy 11.00 protocol enabled", "port", cfg.Legacy1100Port)
+	}
+	if cfg.Legacy860Port > 0 {
+		legacy860Svc := network.NewService("legacy-860", fmt.Sprintf(":%d", cfg.Legacy860Port),
+			cfg.ServerName, protocol.NewLegacy860Factory(deps), log)
+		go func() { errCh <- legacy860Svc.Start(ctx) }()
+		log.Info("legacy 8.60 protocol enabled", "port", cfg.Legacy860Port)
+	}
 
-		log.Info("canary-go is running",
-			"login", cfg.LoginPort, "game", cfg.GamePort,
-			"legacy1100", cfg.Legacy1100Port,
-			"legacy860", cfg.Legacy860Port)
+	log.Info("canary-go is running",
+		"login", cfg.LoginPort, "game", cfg.GamePort,
+		"legacy1100", cfg.Legacy1100Port,
+		"legacy860", cfg.Legacy860Port)
 
 	select {
 	case <-ctx.Done():

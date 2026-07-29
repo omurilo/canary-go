@@ -82,6 +82,10 @@ const (
 	CombatParamUpdateItem
 	CombatParamAggressive
 	CombatParamDispel
+	CombatParamChainEffect
+	CombatParamCastSound
+	CombatParamImpactSound
+	CombatParamUseCharges
 )
 
 // FormulaType represents how the damage formula is calculated

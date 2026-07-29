@@ -292,12 +292,44 @@ func (pt *Party) SetSharedExperience(active bool) {
 	pt.updateShields()
 }
 
-// ShareExperience splits experience across the whole roster. staminaBoost is a
-// fixed 1.0x until stamina is ported.
+// getLowestHazardPoints returns the lowest hazard points among all party members.
+func (pt *Party) getLowestHazardPoints() uint32 {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+	var lowest uint32
+	first := true
+	check := func(p *Player) {
+		if p == nil {
+			return
+		}
+		if first || p.HazardPoints < lowest {
+			lowest = p.HazardPoints
+			first = false
+		}
+	}
+	check(pt.leader)
+	for _, m := range pt.members {
+		check(m)
+	}
+	return lowest
+}
+
+// ShareExperience splits experience across the whole roster, applying hazard
+// experience bonus based on the lowest hazard points in the party.
 func (pt *Party) ShareExperience(exp uint64) {
+	lowestHazard := pt.getLowestHazardPoints()
+	var hazardMultiplier float64
+	if lowestHazard > 0 {
+		hazardMultiplier = 1.0 + hazardExpBonus(int32(lowestHazard))
+	}
+
 	for _, m := range pt.Players() {
 		if m != nil {
-			m.AddExperience(exp)
+			finalExp := exp
+			if hazardMultiplier > 0 {
+				finalExp = uint64(float64(exp) * hazardMultiplier)
+			}
+			m.AddExperience(finalExp)
 			if pt.world != nil && pt.world.OnPlayerStatsChange != nil {
 				pt.world.OnPlayerStatsChange(m)
 			}
@@ -305,9 +337,7 @@ func (pt *Party) ShareExperience(exp uint64) {
 	}
 }
 
-// updateSharedExperience recomputes whether shared-exp is effective. Simplified:
-// enabled when active and the party has at least one member (no level-range /
-// distance gating yet).
+// updateSharedExperience recomputes whether shared-exp is effective.
 func (pt *Party) updateSharedExperience() {
 	pt.sharedExpEnabled = pt.sharedExpActive && pt.MemberCount() > 0
 }

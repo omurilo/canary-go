@@ -62,6 +62,14 @@ type Combat struct {
 	CallbackSkillValue      string
 	CallbackTargetTile      string
 	CallbackTargetCreature  string
+
+	// ChainCallback is a Lua function name returning chain params:
+	// func(caster, target) -> maxTargets, chainDistance, backtracking
+	ChainCallback string
+
+	// ChainPickerCallback filters chain targets:
+	// func(caster, target, currentTarget) -> bool
+	ChainPickerCallback string
 }
 
 // SetArea assigns the combat area. Mirrors Combat::setArea (combat.cpp).
@@ -363,5 +371,7 @@ func (c *Combat) SetParam(param CombatParam, value uint32) {
 		c.Params.Aggressive = value != 0
 	case CombatParamDispel:
 		c.Params.DispelType = ConditionType(value)
+	case CombatParamChainEffect:
+		c.Params.ChainEffect = uint16(value)
 	}
 }
