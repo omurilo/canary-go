@@ -1,0 +1,10 @@
+[
+  {
+    "title": "Random Hint 2",
+    "richText": "<table><tbody><tr><td><p style=\"margin-right: 5px;\"><img src=\"https://static.tibia.com/images/news/rh_misc.png\" width=\"80\" height=\"80\"></p></td><td><p><br><br>The quest log gives you a fine overview of the quests you have started or already completed.</p></td></tr></tbody></table>"
+  },
+  {
+    "title": "Random Hint 1",
+    "richText": "<table><tbody><tr><td><p style=\"margin-right: 5px;\"><img src=\"https://static.tibia.com/images/news/rh_misc.png\" width=\"80\" height=\"80\"></p></td><td><p><br><br>Use the CTRL + Arrow Key to turn (but not step) your character to the (respectively): West, East, North or South.&nbsp;</p></td></tr></tbody></table>"
+  }
+]
