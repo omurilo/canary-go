@@ -351,7 +351,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	const q = `UPDATE players SET
 	              level=?, experience=?, health=?, healthmax=?,
 	              mana=?, manamax=?, soul=?, cap=?, balance=?,
-	              posx=?, posy=?, posz=?,
+	              town_id=?, posx=?, posy=?, posz=?,
 	              looktype=?, lookhead=?, lookbody=?, looklegs=?,
 	              lookfeet=?, lookaddons=?,
 	              maglevel=?, manaspent=?,
@@ -382,7 +382,7 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	_, err := d.SQL.ExecContext(ctx, q,
 		p.Level, p.Experience, p.Health, p.MaxHealth,
 		p.Mana, p.MaxMana, p.Soul, p.Capacity/100, p.BankBalance,
-		p.Pos.X, p.Pos.Y, p.Pos.Z,
+		p.TownID, p.Pos.X, p.Pos.Y, p.Pos.Z,
 		p.Outfit.LookType, p.Outfit.Head, p.Outfit.Body, p.Outfit.Legs,
 		p.Outfit.Feet, p.Outfit.Addons,
 		p.MagLevel, p.ManaSpent,
