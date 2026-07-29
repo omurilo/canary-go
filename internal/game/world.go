@@ -56,7 +56,7 @@ type World struct {
 	OnCreatureHealthChange func(c Creature)
 	OnCombatHit            func(attacker, victim Creature, damage int32, effect uint16)
 	OnItemAppear           func(pos Position, item *Item)
-	OnItemDisappear        func(pos Position, stackPos uint8, item *Item)
+	OnTileUpdate           func(pos Position)
 	OnContainerAddItem     func(p *Player, container *Item, item *Item)
 	OnTargetLost           func(p *Player)
 	// OnPlayerStatsChange pushes a refreshed stats packet (0xA0) after
@@ -237,6 +237,28 @@ func (w *World) BrowseFieldRemove(pos Position) {
 }
 
 // StartDecayingMap scans the entire map and starts decay for all applicable items.
+// InternalRemoveItem removes count from an item on a tile and broadcasts the update.
+// Mirrors C++ Game::internalRemoveItem for tile items.
+func (w *World) InternalRemoveItem(pos Position, item *Item, count uint16) {
+	if int(item.Count) > int(count) {
+		item.Count -= count
+	} else {
+		w.Map.RemoveItemPtr(pos, item)
+		// Remove from open browse field
+		if bf := w.BrowseFieldGet(pos); bf != nil {
+			for i, cit := range bf.Contents {
+				if cit == item {
+					bf.Contents = append(bf.Contents[:i], bf.Contents[i+1:]...)
+					break
+				}
+			}
+		}
+	}
+	if w.OnTileUpdate != nil {
+		w.OnTileUpdate(pos)
+	}
+}
+
 func (w *World) StartDecayingMap() {
 	if w.Items == nil || w.Decay == nil {
 		return
