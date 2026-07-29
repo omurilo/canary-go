@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -123,5 +124,115 @@ func (g *GameProtocol) parseVIPRemove(r *netmsg.Reader) {
 			return
 		}
 	}
+}
+
+// parseVIPEdit handles client request to edit a VIP entry (icon, notify, groups) (Opcode 0xDE).
+func (g *GameProtocol) parseVIPEdit(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
+
+	guid := r.GetU32()
+	description := r.GetString()
+	icon := r.GetU32()
+	if icon > 10 {
+		icon = 10
+	}
+	notify := r.GetByte() != 0
+	groupsAmount := r.GetByte()
+
+	var groupsID []uint32
+	for range groupsAmount {
+		gid := r.GetU32()
+		groupsID = append(groupsID, gid)
+	}
+
+	// Find and update the VIP entry
+	for i := range g.player.VIPList {
+		if g.player.VIPList[i].PlayerID == guid {
+			g.player.VIPList[i].Description = description
+			g.player.VIPList[i].Icon = uint8(icon)
+			g.player.VIPList[i].Notify = notify
+			g.player.VIPList[i].Groups = groupsID
+			break
+		}
+	}
+
+	g.SendVIPList()
+}
+
+// parseVipGroupActions handles VIP group management (add/edit/remove) (Opcode 0xDF).
+func (g *GameProtocol) parseVipGroupActions(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
+
+	action := r.GetByte()
+
+	switch action {
+	case 0x01: // Add group
+		groupName := r.GetString()
+		// Check for duplicate name
+		for _, grp := range g.player.VIPGroups {
+			if grp.Name == groupName {
+				g.player.SendTextMessage(0x14, "A group with this name already exists. Please choose another name.")
+				return
+			}
+		}
+		// Find free ID (1-8)
+		var freeID uint32 = 1
+	loop:
+		for freeID <= 8 {
+			for _, grp := range g.player.VIPGroups {
+				if grp.ID == freeID {
+					freeID++
+					continue loop
+				}
+			}
+			break
+		}
+		if freeID > 8 {
+			g.player.SendTextMessage(0x14, "No free VIP group ID available.")
+			return
+		}
+		g.player.VIPGroups = append(g.player.VIPGroups, game.VIPGroup{
+			ID:           freeID,
+			Name:         groupName,
+			Customizable: true,
+		})
+
+	case 0x02: // Edit group
+		groupID := r.GetU32()
+		newName := r.GetString()
+		for i := range g.player.VIPGroups {
+			if g.player.VIPGroups[i].ID == groupID {
+				g.player.VIPGroups[i].Name = newName
+				break
+			}
+		}
+
+	case 0x03: // Remove group
+		groupID := r.GetU32()
+		groupIdx := -1
+		for i, grp := range g.player.VIPGroups {
+			if grp.ID == groupID {
+				groupIdx = i
+				break
+			}
+		}
+		if groupIdx >= 0 {
+			g.player.VIPGroups = append(g.player.VIPGroups[:groupIdx], g.player.VIPGroups[groupIdx+1:]...)
+		}
+
+		// Also remove this group from all VIP entries
+		for i := range g.player.VIPList {
+			entry := &g.player.VIPList[i]
+			entry.Groups = slices.DeleteFunc(entry.Groups, func(gid uint32) bool {
+				return gid == groupID
+			})
+		}
+	}
+
+	g.SendVIPList()
 }
 

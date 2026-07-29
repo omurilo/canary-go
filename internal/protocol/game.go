@@ -993,17 +993,17 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case 0xCD:
 		g.parseInspectionObject(r)
 	case 0xCE:
-		g.parseVIPAdd(r)
+		g.parseInspectPlayer(r)
 	case 0xCF:
-		g.parseVIPRemove(r)
+		g.SendBlessingsDialog()
 	case 0xD0:
 		g.parseOpenRewardChest(r)
 	case 0xD2:
 		g.SendOutfitWindow()
 	case 0xD3:
-		g.parseBuyBlessing(r) // Buy blessing request  
+		g.parseSetOutfit(r)
 	case 0xD4:
-		g.parseSetOutfit(r) // Moved from 0xD3
+		g.parseToggleMount(r)
 	case 0xD8, 0xD9, 0xDA:
 		g.dispatchDailyReward(op, r)
 	case 0xD5:
@@ -1012,6 +1012,10 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseImbuementClear(r)
 	case 0xD7:
 		g.parseCloseImbuementWindow(r)
+	case 0xDC:
+		g.parseVIPAdd(r)
+	case 0xDD:
+		g.parseVIPRemove(r)
 	case 0xE5:
 		g.parseCyclopediaCharacterInfo(r)
 	case 0xBF:
