@@ -158,16 +158,26 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		} else {
 			cid := uint8(toPos.Y - 0x40)
 			if openCont, offset, ok := g.openContainerByCID(cid); ok {
-				slotIdx := int(toPos.Z) + offset
-				if slotIdx >= 0 && slotIdx < len(openCont.Contents) {
-					targetItem := openCont.Contents[slotIdx]
-					if targetItem != nil && targetItem.IsContainer(g.deps.Items) && targetItem != item {
-						destContainer = targetItem
+				// Browse field containers redirect to tile
+				if openCont.ID == game.ItemBrowseField {
+					for bfPos, bf := range g.deps.World.BrowseFields {
+						if bf == openCont {
+							toPos = netmsg.Position{X: bfPos.X, Y: bfPos.Y, Z: uint8(bfPos.Z)}
+							break
+						}
+					}
+				} else {
+					slotIdx := int(toPos.Z) + offset
+					if slotIdx >= 0 && slotIdx < len(openCont.Contents) {
+						targetItem := openCont.Contents[slotIdx]
+						if targetItem != nil && targetItem.IsContainer(g.deps.Items) && targetItem != item {
+							destContainer = targetItem
+						} else {
+							destContainer = openCont
+						}
 					} else {
 						destContainer = openCont
 					}
-				} else {
-					destContainer = openCont
 				}
 			}
 		}
@@ -244,6 +254,16 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			if fromPos.Y >= 0x40 {
 				fromContainer.Contents = append(fromContainer.Contents[:fromSlot], fromContainer.Contents[fromSlot+1:]...)
 				g.sendRemoveContainerItem(uint8(fromPos.Y-0x40), fromSlot, nil)
+				// Browse field: also remove from tile
+				if fromContainer.ID == game.ItemBrowseField {
+					for bfPos, bf := range g.deps.World.BrowseFields {
+						if bf == fromContainer {
+							g.deps.World.Map.RemoveItemPtr(bfPos, item)
+							g.broadcastRemoveTileThing(bfPos, fromStack)
+							break
+						}
+					}
+				}
 			} else {
 				g.player.Inventory[fromSlot] = nil
 				g.sendInventoryEmpty(fromSlot)

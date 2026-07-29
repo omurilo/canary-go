@@ -44,6 +44,7 @@ type World struct {
 	Houses       map[uint32]*House
 	Market       *Market
 	Decay *DecayManager
+	BrowseFields map[Position]*Item
 
 	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldTileIndex int)
 	OnCreatureAppear func(c Creature)
@@ -196,6 +197,10 @@ func (w *World) AddItem(pos Position, it *Item) bool {
 	if !w.Map.AddItem(pos, it) {
 		return false
 	}
+	// Refresh open browse field for this tile
+	if bf := w.BrowseFieldGet(pos); bf != nil {
+		bf.Contents = append([]*Item{it}, bf.Contents...)
+	}
 	if w.Items != nil && w.Decay != nil {
 		if itemType := w.Items.Get(it.ID)
  itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
@@ -203,6 +208,27 @@ func (w *World) AddItem(pos Position, it *Item) bool {
 		}
 	}
 	return true
+}
+
+// BrowseFieldGet returns the browse field container for the given tile position, or nil.
+func (w *World) BrowseFieldGet(pos Position) *Item {
+	if w.BrowseFields == nil {
+		return nil
+	}
+	return w.BrowseFields[pos]
+}
+
+// BrowseFieldSet registers a browse field container for the given tile position.
+func (w *World) BrowseFieldSet(pos Position, c *Item) {
+	if w.BrowseFields == nil {
+		w.BrowseFields = make(map[Position]*Item)
+	}
+	w.BrowseFields[pos] = c
+}
+
+// BrowseFieldRemove unregisters the browse field for the given tile position.
+func (w *World) BrowseFieldRemove(pos Position) {
+	delete(w.BrowseFields, pos)
 }
 
 // StartDecayingMap scans the entire map and starts decay for all applicable items.

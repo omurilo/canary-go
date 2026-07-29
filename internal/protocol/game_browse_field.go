@@ -61,6 +61,9 @@ func (g *GameProtocol) sendBrowseField(pos game.Position) {
 		g.sendCloseContainer(dummyCID)
 	}
 
+	// Register in world browse field map (C++ browseFields[shared_ptr<Tile>] = weak_ptr<Container>)
+	g.deps.World.BrowseFieldSet(pos, browseContainer)
+
 	// Register and send the container
 	g.player.OpenContainerAtWithPos(dummyCID, browseContainer, pos, true)
 	g.sendContainer(dummyCID, browseContainer, false)
