@@ -283,32 +283,15 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			if count < 1 {
 				count = 1
 			}
-			if int(it.item.Count) > count {
-				it.item.Count -= uint16(count)
-				L.Push(lua.LTrue)
-				return 1
-			}
-			// Item fully consumed: remove from tile and broadcast
 			if it.pos.X != 0 && e.world != nil {
-				stack := byte(0)
-				tile := e.world.Map.GetTile(it.pos)
-				if tile != nil {
-					if tile.Ground != nil { stack++ }
-					for _, tileIt := range tile.Items {
-						if tileIt == it.item { break }
-						if e.world.Items != nil {
-							if ti := e.world.Items.Get(tileIt.ID); ti != nil && ti.AlwaysOnTop() {
-							} else { stack++ }
-						}
-					}
-					stack += byte(len(tile.Creatures))
-					e.world.Map.RemoveItemPtr(it.pos, it.item)
-					if e.world.OnItemDisappear != nil {
-						e.world.OnItemDisappear(it.pos, uint8(stack), it.item)
-					}
+				e.world.InternalRemoveItem(it.pos, it.item, uint16(count))
+			} else {
+				if int(it.item.Count) > count {
+					it.item.Count -= uint16(count)
+				} else {
+					it.item.Count = 0
 				}
 			}
-			it.item.Count = 0
 			L.Push(lua.LTrue)
 			return 1
 		},

@@ -202,6 +202,15 @@ func BroadcastAddItem(w *game.World, pos game.Position, item *game.Item) {
 }
 
 // BroadcastItemDecay tells every spectator an item transformed due to decay.
+func BroadcastTileUpdate(w *game.World, pos game.Position) {
+	for _, s := range w.Spectators(pos, 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			tile := w.Map.GetTile(pos)
+			gp.sendUpdateTile(pos, tile)
+		}
+	}
+}
+
 func BroadcastRemoveTileThing(w *game.World, pos game.Position, stackPos uint8) {
 	for _, s := range w.Spectators(pos, 0) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
