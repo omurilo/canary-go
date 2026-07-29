@@ -10,7 +10,8 @@ const (
 	ItemStoreInbox = 23396
 	ItemStash      = 28750
 	ItemStoreCoin  = 22118
-	ItemGoldPouch  = 23721
+	ItemGoldPouch    = 23721
+	ItemBrowseField  = 470
 
 	// Mail item IDs.
 	ItemParcel        = 3503

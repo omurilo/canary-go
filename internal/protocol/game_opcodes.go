@@ -340,7 +340,39 @@ func (g *GameProtocol) parseRewardChestCollect(r *netmsg.Reader) { if g.player =
 
 func (g *GameProtocol) parseCharacterTradeConfig(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte() }
 func (g *GameProtocol) parseExivaRestrictions(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte(); _ = r.GetString() }
-func (g *GameProtocol) parseBrowseField(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetPosition() }
+func (g *GameProtocol) parseBrowseField(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
+	pos := r.GetPosition()
+	gPos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
+
+	// Same floor check
+	if g.player.Pos.Z != gPos.Z {
+		msg := "First go upstairs"
+		if g.player.Pos.Z < gPos.Z {
+			msg = "First go downstairs"
+		}
+		g.sendStatusText(msg)
+		return
+	}
+
+	// Distance check (range 1,1)
+	dx := int(g.player.Pos.X) - int(gPos.X)
+	if dx < 0 {
+		dx = -dx
+	}
+	dy := int(g.player.Pos.Y) - int(gPos.Y)
+	if dy < 0 {
+		dy = -dy
+	}
+	if dx > 1 || dy > 1 {
+		g.sendStatusText("You are too far.")
+		return
+	}
+
+	g.sendBrowseField(gPos)
+}
 func (g *GameProtocol) parseClientDetails(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetU16(); _ = r.GetU16() }
 func (g *GameProtocol) parseBossDifficultySelection(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetU16(); _ = r.GetByte() }
 func (g *GameProtocol) parseAimAtTarget(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetU32() }
