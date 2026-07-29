@@ -201,6 +201,10 @@ func (w *World) AddItem(pos Position, it *Item) bool {
 	if bf := w.BrowseFieldGet(pos); bf != nil {
 		bf.Contents = append([]*Item{it}, bf.Contents...)
 	}
+	// Notify nearby players about the new item
+	if w.OnItemAppear != nil {
+		w.OnItemAppear(pos, it)
+	}
 	if w.Items != nil && w.Decay != nil {
 		if itemType := w.Items.Get(it.ID)
  itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
