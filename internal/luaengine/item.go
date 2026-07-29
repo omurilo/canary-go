@@ -125,9 +125,39 @@ func itemRemove(L *lua.LState) int {
 	}
 	if int(it.item.Count) > count {
 		it.item.Count -= uint16(count)
-	} else {
-		it.item.Count = 0
+		L.Push(lua.LTrue)
+		return 1
 	}
+	// Item fully consumed: remove from tile and broadcast
+	if e, ok := L.GetGlobal("Game").(*lua.LUserData); ok {
+		if eng, ok2 := e.Value.(*Engine); ok2 && eng.world != nil {
+			if it.pos.X != 0 {
+				stack := byte(0)
+				tile := eng.world.Map.GetTile(it.pos)
+				if tile != nil {
+					if tile.Ground != nil { stack++ }
+					for _, tileIt := range tile.Items {
+						if tileIt == it.item {
+							break
+						}
+						if eng.world.Items != nil {
+							if ti := eng.world.Items.Get(tileIt.ID); ti != nil && ti.AlwaysOnTop() {
+								// skip, counted separately
+							} else {
+								stack++
+							}
+						}
+					}
+					stack += byte(len(tile.Creatures))
+					eng.world.Map.RemoveItemPtr(it.pos, it.item)
+					if eng.world.OnItemDisappear != nil {
+						eng.world.OnItemDisappear(it.pos, uint8(stack), it.item)
+					}
+				}
+			}
+		}
+	}
+	it.item.Count = 0
 	L.Push(lua.LTrue)
 	return 1
 }
