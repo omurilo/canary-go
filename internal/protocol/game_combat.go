@@ -84,11 +84,111 @@ func SendExpMessage(p *game.Player, exp uint64, text string) {
 	}
 }
 
-// sendTileAddItem tells this client an item appeared on top of a tile
-// (0x6A TileAddThing), mirroring the internalAddItem broadcast used when a
-// corpse is dropped in Creature::dropCorpse (src/creatures/creature.cpp).
 func (g *GameProtocol) sendTileAddItem(pos game.Position, item *game.Item) {
 	g.sendAddTileItem(pos, g.stackPosOfItem(pos, item), item)
+}
+
+
+
+// BroadcastCreatureHealth sends a health-bar update for c to every player who
+// can see it (item #3 of the combat migration).
+func BroadcastCreatureHealth(w *game.World, c game.Creature) {
+	for _, s := range w.Spectators(c.GetPosition(), 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok && gp.isKnown(c.GetID()) {
+			gp.sendCreatureHealth(c)
+		}
+	}
+}
+
+// BroadcastCombatHit shows the impact magic effect at the victim and the
+// animated damage text to the participants (attacker sees MESSAGE_DAMAGE_DEALT,
+// victim sees MESSAGE_DAMAGE_RECEIVED), mirroring Game::sendEffects /
+// Game::buildMessageAsAttacker / buildMessageAsTarget (src/game/game.cpp).
+func BroadcastCombatHit(w *game.World, attacker, victim game.Creature, damage int32, effect uint16) {
+	pos := victim.GetPosition()
+
+	// Impact effect for everyone who can see the tile.
+	for _, s := range w.Spectators(pos, 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			gp.sendMagicEffect(pos, effect)
+		}
+	}
+
+	if damage <= 0 {
+		return
+	}
+
+	unit := "hitpoints"
+	if damage == 1 {
+		unit = "hitpoint"
+	}
+	dmgStr := fmt.Sprintf("%d %s", damage, unit)
+
+	// Attacker (if a player): "NAME loses X hitpoints due to your attack."
+	if ap, ok := attacker.(*game.Player); ok {
+		if gp, ok := ap.Session.(*GameProtocol); ok {
+			text := fmt.Sprintf("%s loses %s due to your attack.", ucfirst(victim.GetName()), dmgStr)
+			gp.sendDamageText(messageDamageDealt, pos, uint32(damage), textcolorRed, text)
+		}
+	}
+
+	// Victim (if a player): "You lose X hitpoints due to an attack by NAME."
+	if vp, ok := victim.(*game.Player); ok {
+		if gp, ok := vp.Session.(*GameProtocol); ok {
+			text := fmt.Sprintf("You lose %s due to an attack by %s.", dmgStr, attacker.GetName())
+			gp.sendDamageText(messageDamageReceived, pos, uint32(damage), textcolorRed, text)
+		}
+	}
+}
+
+// sendDistanceEffect shows a shoot animation from->to, mirroring the modern
+// branch of ProtocolGame::sendDistanceShoot (protocolgame.cpp:8089): 0x83,
+// from-position, MAGIC_EFFECTS_CREATE_DISTANCEEFFECT (4), u16 type, signed dx,
+// signed dy, source byte, end-loop.
+func (g *GameProtocol) sendDistanceEffect(from, to game.Position, effect uint16) {
+	w := netmsg.NewWriter()
+	w.AddByte(opMagicEffect)
+	w.AddPosition(netmsg.Position{X: from.X, Y: from.Y, Z: from.Z})
+	w.AddByte(4) // MAGIC_EFFECTS_CREATE_DISTANCEEFFECT
+	w.AddU16(effect)
+	w.AddByte(byte(int8(int32(to.X) - int32(from.X))))
+	w.AddByte(byte(int8(int32(to.Y) - int32(from.Y))))
+	w.AddByte(sourceEffectOwn)
+	w.AddByte(magicEffectsEndLoop)
+	g.SendToClient(w)
+}
+
+// BroadcastMagicEffect shows a graphical effect on a tile to every spectator,
+// used by spell area/impact effects that carry no damage text.
+func BroadcastMagicEffect(w *game.World, pos game.Position, effect uint16) {
+	for _, s := range w.Spectators(pos, 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			gp.sendMagicEffect(pos, effect)
+		}
+	}
+}
+
+// BroadcastDistanceEffect shows a shoot animation from->to to spectators of both
+// endpoints (used by spell distance effects).
+func BroadcastDistanceEffect(w *game.World, from, to game.Position, effect uint16) {
+	seen := make(map[uint32]bool)
+	send := func(gp *GameProtocol, id uint32) {
+		if seen[id] {
+			return
+		}
+		seen[id] = true
+		gp.sendDistanceEffect(from, to, effect)
+	}
+	for _, s := range w.Spectators(from, 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			send(gp, s.ID)
+		}
+	}
+	for _, s := range w.Spectators(to, 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			send(gp, s.ID)
+		}
+	}
 }
 
 // BroadcastAddItem tells every spectator an item appeared on a tile (used for
