@@ -2,8 +2,8 @@
 	"events": [
 		{
 			"name": "Forge Time",
-			"startdate": "11/12/2024",
-			"enddate": "11/17/2024",
+			"startdate": "07/14/2026",
+			"enddate": "07/20/2026",
 			"ingame": {
 				"forgechance": 120
 			},
@@ -20,8 +20,8 @@
 		},
 		{
 			"name": "Double Bestiary",
-			"startdate": "11/12/2024",
-			"enddate": "11/17/2024",
+			"startdate": "07/21/2026",
+			"enddate": "07/27/2026",
 			"ingame": {
 				"doublebestiary": true
 			},
@@ -38,8 +38,8 @@
 		},
 		{
 			"name": "Fast Exercise",
-			"startdate": "11/12/2024",
-			"enddate": "11/17/2024",
+			"startdate": "07/28/2026",
+			"enddate": "08/03/2026",
 			"ingame": {
 				"fastexercise": true
 			},
@@ -56,8 +56,8 @@
 		},
 		{
 			"name": "50% Loot Bonus",
-			"startdate": "11/12/2024",
-			"enddate": "11/17/2024",
+			"startdate": "08/04/2026",
+			"enddate": "08/10/2026",
 			"ingame": {
 				"lootrate": 150
 			},
@@ -74,8 +74,8 @@
 		},
 		{
 			"name": "50% Exp Bonus",
-			"startdate": "11/12/2024",
-			"enddate": "11/17/2024",
+			"startdate": "08/04/2026",
+			"enddate": "08/10/2026",
 			"ingame": {
 				"exprate": 150
 			},
@@ -92,8 +92,8 @@
 		},
 		{
 			"name": "Boss Cooldown Reduction",
-			"startdate": "11/12/2024",
-			"enddate": "11/17/2024",
+			"startdate": "08/11/2026",
+			"enddate": "08/17/2026",
 			"ingame": {
 				"bosscooldown": 150
 			},
@@ -110,8 +110,8 @@
 		},
 		{
 			"name": "Double Exp",
-			"startdate": "11/12/2024",
-			"enddate": "11/17/2024",
+			"startdate": "08/18/2026",
+			"enddate": "08/24/2026",
 			"ingame": {
 				"exprate": 200
 			},
@@ -128,8 +128,8 @@
 		},
 		{
 			"name": "Double Loot",
-			"startdate": "11/12/2024",
-			"enddate": "11/17/2024",
+			"startdate": "08/18/2026",
+			"enddate": "08/24/2026",
 			"ingame": {
 				"lootrate": 200
 			},
@@ -146,8 +146,8 @@
 		},
 		{
 			"name": "Double Bosstiary",
-			"startdate": "11/12/2024",
-			"enddate": "11/17/2024",
+			"startdate": "08/25/2026",
+			"enddate": "08/31/2026",
 			"ingame": {
 				"doublebosstiary": true
 			},
@@ -164,8 +164,8 @@
 		},
 		{
 			"name": "Fast Respawn",
-			"startdate": "11/01/2024",
-			"enddate": "11/15/2024",
+			"startdate": "07/28/2026",
+			"enddate": "08/10/2026",
 			"ingame": {
 				"spawnrate": 200
 			},
