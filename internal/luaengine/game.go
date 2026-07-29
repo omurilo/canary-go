@@ -386,12 +386,7 @@ func (e *Engine) gameCreateItem(L *lua.LState) int {
 
 	if L.GetTop() >= 3 {
 		if pos, ok := parsePosition(L, 3); ok && e.world != nil && e.world.Map != nil {
-			tile := e.world.Map.GetTile(pos)
-			if tile == nil {
-				tile = &game.Tile{}
-				e.world.Map.SetTile(pos, tile)
-			}
-			tile.Items = append(tile.Items, item)
+			e.world.AddItem(pos, item)
 		}
 	}
 
