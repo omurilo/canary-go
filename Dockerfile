@@ -24,10 +24,7 @@ COPY config.lua /app/config.lua
 COPY key.pem /app/key.pem
 COPY schema /app/schema
 COPY scripts /app/scripts
-#COPY data /app/data
-#COPY data-otservbr-global /app/data-otservbr-global
-# data/, data-canary/, data-otservbr-global/ are mounted at runtime (see compose).
 USER canary
 EXPOSE 7171 7172
 ENTRYPOINT ["/app/canary"]
-CMD ["-config", "config.lua", "-schema", "schema/mysql.sql", "-scripts", "scripts", "-appearances", "data/items/appearances.dat", "-migrate", "-seed"]
+CMD ["-appearances", "data/items/appearances.dat", "-migrate", "-seed"]

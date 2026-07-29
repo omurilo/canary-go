@@ -1,4 +1,6 @@
-.PHONY: build run client test docker-up docker-down docker-fup docker-fdown smoke tidy
+.PHONY: build run client test up down fup fdown logs smoke tidy
+
+c ?=
 
 build:
 	go build -o bin/canary ./cmd/canary
@@ -10,16 +12,20 @@ test:
 tidy:
 	go mod tidy
 
-docker-up:
+up:
 	docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 
-docker-down:
+down:
 	docker compose -f deploy/docker-compose.yml down
 
-docker-fup:
+fup:
 	docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --profile full --build
 
-docker-fdown: docker compose -f deploy/docker-compose.yml down --profile full
+fdown:
+	docker compose -f deploy/docker-compose.yml down --profile full
+
+logs:
+	docker compose -f deploy/docker-compose.yml logs -f $(c)
 
 # Run the server (applies schema + seeds the test account).
 run: build

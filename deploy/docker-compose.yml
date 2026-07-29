@@ -45,8 +45,6 @@ services:
       CANARY_DB_HOST: db
       CANARY_LEGACY_1100_GAME_PORT: "7174"
       CANARY_LEGACY_860_GAME_PORT: "7175"
-    command: >
-      -config config.lua -schema schema/mysql.sql -scripts scripts -appearances data/items/appearances.dat -migrate -seed
     ports:
       - "7171:7171"
       - "7172:7172"
@@ -54,7 +52,6 @@ services:
       - "7175:7175"
       - "7173:7173"
     volumes:
-      - ../config.lua:/app/config.lua:ro
       - ../data:/app/data:ro
       - ../data-otservbr-global:/app/data-otservbr-global:rw
     depends_on:
