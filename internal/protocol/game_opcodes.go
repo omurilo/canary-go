@@ -357,18 +357,20 @@ func (g *GameProtocol) parseBrowseField(r *netmsg.Reader) {
 		return
 	}
 
-	// Distance check (range 1,1)
-	dx := int(g.player.Pos.X) - int(gPos.X)
-	if dx < 0 {
-		dx = -dx
-	}
-	dy := int(g.player.Pos.Y) - int(gPos.Y)
-	if dy < 0 {
-		dy = -dy
-	}
-	if dx > 1 || dy > 1 {
-		g.sendStatusText("You are too far.")
-		return
+	// Gods/GMs can browse from any distance
+	if g.player.AccountType < 5 {
+		dx := int(g.player.Pos.X) - int(gPos.X)
+		if dx < 0 {
+			dx = -dx
+		}
+		dy := int(g.player.Pos.Y) - int(gPos.Y)
+		if dy < 0 {
+			dy = -dy
+		}
+		if dx > 1 || dy > 1 {
+			g.sendStatusText("You are too far.")
+			return
+		}
 	}
 
 	g.sendBrowseField(gPos)
