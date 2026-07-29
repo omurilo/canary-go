@@ -17,13 +17,8 @@ func (g *GameProtocol) sendBrowseField(pos game.Position) {
 		return
 	}
 
-	// Collect valid items from the tile (reverse order, like C++).
-	// Valid: has container, is movable, or is wrapable non-blocking.
+	// Collect items from the tile (C++ uses tile->getItemList() which excludes Ground).
 	var items []*game.Item
-	if tile.Ground != nil {
-		items = append(items, tile.Ground)
-	}
-	// Add tile items in reverse so top items appear first in the container
 	for i := len(tile.Items) - 1; i >= 0; i-- {
 		it := tile.Items[i]
 		if it == nil {
@@ -33,13 +28,15 @@ func (g *GameProtocol) sendBrowseField(pos game.Position) {
 		if it.Attr != nil && it.Attr.UniqueID != nil {
 			continue
 		}
-		// Valid: has sub-container, is movable, or is wrapable non-blocking
-		itType := g.deps.Items.Get(it.ID)
+		// Valid: has sub-container, is movable
 		isContainer := len(it.Contents) > 0
-		isMovable := itType != nil && itType.Pickupable
+		isMovable := false
+		if itType := g.deps.Items.Get(it.ID); itType != nil {
+			isMovable = itType.Pickupable
+		}
 		if !isContainer && !isMovable {
 			// Skip non-interactive blocking items (decorations, walls)
-			if itType != nil && itType.BlockSolid {
+			if itType := g.deps.Items.Get(it.ID); itType != nil && itType.BlockSolid {
 				continue
 			}
 		}
