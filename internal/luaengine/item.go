@@ -125,39 +125,9 @@ func itemRemove(L *lua.LState) int {
 	}
 	if int(it.item.Count) > count {
 		it.item.Count -= uint16(count)
-		L.Push(lua.LTrue)
-		return 1
+	} else {
+		it.item.Count = 0
 	}
-	// Item fully consumed: remove from tile and broadcast
-	if e, ok := L.GetGlobal("Game").(*lua.LUserData); ok {
-		if eng, ok2 := e.Value.(*Engine); ok2 && eng.world != nil {
-			if it.pos.X != 0 {
-				stack := byte(0)
-				tile := eng.world.Map.GetTile(it.pos)
-				if tile != nil {
-					if tile.Ground != nil { stack++ }
-					for _, tileIt := range tile.Items {
-						if tileIt == it.item {
-							break
-						}
-						if eng.world.Items != nil {
-							if ti := eng.world.Items.Get(tileIt.ID); ti != nil && ti.AlwaysOnTop() {
-								// skip, counted separately
-							} else {
-								stack++
-							}
-						}
-					}
-					stack += byte(len(tile.Creatures))
-					eng.world.Map.RemoveItemPtr(it.pos, it.item)
-					if eng.world.OnItemDisappear != nil {
-						eng.world.OnItemDisappear(it.pos, uint8(stack), it.item)
-					}
-				}
-			}
-		}
-	}
-	it.item.Count = 0
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -300,7 +270,48 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		"getParent": stubItemMethod,
 		"clone": stubItemMethod,
 		"split": stubItemMethod,
-		"remove": itemRemove,
+		"remove": func(L *lua.LState) int {
+			it := checkItem(L)
+			if it.item == nil {
+				L.Push(lua.LFalse)
+				return 1
+			}
+			count := 1
+			if L.GetTop() >= 2 && L.Get(2).Type() == lua.LTNumber {
+				count = luaOptInt(L, 2)
+			}
+			if count < 1 {
+				count = 1
+			}
+			if int(it.item.Count) > count {
+				it.item.Count -= uint16(count)
+				L.Push(lua.LTrue)
+				return 1
+			}
+			// Item fully consumed: remove from tile and broadcast
+			if it.pos.X != 0 && e.world != nil {
+				stack := byte(0)
+				tile := e.world.Map.GetTile(it.pos)
+				if tile != nil {
+					if tile.Ground != nil { stack++ }
+					for _, tileIt := range tile.Items {
+						if tileIt == it.item { break }
+						if e.world.Items != nil {
+							if ti := e.world.Items.Get(tileIt.ID); ti != nil && ti.AlwaysOnTop() {
+							} else { stack++ }
+						}
+					}
+					stack += byte(len(tile.Creatures))
+					e.world.Map.RemoveItemPtr(it.pos, it.item)
+					if e.world.OnItemDisappear != nil {
+						e.world.OnItemDisappear(it.pos, uint8(stack), it.item)
+					}
+				}
+			}
+			it.item.Count = 0
+			L.Push(lua.LTrue)
+			return 1
+		},
 		"addItem": func(L *lua.LState) int {
 			it := checkItem(L)
 			itemID, ok := e.resolveItemID(L, 2)
