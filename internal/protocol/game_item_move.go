@@ -1,5 +1,4 @@
 package protocol
-
 import (
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/items"
@@ -248,8 +247,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	// 3. Remove from source
 	if moveItem == item {
 		if fromPos.X != 0xFFFF {
-			g.deps.World.Map.RemoveItemPtr(game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}, item)
-			g.broadcastRemoveTileThing(game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}, fromStack)
+			pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+			g.deps.World.Map.RemoveItemPtr(pos, item)
+			g.onRemoveTileItem(pos, fromStack, item)
 		} else {
 			if fromPos.Y >= 0x40 {
 				fromContainer.Contents = append(fromContainer.Contents[:fromSlot], fromContainer.Contents[fromSlot+1:]...)
@@ -547,6 +547,9 @@ func (g *GameProtocol) broadcastRemoveTileThing(pos game.Position, stack uint8) 
 }
 
 func (g *GameProtocol) sendRemoveTileThing(pos game.Position, stack uint8) {
+	if stack >= 10 {
+		return
+	}
 	w := netmsg.NewWriter()
 	w.AddByte(0x6C) // TileRemoveThing
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
@@ -669,4 +672,14 @@ func isChildOf(parent, child *game.Item) bool {
 		}
 	}
 	return false
+}
+
+// onRemoveTileItem sends RemoveTileThing to each spectator with per-player stack position.
+// Mirrors C++ Tile::onRemoveTileItem.
+func (g *GameProtocol) onRemoveTileItem(pos game.Position, stackPos uint8, item *game.Item) {
+	for _, s := range g.deps.World.Spectators(pos, 0) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			gp.sendRemoveTileThing(pos, stackPos)
+		}
+	}
 }
