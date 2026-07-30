@@ -309,12 +309,55 @@ func (p *Player) InternalAddItem(catalog *items.Catalog, itemId uint16, count ui
 	return placed, true
 }
 
-// placeItem puts a single item into a specific equipment slot (when given and
-// free), else merges into an existing stack / drops into the backpack, else the
-// first free equipment slot. Returns false when there was no room.
+// FitsSlot reports whether an item may be worn in an equipment slot, porting the
+// per-slot checks in Player::queryAdd (src/creatures/players/player.cpp:4515):
+// each slot only accepts an item whose slotPosition carries the matching flag, and
+// anything else is CANNOTBEDRESSED.
+//
+// Go models slotPosition as the raw string from the item data rather than a
+// bitmask, so this maps the names instead of masking. An item with no slotPosition
+// is not equippable anywhere and can only go into a container.
+func FitsSlot(it *items.ItemType, slot int) bool {
+	if it == nil {
+		return false
+	}
+	switch it.SlotPosition {
+	case "head":
+		return slot == ConstSlotHead
+	case "necklace", "amulet":
+		return slot == ConstSlotNecklace
+	case "backpack":
+		return slot == ConstSlotBackpack
+	case "armor", "body":
+		return slot == ConstSlotArmor
+	case "legs":
+		return slot == ConstSlotLegs
+	case "feet":
+		return slot == ConstSlotFeet
+	case "ring":
+		return slot == ConstSlotRing
+	case "ammo":
+		return slot == ConstSlotAmmo
+	case "hand", "two-handed", "dualwielding":
+		// Either hand; two-handed additionally requires the other hand free, which
+		// the equip path enforces separately.
+		return slot == ConstSlotRight || slot == ConstSlotLeft
+	case "right-hand":
+		return slot == ConstSlotRight
+	case "left-hand":
+		return slot == ConstSlotLeft
+	default:
+		return false
+	}
+}
+
+// placeItem puts a single item into a specific equipment slot (when given, free and
+// valid for the item), else merges into an existing stack / drops into the backpack,
+// else the first free equipment slot the item actually fits. Returns false when
+// there was no room.
 func (p *Player) placeItem(catalog *items.Catalog, it *Item, slot int) bool {
 	if slot >= ConstSlotFirst && slot <= ConstSlotLast {
-		if p.Inventory[slot] == nil {
+		if p.Inventory[slot] == nil && FitsSlot(catalog.Get(it.ID), slot) {
 			p.Inventory[slot] = it
 			return true
 		}
@@ -332,9 +375,13 @@ func (p *Player) placeItem(catalog *items.Catalog, it *Item, slot int) bool {
 			return true
 		}
 	}
-	// Fall back to the first free equipment slot.
+	// Fall back to the first free equipment slot the item actually fits. This used
+	// to take ANY free slot, which put ropes on the player's head when the backpack
+	// filled up — and worse, made InternalAddItem report a successful placement, so
+	// a shop charged for items that were never really delivered.
+	itemType := catalog.Get(it.ID)
 	for s := ConstSlotFirst; s <= ConstSlotLast; s++ {
-		if p.Inventory[s] == nil {
+		if p.Inventory[s] == nil && FitsSlot(itemType, s) {
 			p.Inventory[s] = it
 			return true
 		}

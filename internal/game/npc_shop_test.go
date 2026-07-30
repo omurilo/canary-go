@@ -182,3 +182,75 @@ func TestShopBuyAndSellPriceLookup(t *testing.T) {
 		t.Errorf("sell price: got %d ok=%v want 50", price, ok)
 	}
 }
+
+// placeItem used to fall back to ANY free equipment slot when the backpack was
+// full, so a rope ended up worn on the head, the necklace slot and the legs. Worse,
+// InternalAddItem then reported those bogus placements as delivered, and the shop
+// charged for them.
+func TestInternalAddItemDoesNotEquipUnfittingItems(t *testing.T) {
+	cat := items.NewCatalog(
+		&items.ItemType{ID: 3003, Name: "rope"}, // no slot: containers only
+		&items.ItemType{ID: 1988, Name: "bag", Group: items.GroupContainer, SlotPosition: "backpack"},
+	)
+	p := &Player{}
+	// A backpack with capacity 2 that already holds one item: room for exactly one
+	// more, and no equipment slot may take the overflow.
+	bp := &Item{ID: 1988, MaxSize: 2, Contents: []*Item{{ID: 3003}}}
+	p.Inventory[ConstSlotBackpack] = bp
+
+	placed, ok := p.InternalAddItem(cat, 3003, 5, -1, ConstSlotWhereever)
+
+	if ok {
+		t.Error("adding 5 items into room for 1 must not report full success")
+	}
+	if len(placed) != 1 {
+		t.Errorf("expected exactly 1 placement to be reported, got %d", len(placed))
+	}
+	if len(bp.Contents) != 2 {
+		t.Errorf("backpack should hold 2 items, holds %d", len(bp.Contents))
+	}
+	for s := ConstSlotFirst; s <= ConstSlotLast; s++ {
+		if s == ConstSlotBackpack {
+			continue
+		}
+		if p.Inventory[s] != nil {
+			t.Errorf("slot %d must stay empty, holds item %d", s, p.Inventory[s].ID)
+		}
+	}
+	// The reported count must match reality, or the shop overcharges.
+	if got := p.GetItemTypeCount(cat, 3003, -1); got != 2 {
+		t.Errorf("player should hold 2 ropes (1 pre-existing + 1 added), holds %d", got)
+	}
+}
+
+// FitsSlot mirrors the per-slot rules of Player::queryAdd.
+func TestFitsSlot(t *testing.T) {
+	cat := items.NewCatalog(
+		&items.ItemType{ID: 1, SlotPosition: "head"},
+		&items.ItemType{ID: 2, SlotPosition: "two-handed"},
+		&items.ItemType{ID: 3, SlotPosition: "right-hand"},
+		&items.ItemType{ID: 4}, // not equippable
+	)
+
+	if !FitsSlot(cat.Get(1), ConstSlotHead) {
+		t.Error("a helmet must fit the head slot")
+	}
+	if FitsSlot(cat.Get(1), ConstSlotLegs) {
+		t.Error("a helmet must not fit the legs slot")
+	}
+	// Two-handed goes in either hand; the equip path enforces the other hand.
+	if !FitsSlot(cat.Get(2), ConstSlotLeft) || !FitsSlot(cat.Get(2), ConstSlotRight) {
+		t.Error("a two-handed weapon must fit either hand")
+	}
+	if FitsSlot(cat.Get(3), ConstSlotLeft) {
+		t.Error("a right-hand item must not fit the left hand")
+	}
+	for s := ConstSlotFirst; s <= ConstSlotLast; s++ {
+		if FitsSlot(cat.Get(4), s) {
+			t.Errorf("an item with no slot must fit nowhere, but fits %d", s)
+		}
+	}
+	if FitsSlot(nil, ConstSlotHead) {
+		t.Error("a nil item type must not fit anywhere")
+	}
+}
