@@ -14,9 +14,15 @@ func TestProtectionZone_TileFlags(t *testing.T) {
 		t.Error("expected fresh tile NOT to be a protection zone")
 	}
 
-	tile.Flags = 1 // 1 is TILESTATE_PROTECTIONZONE
+	// TILESTATE_PROTECTIONZONE is 1 << 7, not 1: the loader used to keep the raw
+	// OTBM bits, where the protection-zone bit happens to be 1 << 0.
+	tile.Flags = TileFlagProtectionZone
 	if !tile.IsProtectionZone() {
-		t.Error("expected tile with flag 1 to be a protection zone")
+		t.Error("expected tile with TILESTATE_PROTECTIONZONE to be a protection zone")
+	}
+	tile.Flags = 1 // the OTBM bit, which must no longer read as a protection zone
+	if tile.IsProtectionZone() {
+		t.Error("raw OTBM bit 1 must not read as TILESTATE_PROTECTIONZONE")
 	}
 }
 
@@ -25,7 +31,7 @@ func TestProtectionZone_CanDoCombat_BlocksAggressiveActions(t *testing.T) {
 	p1 := &Player{}
 	p1.World = w
 	p1.SetPosition(Position{X: 100, Y: 100, Z: 7})
-	w.Map.SetTile(p1.GetPosition(), &Tile{Ground: &Item{ID: 1}, Flags: 1}) // Inside PZ
+	w.Map.SetTile(p1.GetPosition(), &Tile{Ground: &Item{ID: 1}, Flags: TileFlagProtectionZone}) // Inside PZ
 
 	p2 := &Player{}
 	p2.World = w
@@ -54,14 +60,14 @@ func TestProtectionZone_CanDoCombat_BlocksAggressiveActions(t *testing.T) {
 
 func TestProtectionZone_MovementRestrictions(t *testing.T) {
 	w := NewWorld()
-	w.Map.SetTile(Position{X: 100, Y: 100, Z: 7}, &Tile{Ground: &Item{ID: 1}, Flags: 0}) // Normal tile
-	w.Map.SetTile(Position{X: 101, Y: 100, Z: 7}, &Tile{Ground: &Item{ID: 1}, Flags: 1}) // PZ tile
+	w.Map.SetTile(Position{X: 100, Y: 100, Z: 7}, &Tile{Ground: &Item{ID: 1}, Flags: 0})                      // Normal tile
+	w.Map.SetTile(Position{X: 101, Y: 100, Z: 7}, &Tile{Ground: &Item{ID: 1}, Flags: TileFlagProtectionZone}) // PZ tile
 
 	// Player can enter Protection Zone
 	player := &Player{}
 	player.World = w
 	player.SetPosition(Position{X: 100, Y: 100, Z: 7})
-	
+
 	_, ok := w.TryMoveCreature(player, DirEast)
 	if !ok {
 		t.Error("expected player to be allowed to move into protection zone")
@@ -182,7 +188,7 @@ func TestProtectionZone_PlayerIcons(t *testing.T) {
 	}
 
 	// 2. Inside PZ -> Protection Zone icon (bit 14) is set
-	w.Map.SetTile(p.GetPosition(), &Tile{Ground: &Item{ID: 1}, Flags: 1})
+	w.Map.SetTile(p.GetPosition(), &Tile{Ground: &Item{ID: 1}, Flags: TileFlagProtectionZone})
 	if (p.GetIcons() & (1 << 14)) == 0 {
 		t.Error("expected protection zone icon bit (bit 14) to be set inside protection zone")
 	}
@@ -192,13 +198,13 @@ func TestWalkthrough_TryMove(t *testing.T) {
 	w := NewWorld()
 	p1 := &Player{GroupID: 1}
 	p1.SetPosition(Position{X: 100, Y: 100, Z: 7})
-	tile1 := &Tile{Ground: &Item{ID: 1}, Flags: 1} // Protection Zone
+	tile1 := &Tile{Ground: &Item{ID: 1}, Flags: TileFlagProtectionZone} // Protection Zone
 	tile1.Creatures = append(tile1.Creatures, p1)
 	w.Map.SetTile(Position{X: 100, Y: 100, Z: 7}, tile1)
 
 	p2 := &Player{GroupID: 1}
 	p2.SetPosition(Position{X: 100, Y: 101, Z: 7})
-	tile2 := &Tile{Ground: &Item{ID: 1}, Flags: 1} // Protection Zone
+	tile2 := &Tile{Ground: &Item{ID: 1}, Flags: TileFlagProtectionZone} // Protection Zone
 	tile2.Creatures = append(tile2.Creatures, p2)
 	w.Map.SetTile(Position{X: 100, Y: 101, Z: 7}, tile2)
 
@@ -217,4 +223,3 @@ func TestWalkthrough_TryMove(t *testing.T) {
 		t.Fatalf("expected GM to walk through p1, got ok=%v, pos=%v", ok, pos)
 	}
 }
-

@@ -73,11 +73,14 @@ func Str(key, def string) string { return Active.String(key, def) }
 // keys in config.lua are simply ignored.
 type Config struct {
 	ServerName string
-	IP         string
+	// WorldType is the parsed worldType string as a WorldType_t value
+	// (WORLD_TYPE_NO_PVP = 1, PVP = 2, PVP_ENFORCED = 3).
+	WorldType int
+	IP        string
 
-	LoginPort    int
-	GamePort     int
-	StatusPort   int
+	LoginPort      int
+	GamePort       int
+	StatusPort     int
 	Legacy1100Port int // legacy 11.00 game protocol port (0 = disabled)
 	Legacy860Port  int // legacy 8.60 game protocol port (0 = disabled)
 
@@ -118,20 +121,21 @@ type Config struct {
 // Default returns a config with sane defaults for local development.
 func Default() *Config {
 	return &Config{
-		ServerName:    "Canary-Go",
-		IP:            "127.0.0.1",
-		LoginPort:     7171,
-		GamePort:      7172,
-		StatusPort:    7171,
-		Legacy1100Port: 0, // disabled by default; enable via config.lua or env
-		Legacy860Port:  0, // disabled by default; enable via config.lua or env
-		DataPack:      "data-otservbr-global",
-		Core:          "data",
-		DBHost:        "127.0.0.1",
-		DBUser:        "canary",
-		DBPassword:    "canary",
-		DBName:        "canary",
-		DBPort:        3306,
+		ServerName:         "Canary-Go",
+		WorldType:          2, // "pvp", the upstream default
+		IP:                 "127.0.0.1",
+		LoginPort:          7171,
+		GamePort:           7172,
+		StatusPort:         7171,
+		Legacy1100Port:     0, // disabled by default; enable via config.lua or env
+		Legacy860Port:      0, // disabled by default; enable via config.lua or env
+		DataPack:           "data-otservbr-global",
+		Core:               "data",
+		DBHost:             "127.0.0.1",
+		DBUser:             "canary",
+		DBPassword:         "canary",
+		DBName:             "canary",
+		DBPort:             3306,
 		MOTD:               "Welcome to Canary-Go!",
 		AllowOldProto:      true,
 		RSAKeyFile:         "key.pem",
@@ -190,6 +194,14 @@ func Load(path string) (*Config, error) {
 	}
 
 	cfg.ServerName = str("serverName", cfg.ServerName)
+	switch str("worldType", "pvp") {
+	case "no-pvp":
+		cfg.WorldType = 1
+	case "pvp-enforced":
+		cfg.WorldType = 3
+	default:
+		cfg.WorldType = 2
+	}
 	cfg.IP = str("ip", cfg.IP)
 	cfg.LoginPort = num("loginProtocolPort", cfg.LoginPort)
 	cfg.GamePort = num("gameProtocolPort", cfg.GamePort)

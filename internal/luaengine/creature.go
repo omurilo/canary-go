@@ -214,11 +214,11 @@ func (e *Engine) registerCreatureType() {
 }
 
 var creatureMethods = map[string]lua.LGFunction{
-	"getEvents": creatureGetevents,
-	"registerEvent": creatureRegisterevent,
+	"getEvents":       creatureGetevents,
+	"registerEvent":   creatureRegisterevent,
 	"unregisterEvent": creatureUnregisterevent,
-	"isRemoved": creatureIsremoved,
-	"isCreature": creatureIscreature,
+	"isRemoved":       creatureIsremoved,
+	"isCreature":      creatureIscreature,
 	"isPlayer": func(L *lua.LState) int {
 		c := checkCreature(L)
 		_, ok := c.(*game.Player)
@@ -242,71 +242,71 @@ var creatureMethods = map[string]lua.LGFunction{
 	// `local player = creature:getPlayer()` (e.g. the temple/citizen movement),
 	// so these must be real methods on the metatable, not just the Lua-lib
 	// versions on the global Creature table (which revscriptsys never resolves).
-	"getPlayer":   creatureGetplayer,
-	"getMonster":  creatureGetmonster,
-	"getNpc":      creatureGetnpc,
-	"getCreature": func(L *lua.LState) int { L.Push(L.Get(1)); return 1 },
-	"isInGhostMode": creatureIsinghostmode,
-	"isHealthHidden": creatureIshealthhidden,
-	"isImmune": creatureIsimmune,
-	"canSee": creatureCansee,
-	"canSeeCreature": creatureCanseecreature,
-	"getId": creatureGetid,
-	"getName": creatureGetname,
-	"getTypeName": creatureGettypename,
-	"getTarget": creatureGettarget,
-	"setTarget": creatureSettarget,
-	"getFollowCreature": creatureGetfollowcreature,
-	"setFollowCreature": creatureSetfollowcreature,
-	"reload": creatureReload,
-	"getMaster": creatureGetmaster,
-	"setMaster": creatureSetmaster,
-	"getLight": creatureGetlight,
-	"setLight": creatureSetlight,
-	"getSpeed": creatureGetspeed,
-	"getBaseSpeed": creatureGetbasespeed,
-	"setDropLoot": creatureSetdroploot,
-	"setSkillLoss": creatureSetskillloss,
-	"getPosition": creatureGetposition,
-	"getDirection": creatureGetdirection,
-	"setDirection": creatureSetdirection,
-	"getHealth": creatureGethealth,
-	"setHealth": creatureSethealth,
-	"addHealth": creatureAddhealth,
-	"getMaxHealth": creatureGetmaxhealth,
-	"setMaxHealth": creatureSetmaxhealth,
-	"setHiddenHealth": creatureSethiddenhealth,
-	"isMoveLocked": creatureIsmovelocked,
-	"isDirectionLocked": creatureIsdirectionlocked,
-	"setMoveLocked": creatureSetmovelocked,
+	"getPlayer":          creatureGetplayer,
+	"getMonster":         creatureGetmonster,
+	"getNpc":             creatureGetnpc,
+	"getCreature":        func(L *lua.LState) int { L.Push(L.Get(1)); return 1 },
+	"isInGhostMode":      creatureIsinghostmode,
+	"isHealthHidden":     creatureIshealthhidden,
+	"isImmune":           creatureIsimmune,
+	"canSee":             creatureCansee,
+	"canSeeCreature":     creatureCanseecreature,
+	"getId":              creatureGetid,
+	"getName":            creatureGetname,
+	"getTypeName":        creatureGettypename,
+	"getTarget":          creatureGettarget,
+	"setTarget":          creatureSettarget,
+	"getFollowCreature":  creatureGetfollowcreature,
+	"setFollowCreature":  creatureSetfollowcreature,
+	"reload":             creatureReload,
+	"getMaster":          creatureGetmaster,
+	"setMaster":          creatureSetmaster,
+	"getLight":           creatureGetlight,
+	"setLight":           creatureSetlight,
+	"getSpeed":           creatureGetspeed,
+	"getBaseSpeed":       creatureGetbasespeed,
+	"setDropLoot":        creatureSetdroploot,
+	"setSkillLoss":       creatureSetskillloss,
+	"getPosition":        creatureGetposition,
+	"getDirection":       creatureGetdirection,
+	"setDirection":       creatureSetdirection,
+	"getHealth":          creatureGethealth,
+	"setHealth":          creatureSethealth,
+	"addHealth":          creatureAddhealth,
+	"getMaxHealth":       creatureGetmaxhealth,
+	"setMaxHealth":       creatureSetmaxhealth,
+	"setHiddenHealth":    creatureSethiddenhealth,
+	"isMoveLocked":       creatureIsmovelocked,
+	"isDirectionLocked":  creatureIsdirectionlocked,
+	"setMoveLocked":      creatureSetmovelocked,
 	"setDirectionLocked": creatureSetdirectionlocked,
-	"getSkull": creatureGetskull,
-	"setSkull": creatureSetskull,
-	"getOutfit": creatureGetoutfit,
-	"setOutfit": creatureSetoutfit,
-	"getCondition": creatureGetcondition,
-	"addCondition": creatureAddcondition,
-	"removeCondition": creatureRemovecondition,
-	"hasCondition": creatureHascondition,
-	"say": creatureSay,
-	"getDamageMap": creatureGetdamagemap,
-	"getSummons": creatureGetsummons,
-	"hasBeenSummoned": creatureHasbeensummoned,
-	"getDescription": creatureGetdescription,
-	"getPathTo": creatureGetpathto,
-	"move": creatureMove,
+	"getSkull":           creatureGetskull,
+	"setSkull":           creatureSetskull,
+	"getOutfit":          creatureGetoutfit,
+	"setOutfit":          creatureSetoutfit,
+	"getCondition":       creatureGetcondition,
+	"addCondition":       creatureAddcondition,
+	"removeCondition":    creatureRemovecondition,
+	"hasCondition":       creatureHascondition,
+	"say":                creatureSay,
+	"getDamageMap":       creatureGetdamagemap,
+	"getSummons":         creatureGetsummons,
+	"hasBeenSummoned":    creatureHasbeensummoned,
+	"getDescription":     creatureGetdescription,
+	"getPathTo":          creatureGetpathto,
+	"move":               creatureMove,
 	// getZoneType is registered as an engine method below in registerCreatureType()
-	"getZones": creatureGetzones,
-	"setIcon": creatureSeticon,
-	"getIcon": creatureGeticon,
-	"getIcons": creatureGeticons,
-	"removeIcon": creatureRemoveicon,
-	"clearIcons": creatureClearicons,
-	"attachEffectById": creatureAttacheffectbyid,
-	"detachEffectById": creatureDetacheffectbyid,
+	"getZones":           creatureGetzones,
+	"setIcon":            creatureSeticon,
+	"getIcon":            creatureGeticon,
+	"getIcons":           creatureGeticons,
+	"removeIcon":         creatureRemoveicon,
+	"clearIcons":         creatureClearicons,
+	"attachEffectById":   creatureAttacheffectbyid,
+	"detachEffectById":   creatureDetacheffectbyid,
 	"getAttachedEffects": creatureGetattachedeffects,
-	"getShader": creatureGetshader,
-	"setShader": creatureSetshader,
+	"getShader":          creatureGetshader,
+	"setShader":          creatureSetshader,
 }
 
 func creatureAddcondition(L *lua.LState) int {
@@ -657,15 +657,15 @@ func (e *Engine) creatureGetzonetype(L *lua.LState) int {
 		L.Push(lua.LNumber(0)) // ZONE_PROTECTION
 		return 1
 	}
-	if (tile.Flags & (1 << 4)) != 0 { // TILESTATE_PVPZONE
+	if (tile.Flags & game.TileFlagPvpZone) != 0 {
 		L.Push(lua.LNumber(2)) // ZONE_PVP
 		return 1
 	}
-	if (tile.Flags & (1 << 2)) != 0 { // TILESTATE_NOPVPZONE
+	if (tile.Flags & game.TileFlagNoPvpZone) != 0 {
 		L.Push(lua.LNumber(1)) // ZONE_NOPVP
 		return 1
 	}
-	if (tile.Flags & (1 << 3)) != 0 { // TILESTATE_NOLOGOUT
+	if (tile.Flags & game.TileFlagNoLogout) != 0 {
 		L.Push(lua.LNumber(3)) // ZONE_NOLOGOUT
 		return 1
 	}
@@ -861,13 +861,13 @@ func (e *Engine) creatureSetspeed(L *lua.LState) int {
 		speed := L.CheckInt(2)
 		// C++ setCreatureSpeed changes base speed, then broadcasts
 		// We'll mimic this by finding the difference from current base speed
-		// Wait, Creature doesn't have SetBaseSpeed. We can just add SetBaseSpeed, 
+		// Wait, Creature doesn't have SetBaseSpeed. We can just add SetBaseSpeed,
 		// but since we only use ChangeSpeed, let's just adjust the SpeedBonus
-		// so that GetSpeed() == speed. 
+		// so that GetSpeed() == speed.
 		// Actually, in Canary setCreatureSpeed does: creature->setBaseSpeed(speed); then broadcasts.
 		// For now we'll just set speed delta to match requested speed.
 		delta := int32(speed) - int32(c.GetBaseSpeed())
-		e.world.ChangeSpeed(c, delta - int32(c.GetSpeed()) + int32(c.GetBaseSpeed())) 
+		e.world.ChangeSpeed(c, delta-int32(c.GetSpeed())+int32(c.GetBaseSpeed()))
 		// Wait, ChangeSpeed adds to SpeedBonus.
 		// Current Speed = BaseSpeed + SpeedBonus.
 		// We want New Speed = speed.
@@ -931,4 +931,3 @@ func creatureUnregisterevent(L *lua.LState) int {
 	L.Push(lua.LTrue)
 	return 1
 }
-

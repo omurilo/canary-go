@@ -14,13 +14,13 @@ import (
 
 // Node type bytes.
 const (
-	nodeRootV1   = 1
-	nodeMapData  = 2
-	nodeTileArea = 4
-	nodeTile     = 5
-	nodeItem     = 6
-	nodeTownsGrp = 12
-	nodeTown     = 13
+	nodeRootV1    = 1
+	nodeMapData   = 2
+	nodeTileArea  = 4
+	nodeTile      = 5
+	nodeItem      = 6
+	nodeTownsGrp  = 12
+	nodeTown      = 13
 	nodeHouseTile = 14
 	nodeWaypoints = 15
 	nodeWaypoint  = 16
@@ -29,41 +29,41 @@ const (
 
 // Attribute tag bytes (map + item level share values).
 const (
-	attrDescription = 1
-	attrExtFile     = 2
-	attrTileFlags   = 3
-	attrActionID    = 4
-	attrUniqueID    = 5
-	attrText        = 6
-	attrDesc        = 7
-	attrTeleDest    = 8
-	attrItem        = 9
-	attrDepotID     = 10
-	attrExtSpawnMon = 11
-	attrRuneCharges = 12
-	attrExtHouse    = 13
-	attrHouseDoorID = 14
-	attrCount       = 15
-	attrDuration    = 16
-	attrDecayState  = 17
-	attrWrittenDate = 18
-	attrWrittenBy   = 19
-	attrSleeperGUID = 20
-	attrSleepStart  = 21
-	attrCharges     = 22
-	attrExtSpawnNPC = 23
-	attrName        = 24
-	attrArticle     = 25
-	attrPluralName  = 26
-	attrWeight      = 27
-	attrAttack      = 28
-	attrDefense     = 29
+	attrDescription  = 1
+	attrExtFile      = 2
+	attrTileFlags    = 3
+	attrActionID     = 4
+	attrUniqueID     = 5
+	attrText         = 6
+	attrDesc         = 7
+	attrTeleDest     = 8
+	attrItem         = 9
+	attrDepotID      = 10
+	attrExtSpawnMon  = 11
+	attrRuneCharges  = 12
+	attrExtHouse     = 13
+	attrHouseDoorID  = 14
+	attrCount        = 15
+	attrDuration     = 16
+	attrDecayState   = 17
+	attrWrittenDate  = 18
+	attrWrittenBy    = 19
+	attrSleeperGUID  = 20
+	attrSleepStart   = 21
+	attrCharges      = 22
+	attrExtSpawnNPC  = 23
+	attrName         = 24
+	attrArticle      = 25
+	attrPluralName   = 26
+	attrWeight       = 27
+	attrAttack       = 28
+	attrDefense      = 29
 	attrExtraDefense = 30
-	attrArmor       = 31
-	attrHitChance   = 32
-	attrShootRange  = 33
-	attrSpecial     = 34
-	attrTier        = 40
+	attrArmor        = 31
+	attrHitChance    = 32
+	attrShootRange   = 33
+	attrSpecial      = 34
+	attrTier         = 40
 )
 
 const escapeByte = 0xFD
@@ -94,6 +94,15 @@ type reader struct {
 	pos   int
 	depth int
 }
+
+// OTBM tile flags as written in the map file (io_definitions.hpp:72) and the
+// runtime tile flags they translate to (items_definitions.hpp:443).
+const (
+	otbmTileFlagProtectionZone = 1 << 0
+	otbmTileFlagNoPvpZone      = 1 << 2
+	otbmTileFlagNoLogout       = 1 << 3
+	otbmTileFlagPvpZone        = 1 << 4
+)
 
 func (r *reader) eof() bool { return r.pos >= len(r.data) }
 
@@ -306,15 +315,30 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 	}
 
 	if house {
-		tile.HouseID = r.u32() // house id
-		tile.Flags |= 1 // House tiles are protection zones
+		tile.HouseID = r.u32()                    // house id
+		tile.Flags |= game.TileFlagProtectionZone // C++ House::addTile (house.cpp:27)
 	}
 
 	// Inline tile attributes.
 	for {
 		tag := r.u8()
 		if tag == attrTileFlags {
-			tile.Flags = r.u32()
+			// The OTBM bits are not TileFlags_t: C++ translates them
+			// (iomap.cpp:165-178) and stores the runtime flags. Go used to keep the
+			// raw OTBM word, so every TILESTATE_ constant had to be redefined to
+			// match, and tile:hasFlag disagreed with upstream.
+			otbmFlags := r.u32()
+			switch {
+			case otbmFlags&otbmTileFlagProtectionZone != 0:
+				tile.Flags |= game.TileFlagProtectionZone
+			case otbmFlags&otbmTileFlagNoPvpZone != 0:
+				tile.Flags |= game.TileFlagNoPvpZone
+			case otbmFlags&otbmTileFlagPvpZone != 0:
+				tile.Flags |= game.TileFlagPvpZone
+			}
+			if otbmFlags&otbmTileFlagNoLogout != 0 {
+				tile.Flags |= game.TileFlagNoLogout
+			}
 			continue
 		}
 		if tag == attrItem {

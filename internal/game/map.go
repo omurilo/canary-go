@@ -11,16 +11,25 @@ type Tile struct {
 	Ground    *Item
 	Items     []*Item // stacked items (top + down), excluding creatures
 	Creatures []Creature
-	Flags     uint32  // tile flags (e.g. Protection Zone, No-PVP, etc.)
-	HouseID   uint32  // 0 = not a house tile; >0 = owned by house with this ID
+	Flags     uint32 // tile flags (e.g. Protection Zone, No-PVP, etc.)
+	HouseID   uint32 // 0 = not a house tile; >0 = owned by house with this ID
 }
+
+// TileFlags_t (items_definitions.hpp:443). Only the subset the map loader and
+// the engine actually set is named here; the Lua enum table carries all of them.
+const (
+	TileFlagProtectionZone uint32 = 1 << 7
+	TileFlagNoPvpZone      uint32 = 1 << 8
+	TileFlagNoLogout       uint32 = 1 << 9
+	TileFlagPvpZone        uint32 = 1 << 10
+)
 
 // IsProtectionZone reports whether the tile has the protection zone flag.
 func (t *Tile) IsProtectionZone() bool {
 	if t == nil {
 		return false
 	}
-	return (t.Flags & 1) != 0
+	return (t.Flags & TileFlagProtectionZone) != 0
 }
 
 // WalkableFor reports whether mover may stand on or walk through the tile.

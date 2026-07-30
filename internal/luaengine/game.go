@@ -3,6 +3,8 @@ package luaengine
 import (
 	"strings"
 
+	"github.com/opentibiabr/canary-go/internal/config"
+
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
@@ -13,64 +15,64 @@ import (
 // registerGame registers the global Game table and its methods.
 func (e *Engine) registerGame() {
 	gameMethods := map[string]lua.LGFunction{
-		"getMonsterTypeByName":     e.gameGetMonsterTypeByName,
-		"getSpectators":            e.gameGetSpectators,
-		"getBoostedCreature":       e.gameGetBoostedCreature,
-		"getBestiaryList":          e.gameGetBestiaryList,
-		"getPlayers":               e.gameGetPlayers,
-		"loadMap":                  e.gameLoadMap,
-		"loadMapChunk":             e.gameLoadMapChunk,
-		"getExperienceForLevel":    e.gameGetExperienceForLevel,
-		"getMonsterCount":          e.gameGetMonsterCount,
-		"getPlayerCount":           e.gameGetPlayerCount,
-		"getNpcCount":              e.gameGetNpcCount,
-		"getMonsterTypes":          e.gameGetMonsterTypes,
-		"getTowns":                 e.gameGetTowns,
-		"getHouses":                e.gameGetHouses,
-		"getGameState":             e.gameGetGameState,
-		"setGameState":             e.gameSetGameState,
-		"getWorldType":             e.gameGetWorldType,
-		"setWorldType":             e.gameSetWorldType,
-		"getReturnMessage":         e.gameGetReturnMessage,
-		"createItem":               e.gameCreateItem,
-		"createContainer":          e.gameCreateContainer,
-		"createMonster":            e.gameCreateMonster,
-		"createSoulPitMonster":     e.gameCreateSoulPitMonster,
-		"createNpc":                e.gameCreateNpc,
-		"generateNpc":              e.gameGenerateNpc,
-		"createTile":               e.gameCreateTile,
-		"createBestiaryCharm":      e.gameCreateBestiaryCharm,
-		"createItemClassification": e.gameCreateItemClassification,
-		"getBestiaryCharm":         e.gameGetBestiaryCharm,
-		"startRaid":                e.gameStartRaid,
-		"getClientVersion":         e.gameGetClientVersion,
-		"reload":                   e.gameReload,
-		"hasDistanceEffect":        e.gameHasDistanceEffect,
-		"hasEffect":                e.gameHasEffect,
-		"getOfflinePlayer":         e.gameGetOfflinePlayer,
-		"getNormalizedPlayerName":  e.gameGetNormalizedPlayerName,
-		"getNormalizedGuildName":   e.gameGetNormalizedGuildName,
-		"addInfluencedMonster":     e.gameAddInfluencedMonster,
-		"removeInfluencedMonster":  e.gameRemoveInfluencedMonster,
-		"getInfluencedMonsters":    e.gameGetInfluencedMonsters,
-		"makeFiendishMonster":      e.gameMakeFiendishMonster,
-		"removeFiendishMonster":    e.gameRemoveFiendishMonster,
-		"getFiendishMonsters":      e.gameGetFiendishMonsters,
-		"getBoostedBoss":           e.gameGetBoostedBoss,
-		"getLadderIds":             e.gameGetLadderIds,
-		"getDummies":               e.gameGetDummies,
-		"getTalkActions":           e.gameGetTalkActions,
-		"getEventCallbacks":        e.gameGetEventCallbacks,
-		"registerAchievement":      e.gameRegisterAchievement,
-		"getAchievementInfoById":   e.gameGetAchievementInfoById,
-		"getAchievementInfoByName": e.gameGetAchievementInfoByName,
-		"getSecretAchievements":    e.gameGetSecretAchievements,
-		"getPublicAchievements":    e.gameGetPublicAchievements,
-		"getAchievements":          e.gameGetAchievements,
-		"getSoulCoreItems":         e.gameGetSoulCoreItems,
-		"getMonstersByRace":        e.gameGetMonstersByRace,
+		"getMonsterTypeByName":       e.gameGetMonsterTypeByName,
+		"getSpectators":              e.gameGetSpectators,
+		"getBoostedCreature":         e.gameGetBoostedCreature,
+		"getBestiaryList":            e.gameGetBestiaryList,
+		"getPlayers":                 e.gameGetPlayers,
+		"loadMap":                    e.gameLoadMap,
+		"loadMapChunk":               e.gameLoadMapChunk,
+		"getExperienceForLevel":      e.gameGetExperienceForLevel,
+		"getMonsterCount":            e.gameGetMonsterCount,
+		"getPlayerCount":             e.gameGetPlayerCount,
+		"getNpcCount":                e.gameGetNpcCount,
+		"getMonsterTypes":            e.gameGetMonsterTypes,
+		"getTowns":                   e.gameGetTowns,
+		"getHouses":                  e.gameGetHouses,
+		"getGameState":               e.gameGetGameState,
+		"setGameState":               e.gameSetGameState,
+		"getWorldType":               e.gameGetWorldType,
+		"setWorldType":               e.gameSetWorldType,
+		"getReturnMessage":           e.gameGetReturnMessage,
+		"createItem":                 e.gameCreateItem,
+		"createContainer":            e.gameCreateContainer,
+		"createMonster":              e.gameCreateMonster,
+		"createSoulPitMonster":       e.gameCreateSoulPitMonster,
+		"createNpc":                  e.gameCreateNpc,
+		"generateNpc":                e.gameGenerateNpc,
+		"createTile":                 e.gameCreateTile,
+		"createBestiaryCharm":        e.gameCreateBestiaryCharm,
+		"createItemClassification":   e.gameCreateItemClassification,
+		"getBestiaryCharm":           e.gameGetBestiaryCharm,
+		"startRaid":                  e.gameStartRaid,
+		"getClientVersion":           e.gameGetClientVersion,
+		"reload":                     e.gameReload,
+		"hasDistanceEffect":          e.gameHasDistanceEffect,
+		"hasEffect":                  e.gameHasEffect,
+		"getOfflinePlayer":           e.gameGetOfflinePlayer,
+		"getNormalizedPlayerName":    e.gameGetNormalizedPlayerName,
+		"getNormalizedGuildName":     e.gameGetNormalizedGuildName,
+		"addInfluencedMonster":       e.gameAddInfluencedMonster,
+		"removeInfluencedMonster":    e.gameRemoveInfluencedMonster,
+		"getInfluencedMonsters":      e.gameGetInfluencedMonsters,
+		"makeFiendishMonster":        e.gameMakeFiendishMonster,
+		"removeFiendishMonster":      e.gameRemoveFiendishMonster,
+		"getFiendishMonsters":        e.gameGetFiendishMonsters,
+		"getBoostedBoss":             e.gameGetBoostedBoss,
+		"getLadderIds":               e.gameGetLadderIds,
+		"getDummies":                 e.gameGetDummies,
+		"getTalkActions":             e.gameGetTalkActions,
+		"getEventCallbacks":          e.gameGetEventCallbacks,
+		"registerAchievement":        e.gameRegisterAchievement,
+		"getAchievementInfoById":     e.gameGetAchievementInfoById,
+		"getAchievementInfoByName":   e.gameGetAchievementInfoByName,
+		"getSecretAchievements":      e.gameGetSecretAchievements,
+		"getPublicAchievements":      e.gameGetPublicAchievements,
+		"getAchievements":            e.gameGetAchievements,
+		"getSoulCoreItems":           e.gameGetSoulCoreItems,
+		"getMonstersByRace":          e.gameGetMonstersByRace,
 		"getMonstersByBestiaryStars": e.gameGetMonstersByBestiaryStars,
-		"broadcastMessage":         e.gameBroadcastMessage,
+		"broadcastMessage":           e.gameBroadcastMessage,
 	}
 
 	e.mu.Lock()
@@ -100,7 +102,6 @@ func (e *Engine) registerGame() {
 		return 2
 	}))
 }
-
 
 func (e *Engine) gameGetMonsterTypeByName(L *lua.LState) int {
 	name := strings.ToLower(L.CheckString(1))
@@ -338,7 +339,17 @@ func (e *Engine) gameGetHouses(L *lua.LState) int {
 }
 func (e *Engine) gameGetGameState(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
 func (e *Engine) gameSetGameState(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetWorldType(L *lua.LState) int { L.Push(lua.LNumber(0)); return 1 }
+func (e *Engine) gameGetWorldType(L *lua.LState) int {
+	// WorldType_t is 1-based (WORLD_TYPE_NO_PVP = 1). This returned a hardcoded 0,
+	// which only compared equal to WORLD_TYPE_NO_PVP because the Lua enum had been
+	// renumbered from zero.
+	wt := 2
+	if cfg := config.Active; cfg != nil && cfg.WorldType != 0 {
+		wt = cfg.WorldType
+	}
+	L.Push(lua.LNumber(wt))
+	return 1
+}
 func (e *Engine) gameSetWorldType(L *lua.LState) int { return 0 }
 func (e *Engine) gameGetReturnMessage(L *lua.LState) int {
 	code := L.OptInt(1, 0)
@@ -536,7 +547,7 @@ func (e *Engine) gameCreateNpc(L *lua.LState) int {
 }
 
 func (e *Engine) gameGenerateNpc(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateTile(L *lua.LState) int { return 0 }
+func (e *Engine) gameCreateTile(L *lua.LState) int  { return 0 }
 func (e *Engine) gameCreateBestiaryCharm(L *lua.LState) int {
 	mt := L.GetTypeMetatable("BestiaryCharm")
 	ud := L.NewUserData()
@@ -545,6 +556,7 @@ func (e *Engine) gameCreateBestiaryCharm(L *lua.LState) int {
 	L.Push(ud)
 	return 1
 }
+
 // gameCreateItemClassification is now defined in item_classification.go
 func (e *Engine) gameGetBestiaryCharm(L *lua.LState) int { return 0 }
 func (e *Engine) gameStartRaid(L *lua.LState) int {
@@ -560,11 +572,11 @@ func (e *Engine) gameStartRaid(L *lua.LState) int {
 	L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR
 	return 1
 }
-func (e *Engine) gameGetClientVersion(L *lua.LState) int { return 0 }
-func (e *Engine) gameReload(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetClientVersion(L *lua.LState) int  { return 0 }
+func (e *Engine) gameReload(L *lua.LState) int            { return 0 }
 func (e *Engine) gameHasDistanceEffect(L *lua.LState) int { return 0 }
-func (e *Engine) gameHasEffect(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetOfflinePlayer(L *lua.LState) int { return 0 }
+func (e *Engine) gameHasEffect(L *lua.LState) int         { return 0 }
+func (e *Engine) gameGetOfflinePlayer(L *lua.LState) int  { return 0 }
 func (e *Engine) gameGetNormalizedPlayerName(L *lua.LState) int {
 	name := L.CheckString(1)
 	if name == "" {
@@ -591,13 +603,13 @@ func (e *Engine) gameGetNormalizedPlayerName(L *lua.LState) int {
 	L.Push(lua.LNil)
 	return 1
 }
-func (e *Engine) gameGetNormalizedGuildName(L *lua.LState) int { L.Push(lua.LString("")); return 1 }
-func (e *Engine) gameAddInfluencedMonster(L *lua.LState) int { return 0 }
+func (e *Engine) gameGetNormalizedGuildName(L *lua.LState) int  { L.Push(lua.LString("")); return 1 }
+func (e *Engine) gameAddInfluencedMonster(L *lua.LState) int    { return 0 }
 func (e *Engine) gameRemoveInfluencedMonster(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetInfluencedMonsters(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
-func (e *Engine) gameMakeFiendishMonster(L *lua.LState) int { return 0 }
-func (e *Engine) gameRemoveFiendishMonster(L *lua.LState) int { return 0 }
-func (e *Engine) gameGetFiendishMonsters(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetInfluencedMonsters(L *lua.LState) int   { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameMakeFiendishMonster(L *lua.LState) int     { return 0 }
+func (e *Engine) gameRemoveFiendishMonster(L *lua.LState) int   { return 0 }
+func (e *Engine) gameGetFiendishMonsters(L *lua.LState) int     { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetBoostedBoss(L *lua.LState) int {
 	if e == nil || e.world == nil {
 		L.Push(lua.LString("None"))
@@ -625,7 +637,7 @@ func (e *Engine) gameGetDummies(L *lua.LState) int {
 	L.Push(tbl)
 	return 1
 }
-func (e *Engine) gameGetTalkActions(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetTalkActions(L *lua.LState) int    { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetEventCallbacks(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameRegisterAchievement(L *lua.LState) int {
 	// Lua scripts call with (name, description, secret, points) OR
@@ -757,8 +769,8 @@ func (e *Engine) gameGetAchievements(L *lua.LState) int {
 	L.Push(tbl)
 	return 1
 }
-func (e *Engine) gameGetSoulCoreItems(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
-func (e *Engine) gameGetMonstersByRace(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetSoulCoreItems(L *lua.LState) int           { L.Push(L.NewTable()); return 1 }
+func (e *Engine) gameGetMonstersByRace(L *lua.LState) int          { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameGetMonstersByBestiaryStars(L *lua.LState) int { L.Push(L.NewTable()); return 1 }
 func (e *Engine) gameBroadcastMessage(L *lua.LState) int {
 	message := L.CheckString(1)

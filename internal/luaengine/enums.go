@@ -8,7 +8,7 @@ import (
 func RegisterEnums(L *lua.LState) {
 	enums := map[string]lua.LNumber{
 		// Slots
-		"CONST_SLOT_FIRST":       0,
+		"CONST_SLOT_FIRST": 1, // = CONST_SLOT_HEAD
 		// MAX_LOOTCHANCE (src/utils/const.hpp:12, registered at
 		// lua_enums.cpp:166). Loot chances in monster data are out of this, and
 		// getLootRandom does math.random(0, MAX_LOOTCHANCE) — without it the whole
@@ -40,7 +40,7 @@ func RegisterEnums(L *lua.LState) {
 		"CONST_SLOT_RING":        9,
 		"CONST_SLOT_AMMO":        10,
 		"CONST_SLOT_STORE_INBOX": 11,
-		"CONST_SLOT_LAST":        12,
+		"CONST_SLOT_LAST":        11, // = CONST_SLOT_STORE_INBOX
 
 		// Account types
 		"ACCOUNT_TYPE_NORMAL":           1,
@@ -53,29 +53,29 @@ func RegisterEnums(L *lua.LState) {
 		// Speak classes (talk types). NPC dialogue gates keyword processing on
 		// TALKTYPE_PRIVATE_PN (player→NPC), so these MUST exist as globals — a
 		// nil TALKTYPE_PRIVATE_PN silently kills all post-greeting interaction.
-		"TALKTYPE_SAY":              1,
-		"TALKTYPE_WHISPER":          2,
-		"TALKTYPE_YELL":             3,
-		"TALKTYPE_PRIVATE_FROM":     4,
-		"TALKTYPE_PRIVATE_TO":       5,
+		"TALKTYPE_SAY":                1,
+		"TALKTYPE_WHISPER":            2,
+		"TALKTYPE_YELL":               3,
+		"TALKTYPE_PRIVATE_FROM":       4,
+		"TALKTYPE_PRIVATE_TO":         5,
 		"TALKTYPE_CHANNEL_MANAGEMENT": 6,
-		"TALKTYPE_CHANNEL_Y":        7,
-		"TALKTYPE_CHANNEL_O":        8,
-		"TALKTYPE_SPELL_USE":        9,
-		"TALKTYPE_PRIVATE_NP":       10,
-		"TALKTYPE_NPC_UNKNOWN":      11,
-		"TALKTYPE_PRIVATE_PN":       12,
-		"TALKTYPE_BROADCAST":        13,
-		"TALKTYPE_CHANNEL_R1":       14,
-		"TALKTYPE_PRIVATE_RED_FROM": 15,
-		"TALKTYPE_PRIVATE_RED_TO":   16,
-		"TALKTYPE_MONSTER_SAY":      36,
-		"TALKTYPE_MONSTER_YELL":     37,
-		"TALKTYPE_CHANNEL_R2":       0xFF,
+		"TALKTYPE_CHANNEL_Y":          7,
+		"TALKTYPE_CHANNEL_O":          8,
+		"TALKTYPE_SPELL_USE":          9,
+		"TALKTYPE_PRIVATE_NP":         10,
+		"TALKTYPE_NPC_UNKNOWN":        11,
+		"TALKTYPE_PRIVATE_PN":         12,
+		"TALKTYPE_BROADCAST":          13,
+		"TALKTYPE_CHANNEL_R1":         14,
+		"TALKTYPE_PRIVATE_RED_FROM":   15,
+		"TALKTYPE_PRIVATE_RED_TO":     16,
+		"TALKTYPE_MONSTER_SAY":        36,
+		"TALKTYPE_MONSTER_YELL":       37,
+		"TALKTYPE_CHANNEL_R2":         0xFF,
 
 		// Messages
-		"MESSAGE_GAMEMASTER_CONSOLE":  13,
-		"MESSAGE_LOGIN":               17,
+		"MESSAGE_GAMEMASTER_CONSOLE": 13,
+		"MESSAGE_LOGIN":              17,
 
 		// Groups
 		"GROUP_TYPE_NONE":             0,
@@ -190,9 +190,9 @@ func RegisterEnums(L *lua.LState) {
 		"ITEM_ATTRIBUTE_MANTRA":               37,
 
 		// Item Coin IDs
-		"ITEM_GOLD_COIN":        3031,
-		"ITEM_PLATINUM_COIN":    3035,
-		"ITEM_CRYSTAL_COIN":     3043,
+		"ITEM_GOLD_COIN":     3031,
+		"ITEM_PLATINUM_COIN": 3035,
+		"ITEM_CRYSTAL_COIN":  3043,
 
 		// skills_t (creatures_definitions.hpp:466). These were every value shifted
 		// up by one, so a script asking for SKILL_FIST indexed the club slot —
@@ -229,7 +229,7 @@ func RegisterEnums(L *lua.LState) {
 		"Concoction_StrikeEnhancement":     3,
 		"Concoction_CharmUpgrade":          4,
 		"Concoction_WealthDuplex":          5,
-		"Concoction_BestiaryBetterment":     6,
+		"Concoction_BestiaryBetterment":    6,
 		"Concoction_FireResilience":        7,
 		"Concoction_IceResilience":         8,
 		"Concoction_EarthResilience":       9,
@@ -246,31 +246,45 @@ func RegisterEnums(L *lua.LState) {
 		"Concoction_PhysicalAmplification": 20,
 
 		// World Types
-		"WORLD_TYPE_NO_PVP":       0,
-		"WORLD_TYPE_PVP":          1,
-		"WORLD_TYPE_PVP_ENFORCED": 2,
+		"WORLD_TYPE_NO_PVP":       1,
+		"WORLD_TYPE_PVP":          2,
+		"WORLD_TYPE_PVP_ENFORCED": 3,
 
-		// Tile states. Values match the OTBM tile-flag bits actually stored in
-		// Tile.Flags by the map loader (io_definitions.hpp OTBM_TILEFLAG_*):
-		// PZ=1<<0, NOPVP=1<<2, NOLOGOUT=1<<3, PVP=1<<4. The remaining TILESTATE_*
-		// constants are runtime-only in C++ and are not populated by the loader
-		// (they read back as absent); they are defined here so datapack scripts
-		// that reference them get a number rather than nil.
-		"TILESTATE_NONE":           0,
-		"TILESTATE_PROTECTIONZONE": 1 << 0,
-		"TILESTATE_NOPVPZONE":      1 << 2,
-		"TILESTATE_NOPVP":          1 << 2,
-		"TILESTATE_NOLOGOUT":       1 << 3,
-		"TILESTATE_PVPZONE":        1 << 4,
-		"TILESTATE_TELEPORT":       1 << 11,
-		"TILESTATE_MAGICFIELD":     1 << 12,
-		"TILESTATE_MAILBOX":        1 << 13,
-		"TILESTATE_TRASHHOLDER":    1 << 14,
-		"TILESTATE_BED":            1 << 15,
-		"TILESTATE_DEPOT":          1 << 16,
-		// House is not a distinct OTBM bit (house tiles are stored as protection
-		// zones); a high, never-set bit keeps hasFlag(TILESTATE_HOUSE) false.
-		"TILESTATE_HOUSE": 1 << 30,
+		// TileFlags_t (items_definitions.hpp:443). The map loader now translates
+		// the OTBM bits into these, as IOMap does, so hasFlag agrees with upstream.
+		// TILESTATE_HOUSE is deliberately absent: it does not exist in C++ either,
+		// where hasFlag(nil) reads the flag as 0 and returns false.
+		"TILESTATE_NONE":                      0,
+		"TILESTATE_FLOORCHANGE_DOWN":          1 << 0,
+		"TILESTATE_FLOORCHANGE_NORTH":         1 << 1,
+		"TILESTATE_FLOORCHANGE_SOUTH":         1 << 2,
+		"TILESTATE_FLOORCHANGE_EAST":          1 << 3,
+		"TILESTATE_FLOORCHANGE_WEST":          1 << 4,
+		"TILESTATE_FLOORCHANGE_SOUTH_ALT":     1 << 5,
+		"TILESTATE_FLOORCHANGE_EAST_ALT":      1 << 6,
+		"TILESTATE_PROTECTIONZONE":            1 << 7,
+		"TILESTATE_NOPVPZONE":                 1 << 8,
+		"TILESTATE_NOLOGOUT":                  1 << 9,
+		"TILESTATE_PVPZONE":                   1 << 10,
+		"TILESTATE_TELEPORT":                  1 << 11,
+		"TILESTATE_MAGICFIELD":                1 << 12,
+		"TILESTATE_MAILBOX":                   1 << 13,
+		"TILESTATE_TRASHHOLDER":               1 << 14,
+		"TILESTATE_BED":                       1 << 15,
+		"TILESTATE_DEPOT":                     1 << 16,
+		"TILESTATE_BLOCKSOLID":                1 << 17,
+		"TILESTATE_BLOCKPATH":                 1 << 18,
+		"TILESTATE_IMMOVABLEBLOCKSOLID":       1 << 19,
+		"TILESTATE_IMMOVABLEBLOCKPATH":        1 << 20,
+		"TILESTATE_IMMOVABLENOFIELDBLOCKPATH": 1 << 21,
+		"TILESTATE_NOFIELDBLOCKPATH":          1 << 22,
+		"TILESTATE_SUPPORTS_HANGABLE":         1 << 23,
+		"TILESTATE_MOVABLE":                   1 << 24,
+		"TILESTATE_ISHORIZONTAL":              1 << 25,
+		"TILESTATE_ISVERTICAL":                1 << 26,
+		"TILESTATE_BLOCKPROJECTILE":           1 << 27,
+		"TILESTATE_HASHEIGHT":                 1 << 28,
+		"TILESTATE_FLOORCHANGE":               (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6),
 
 		// Item / Tile Properties (CONST_PROP_*)
 		"CONST_PROP_BLOCKSOLID":                0,
@@ -319,60 +333,60 @@ func RegisterEnums(L *lua.LState) {
 		"BESTY_RACE_INKBORN":           21,
 
 		// Creature Types
-		"CREATURETYPE_PLAYER":   0,
-		"CREATURETYPE_MONSTER":  1,
-		"CREATURETYPE_NPC":      2,
+		"CREATURETYPE_PLAYER":        0,
+		"CREATURETYPE_MONSTER":       1,
+		"CREATURETYPE_NPC":           2,
 		"CREATURETYPE_SUMMON_OWN":    3,
 		"CREATURETYPE_SUMMON_OTHERS": 4,
 
 		// Directions
-		"DIRECTION_NORTH":     0,
-		"DIRECTION_EAST":      1,
-		"DIRECTION_SOUTH":     2,
-		"DIRECTION_WEST":      3,
+		"DIRECTION_NORTH":         0,
+		"DIRECTION_EAST":          1,
+		"DIRECTION_SOUTH":         2,
+		"DIRECTION_WEST":          3,
 		"DIRECTION_DIAGONAL_MASK": 4,
-		"DIRECTION_SOUTHWEST": 4,
-		"DIRECTION_SOUTHEAST": 5,
-		"DIRECTION_NORTHWEST": 6,
-		"DIRECTION_NORTHEAST": 7,
+		"DIRECTION_SOUTHWEST":     4,
+		"DIRECTION_SOUTHEAST":     5,
+		"DIRECTION_NORTHWEST":     6,
+		"DIRECTION_NORTHEAST":     7,
 
 		// Return values
-		"RETURNVALUE_NOERROR":         0,
-		"RETURNVALUE_NOTPOSSIBLE":     1,
-		"RETURNVALUE_NOTENOUGHROOM":   2,
+		"RETURNVALUE_NOERROR":          0,
+		"RETURNVALUE_NOTPOSSIBLE":      1,
+		"RETURNVALUE_NOTENOUGHROOM":    2,
 		"RETURNVALUE_PLAYERISPZLOCKED": 3,
 
 		// Condition types
-		"CONDITION_NONE":              0,
-		"CONDITION_POISON":            1,
-		"CONDITION_FIRE":              2,
-		"CONDITION_ENERGY":            3,
-		"CONDITION_BLEEDING":          4,
-		"CONDITION_HASTE":             5,
-		"CONDITION_PARALYZE":          6,
-		"CONDITION_OUTFIT":            7,
-		"CONDITION_INVISIBLE":         8,
-		"CONDITION_LIGHT":             9,
-		"CONDITION_MANASHIELD":        10,
-		"CONDITION_INFIGHT":           11,
-		"CONDITION_DRUNK":             12,
-		"CONDITION_EXHAUST":           13,
-		"CONDITION_REGENERATION":      14,
+		"CONDITION_NONE":         0,
+		"CONDITION_POISON":       1,
+		"CONDITION_FIRE":         2,
+		"CONDITION_ENERGY":       3,
+		"CONDITION_BLEEDING":     4,
+		"CONDITION_HASTE":        5,
+		"CONDITION_PARALYZE":     6,
+		"CONDITION_OUTFIT":       7,
+		"CONDITION_INVISIBLE":    8,
+		"CONDITION_LIGHT":        9,
+		"CONDITION_MANASHIELD":   10,
+		"CONDITION_INFIGHT":      11,
+		"CONDITION_DRUNK":        12,
+		"CONDITION_EXHAUST":      13,
+		"CONDITION_REGENERATION": 14,
 		// Condition slot ids (ConditionId_t). Food scripts pass CONDITIONID_DEFAULT.
 		"CONDITIONID_DEFAULT": -1,
 		"CONDITIONID_COMBAT":  0,
 		// Sound effect used by the food action; sound playback is a no-op stub
 		// for now, but the constant must exist so the script doesn't pass nil.
-		"SOUND_EFFECT_TYPE_ACTION_EAT": 82,
-		"CONDITION_SOUL":              15,
-		"CONDITION_DROWN":             16,
-		"CONDITION_MUTED":             17,
-		"CONDITION_CHANNELMUTEDTICKS": 18,
-		"CONDITION_YELLTICKS":         19,
-		"CONDITION_ATTRIBUTES":        20,
-		"CONDITION_FREEZING":          21,
-		"CONDITION_DAZZLED":           22,
-		"CONDITION_CURSED":            23,
+		"SOUND_EFFECT_TYPE_ACTION_EAT": 2803,
+		"CONDITION_SOUL":               15,
+		"CONDITION_DROWN":              16,
+		"CONDITION_MUTED":              17,
+		"CONDITION_CHANNELMUTEDTICKS":  18,
+		"CONDITION_YELLTICKS":          19,
+		"CONDITION_ATTRIBUTES":         20,
+		"CONDITION_FREEZING":           21,
+		"CONDITION_DAZZLED":            22,
+		"CONDITION_CURSED":             23,
 
 		"FORGE_NORMAL_MONSTER":     0,
 		"FORGE_INFLUENCED_MONSTER": 1,
