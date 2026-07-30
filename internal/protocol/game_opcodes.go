@@ -168,7 +168,11 @@ func (g *GameProtocol) parseLookInShop(r *netmsg.Reader) {
 	}
 	itemID := r.GetU16()
 	count := r.GetByte()
-	_ = count
+	// EventCallback playerOnLookInShop(player, itemType, count). A false return
+	// stops the reply, matching how EventCallback gates the C++ side.
+	if g.deps.Events != nil && !g.deps.Events.ExecutePlayerOnLookInShop(g.player, itemID, uint16(count)) {
+		return
+	}
 	if nType := g.shopOwnerType(); nType != nil {
 		for _, si := range nType.ShopItems {
 			if si.ID == itemID {
@@ -206,6 +210,12 @@ func (g *GameProtocol) parseAcceptTrade(r *netmsg.Reader) {
 	if g.player == nil {
 		return
 	}
+	// EventCallback playerOnTradeAccept(player, target, item, targetItem). The
+	// partner and the two offered items are not tracked separately yet, so they go
+	// as nil — the callback signature is still the documented one.
+	if g.deps.Events != nil && !g.deps.Events.ExecutePlayerOnTradeAccept(g.player, nil, nil, nil) {
+		return
+	}
 	g.deps.World.PlayerAcceptTrade(g.player.ID)
 }
 
@@ -231,7 +241,23 @@ func (g *GameProtocol) parseRotateItem(r *netmsg.Reader) {
 	pos := r.GetPosition()
 	itemID := r.GetU16()
 	stackPos := r.GetByte()
-	g.deps.World.PlayerRotateItem(g.player.ID, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, itemID, stackPos)
+	gPos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
+	// EventCallback playerOnRotateItem(player, item, position).
+	if g.deps.Events != nil {
+		var item *game.Item
+		if tile := g.deps.World.Map.GetTile(gPos); tile != nil {
+			for _, it := range tile.Items {
+				if it.ID == itemID {
+					item = it
+					break
+				}
+			}
+		}
+		if !g.deps.Events.ExecutePlayerOnRotateItem(g.player, item, gPos) {
+			return
+		}
+	}
+	g.deps.World.PlayerRotateItem(g.player.ID, gPos, itemID, stackPos)
 }
 
 // parseConfigureShowOffSocket handles 0x86 — item show-off socket configuration.
@@ -334,7 +360,16 @@ func (g *GameProtocol) parseFollow(r *netmsg.Reader) {
 	g.deps.World.PlayerFollow(g.player.ID, targetID)
 }
 
-func (g *GameProtocol) parseQuestLog(r *netmsg.Reader) { if g.player == nil { return }; g.deps.Lua.Call("onPlayerQuestLog", g.player.Name) }
+func (g *GameProtocol) parseQuestLog(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
+	// EventCallback playerOnRequestQuestLog(player).
+	if g.deps.Events != nil && !g.deps.Events.ExecutePlayerOnRequestQuestLog(g.player) {
+		return
+	}
+	g.deps.Lua.Call("onPlayerQuestLog", g.player.Name)
+}
 func (g *GameProtocol) parseQuestLine(r *netmsg.Reader) { if g.player == nil { return }; qid := r.GetU16(); g.deps.Lua.Call("onPlayerQuestLine", g.player.Name, fmt.Sprint(qid)) }
 func (g *GameProtocol) parseRewardChestCollect(r *netmsg.Reader) { if g.player == nil { return } }
 

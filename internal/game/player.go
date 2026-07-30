@@ -618,15 +618,26 @@ func (p *Player) GetStorageValue(key uint32) int32 {
 }
 
 // SetStorageValue sets (or, with value -1, clears) a storage key.
+// OnPlayerStorageUpdate is the EventCallback playerOnStorageUpdate hook, set by
+// the events engine at startup.
+var OnPlayerStorageUpdate func(p *Player, key uint32, value, oldValue int32)
+
 func (p *Player) SetStorageValue(key uint32, value int32) {
+	oldValue, had := p.Storages[key]
+	if !had {
+		oldValue = -1
+	}
 	if value == -1 {
 		delete(p.Storages, key)
-		return
+	} else {
+		if p.Storages == nil {
+			p.Storages = make(map[uint32]int32)
+		}
+		p.Storages[key] = value
 	}
-	if p.Storages == nil {
-		p.Storages = make(map[uint32]int32)
+	if OnPlayerStorageUpdate != nil && value != oldValue {
+		OnPlayerStorageUpdate(p, key, value, oldValue)
 	}
-	p.Storages[key] = value
 }
 
 // storageBestiaryKillCount is the base storage key for per-race kill counts

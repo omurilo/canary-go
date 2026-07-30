@@ -243,6 +243,11 @@ func (pt *Party) PassLeadership(p *Player) bool {
 }
 
 // Disband dissolves the party. Idempotent.
+// OnPartyDisband is the EventCallback partyOnDisband hook. The events engine sets
+// it at startup; game cannot import events directly (events imports game), so this
+// follows the same indirection as World.OnCreatureSay.
+var OnPartyDisband func(*Party)
+
 func (pt *Party) Disband() {
 	pt.mu.Lock()
 	if pt.leader == nil {
@@ -256,6 +261,10 @@ func (pt *Party) Disband() {
 	pt.members = nil
 	pt.invites = nil
 	pt.mu.Unlock()
+
+	if OnPartyDisband != nil {
+		OnPartyDisband(pt)
+	}
 
 	all := append([]*Player{}, members...)
 	all = append(all, leader)

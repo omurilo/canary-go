@@ -547,7 +547,17 @@ func run(o runOpts, log *slog.Logger) error {
 
 	// Event callback engine — initialized here before Lua scripts load
 	// so that EventCallback:register() calls in scripts don't silently fail.
-	_ = events.NewEngine(lengine.L, log)
+	eventEngine := events.NewEngine(lengine.L, log)
+
+	// EventCallback hooks that fire from the game core rather than the protocol
+	// layer. game cannot import events (events imports game), so they are wired
+	// through package-level indirection.
+	game.OnPartyDisband = func(pt *game.Party) {
+		eventEngine.ExecutePartyOnDisband(pt)
+	}
+	game.OnPlayerStorageUpdate = func(p *game.Player, key uint32, value, oldValue int32) {
+		eventEngine.ExecutePlayerOnStorageUpdate(p, key, value, oldValue, time.Now().UnixMilli())
+	}
 	lengine.SetGameFunc("getPlayerCount", func(L *lua.LState) int {
 		L.Push(lua.LNumber(world.OnlineCount()))
 		return 1

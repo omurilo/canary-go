@@ -2,6 +2,7 @@ package events
 
 import (
 	"log/slog"
+	"reflect"
 	"sync"
 
 	"github.com/opentibiabr/canary-go/internal/game"
@@ -258,4 +259,131 @@ func (e *Engine) ExecuteOnDeath(player *game.Player, killer game.Creature) bool 
 		return e.executeCallbacks(EventPlayerOnDeath, pUd, kUd)
 	}
 	return e.executeCallbacks(EventPlayerOnDeath, pUd, lua.LNil)
+}
+
+// ── Dispatchers added for hooks that were being parsed and stored but never
+// fired. Signatures come from the datapack scripts in data/scripts/eventcallbacks,
+// which are the same argument lists EventCallback:: builds in C++.
+
+// ud wraps a value as Lua userdata of the named metatable, or nil.
+//
+// The reflect check is load-bearing: a typed nil pointer such as
+// (*game.Item)(nil) stored in an `any` is NOT == nil, so a plain comparison would
+// wrap it in userdata and Lua would see a non-nil value that panics on first use.
+// Several call sites legitimately pass a nil item or player.
+func (e *Engine) ud(v any, metatable string) lua.LValue {
+	if v == nil || isNilValue(v) {
+		return lua.LNil
+	}
+	u := e.L.NewUserData()
+	u.Value = v
+	e.L.SetMetatable(u, e.L.GetTypeMetatable(metatable))
+	return u
+}
+
+// pos wraps a position as Position userdata.
+func (e *Engine) pos(p game.Position) lua.LValue {
+	u := e.L.NewUserData()
+	u.Value = p
+	e.L.SetMetatable(u, e.L.GetTypeMetatable("Position"))
+	return u
+}
+
+// ExecutePlayerOnBrowseField fires playerOnBrowseField(player, position).
+func (e *Engine) ExecutePlayerOnBrowseField(player *game.Player, position game.Position) bool {
+	return e.executeCallbacks(EventPlayerOnBrowseField,
+		e.ud(player, "Player"), e.pos(position))
+}
+
+// ExecutePlayerOnLookInShop fires playerOnLookInShop(player, itemType, count).
+// itemType is the item id: the Lua side only reads it through ItemType helpers.
+func (e *Engine) ExecutePlayerOnLookInShop(player *game.Player, itemID uint16, count uint16) bool {
+	return e.executeCallbacks(EventPlayerOnLookInShop,
+		e.ud(player, "Player"), lua.LNumber(itemID), lua.LNumber(count))
+}
+
+// ExecutePlayerOnLookInTrade fires playerOnLookInTrade(player, partner, item, distance).
+func (e *Engine) ExecutePlayerOnLookInTrade(player *game.Player, partner *game.Player, item *game.Item, distance int) bool {
+	return e.executeCallbacks(EventPlayerOnLookInTrade,
+		e.ud(player, "Player"), e.ud(partner, "Player"), e.ud(item, "Item"), lua.LNumber(distance))
+}
+
+// ExecutePlayerOnRotateItem fires playerOnRotateItem(player, item, position).
+func (e *Engine) ExecutePlayerOnRotateItem(player *game.Player, item *game.Item, position game.Position) bool {
+	return e.executeCallbacks(EventPlayerOnRotateItem,
+		e.ud(player, "Player"), e.ud(item, "Item"), e.pos(position))
+}
+
+// ExecutePlayerOnRemoveCount fires playerOnRemoveCount(player, item).
+func (e *Engine) ExecutePlayerOnRemoveCount(player *game.Player, item *game.Item) bool {
+	return e.executeCallbacks(EventPlayerOnRemoveCount,
+		e.ud(player, "Player"), e.ud(item, "Item"))
+}
+
+// ExecutePlayerOnRequestQuestLog fires playerOnRequestQuestLog(player).
+func (e *Engine) ExecutePlayerOnRequestQuestLog(player *game.Player) bool {
+	return e.executeCallbacks(EventPlayerOnRequestQuestLog, e.ud(player, "Player"))
+}
+
+// ExecutePlayerOnRequestQuestLine fires playerOnRequestQuestLine(player, questId).
+func (e *Engine) ExecutePlayerOnRequestQuestLine(player *game.Player, questID uint16) bool {
+	return e.executeCallbacks(EventPlayerOnRequestQuestLine,
+		e.ud(player, "Player"), lua.LNumber(questID))
+}
+
+// ExecutePlayerOnStorageUpdate fires
+// playerOnStorageUpdate(player, key, value, oldValue, currentFrameTime).
+func (e *Engine) ExecutePlayerOnStorageUpdate(player *game.Player, key uint32, value, oldValue int32, frameTime int64) bool {
+	return e.executeCallbacks(EventPlayerOnStorageUpdate,
+		e.ud(player, "Player"), lua.LNumber(key), lua.LNumber(value),
+		lua.LNumber(oldValue), lua.LNumber(frameTime))
+}
+
+// ExecutePlayerOnTradeAccept fires playerOnTradeAccept(player, target, item, targetItem).
+func (e *Engine) ExecutePlayerOnTradeAccept(player *game.Player, target *game.Player, item, targetItem *game.Item) bool {
+	return e.executeCallbacks(EventPlayerOnTradeAccept,
+		e.ud(player, "Player"), e.ud(target, "Player"),
+		e.ud(item, "Item"), e.ud(targetItem, "Item"))
+}
+
+// ExecutePartyOnDisband fires partyOnDisband(party).
+func (e *Engine) ExecutePartyOnDisband(party *game.Party) bool {
+	return e.executeCallbacks(EventPartyOnDisband, e.ud(party, "Party"))
+}
+
+// ExecuteCreatureOnAreaCombat fires creatureOnAreaCombat(creature, tile, isAggressive).
+func (e *Engine) ExecuteCreatureOnAreaCombat(creature game.Creature, tile *game.Tile, aggressive bool) bool {
+	return e.executeCallbacks(EventCreatureOnAreaCombat,
+		e.ud(creature, "Creature"), e.ud(tile, "Tile"), lua.LBool(aggressive))
+}
+
+// ExecuteCreatureOnTargetCombat fires creatureOnTargetCombat(creature, target).
+func (e *Engine) ExecuteCreatureOnTargetCombat(creature, target game.Creature) bool {
+	return e.executeCallbacks(EventCreatureOnTargetCombat,
+		e.ud(creature, "Creature"), e.ud(target, "Creature"))
+}
+
+// ExecuteMonsterPostDropLoot fires monsterPostDropLoot(monster, corpse).
+//
+// Only the POST hook is wired. The main monsterOnDropLoot event generates the loot
+// itself in the datapack (data/scripts/eventcallbacks/monster/ondroploot__base.lua
+// calls mType:generateLootRoll and corpse:addLoot), and neither generateLootRoll nor
+// player:calculateLootFactor is bound in Go yet — dispatching it while Go still
+// generates loot inline would double every drop. See Monster::dropLoot
+// (monster.cpp:3414), which delegates both.
+func (e *Engine) ExecuteMonsterPostDropLoot(monster *game.Monster, corpse *game.Item) bool {
+	return e.executeCallbacks(EventMonsterPostDropLoot,
+		e.ud(monster, "Monster"), e.ud(corpse, "Container"))
+}
+
+// isNilValue reports whether v holds a typed nil (pointer, map, slice, interface or
+// func), which an `any` comparison against nil misses.
+func isNilValue(v any) bool {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Interface, reflect.Func, reflect.Chan:
+		return rv.IsNil()
+	default:
+		return false
+	}
 }
