@@ -194,23 +194,26 @@ func RegisterEnums(L *lua.LState) {
 		"ITEM_PLATINUM_COIN":    3035,
 		"ITEM_CRYSTAL_COIN":     3043,
 
-		// Skills
+		// skills_t (creatures_definitions.hpp:466). These were every value shifted
+		// up by one, so a script asking for SKILL_FIST indexed the club slot —
+		// player:getSkillLevel and friends index game.Skills directly, and
+		// game.SkillFist is 0.
 		"SKILL_NONE":                -1,
-		"SKILL_FIST":                1,
-		"SKILL_CLUB":                2,
-		"SKILL_SWORD":               3,
-		"SKILL_AXE":                 4,
-		"SKILL_DISTANCE":            5,
-		"SKILL_SHIELD":              6,
-		"SKILL_FISHING":             7,
-		"SKILL_CRITICAL_HIT_CHANCE": 8,
-		"SKILL_CRITICAL_HIT_DAMAGE": 9,
-		"SKILL_LIFE_LEECH_CHANCE":   10,
-		"SKILL_LIFE_LEECH_AMOUNT":   11,
-		"SKILL_MANA_LEECH_CHANCE":   12,
-		"SKILL_MANA_LEECH_AMOUNT":   13,
-		"SKILL_MAGLEVEL":            14,
-		"SKILL_LEVEL":               15,
+		"SKILL_FIST":                0,
+		"SKILL_CLUB":                1,
+		"SKILL_SWORD":               2,
+		"SKILL_AXE":                 3,
+		"SKILL_DISTANCE":            4,
+		"SKILL_SHIELD":              5,
+		"SKILL_FISHING":             6,
+		"SKILL_CRITICAL_HIT_CHANCE": 7,
+		"SKILL_CRITICAL_HIT_DAMAGE": 8,
+		"SKILL_LIFE_LEECH_CHANCE":   9,
+		"SKILL_LIFE_LEECH_AMOUNT":   10,
+		"SKILL_MANA_LEECH_CHANCE":   11,
+		"SKILL_MANA_LEECH_AMOUNT":   12,
+		"SKILL_MAGLEVEL":            13,
+		"SKILL_LEVEL":               14,
 
 		// Player Pronouns
 		"PLAYERPRONOUN_UNSET": 0,
