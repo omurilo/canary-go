@@ -10,7 +10,11 @@ func (e *Engine) registerEventCallback() {
 	L := e.L
 	// EventCallback global constructor
 	eventCallbackConstructor := L.NewTable()
-	eventCallbackMt := L.NewTable()
+	// Must be a TYPE metatable: revscriptsys.lua:121 does
+	// rawgetmetatable("EventCallback").__newindex = ..., which looks the name up in
+	// the type registry. A plain table is invisible there, so that assignment hit
+	// nil and aborted revscriptsys — taking the rest of the file with it.
+	eventCallbackMt := L.NewTypeMetatable("EventCallback")
 	L.SetField(eventCallbackMt, "__call", L.NewFunction(eventCallbackCreate))
 	L.SetMetatable(eventCallbackConstructor, eventCallbackMt)
 
