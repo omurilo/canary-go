@@ -1132,65 +1132,25 @@ func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 		return
 	}
 
-	// Shopping bags are charged on top of the goods.
-	totalCost += bagsCost
+	g.deps.Log.Debug("parseBuyItem: dispatching onBuyItem", "player", g.player.Name, "itemID", itemID, "amount", amount, "price", price, "totalCost", totalCost, "bagsCost", bagsCost)
 
-	g.deps.Log.Debug("parseBuyItem: starting transaction", "player", g.player.Name, "itemID", itemID, "amount", amount, "price", price, "totalCost", totalCost, "bagsCost", bagsCost, "playerMoney", g.player.GetMoney(), "bankBalance", g.player.BankBalance)
-
-	invMoney := g.player.GetMoney()
-
-	// Safely deduct the funds first. Keep track of how much bank balance is utilized.
-	bankDebited := uint64(0)
-	if invMoney < totalCost {
-		bankDebited = totalCost - invMoney
-	}
-	if !g.player.RemoveMoney(totalCost, true) {
-		g.player.SendTextMessage(0x13, "You do not have enough money.")
+	// The core stops here. Npc::onPlayerBuyItem validates and prices the purchase
+	// and then hands off to the script; delivery and payment happen inside
+	// npc:sellItem, which is what onBuyItem calls. Note totalCost is passed WITHOUT
+	// the bag cost, matching the callback's argument upstream — npc:sellItem
+	// recomputes the bags itself.
+	if !g.deps.Lua.CallNpcOnBuyItem(npc, g.player, itemID, subType, amount, ignoreCap, inBackpacks, totalCost) {
+		// No onBuyItem on this NPC means nothing happens, exactly as upstream: the
+		// core never delivers on its own. Three otservbr merchants (elgar, murim,
+		// enpa-deia_pema) declare buy prices without the callback and so cannot be
+		// bought from — a datapack bug, not one to paper over here.
+		g.deps.Log.Warn("npc has no onBuyItem callback; purchase ignored",
+			"npc", npc.Name, "itemID", itemID)
 		return
 	}
 
-	// Deliver the items
-	placed, _ := g.player.InternalAddItem(g.deps.Items, itemID, uint32(amount), int(subType), game.ConstSlotWhereever)
-	deliveredCount := deliveredUnits(placed)
-	if deliveredCount == 0 {
-		// Full refund
-		if bankDebited > 0 {
-			g.player.BankBalance += bankDebited
-			g.player.AddMoney(invMoney)
-		} else {
-			g.player.AddMoney(totalCost)
-		}
-		g.player.SendTextMessage(0x13, "You do not have enough room to carry this item.")
-		g.refreshAfterTrade()
-		return
-	}
-
-	// Charge for what was actually delivered, bags included — recomputing the bag
-	// cost for the delivered amount so a partial delivery does not refund every bag.
-	charge := uint64(price)*uint64(deliveredCount) +
-		game.CalculateBagsCost(it, uint16(deliveredCount), inBackpacks)
-	if deliveredCount < uint32(amount) {
-		// Partial refund
-		refund := totalCost - charge
-		if bankDebited > 0 {
-			toBank := refund
-			if toBank > bankDebited {
-				toBank = bankDebited
-			}
-			g.player.BankBalance += toBank
-			toInv := refund - toBank
-			if toInv > 0 {
-				g.player.AddMoney(toInv)
-			}
-		} else {
-			g.player.AddMoney(refund)
-		}
-	}
-
-	g.player.SendTextMessage(0x14, fmt.Sprintf("Bought %dx %s for %d gold.", deliveredCount, itemName(it, itemID), charge))
 	g.refreshAfterTrade()
 }
-
 // deliveredUnits sums the stack counts of the items actually placed by a buy.
 func deliveredUnits(placed []*game.Item) uint32 {
 	var n uint32
@@ -1316,23 +1276,15 @@ func (g *GameProtocol) parseSellItem(r *netmsg.Reader) {
 	}
 	subType := r.GetByte()
 	amount := r.GetU16()
-	_ = r.GetByte() // ignoreEquipped
+	ignoreEquipped := r.GetByte() != 0
 
-	nType := g.shopOwnerType()
-	if nType == nil {
+	npc := g.shopOwner()
+	if npc == nil {
 		return
 	}
 
-	var price uint32
-	var found bool
-	for _, si := range nType.ShopItems {
-		if si.ID == itemID && (si.SubType == 0 || si.SubType == subType) {
-			price = si.SellPrice
-			found = true
-			break
-		}
-	}
-	if !found || price == 0 {
+	price, found := npc.ShopSellPrice(itemID, subType)
+	if !found {
 		g.player.SendTextMessage(0x13, "This NPC does not buy this item.")
 		return
 	}
@@ -1357,8 +1309,17 @@ func (g *GameProtocol) parseSellItem(r *netmsg.Reader) {
 	// to the bank is a config-driven follow-up.
 	g.player.AddMoney(totalGain)
 
+	// Unlike buying, the core owns the whole sale: Npc::onPlayerSellItem removes the
+	// items and credits the proceeds itself, and only then fires onSellItem as a
+	// NOTIFICATION. The datapack scripts use it purely to send the "Sold Nx ..."
+	// message, which is why this no longer sends one of its own.
 	it := g.deps.Items.Get(itemID)
-	g.player.SendTextMessage(0x14, fmt.Sprintf("Sold %dx %s for %d gold.", sold, itemName(it, itemID), totalGain))
+	name := itemName(it, itemID)
+	if !g.deps.Lua.CallNpcOnSellItem(npc, g.player, itemID, subType, sold, ignoreEquipped, name, totalGain) {
+		// No onSellItem means no confirmation would ever reach the player, so fall
+		// back to the built-in message rather than leaving the sale silent.
+		g.player.SendTextMessage(0x14, fmt.Sprintf("Sold %dx %s for %d gold.", sold, name, totalGain))
+	}
 	g.refreshAfterTrade()
 }
 

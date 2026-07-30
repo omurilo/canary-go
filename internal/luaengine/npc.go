@@ -581,3 +581,103 @@ func (e *Engine) CallNpcOnThink(npc *game.Npc, interval uint32) {
 		e.log.Error("lua npc onThink", "npc", npc.Name, "err", err)
 	}
 }
+
+// CallNpcOnBuyItem dispatches
+// npc:onBuyItem(player, itemId, subType, amount, ignore, inBackpacks, totalCost),
+// mirroring the callback at the end of Npc::onPlayerBuyItem (npc.cpp:775).
+//
+// The core only validates and prices a purchase; the callback is what performs it,
+// by calling npc:sellItem. Returns false when the NPC defines no onBuyItem, so the
+// caller can tell "nothing happened" from "the script handled it".
+func (e *Engine) CallNpcOnBuyItem(npc *game.Npc, p *game.Player, itemID uint16, subType uint8, amount uint16, ignore, inBackpacks bool, totalCost uint64) bool {
+	fn := e.npcCallback(npc, "onBuyItem")
+	if fn == nil {
+		return false
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	L := e.L
+	L.Push(fn)
+	e.pushNpcUserdata(npc)
+	e.pushPlayerUserdata(p)
+	L.Push(lua.LNumber(itemID))
+	L.Push(lua.LNumber(subType))
+	L.Push(lua.LNumber(amount))
+	L.Push(lua.LBool(ignore))
+	L.Push(lua.LBool(inBackpacks))
+	L.Push(lua.LNumber(totalCost))
+
+	if err := L.PCall(8, 0, nil); err != nil {
+		e.log.Error("lua npc onBuyItem", "npc", npc.Name, "err", err)
+		return false
+	}
+	return true
+}
+
+// CallNpcOnSellItem dispatches
+// npc:onSellItem(player, itemId, subType, amount, ignore, itemName, totalCost),
+// mirroring the callback at the end of Npc::onPlayerSellItem (npc.cpp:989).
+//
+// Unlike onBuyItem this is a NOTIFICATION: the core has already removed the items
+// and credited the proceeds by the time it fires, and the datapack scripts only use
+// it to send the "Sold Nx ..." message.
+func (e *Engine) CallNpcOnSellItem(npc *game.Npc, p *game.Player, itemID uint16, subType uint8, amount uint32, ignore bool, itemName string, totalCost uint64) bool {
+	fn := e.npcCallback(npc, "onSellItem")
+	if fn == nil {
+		return false
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	L := e.L
+	L.Push(fn)
+	e.pushNpcUserdata(npc)
+	e.pushPlayerUserdata(p)
+	L.Push(lua.LNumber(itemID))
+	L.Push(lua.LNumber(subType))
+	L.Push(lua.LNumber(amount))
+	L.Push(lua.LBool(ignore))
+	L.Push(lua.LString(itemName))
+	L.Push(lua.LNumber(totalCost))
+
+	if err := L.PCall(8, 0, nil); err != nil {
+		e.log.Error("lua npc onSellItem", "npc", npc.Name, "err", err)
+		return false
+	}
+	return true
+}
+
+// npcCallback looks up one of an NPC type's registered callbacks, or nil.
+func (e *Engine) npcCallback(npc *game.Npc, name string) *lua.LFunction {
+	if npc == nil {
+		return nil
+	}
+	e.npcCallbacksMu.Lock()
+	defer e.npcCallbacksMu.Unlock()
+	if e.npcCallbacks == nil {
+		return nil
+	}
+	callbacks, ok := e.npcCallbacks[strings.ToLower(npc.Name)]
+	if !ok {
+		return nil
+	}
+	return callbacks[name]
+}
+
+// pushNpcUserdata and pushPlayerUserdata must be called with e.mu held.
+func (e *Engine) pushNpcUserdata(npc *game.Npc) {
+	ud := e.L.NewUserData()
+	ud.Value = npc
+	e.L.SetMetatable(ud, e.L.GetTypeMetatable("Npc"))
+	e.L.Push(ud)
+}
+
+func (e *Engine) pushPlayerUserdata(p *game.Player) {
+	ud := e.L.NewUserData()
+	ud.Value = p
+	e.L.SetMetatable(ud, e.L.GetTypeMetatable("Player"))
+	e.L.Push(ud)
+}
