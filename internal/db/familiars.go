@@ -2,64 +2,91 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"errors"
+	"strconv"
 
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/kv"
 )
 
-// LoadPlayerFamiliars loads the player's unlocked familiars from
-// player_familiars and the currently active familiar from the players table.
+// Unlocked familiars move from the invented `player_familiars` table into the KV
+// store. C++ has no per-player familiar persistence in its core — familiars.cpp
+// only parses the XML definitions — so there is no upstream layout to copy; this
+// scope is canary-go's own.
+const scopeFamiliars = "familiars"
+
+// LoadPlayerFamiliars reads the unlocked familiars, keyed by looktype.
 func (d *DB) LoadPlayerFamiliars(ctx context.Context, p *game.Player) error {
-	const q = `SELECT familiar_id FROM player_familiars WHERE player_id = ?`
-	rows, err := d.SQL.QueryContext(ctx, q, p.DBID)
+	p.Familiars = nil
+	if d.KV == nil {
+		return nil
+	}
+
+	scope := d.KV.PlayerScope(p.DBID).Scoped(scopeFamiliars)
+	keys, err := scope.Keys(ctx)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
 		return err
 	}
-	defer rows.Close()
-
-	p.Familiars = nil
-	for rows.Next() {
-		var lookType uint16
-		if err := rows.Scan(&lookType); err == nil {
-			p.Familiars = append(p.Familiars, game.Familiar{
-				LookType: lookType,
-				Unlocked: true,
-			})
+	for _, key := range keys {
+		lookType, ok := parseUint16Key(key)
+		if !ok {
+			continue
 		}
+		p.Familiars = append(p.Familiars, game.Familiar{
+			LookType: lookType,
+			Unlocked: true,
+		})
 	}
 	return nil
 }
 
-// SavePlayerFamiliars persists the player's unlocked familiars.
+// SavePlayerFamiliars writes the unlocked familiars, removing those that are no
+// longer unlocked.
 func (d *DB) SavePlayerFamiliars(ctx context.Context, p *game.Player) error {
-	if len(p.Familiars) == 0 {
+	if d.KV == nil {
 		return nil
 	}
-	if _, err := d.SQL.ExecContext(ctx, `DELETE FROM player_familiars WHERE player_id = ?`, p.DBID); err != nil {
-		return err
-	}
-	const q = `INSERT INTO player_familiars (player_id, familiar_id) VALUES (?, ?)`
+	scope := d.KV.PlayerScope(p.DBID).Scoped(scopeFamiliars)
+
+	unlocked := make(map[uint16]struct{}, len(p.Familiars))
 	for _, f := range p.Familiars {
 		if f.Unlocked {
-			if _, err := d.SQL.ExecContext(ctx, q, p.DBID, f.LookType); err != nil {
+			unlocked[f.LookType] = struct{}{}
+		}
+	}
+
+	existing, err := scope.Keys(ctx)
+	if err != nil {
+		return err
+	}
+	for _, key := range existing {
+		lookType, ok := parseUint16Key(key)
+		if !ok {
+			if err := scope.Remove(ctx, key); err != nil {
+				return err
+			}
+			continue
+		}
+		if _, still := unlocked[lookType]; !still {
+			if err := scope.Remove(ctx, key); err != nil {
 				return err
 			}
 		}
 	}
+
+	for lookType := range unlocked {
+		key := strconv.FormatUint(uint64(lookType), 10)
+		if err := scope.Set(ctx, key, kv.Bool(true)); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-// EnsureFamiliarsTable creates player_familiars if it doesn't exist.
-func (d *DB) EnsureFamiliarsTable(ctx context.Context) error {
-	const ddl = `CREATE TABLE IF NOT EXISTS player_familiars (
-		player_id INT UNSIGNED NOT NULL,
-		familiar_id SMALLINT UNSIGNED NOT NULL,
-		PRIMARY KEY (player_id, familiar_id)
-	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
-	_, err := d.SQL.ExecContext(ctx, ddl)
-	return err
+// parseUint16Key accepts a bare integer that fits in uint16.
+func parseUint16Key(key string) (uint16, bool) {
+	v, err := strconv.ParseUint(key, 10, 64)
+	if err != nil || v > 0xFFFF {
+		return 0, false
+	}
+	return uint16(v), true
 }

@@ -204,8 +204,14 @@ type Player struct {
 
 	// WheelGemManager holds the player gem Atelier data (separate from Wheel).
 	WheelGemManager *WheelGemCollection
-		// WeaponProficiency tracks per-weapon bonus stats.
+		// WeaponProficiency tracks per-weapon bonus stats. It is DERIVED state:
+		// C++ recomputes it from Proficiency via applyPerks and never persists it.
 		WeaponProficiency *WeaponProficiency
+
+		// Proficiency is the persisted per-weapon progression, keyed by item id.
+		// It lives in the KV store under player.<guid>.weapon-proficiency.<weaponId>,
+		// matching WeaponProficiency::load/save (weapon_proficiency.cpp:253-291).
+		Proficiency map[uint16]WeaponProficiencyData
 
 	// Prey & Task Hunting systems. PreyCards is the wildcard/prey-card resource
 	// (schema players.prey_wildcard) spent on bonus rerolls and list selection.

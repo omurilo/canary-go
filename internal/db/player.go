@@ -35,8 +35,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	                  p.boss_points,
 	                  p.lastlogin, p.lastlogout,
 	                  p.blessings1, p.blessings2, p.blessings3, p.blessings4,
-	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8,
-	                  p.weapon_proficiency
+	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8
 	           FROM players p JOIN accounts a ON a.id = p.account_id WHERE p.name = ? LIMIT 1`
 
 	p := &game.Player{}
@@ -48,7 +47,6 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	var offlineTimeSeconds int32
 	var taskPoints uint32
 	var quickLootFallback bool
-	var weaponProfBlob sql.NullString
 	err := d.SQL.QueryRowContext(ctx, q, name).Scan(
 		&p.DBID, &p.AccountID, &p.AccountType, &p.CoinBalance, &p.CoinTransferable, &p.TournamentBalance, &p.GroupID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
 		&p.Health, &p.MaxHealth, &p.Mana, &p.MaxMana, &p.Experience,
@@ -70,7 +68,6 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		&p.LastLogin, &p.LastLogout,
 		&p.Blessings[0], &p.Blessings[1], &p.Blessings[2], &p.Blessings[3],
 		&p.Blessings[4], &p.Blessings[5], &p.Blessings[6], &p.Blessings[7],
-		&weaponProfBlob,
 	)
 	p.OfflineTrainingTime = offlineTimeSeconds * 1000
 	if errors.Is(err, sql.ErrNoRows) {
@@ -80,11 +77,11 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		return nil, err
 	}
 
-	if weaponProfBlob.Valid && weaponProfBlob.String != "" {
+	// WeaponProficiency is derived state that C++ recomputes from the persisted
+	// perks (applyPerks); it is never read back from the database. The persisted
+	// half lives in the KV store and is loaded by LoadPlayerWeaponProficiency.
+	if p.WeaponProficiency == nil {
 		p.WeaponProficiency = game.NewWeaponProficiency()
-		if err := json.Unmarshal([]byte(weaponProfBlob.String), p.WeaponProficiency); err != nil {
-			p.WeaponProficiency = game.NewWeaponProficiency()
-		}
 	}
 	p.Capacity = capValue * 100
 	if minExp := game.ExpForLevel(uint64(p.Level)); p.Experience < minExp {
@@ -140,32 +137,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		}
 	}
 
-	// Load player mounts
-	p.Mounts = make(map[uint16]bool)
-	mRows, err := d.SQL.QueryContext(ctx, "SELECT mount_id FROM player_mounts WHERE player_id = ?", p.DBID)
-	if err == nil {
-		defer mRows.Close()
-		for mRows.Next() {
-			var mid uint16
-			if err := mRows.Scan(&mid); err == nil {
-				p.AddMount(mid)
-			}
-		}
-	}
-
-	// Load player outfits
-	p.Outfits = []game.OutfitEntry{}
-	oRows, err := d.SQL.QueryContext(ctx, "SELECT looktype, addons FROM player_outfits WHERE player_id = ?", p.DBID)
-	if err == nil {
-		defer oRows.Close()
-		for oRows.Next() {
-			var lookType uint16
-			var addons uint8
-			if err := oRows.Scan(&lookType, &addons); err == nil {
-				p.Outfits = append(p.Outfits, game.OutfitEntry{LookType: lookType, Addons: addons})
-			}
-		}
-	}
+	// Mounts and outfits are loaded from the KV store by the subsystem loop below.
 	// Load player guild membership
 	gQuery := `SELECT g.name, r.name, m.nick
 	           FROM guild_membership m
@@ -174,9 +146,8 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	           WHERE m.player_id = ? LIMIT 1`
 	_ = d.SQL.QueryRowContext(ctx, gQuery, p.DBID).Scan(&p.GuildName, &p.GuildRankName, &p.GuildNick)
 
-	// Per-subsystem loads. These used to be `_ = ...`, which hid real failures —
-	// notably a missing player_achievements/player_titles table, so achievements
-	// silently never persisted.
+	// Per-subsystem loads. These used to be `_ = ...`, which hid real failures.
+	// Everything not backed by a canonical column now reads from the KV store.
 	for _, sub := range []struct {
 		name string
 		load func(context.Context, *game.Player) error
@@ -195,6 +166,9 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		{"concoctions", d.LoadPlayerConcoctions},
 		{"hirelings", d.LoadPlayerHirelings},
 		{"animus_mastery", d.LoadPlayerAnimusMastery},
+		{"weapon_proficiency", d.LoadPlayerWeaponProficiency},
+		{"mounts", d.LoadPlayerMounts},
+		{"outfits", d.LoadPlayerOutfits},
 	} {
 		if err := sub.load(ctx, p); err != nil {
 			slog.Default().Warn("load player subsystem failed",
@@ -383,16 +357,8 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	              boss_points=?,
 	              skull=?, skulltime=?, conditions=?,
 	              blessings1=?, blessings2=?, blessings3=?, blessings4=?,
-	              blessings5=?, blessings6=?, blessings7=?, blessings8=?,
-	              weapon_proficiency=?
+	              blessings5=?, blessings6=?, blessings7=?, blessings8=?
 	           WHERE id=?`
-	// Serialize weapon proficiency.
-	var weaponProfJSON = []byte("")
-	if p.WeaponProficiency != nil {
-		if data, err := json.Marshal(p.WeaponProficiency); err == nil {
-			weaponProfJSON = data
-		}
-	}
 	_, err := d.SQL.ExecContext(ctx, q,
 		p.Level, p.Experience, p.Health, p.MaxHealth,
 		p.Mana, p.MaxMana, p.Soul, p.Capacity/100, p.BankBalance,
@@ -415,7 +381,6 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		p.Skull, p.SkullTime, p.ConditionsBlob,
 		p.Blessings[0], p.Blessings[1], p.Blessings[2], p.Blessings[3],
 		p.Blessings[4], p.Blessings[5], p.Blessings[6], p.Blessings[7],
-		weaponProfJSON,
 		p.DBID,
 	)
 	if err != nil {
@@ -433,21 +398,6 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		}
 	}
 
-	// Save player mounts
-	if p.Mounts != nil {
-		_, _ = d.SQL.ExecContext(ctx, "DELETE FROM player_mounts WHERE player_id = ?", p.DBID)
-		for mid := range p.Mounts {
-			_, _ = d.SQL.ExecContext(ctx, "INSERT INTO player_mounts (player_id, mount_id) VALUES (?, ?)", p.DBID, mid)
-		}
-	}
-
-	// Save player outfits
-	if p.Outfits != nil {
-		_, _ = d.SQL.ExecContext(ctx, "DELETE FROM player_outfits WHERE player_id = ?", p.DBID)
-		for _, outfit := range p.Outfits {
-			_, _ = d.SQL.ExecContext(ctx, "INSERT INTO player_outfits (player_id, looktype, addons) VALUES (?, ?, ?)", p.DBID, outfit.LookType, outfit.Addons)
-		}
-	}
 
 	// Save Wheel of Destiny, Prey and Task Hunting slots.
 	// Per-subsystem saves. These used to be `_ = ...`; a missing table or a broken
@@ -471,6 +421,9 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		{"concoctions", d.SavePlayerConcoctions},
 		{"hirelings", d.SavePlayerHirelings},
 		{"animus_mastery", d.SavePlayerAnimusMastery},
+		{"weapon_proficiency", d.SavePlayerWeaponProficiency},
+		{"mounts", d.SavePlayerMounts},
+		{"outfits", d.SavePlayerOutfits},
 	} {
 		if err := sub.save(ctx, p); err != nil {
 			slog.Default().Warn("save player subsystem failed",

@@ -2,111 +2,169 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"errors"
+	"log/slog"
+	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/kv"
 )
 
-// LoadPlayerAchievements loads the player's unlocked achievements from
-// player_achievements. Each row maps achievement_id → unlock timestamp.
+// Achievements and titles live in the KV store, not in dedicated tables. The key
+// layout is taken from PlayerAchievement / PlayerTitle:
+//
+//	player.<guid>.achievements.points            → int
+//	player.<guid>.achievements.unlocked.<name>   → unlock timestamp
+//	player.<guid>.titles.current-title           → title id
+//	player.<guid>.titles.unlocked.<name>         → unlock timestamp
+//
+// See player_achievement.cpp:81,87,136 and player_title.cpp:56,89,94,176.
+// The previous Go implementation invented `player_achievements` and
+// `player_titles` tables created by runtime DDL that was never called, so
+// nothing persisted at all.
+//
+// C++ keys these by achievement/title NAME rather than id, so the registry is
+// needed to translate. Timestamps go through IntType, which is int32 on both
+// sides, so both servers share the same year-2038 ceiling.
+const (
+	scopeAchievements = "achievements"
+	scopeTitles       = "titles"
+	scopeUnlocked     = "unlocked"
+
+	keyPoints = "points"
+)
+
+// LoadPlayerAchievements reads the unlocked achievements, porting
+// PlayerAchievement::loadUnlockedAchievements (player_achievement.cpp:105).
 func (d *DB) LoadPlayerAchievements(ctx context.Context, p *game.Player) error {
-	const q = `SELECT achievement_id, unlock_time FROM player_achievements WHERE player_id = ?`
-	rows, err := d.SQL.QueryContext(ctx, q, p.DBID)
-	if err != nil {
-		return err
+	if d.KV == nil {
+		return nil
 	}
-	defer rows.Close()
-
 	p.Achievements = make(map[uint16]int64)
-	for rows.Next() {
-		var id uint16
-		var ts int64
-		if err := rows.Scan(&id, &ts); err == nil {
-			p.Achievements[id] = ts
-		}
-	}
-	return nil
-}
 
-// SavePlayerAchievements persists the player's unlocked achievements.
-// player_achievements has a composite PK (player_id, achievement_id), so we
-// DELETE + INSERT like other player sub-tables.
-func (d *DB) SavePlayerAchievements(ctx context.Context, p *game.Player) error {
-	if len(p.Achievements) == 0 {
+	registry := achievementRegistry(p)
+	if registry == nil {
+		// Without the registry the stored names cannot be resolved back to ids.
+		// Leave the map empty rather than guessing.
 		return nil
 	}
-	if _, err := d.SQL.ExecContext(ctx, `DELETE FROM player_achievements WHERE player_id = ?`, p.DBID); err != nil {
-		return err
-	}
-	const q = `INSERT INTO player_achievements (player_id, achievement_id, unlock_time) VALUES (?, ?, ?)`
-	for id, ts := range p.Achievements {
-		if _, err := d.SQL.ExecContext(ctx, q, p.DBID, id, ts); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
-// EnsureAchievementsTable creates player_achievements if it doesn't exist.
-func (d *DB) EnsureAchievementsTable(ctx context.Context) error {
-	const ddl = `CREATE TABLE IF NOT EXISTS player_achievements (
-		player_id INT UNSIGNED NOT NULL,
-		achievement_id SMALLINT UNSIGNED NOT NULL,
-		unlock_time INT UNSIGNED NOT NULL DEFAULT 0,
-		PRIMARY KEY (player_id, achievement_id)
-	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
-	_, err := d.SQL.ExecContext(ctx, ddl)
-	return err
-}
-
-// LoadPlayerTitles loads the player's unlocked titles from player_titles.
-func (d *DB) LoadPlayerTitles(ctx context.Context, p *game.Player) error {
-	const q = `SELECT title FROM player_titles WHERE player_id = ?`
-	rows, err := d.SQL.QueryContext(ctx, q, p.DBID)
+	scope := d.KV.PlayerScope(p.DBID).Scoped(scopeAchievements).Scoped(scopeUnlocked)
+	names, err := scope.Keys(ctx)
 	if err != nil {
-		// Table might not exist yet — treat as empty
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
 		return err
 	}
-	defer rows.Close()
 
-	p.TitleStrings = nil
-	for rows.Next() {
-		var title string
-		if err := rows.Scan(&title); err == nil {
-			p.TitleStrings = append(p.TitleStrings, title)
+	for _, name := range names {
+		achievement := registry.GetByName(name)
+		if achievement == nil {
+			slog.Default().Warn("unknown achievement in KV; skipping",
+				"name", name, "player", p.Name)
+			continue
 		}
+		value, found, err := scope.Get(ctx, name)
+		if err != nil {
+			return err
+		}
+		if !found {
+			continue
+		}
+		p.Achievements[achievement.ID] = int64(value.GetInt())
 	}
 	return nil
 }
 
-// SavePlayerTitles persists the player's titles.
-func (d *DB) SavePlayerTitles(ctx context.Context, p *game.Player) error {
-	if len(p.TitleStrings) == 0 {
+// SavePlayerAchievements writes the unlocked achievements and the points total.
+func (d *DB) SavePlayerAchievements(ctx context.Context, p *game.Player) error {
+	if d.KV == nil {
 		return nil
 	}
-	if _, err := d.SQL.ExecContext(ctx, `DELETE FROM player_titles WHERE player_id = ?`, p.DBID); err != nil {
+	registry := achievementRegistry(p)
+	if registry == nil {
+		return nil
+	}
+
+	base := d.KV.PlayerScope(p.DBID).Scoped(scopeAchievements)
+	scope := base.Scoped(scopeUnlocked)
+
+	var points int32
+	for id, ts := range p.Achievements {
+		achievement := registry.GetByID(id)
+		if achievement == nil {
+			slog.Default().Warn("unknown achievement id; not persisted",
+				"id", id, "player", p.Name)
+			continue
+		}
+		if err := scope.Set(ctx, achievement.Name, kv.Int(int32(ts))); err != nil {
+			return err
+		}
+		points += int32(achievement.Points)
+	}
+
+	return base.Set(ctx, keyPoints, kv.Int(points))
+}
+
+// LoadPlayerTitles reads the unlocked titles, porting
+// PlayerTitle::loadUnlockedTitles (player_title.cpp:170).
+func (d *DB) LoadPlayerTitles(ctx context.Context, p *game.Player) error {
+	if d.KV == nil {
+		return nil
+	}
+	p.TitleStrings = nil
+
+	scope := d.KV.PlayerScope(p.DBID).Scoped(scopeTitles).Scoped(scopeUnlocked)
+	names, err := scope.Keys(ctx)
+	if err != nil {
 		return err
 	}
-	const q = `INSERT INTO player_titles (player_id, title) VALUES (?, ?)`
+	p.TitleStrings = append(p.TitleStrings, names...)
+	return nil
+}
+
+// SavePlayerTitles writes the unlocked titles, dropping any that were revoked and
+// preserving the original unlock timestamp of the ones that remain.
+func (d *DB) SavePlayerTitles(ctx context.Context, p *game.Player) error {
+	if d.KV == nil {
+		return nil
+	}
+	scope := d.KV.PlayerScope(p.DBID).Scoped(scopeTitles).Scoped(scopeUnlocked)
+
+	existing, err := scope.Keys(ctx)
+	if err != nil {
+		return err
+	}
+	current := make(map[string]struct{}, len(p.TitleStrings))
 	for _, title := range p.TitleStrings {
-		if _, err := d.SQL.ExecContext(ctx, q, p.DBID, title); err != nil {
+		current[title] = struct{}{}
+	}
+
+	for _, name := range existing {
+		if _, ok := current[name]; !ok {
+			if err := scope.Remove(ctx, name); err != nil {
+				return err
+			}
+		}
+	}
+
+	now := int32(time.Now().Unix())
+	for title := range current {
+		_, found, err := scope.Get(ctx, title)
+		if err != nil {
+			return err
+		}
+		if found {
+			continue
+		}
+		if err := scope.Set(ctx, title, kv.Int(now)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// EnsureTitlesTable creates player_titles if it doesn't exist.
-func (d *DB) EnsureTitlesTable(ctx context.Context) error {
-	const ddl = `CREATE TABLE IF NOT EXISTS player_titles (
-		player_id INT UNSIGNED NOT NULL,
-		title VARCHAR(64) NOT NULL,
-		PRIMARY KEY (player_id, title)
-	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
-	_, err := d.SQL.ExecContext(ctx, ddl)
-	return err
+// achievementRegistry reaches the registry through the player's world.
+func achievementRegistry(p *game.Player) *game.AchievementRegistry {
+	if p == nil || p.World == nil {
+		return nil
+	}
+	return p.World.Achievements
 }

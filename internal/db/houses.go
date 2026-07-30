@@ -112,58 +112,6 @@ func (d *DB) SaveHouseAccessList(ctx context.Context, houseID uint32, access gam
 	return tx.Commit()
 }
 
-// EnsureHousesTables creates the houses and house_lists tables if they don't exist.
-func (d *DB) EnsureHousesTables(ctx context.Context) error {
-	const ddl = `CREATE TABLE IF NOT EXISTS houses (
-		id INT UNSIGNED NOT NULL,
-		name VARCHAR(100) NOT NULL DEFAULT '',
-		owner INT UNSIGNED NOT NULL DEFAULT 0,
-		rent INT UNSIGNED NOT NULL DEFAULT 0,
-		size INT UNSIGNED NOT NULL DEFAULT 0,
-		town_id INT UNSIGNED NOT NULL DEFAULT 0,
-		beds SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-		client_id INT UNSIGNED NOT NULL DEFAULT 0,
-		bidder_name VARCHAR(100) NOT NULL DEFAULT '',
-		highest_bid BIGINT UNSIGNED NOT NULL DEFAULT 0,
-		internal_bid BIGINT UNSIGNED NOT NULL DEFAULT 0,
-		bid_holder_limit BIGINT UNSIGNED NOT NULL DEFAULT 0,
-		bid_end_date INT UNSIGNED NOT NULL DEFAULT 0,
-		bidder INT UNSIGNED NOT NULL DEFAULT 0,
-		transfer_to_name VARCHAR(100) NOT NULL DEFAULT '',
-		transfer_price BIGINT UNSIGNED NOT NULL DEFAULT 0,
-		transfer_accept INT UNSIGNED NOT NULL DEFAULT 0,
-		PRIMARY KEY (id)
-	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
-	if _, err := d.SQL.ExecContext(ctx, ddl); err != nil {
-		return err
-	}
-
-	// Add columns for existing tables (safe no-ops if already present).
-	alterQueries := []string{
-		`ALTER TABLE houses ADD COLUMN client_id INT UNSIGNED NOT NULL DEFAULT 0 AFTER beds`,
-		`ALTER TABLE houses ADD COLUMN bidder_name VARCHAR(100) NOT NULL DEFAULT '' AFTER client_id`,
-		`ALTER TABLE houses ADD COLUMN highest_bid BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER bidder_name`,
-		`ALTER TABLE houses ADD COLUMN internal_bid BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER highest_bid`,
-		`ALTER TABLE houses ADD COLUMN bid_holder_limit BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER internal_bid`,
-		`ALTER TABLE houses ADD COLUMN bid_end_date INT UNSIGNED NOT NULL DEFAULT 0 AFTER bid_holder_limit`,
-		`ALTER TABLE houses ADD COLUMN bidder INT UNSIGNED NOT NULL DEFAULT 0 AFTER bid_end_date`,
-		`ALTER TABLE houses ADD COLUMN transfer_to_name VARCHAR(100) NOT NULL DEFAULT '' AFTER bidder`,
-		`ALTER TABLE houses ADD COLUMN transfer_price BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER transfer_to_name`,
-		`ALTER TABLE houses ADD COLUMN transfer_accept INT UNSIGNED NOT NULL DEFAULT 0 AFTER transfer_price`,
-	}
-	for _, q := range alterQueries {
-		_, _ = d.SQL.ExecContext(ctx, q)
-	}
-
-	const ddl2 = `CREATE TABLE IF NOT EXISTS house_lists (
-		house_id INT UNSIGNED NOT NULL,
-		type VARCHAR(20) NOT NULL,
-		value VARCHAR(100) NOT NULL,
-		PRIMARY KEY (house_id, type, value)
-	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
-	_, err := d.SQL.ExecContext(ctx, ddl2)
-	return err
-}
 
 // HouseBidExpiryDuration is how long an auction lasts after the first bid.
 const HouseBidExpiryDuration = 7 * 24 * time.Hour // 7 days

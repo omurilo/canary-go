@@ -87,22 +87,3 @@ func (d *DB) GetPlayerMarketOffers(ctx context.Context, playerID uint32) ([]game
 	return offers, nil
 }
 
-// EnsureMarketTable creates market_offers if it doesn't exist.
-func (d *DB) EnsureMarketTable(ctx context.Context) error {
-	const ddl = `CREATE TABLE IF NOT EXISTS market_offers (
-		id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-		player_id INT UNSIGNED NOT NULL,
-		sale TINYINT UNSIGNED NOT NULL DEFAULT 0,
-		itemtype SMALLINT UNSIGNED NOT NULL,
-		amount SMALLINT UNSIGNED NOT NULL,
-		price BIGINT UNSIGNED NOT NULL,
-		created INT UNSIGNED NOT NULL,
-		anonymous TINYINT UNSIGNED NOT NULL DEFAULT 0,
-		tier TINYINT UNSIGNED NOT NULL DEFAULT 0,
-		PRIMARY KEY (id),
-		KEY idx_player (player_id),
-		KEY idx_item (itemtype, sale)
-	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
-	_, err := d.SQL.ExecContext(ctx, ddl)
-	return err
-}

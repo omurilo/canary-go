@@ -20,7 +20,7 @@ for _ in $(seq 1 30); do
 done
 
 echo "== starting server =="
-./bin/canary -config config.lua -schema schema/mysql.sql -scripts scripts -migrate -seed \
+./bin/canary -config config.lua -schema schema/schema.sql -scripts scripts -migrate -seed \
   > /tmp/canary-server.log 2>&1 &
 SERVER_PID=$!
 trap 'kill $SERVER_PID 2>/dev/null || true' EXIT

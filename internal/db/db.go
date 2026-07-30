@@ -14,11 +14,17 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/opentibiabr/canary-go/internal/config"
+	"github.com/opentibiabr/canary-go/internal/kv"
 )
 
 // DB wraps a *sql.DB (MariaDB).
 type DB struct {
 	SQL *sql.DB
+
+	// KV is the key/value store backed by the `kv_store` table. It holds the
+	// state C++ keeps out of the players table (weapon proficiency, achievements,
+	// wheel gems, attached effects, ...). Nil disables every KV-backed load/save.
+	KV *kv.Store
 }
 
 // dsn builds a go-sql-driver DSN. multiStatements enables running the schema
@@ -48,7 +54,7 @@ func Connect(ctx context.Context, cfg *config.Config) (*DB, error) {
 		pool.Close()
 		return nil, fmt.Errorf("db: ping: %w", err)
 	}
-	return &DB{SQL: pool}, nil
+	return &DB{SQL: pool, KV: kv.New(pool)}, nil
 }
 
 // Close releases the pool.

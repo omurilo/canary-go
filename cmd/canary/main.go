@@ -41,7 +41,7 @@ import (
 func main() {
 	var (
 		configPath  = flag.String("config", "config.lua", "path to the Lua config file")
-		schemaPath  = flag.String("schema", "schema/mysql.sql", "path to the MySQL schema (canary-go extras)")
+		schemaPath  = flag.String("schema", "schema/schema.sql", "path to the canonical Canary schema")
 		scriptsDir  = flag.String("scripts", "scripts", "directory of Lua scripts to load at startup")
 		appearances = flag.String("appearances", "../data/items/appearances.dat", "path to appearances.dat (item metadata)")
 		mapFile     = flag.String("map", "", "path to an OTBM map file (empty = synthetic spawn field)")
@@ -173,42 +173,13 @@ func run(o runOpts, log *slog.Logger) error {
 		world.BoostedBoss = bb
 	}
 
-	// Market table and pre-load existing offers.
-	if err := database.EnsureMarketTable(ctx); err != nil {
-		log.Warn("ensure market table", "err", err)
-	} else if err := database.LoadMarketOffers(ctx, world.Market); err != nil {
+	// There is deliberately no runtime DDL here any more. `market_offers`, `houses`
+	// and `house_lists` are defined by the canonical schema, and the former
+	// Ensure*Table helpers either duplicated those definitions or ALTERed the
+	// shared `players` table to add columns the C++ schema does not have. The
+	// remaining Go-only state moved into the kv_store table instead.
+	if err := database.LoadMarketOffers(ctx, world.Market); err != nil {
 		log.Warn("load market offers", "err", err)
-	}
-
-	// Familiars table.
-	if err := database.EnsureFamiliarsTable(ctx); err != nil {
-		log.Warn("ensure familiars table", "err", err)
-	}
-
-	// Hazard system table.
-	if err := database.EnsureHazardTable(ctx); err != nil {
-		log.Warn("ensure hazard table", "err", err)
-	}
-
-	// Concoctions system table.
-	if err := database.EnsureConcoctionsTable(ctx); err != nil {
-		log.Warn("ensure concoctions table", "err", err)
-	}
-
-	// Houses table.
-	if err := database.EnsureHousesTables(ctx); err != nil {
-		log.Warn("ensure houses table", "err", err)
-	}
-
-	// Achievements table. Without this, LoadPlayerAchievements/SavePlayerAchievements
-	// fail against a missing table and achievements never persist.
-	if err := database.EnsureAchievementsTable(ctx); err != nil {
-		log.Warn("ensure achievements table", "err", err)
-	}
-
-	// Titles table. Same as above for SavePlayerTitles.
-	if err := database.EnsureTitlesTable(ctx); err != nil {
-		log.Warn("ensure titles table", "err", err)
 	}
 
 	imbPath := filepath.Join(filepath.Dir(filepath.Dir(o.appearances)), "XML", "imbuements.xml")
@@ -556,6 +527,23 @@ func run(o runOpts, log *slog.Logger) error {
 	lengine = luaengine.New(world, log)
 	lengine.SetDB(database)
 	defer lengine.Close()
+
+	// Database migrations, mirroring DatabaseManager::updateDatabase. They run
+	// after the schema and before the datapack loads, and they need the Lua state
+	// because the migration scripts are Lua files exposing onUpdateDatabase().
+	// C++ resolves the directory from DATA_DIRECTORY, which is dataPackDirectory.
+	if migrate {
+		migrationsDir := filepath.Join(cfg.DataPack, "migrations")
+		if _, err := os.Stat(migrationsDir); err == nil {
+			version, err := database.UpdateDatabase(ctx, migrationsDir, lengine, log)
+			if err != nil {
+				return err
+			}
+			log.Info("database migrations applied", "db_version", version)
+		} else {
+			log.Warn("migrations directory not found; skipping", "dir", migrationsDir)
+		}
+	}
 
 	// Event callback engine — initialized here before Lua scripts load
 	// so that EventCallback:register() calls in scripts don't silently fail.

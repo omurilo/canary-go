@@ -92,7 +92,6 @@ CREATE TABLE IF NOT EXISTS `players` (
     `blessings6` tinyint(4) NOT NULL DEFAULT '0',
     `blessings7` tinyint(4) NOT NULL DEFAULT '0',
     `blessings8` tinyint(4) NOT NULL DEFAULT '0',
-	`weapon_proficiency` text DEFAULT NULL,
     `onlinetime` int(11) NOT NULL DEFAULT '0',
     `deletion` bigint(15) NOT NULL DEFAULT '0',
     `balance` bigint(20) UNSIGNED NOT NULL DEFAULT '0',
