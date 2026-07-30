@@ -101,22 +101,47 @@ func (d *DB) SavePlayerConcoctions(ctx context.Context, p *game.Player) error {
 	return nil
 }
 
-// LoadPlayerAnimusMastery loads the animus mastery blob. This one IS a canonical
-// column (`players`.`animus_mastery`), so it stays in SQL.
+// LoadPlayerAnimusMastery loads the animus mastery blob from the canonical
+// `players`.`animus_mastery` column and decodes it into the runtime tracker.
 //
-// The encoding still differs from C++, which writes it with PropStream
-// (iologindata_load_player.cpp:283) while Go uses its own layout — the column is
-// shared but its contents are not yet interchangeable.
+// The blob is now the same PropStream format C++ uses — a bare sequence of
+// length-prefixed lowercase monster names (animus_mastery.cpp serialize/
+// unserialize, read at iologindata_load_player.cpp:283). Previously the column was
+// an opaque passthrough that was never parsed, so the runtime masteries never
+// actually persisted, and anything Go wrote was unreadable by the C++ server.
 func (d *DB) LoadPlayerAnimusMastery(ctx context.Context, p *game.Player) error {
-	err := d.SQL.QueryRowContext(ctx, `SELECT animus_mastery FROM players WHERE id = ?`, p.DBID).Scan(&p.AnimusMastery)
-	if err != nil {
+	if err := d.SQL.QueryRowContext(ctx,
+		`SELECT animus_mastery FROM players WHERE id = ?`, p.DBID).Scan(&p.AnimusMastery); err != nil {
 		p.AnimusMastery = nil
+		return nil
 	}
+
+	p.AnimMastery = game.UnserializeAnimusMastery(p.AnimusMastery, monsterRaceLookup(p))
 	return nil
 }
 
-// SavePlayerAnimusMastery persists the animus mastery blob.
+// SavePlayerAnimusMastery re-encodes the tracker and persists it.
 func (d *DB) SavePlayerAnimusMastery(ctx context.Context, p *game.Player) error {
-	_, err := d.SQL.ExecContext(ctx, `UPDATE players SET animus_mastery = ? WHERE id = ?`, p.AnimusMastery, p.DBID)
+	if p.AnimMastery != nil {
+		p.AnimusMastery = p.AnimMastery.Serialize()
+	}
+	_, err := d.SQL.ExecContext(ctx,
+		`UPDATE players SET animus_mastery = ? WHERE id = ?`, p.AnimusMastery, p.DBID)
 	return err
+}
+
+// monsterRaceLookup resolves a lowercase monster name to its bestiary race id.
+// Returns nil when the registry is unavailable, in which case names are kept with
+// race id 0 so the blob still round-trips.
+func monsterRaceLookup(p *game.Player) func(string) (uint16, bool) {
+	if p == nil || p.World == nil || p.World.TypeRegistry == nil {
+		return nil
+	}
+	registry := p.World.TypeRegistry
+	return func(name string) (uint16, bool) {
+		if mt, ok := registry.Monsters[name]; ok && mt != nil {
+			return mt.RaceID, true
+		}
+		return 0, false
+	}
 }

@@ -18,23 +18,76 @@ type WeaponProficiency struct {
 	elementCritical map[int]WeaponProfCritical
 	augments        map[uint16][]WeaponProfAugment
 	powerfulFoeDamage float64
+
+	// Derived sinks that applyPerks feeds and that had no Go counterpart before.
+	specializedMagic map[uint8]float64  // element → bonus magic level
+	skillBonus       map[Skill]float64  // skill → flat bonus
+	perfectShot      map[uint8]float64  // range → damage
 }
 
 type WeaponProfBonus uint8
 
+// WeaponProfBonus mirrors WeaponProficiencyBonus_t
+// (src/enums/weapon_proficiency.hpp:18). These values are NOT free to choose:
+// they are what a persisted ProficiencyPerk carries in its `type` field, so they
+// have to match upstream or a perk written by either server is read as a
+// different bonus by the other.
+//
+// The previous Go enum was an invented 12-value numbering that collided
+// semantically from value 4 onwards — 4 meant LIFE_GAIN_ON_HIT here but
+// SPECIALIZED_MAGIC_LEVEL upstream.
 const (
-	WpAttackDamage      WeaponProfBonus = 0
-	WpDefenseBonus      WeaponProfBonus = 1
-	WpWeaponShield      WeaponProfBonus = 2
-	WpAttackSkill       WeaponProfBonus = 3
-	WpLifeGainOnHit     WeaponProfBonus = 4
-	WpManaGainOnHit     WeaponProfBonus = 5
-	WpLifeGainOnKill    WeaponProfBonus = 6
-	WpManaGainOnKill    WeaponProfBonus = 7
-	WpCriticalChance    WeaponProfBonus = 8
-	WpCriticalDamage    WeaponProfBonus = 9
-	WpPerfectShotWeapon WeaponProfBonus = 10
-	WpElementalWeapon   WeaponProfBonus = 11
+	WpAttackDamage                 WeaponProfBonus = 0
+	WpDefenseBonus                 WeaponProfBonus = 1
+	WpWeaponShieldModifier         WeaponProfBonus = 2
+	WpSkillBonus                   WeaponProfBonus = 3
+	WpSpecializedMagicLevel        WeaponProfBonus = 4
+	WpSpellAugment                 WeaponProfBonus = 5
+	WpBestiary                     WeaponProfBonus = 6
+	WpPowerfulFoeBonus             WeaponProfBonus = 7
+	WpCriticalHitChance            WeaponProfBonus = 8
+	WpElementalHitChance           WeaponProfBonus = 9
+	WpRuneCriticalHitChance        WeaponProfBonus = 10
+	WpAutoAttackCriticalHitChance  WeaponProfBonus = 11
+	WpCriticalExtraDamage          WeaponProfBonus = 12
+	WpElementalCriticalExtraDamage WeaponProfBonus = 13
+	WpRuneCriticalExtraDamage      WeaponProfBonus = 14
+	WpAutoAttackCriticalExtraDmg   WeaponProfBonus = 15
+	WpManaLeech                    WeaponProfBonus = 16
+	WpLifeLeech                    WeaponProfBonus = 17
+	WpManaGainOnHit                WeaponProfBonus = 18
+	WpLifeGainOnHit                WeaponProfBonus = 19
+	WpManaGainOnKill               WeaponProfBonus = 20
+	WpLifeGainOnKill               WeaponProfBonus = 21
+	WpPerfectShotDamage            WeaponProfBonus = 22
+	WpRangedHitChance              WeaponProfBonus = 23
+	WpAttackRange                  WeaponProfBonus = 24
+	WpSkillPercentageAutoAttack    WeaponProfBonus = 25
+	WpSkillPercentageSpellDamage   WeaponProfBonus = 26
+	WpSkillPercentageSpellHealing  WeaponProfBonus = 27
+	WpAlphaStrikeExtraDamage       WeaponProfBonus = 28
+	WpOmegaStrikeExtraDamage       WeaponProfBonus = 29
+	WpArmorPenetration             WeaponProfBonus = 30
+	WpElementalPierce              WeaponProfBonus = 31
+)
+
+// Augment types a SPELL_AUGMENT perk can carry
+// (weapon_proficiency.cpp:31 — note the values are sparse).
+const (
+	AugmentDamage         uint8 = 2
+	AugmentHeal           uint8 = 3
+	AugmentCooldown       uint8 = 6
+	AugmentLifeLeech      uint8 = 14
+	AugmentManaLeech      uint8 = 15
+	AugmentCriticalDamage uint8 = 16
+	AugmentCriticalChance uint8 = 17
+)
+
+// SkillPercentage_t (src/enums/weapon_proficiency.hpp:53).
+const (
+	SkillPctAutoAttack uint8 = 0
+	SkillPctSpellDmg   uint8 = 1
+	SkillPctSpellHeal  uint8 = 2
 )
 
 type WeaponProfCritical struct {

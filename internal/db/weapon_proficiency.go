@@ -49,6 +49,10 @@ func (d *DB) LoadPlayerWeaponProficiency(ctx context.Context, p *game.Player) er
 		}
 		p.Proficiency[weaponID] = game.WeaponProficiencyDataFromKV(value)
 	}
+
+	// Derive the aggregated bonuses from the perks just loaded. C++ gets there by
+	// calling applyPerks as each perk is selected; on load it has to be rebuilt.
+	p.RebuildWeaponProficiency()
 	return nil
 }
 
