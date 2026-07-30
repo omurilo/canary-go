@@ -82,6 +82,10 @@ const (
 // Skill indexes match the client skill order.
 type Skill int
 
+// Skill values mirror skills_t (src/creatures/creatures_definitions.hpp:466).
+// The order is load-bearing: IOLoginDataLoad::loadPlayerSkill indexes
+// player->skills[i] by these values against a fixed array of column names, and a
+// persisted ProficiencyPerk stores its skillId as one of them.
 const (
 	SkillFist Skill = iota
 	SkillClub
@@ -90,6 +94,14 @@ const (
 	SkillDistance
 	SkillShielding
 	SkillFishing
+	SkillCriticalHitChance
+	SkillCriticalHitDamage
+	SkillLifeLeechChance
+	SkillLifeLeechAmount
+	SkillManaLeechChance
+	SkillManaLeechAmount
+	// SkillCount is one past SKILL_LAST (= SKILL_MANA_LEECH_AMOUNT), so it is the
+	// length of the Skills/SkillTries arrays.
 	SkillCount
 )
 
@@ -164,15 +176,11 @@ type Player struct {
 	ManagedContainers       map[uint8]uint16 // ObjectCategory -> loot container item id
 	ManagedObtainContainers map[uint8]uint16 // ObjectCategory -> obtain container item id
 
-	// Advanced Combat Stats
-	CriticalChance  uint16
-	CriticalDamage  uint16
-	LifeLeechChance uint16
-	LifeLeechAmount uint16
-	ManaLeechChance uint16
-	ManaLeechAmount uint16
-	ReflectPercent  uint16
-	AbsorbPercent   uint16
+	// Advanced Combat Stats. Crit and leech are NOT stored here: they are real
+	// skills in C++ (skills_t 7..12) with their own players columns, so they live
+	// in Skills/SkillTries and are read through the getters below.
+	ReflectPercent uint16
+	AbsorbPercent  uint16
 
 	// StoreInbox is the player's Store Inbox container (item id ITEM_STORE_INBOX
 	// 23396) where in-game store purchases are delivered. Created lazily on first
@@ -933,12 +941,15 @@ func (p *Player) SetTarget(target Creature) {
 	}
 }
 
-func (p *Player) GetCriticalChance() uint16 { return p.CriticalChance }
-func (p *Player) GetCriticalDamage() uint16 { return p.CriticalDamage }
-func (p *Player) GetLifeLeechChance() uint16 { return p.LifeLeechChance }
-func (p *Player) GetLifeLeechAmount() uint16 { return p.LifeLeechAmount }
-func (p *Player) GetManaLeechChance() uint16 { return p.ManaLeechChance }
-func (p *Player) GetManaLeechAmount() uint16 { return p.ManaLeechAmount }
+// Crit and leech read straight out of the skills array, which is where C++ keeps
+// them (player->skills[SKILL_CRITICAL_HIT_CHANCE] and friends). They used to be
+// separate fields that nothing ever wrote, so every one of these returned 0.
+func (p *Player) GetCriticalChance() uint16  { return p.Skills[SkillCriticalHitChance] }
+func (p *Player) GetCriticalDamage() uint16  { return p.Skills[SkillCriticalHitDamage] }
+func (p *Player) GetLifeLeechChance() uint16 { return p.Skills[SkillLifeLeechChance] }
+func (p *Player) GetLifeLeechAmount() uint16 { return p.Skills[SkillLifeLeechAmount] }
+func (p *Player) GetManaLeechChance() uint16 { return p.Skills[SkillManaLeechChance] }
+func (p *Player) GetManaLeechAmount() uint16 { return p.Skills[SkillManaLeechAmount] }
 func (p *Player) GetReflectPercent() uint16 { return p.ReflectPercent }
 func (p *Player) GetAbsorbPercent() uint16 { return p.AbsorbPercent }
 func (p *Player) SetAttackTarget(id uint32)           { p.TargetID = id }

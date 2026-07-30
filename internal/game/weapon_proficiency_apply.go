@@ -2,22 +2,6 @@ package game
 
 import "math"
 
-// Extended skills_t values (src/creatures/creatures_definitions.hpp:466). Go's
-// Skill enum stops at SkillFishing because `Skills [SkillCount]uint16` only
-// covers the seven skills the players table has columns for.
-//
-// These ids are valid MAP KEYS for the derived skillBonus/skillPcts maps, which is
-// all a perk needs — they must NEVER be used to index Skills or SkillTries, as
-// they are out of that array's bounds.
-const (
-	SkillCriticalHitChance Skill = 7
-	SkillCriticalHitDamage Skill = 8
-	SkillLifeLeechChance   Skill = 9
-	SkillLifeLeechAmount   Skill = 10
-	SkillManaLeechChance   Skill = 11
-	SkillManaLeechAmount   Skill = 12
-)
-
 // ApplyPerks derives the aggregated bonus cache from the persisted perks of one
 // weapon, porting WeaponProficiency::applyPerks (weapon_proficiency.cpp:441).
 //

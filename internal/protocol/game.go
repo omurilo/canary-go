@@ -826,8 +826,11 @@ func (g *GameProtocol) addSkills(w *netmsg.Writer) {
 	w.AddU16(p.MagLevel) // base magic level
 	w.AddU16(0)          // loyalty magic level
 	w.AddU16(p.GetMagLevelPercent()) // magic level percent * 100
-	// combat skills fist..fishing.
-	for i := game.SkillFist; i < game.SkillCount; i++ {
+	// Combat skills fist..fishing only. AddPlayerSkills iterates
+	// SKILL_FIRST..SKILL_FISHING here (protocolgame.cpp:9806); the crit and leech
+	// skills are NOT part of this block, so the bound must stay at SkillFishing
+	// rather than SkillCount, which now covers all 13 skills.
+	for i := game.SkillFist; i <= game.SkillFishing; i++ {
 		w.AddU16(p.Skills[i]) // level
 		w.AddU16(p.Skills[i]) // base
 		w.AddU16(0)           // loyalty

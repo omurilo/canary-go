@@ -21,7 +21,7 @@ type BaseCritical struct {
 }
 
 func (p *Player) GetBaseCritical() BaseCritical {
-	return BaseCritical{Chance: p.CriticalChance, Damage: p.CriticalDamage}
+	return BaseCritical{Chance: p.GetCriticalChance(), Damage: p.GetCriticalDamage()}
 }
 
 type SkillsEquipment struct {
