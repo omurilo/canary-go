@@ -1,168 +1,214 @@
 package events
 
 import (
-	"fmt"
+	"log/slog"
+	"sync"
+
 	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
 
-type Engine struct {
-	OnLogin          []lua.LValue
-	OnLook           []lua.LValue
-	OnMoveItem       []lua.LValue
-	OnGainExperience []lua.LValue
-	OnDeath          []lua.LValue
-	L                *lua.LState
+// EventCallbackType identifies the type of event callback.
+type EventCallbackType string
+
+const (
+	// Creature callbacks
+	EventCreatureOnAreaCombat EventCallbackType = "creatureOnAreaCombat"
+	EventCreatureOnTargetCombat EventCallbackType = "creatureOnTargetCombat"
+
+	// Player callbacks
+	EventPlayerOnLogin          EventCallbackType = "onLogin"
+	EventPlayerOnLook           EventCallbackType = "playerOnLook"
+	EventPlayerOnLookInShop     EventCallbackType = "playerOnLookInShop"
+	EventPlayerOnLookInTrade    EventCallbackType = "playerOnLookInTrade"
+	EventPlayerOnMoveItem       EventCallbackType = "onMoveItem"
+	EventPlayerOnGainExperience EventCallbackType = "onGainExperience"
+	EventPlayerOnDeath          EventCallbackType = "onDeath"
+	EventPlayerOnTradeAccept    EventCallbackType = "playerOnTradeAccept"
+	EventPlayerOnBrowseField    EventCallbackType = "playerOnBrowseField"
+	EventPlayerOnRotateItem     EventCallbackType = "playerOnRotateItem"
+	EventPlayerOnRemoveCount    EventCallbackType = "playerOnRemoveCount"
+	EventPlayerOnRequestQuestLog   EventCallbackType = "playerOnRequestQuestLog"
+	EventPlayerOnRequestQuestLine  EventCallbackType = "playerOnRequestQuestLine"
+	EventPlayerOnStorageUpdate  EventCallbackType = "playerOnStorageUpdate"
+
+	// Monster callbacks
+	EventMonsterOnDropLoot     EventCallbackType = "monsterOnDropLoot"
+	EventMonsterPostDropLoot   EventCallbackType = "monsterPostDropLoot"
+
+	// Party callbacks
+	EventPartyOnDisband         EventCallbackType = "partyOnDisband"
+	EventPartyOnShareExperience EventCallbackType = "partyOnShareExperience"
+)
+
+// callbackField maps a Lua table field name to an EventCallbackType.
+type callbackField struct {
+	Field string
+	Type  EventCallbackType
 }
 
+// allCallbackFields lists all known Lua table field names and their corresponding
+// EventCallbackType. Used by Register to populate the callbacks map.
+var allCallbackFields = []callbackField{
+	{"onLogin", EventPlayerOnLogin},
+	{"playerOnLook", EventPlayerOnLook},
+	{"onLook", EventPlayerOnLook}, // legacy alias
+	{"playerOnLookInShop", EventPlayerOnLookInShop},
+	{"playerOnLookInTrade", EventPlayerOnLookInTrade},
+	{"onMoveItem", EventPlayerOnMoveItem},
+	{"playerOnMoveItem", EventPlayerOnMoveItem},
+	{"onGainExperience", EventPlayerOnGainExperience},
+	{"onDeath", EventPlayerOnDeath},
+	{"playerOnBrowseField", EventPlayerOnBrowseField},
+	{"playerOnRotateItem", EventPlayerOnRotateItem},
+	{"playerOnRemoveCount", EventPlayerOnRemoveCount},
+	{"playerOnTradeAccept", EventPlayerOnTradeAccept},
+	{"playerOnRequestQuestLog", EventPlayerOnRequestQuestLog},
+	{"playerOnRequestQuestLine", EventPlayerOnRequestQuestLine},
+	{"playerOnStorageUpdate", EventPlayerOnStorageUpdate},
+	{"creatureOnAreaCombat", EventCreatureOnAreaCombat},
+	{"creatureOnTargetCombat", EventCreatureOnTargetCombat},
+	{"monsterOnDropLoot", EventMonsterOnDropLoot},
+	{"monsterPostDropLoot", EventMonsterPostDropLoot},
+	{"partyOnDisband", EventPartyOnDisband},
+	{"partyOnShareExperience", EventPartyOnShareExperience},
+}
+
+// Engine stores and invokes Lua event callbacks registered by EventCallback scripts.
+type Engine struct {
+	mu        sync.Mutex
+	L         *lua.LState
+	log       *slog.Logger
+	callbacks map[EventCallbackType][]lua.LValue
+}
+
+// GlobalEngine is the process-wide event callback engine.
 var GlobalEngine *Engine
 
-func NewEngine(L *lua.LState) *Engine {
-	e := &Engine{L: L}
+// NewEngine creates a new event callback engine and sets it as GlobalEngine.
+func NewEngine(L *lua.LState, log *slog.Logger) *Engine {
+	e := &Engine{
+		L:         L,
+		log:       log,
+		callbacks: make(map[EventCallbackType][]lua.LValue),
+	}
 	GlobalEngine = e
 	return e
 }
 
+// Register reads all known callback field names from the Lua table and registers
+// each function value under its corresponding EventCallbackType.
 func (e *Engine) Register(callbackTable *lua.LTable) {
-	if val := callbackTable.RawGetString("onLogin"); val != lua.LNil {
-		e.OnLogin = append(e.OnLogin, val)
-	}
-	if val := callbackTable.RawGetString("playerOnLook"); val != lua.LNil {
-		e.OnLook = append(e.OnLook, val)
-	}
-	// Fallback/alias
-	if val := callbackTable.RawGetString("onLook"); val != lua.LNil {
-		e.OnLook = append(e.OnLook, val)
-	}
-	if val := callbackTable.RawGetString("onMoveItem"); val != lua.LNil {
-		e.OnMoveItem = append(e.OnMoveItem, val)
-	}
-	if val := callbackTable.RawGetString("onGainExperience"); val != lua.LNil {
-		e.OnGainExperience = append(e.OnGainExperience, val)
-	}
-	if val := callbackTable.RawGetString("onDeath"); val != lua.LNil {
-		e.OnDeath = append(e.OnDeath, val)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, cf := range allCallbackFields {
+		if val := callbackTable.RawGetString(cf.Field); val != lua.LNil {
+			e.callbacks[cf.Type] = append(e.callbacks[cf.Type], val)
+		}
 	}
 }
 
+// executeCallbacks runs all callbacks registered for the given type.
+// Each callback receives the provided args and should return a boolean.
+// Returns false if any callback returned false (short-circuits).
+func (e *Engine) executeCallbacks(typ EventCallbackType, args ...lua.LValue) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	fns, ok := e.callbacks[typ]
+	if !ok || len(fns) == 0 {
+		return true
+	}
+
+	L := e.L
+	for _, fn := range fns {
+		L.Push(fn)
+		for _, arg := range args {
+			L.Push(arg)
+		}
+		n := len(args)
+		if err := L.PCall(n, 1, nil); err != nil {
+			e.log.Error("event callback error", "type", string(typ), "err", err)
+			continue
+		}
+		ret := L.Get(-1)
+		L.Pop(1)
+		if luaBool, ok := ret.(lua.LBool); ok && !bool(luaBool) {
+			return false
+		}
+	}
+	return true
+}
+
+// ExecuteOnLogin fires onLogin callbacks for the given player.
 func (e *Engine) ExecuteOnLogin(player *game.Player) bool {
 	L := e.L
-	for _, fn := range e.OnLogin {
-		L.Push(fn)
-
-		pUd := L.NewUserData()
-		pUd.Value = player
-		L.SetMetatable(pUd, L.GetTypeMetatable("Player"))
-		L.Push(pUd)
-
-		if err := L.PCall(1, 1, nil); err != nil {
-			fmt.Printf("Lua execution error in onLogin: %v\n", err)
-			continue
-		}
-
-		ret := L.Get(-1)
-		L.Pop(1)
-
-		if luaBool, ok := ret.(lua.LBool); ok {
-			if !bool(luaBool) {
-				return false
-			}
-		}
-	}
-	return true
+	ud := L.NewUserData()
+	ud.Value = player
+	L.SetMetatable(ud, L.GetTypeMetatable("Player"))
+	return e.executeCallbacks(EventPlayerOnLogin, ud)
 }
 
+// ExecuteOnLook fires playerOnLook/onLook callbacks.
 func (e *Engine) ExecuteOnLook(player *game.Player, thing interface{}, position game.Position, distance int) bool {
 	L := e.L
-	for _, fn := range e.OnLook {
-		L.Push(fn)
 
-		pUd := L.NewUserData()
-		pUd.Value = player
-		L.SetMetatable(pUd, L.GetTypeMetatable("Player"))
-		L.Push(pUd)
+	pUd := L.NewUserData()
+	pUd.Value = player
+	L.SetMetatable(pUd, L.GetTypeMetatable("Player"))
 
-		tUd := L.NewUserData()
-		tUd.Value = thing
-		if _, ok := thing.(*game.Item); ok {
-			L.SetMetatable(tUd, L.GetTypeMetatable("Item"))
-		} else {
-			L.SetMetatable(tUd, L.GetTypeMetatable("Thing"))
-		}
-		L.Push(tUd)
-
-		pPosUd := L.NewUserData()
-		pPosUd.Value = position
-		L.SetMetatable(pPosUd, L.GetTypeMetatable("Position"))
-		L.Push(pPosUd)
-
-		L.Push(lua.LNumber(distance))
-
-		if err := L.PCall(4, 1, nil); err != nil {
-			fmt.Printf("Lua execution error in onLook: %v\n", err)
-			continue
-		}
-
-		ret := L.Get(-1)
-		L.Pop(1)
-
-		if luaBool, ok := ret.(lua.LBool); ok {
-			if !bool(luaBool) {
-				return false
-			}
-		}
+	tUd := L.NewUserData()
+	tUd.Value = thing
+	if _, ok := thing.(*game.Item); ok {
+		L.SetMetatable(tUd, L.GetTypeMetatable("Item"))
+	} else {
+		L.SetMetatable(tUd, L.GetTypeMetatable("Thing"))
 	}
-	return true
+
+	posUd := L.NewUserData()
+	posUd.Value = position
+	L.SetMetatable(posUd, L.GetTypeMetatable("Position"))
+
+	return e.executeCallbacks(EventPlayerOnLook, pUd, tUd, posUd, lua.LNumber(distance))
 }
 
+// ExecuteOnMoveItem fires onMoveItem callbacks.
 func (e *Engine) ExecuteOnMoveItem(player *game.Player, item *game.Item, count uint16, fromPos game.Position, toPos game.Position) bool {
 	L := e.L
-	for _, fn := range e.OnMoveItem {
-		L.Push(fn)
 
-		pUd := L.NewUserData()
-		pUd.Value = player
-		L.SetMetatable(pUd, L.GetTypeMetatable("Player"))
-		L.Push(pUd)
+	pUd := L.NewUserData()
+	pUd.Value = player
+	L.SetMetatable(pUd, L.GetTypeMetatable("Player"))
 
-		iUd := L.NewUserData()
-		iUd.Value = item
-		L.SetMetatable(iUd, L.GetTypeMetatable("Item"))
-		L.Push(iUd)
-		
-		L.Push(lua.LNumber(count))
+	iUd := L.NewUserData()
+	iUd.Value = item
+	L.SetMetatable(iUd, L.GetTypeMetatable("Item"))
 
-		fPosUd := L.NewUserData()
-		fPosUd.Value = fromPos
-		L.SetMetatable(fPosUd, L.GetTypeMetatable("Position"))
-		L.Push(fPosUd)
+	fPosUd := L.NewUserData()
+	fPosUd.Value = fromPos
+	L.SetMetatable(fPosUd, L.GetTypeMetatable("Position"))
 
-		tPosUd := L.NewUserData()
-		tPosUd.Value = toPos
-		L.SetMetatable(tPosUd, L.GetTypeMetatable("Position"))
-		L.Push(tPosUd)
+	tPosUd := L.NewUserData()
+	tPosUd.Value = toPos
+	L.SetMetatable(tPosUd, L.GetTypeMetatable("Position"))
 
-		if err := L.PCall(5, 1, nil); err != nil {
-			fmt.Printf("Lua execution error in onMoveItem: %v\n", err)
-			continue
-		}
-
-		ret := L.Get(-1)
-		L.Pop(1)
-
-		if luaBool, ok := ret.(lua.LBool); ok {
-			if !bool(luaBool) {
-				return false
-			}
-		}
-	}
-	return true
+	return e.executeCallbacks(EventPlayerOnMoveItem, pUd, iUd, lua.LNumber(count), fPosUd, tPosUd)
 }
 
+// ExecuteOnGainExperience fires onGainExperience callbacks and returns the
+// modified experience value.
 func (e *Engine) ExecuteOnGainExperience(player *game.Player, source game.Creature, exp uint64, rawExp uint64) uint64 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	fns, ok := e.callbacks[EventPlayerOnGainExperience]
+	if !ok || len(fns) == 0 {
+		return exp
+	}
+
 	L := e.L
 	finalExp := exp
-	for _, fn := range e.OnGainExperience {
+	for _, fn := range fns {
 		L.Push(fn)
 
 		pUd := L.NewUserData()
@@ -183,7 +229,7 @@ func (e *Engine) ExecuteOnGainExperience(player *game.Player, source game.Creatu
 		L.Push(lua.LNumber(rawExp))
 
 		if err := L.PCall(4, 1, nil); err != nil {
-			fmt.Printf("Lua execution error in onGainExperience: %v\n", err)
+			e.log.Error("event callback error", "type", string(EventPlayerOnGainExperience), "err", err)
 			continue
 		}
 
@@ -197,38 +243,19 @@ func (e *Engine) ExecuteOnGainExperience(player *game.Player, source game.Creatu
 	return finalExp
 }
 
+// ExecuteOnDeath fires onDeath callbacks.
 func (e *Engine) ExecuteOnDeath(player *game.Player, killer game.Creature) bool {
 	L := e.L
-	for _, fn := range e.OnDeath {
-		L.Push(fn)
 
-		pUd := L.NewUserData()
-		pUd.Value = player
-		L.SetMetatable(pUd, L.GetTypeMetatable("Player"))
-		L.Push(pUd)
-		
-		if killer != nil {
-			kUd := L.NewUserData()
-			kUd.Value = killer
-			L.SetMetatable(kUd, L.GetTypeMetatable("Creature"))
-			L.Push(kUd)
-		} else {
-			L.Push(lua.LNil)
-		}
+	pUd := L.NewUserData()
+	pUd.Value = player
+	L.SetMetatable(pUd, L.GetTypeMetatable("Player"))
 
-		if err := L.PCall(2, 1, nil); err != nil {
-			fmt.Printf("Lua execution error in onDeath: %v\n", err)
-			continue
-		}
-
-		ret := L.Get(-1)
-		L.Pop(1)
-
-		if luaBool, ok := ret.(lua.LBool); ok {
-			if !bool(luaBool) {
-				return false
-			}
-		}
+	if killer != nil {
+		kUd := L.NewUserData()
+		kUd.Value = killer
+		L.SetMetatable(kUd, L.GetTypeMetatable("Creature"))
+		return e.executeCallbacks(EventPlayerOnDeath, pUd, kUd)
 	}
-	return true
+	return e.executeCallbacks(EventPlayerOnDeath, pUd, lua.LNil)
 }

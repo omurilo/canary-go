@@ -13,7 +13,7 @@ luaApiDocsOutputDirectory = "docs/lua-api"
 -- It can be trace, debug, info, warning, error, critical, off (default: info).
 -- NOTE: It will only be valid after the server starts up and only display logs with level higher or equal the one set.
 -- NOTE: Debug and trace logs are only available if compiled in debug mode.
-logLevel = "debug"
+logLevel = "info"
 
 --- Toggles the server's maintenance mode.
 -- When enabled, it restricts user access and indicates maintenance operations.

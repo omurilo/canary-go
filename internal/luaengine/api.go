@@ -302,7 +302,6 @@ func (e *Engine) registerAPI() {
 	mockClass("DropLoot")
 	mockClass("Charm")
 	mockClass("Teleport")
-	mockClass("EventCallback")
 	mockClass("GemAtelier")
 	mockClass("Guild")
 	mockClass("Group")

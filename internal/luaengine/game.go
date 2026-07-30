@@ -497,7 +497,19 @@ func (e *Engine) gameCreateBestiaryCharm(L *lua.LState) int {
 }
 // gameCreateItemClassification is now defined in item_classification.go
 func (e *Engine) gameGetBestiaryCharm(L *lua.LState) int { return 0 }
-func (e *Engine) gameStartRaid(L *lua.LState) int { return 0 }
+func (e *Engine) gameStartRaid(L *lua.LState) int {
+	name := L.CheckString(1)
+	if e.world == nil || e.world.Raids == nil {
+		L.Push(lua.LNumber(1)) // RETURNVALUE_NOTPOSSIBLE
+		return 1
+	}
+	if err := e.world.Raids.StartRaidWithWorld(name, e.world); err != nil {
+		L.Push(lua.LNumber(1))
+		return 1
+	}
+	L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR
+	return 1
+}
 func (e *Engine) gameGetClientVersion(L *lua.LState) int { return 0 }
 func (e *Engine) gameReload(L *lua.LState) int { return 0 }
 func (e *Engine) gameHasDistanceEffect(L *lua.LState) int { return 0 }

@@ -99,6 +99,12 @@ type World struct {
 	// OnBestiaryEntryChanged fires when a player's bestiary monster reaches a new
 	// unlock stage.
 	OnBestiaryEntryChanged func(p *Player, raceID uint16)
+	// OnAreaCombat fires when area combat resolves, before damage is applied.
+	OnAreaCombat func(creature Creature, tile *Tile, isAggressive bool)
+	// OnMonsterDropLoot fires when a monster drops loot (before postDropLoot).
+	OnMonsterDropLoot func(monster *Monster, corpse *Item)
+	// OnMonsterPostDropLoot fires after loot has been placed in the corpse.
+	OnMonsterPostDropLoot func(monster *Monster, corpse *Item)
 
 	// Combat is the world's combat engine, used by the spell system to resolve
 	// spell damage/heal through the same hit/death path as melee.
@@ -106,6 +112,7 @@ type World struct {
 
 	TypeRegistry *creatures.TypeRegistry
 	Fiendish     *FiendishManager
+	Raids        *Raids
 }
 
 // PlayerByName returns an online player by (case-insensitive) name, or nil.

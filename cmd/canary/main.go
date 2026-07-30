@@ -540,10 +540,15 @@ func run(o runOpts, log *slog.Logger) error {
 	// The spell system resolves spell damage/heal through the combat engine.
 	world.Combat = combatEngine
 
-	// Lua engine.
+	// Lua engine — must be created before script loading so that
+	// EventCallback:register() can find GlobalEngine non-nil.
 	lengine = luaengine.New(world, log)
 	lengine.SetDB(database)
 	defer lengine.Close()
+
+	// Event callback engine — initialized here before Lua scripts load
+	// so that EventCallback:register() calls in scripts don't silently fail.
+	_ = events.NewEngine(lengine.L, log)
 	lengine.SetGameFunc("getPlayerCount", func(L *lua.LState) int {
 		L.Push(lua.LNumber(world.OnlineCount()))
 		return 1
@@ -711,14 +716,24 @@ func run(o runOpts, log *slog.Logger) error {
 	// Start the background globalevent scheduler (think/time events).
 	lengine.StartGlobalEventScheduler(ctx)
 
-	eventsEngine := events.NewEngine(lengine.L)
+	// Load and start legacy XML raids.
+	if cfg.DataPack != "" {
+		raidsPath := filepath.Join(cfg.DataPack, "raids", "raids.xml")
+		if raids, err := game.LoadRaids(raidsPath); err != nil {
+			log.Warn("loading raids", "path", raidsPath, "err", err)
+		} else {
+			world.Raids = raids
+			raids.Start(ctx, world)
+			log.Info("raids loaded and scheduler started", "path", raidsPath)
+		}
+	}
 
 	spawnEngine.Start()
 	aiEngine.Start()
 	combatEngine.Start()
 
 	deps := &protocol.Deps{
-		Cfg: cfg, DB: database, RSA: rsa, World: world, Items: catalog, Lua: lengine, Events: eventsEngine, Log: log,
+		Cfg: cfg, DB: database, RSA: rsa, World: world, Items: catalog, Lua: lengine, Events: events.GlobalEngine, Log: log,
 	}
 
 	// Async job worker (PostgreSQL LISTEN/NOTIFY queue).
