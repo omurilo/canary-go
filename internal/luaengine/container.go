@@ -22,7 +22,7 @@ func (e *Engine) registerContainer() {
 	for k, v := range e.containerMethods() {
 		combinedMethods[k] = v
 	}
-	
+
 	// Methods must live directly on the metatable so revscriptsys.lua's
 	// ItemIndex (getmetatable(self)[key]) resolves them — see registerItem.
 	e.L.SetFuncs(mt, combinedMethods)
@@ -277,12 +277,12 @@ func (e *Engine) containerMethods() map[string]lua.LGFunction {
 			c := checkContainer(L)
 			ud, ok := L.Get(2).(*lua.LUserData)
 			if !ok {
-				L.Push(lua.LNumber(1)) // RETURNVALUE not ok
+				L.Push(lua.LNumber(4)) // RETURNVALUE_NOTPOSSIBLE
 				return 1
 			}
 			li, ok := ud.Value.(luaItem)
 			if !ok || li.item == nil {
-				L.Push(lua.LNumber(1))
+				L.Push(lua.LNumber(4)) // RETURNVALUE_NOTPOSSIBLE
 				return 1
 			}
 			flags := 0
@@ -292,7 +292,7 @@ func (e *Engine) containerMethods() map[string]lua.LGFunction {
 			noLimit := flags&1 != 0
 			cat := e.itemCatalog()
 			if !noLimit && int(c.item.ContainerCapacity(cat)) <= len(c.item.Contents) {
-				L.Push(lua.LNumber(6)) // RETURNVALUE_CONTAINERNOTENOUGHROOM
+				L.Push(lua.LNumber(23)) // RETURNVALUE_CONTAINERNOTENOUGHROOM
 				return 1
 			}
 			li.item.Parent = c.item
@@ -302,13 +302,18 @@ func (e *Engine) containerMethods() map[string]lua.LGFunction {
 		},
 		"getCorpseOwner": func(L *lua.LState) int {
 			c := checkContainer(L)
-			if c.item == nil { L.Push(lua.LNumber(0)); return 1 }
+			if c.item == nil {
+				L.Push(lua.LNumber(0))
+				return 1
+			}
 			L.Push(lua.LNumber(0)) // stub - corpse owner tracking not implemented
 			return 1
 		},
 		"registerReward": func(L *lua.LState) int {
 			c := checkContainer(L)
-			if c.item == nil { return 0 }
+			if c.item == nil {
+				return 0
+			}
 			L.Push(lua.LTrue)
 			return 1
 		},

@@ -18,16 +18,16 @@ import (
 type AugmentType uint8
 
 const (
-	AugmentNone                AugmentType = 0
-	AugmentSpellDamage         AugmentType = 1
-	AugmentSpellCooldown       AugmentType = 2
-	AugmentSpellGroupCooldown  AugmentType = 3
-	AugmentSkill               AugmentType = 4
-	AugmentManaLeech           AugmentType = 5
-	AugmentLifeLeech           AugmentType = 6
-	AugmentCriticalChance      AugmentType = 7
-	AugmentCriticalDamage      AugmentType = 8
-	AugmentMagicLevel          AugmentType = 9
+	AugmentNone               AugmentType = 0
+	AugmentSpellDamage        AugmentType = 1
+	AugmentSpellCooldown      AugmentType = 2
+	AugmentSpellGroupCooldown AugmentType = 3
+	AugmentSkill              AugmentType = 4
+	AugmentManaLeech          AugmentType = 5
+	AugmentLifeLeech          AugmentType = 6
+	AugmentCriticalChance     AugmentType = 7
+	AugmentCriticalDamage     AugmentType = 8
+	AugmentMagicLevel         AugmentType = 9
 )
 
 // AugmentInfo mirrors C++ struct AugmentInfo (items.hpp).
@@ -58,7 +58,7 @@ type ItemType struct {
 	Description string
 	Group       Group
 
-	Stackable             bool
+	Stackable bool
 	// StackSize is the maximum count a single stack of this type may hold
 	// (C++ ItemType::stackSize). Stackable/cumulative types default to 100;
 	// non-stackable types are 1. Consumed by inventory add splitting, shop
@@ -91,12 +91,15 @@ type ItemType struct {
 	WeaponType   string
 	// TypeName is the items.xml `type` attribute (e.g. "rune", "container",
 	// "teleport"). Used by getObjectCategory for exact type-based loot routing.
-	TypeName    string
+	TypeName string
+	// Type is TypeName resolved to its ItemTypes_t value, which is what
+	// ItemType:getType reports.
+	Type        ItemTypes
 	FloorChange string
-	ForceUse     bool
-	IsLadder     bool
-	IsDoor       bool
-	IsQuiver     bool
+	ForceUse    bool
+	IsLadder    bool
+	IsDoor      bool
+	IsQuiver    bool
 
 	Weight       uint32
 	Armor        int32
@@ -111,12 +114,12 @@ type ItemType struct {
 	ShowCharges  bool
 	Capacity     uint32
 
-	ElementType     uint8
-	ElementDamage   uint16
-	ImbuementSlot   uint8
-	MinReqLevel     uint16
+	ElementType      uint8
+	ElementDamage    uint16
+	ImbuementSlot    uint8
+	MinReqLevel      uint16
 	MinReqMagicLevel uint16
-	DecayTime       uint32
+	DecayTime        uint32
 
 	MaxHitChance int32
 	HitChance    int32
@@ -136,13 +139,92 @@ type ItemType struct {
 	// Augments stores structured spell-modifier data from items.xml.
 	Augments []AugmentInfo
 
-	Speed         int32
-	BaseSpeed     int32
+	Speed          int32
+	BaseSpeed      int32
 	VocationString string
 }
 
 // AlwaysOnTop reports whether the item stacks below creatures on a tile.
 func (t *ItemType) AlwaysOnTop() bool { return t.AlwaysOnTopOrder > 0 }
+
+// ItemTypes is ItemTypes_t (items_definitions.hpp:140). It is the value behind
+// ItemType:getType, which the datapack compares against the ITEM_TYPE_ globals.
+type ItemTypes int
+
+const (
+	ItemTypeNone            ItemTypes = 0
+	ItemTypeArmor           ItemTypes = 1
+	ItemTypeAmulet          ItemTypes = 2
+	ItemTypeBoots           ItemTypes = 3
+	ItemTypeContainer       ItemTypes = 4
+	ItemTypeDecoration      ItemTypes = 5
+	ItemTypeFood            ItemTypes = 6
+	ItemTypeHelmet          ItemTypes = 7
+	ItemTypeLegs            ItemTypes = 8
+	ItemTypeOther           ItemTypes = 9
+	ItemTypePotion          ItemTypes = 10
+	ItemTypeRing            ItemTypes = 11
+	ItemTypeRune            ItemTypes = 12
+	ItemTypeShield          ItemTypes = 13
+	ItemTypeTools           ItemTypes = 14
+	ItemTypeValuable        ItemTypes = 15
+	ItemTypeAmmo            ItemTypes = 16
+	ItemTypeAxe             ItemTypes = 17
+	ItemTypeClub            ItemTypes = 18
+	ItemTypeDistance        ItemTypes = 19
+	ItemTypeSword           ItemTypes = 20
+	ItemTypeWand            ItemTypes = 21
+	ItemTypePremiumScroll   ItemTypes = 22
+	ItemTypeTibiaCoin       ItemTypes = 23
+	ItemTypeCreatureProduct ItemTypes = 24
+	ItemTypeQuiver          ItemTypes = 25
+	ItemTypeSoulCores       ItemTypes = 26
+	ItemTypeFist            ItemTypes = 27
+	ItemTypeDepot           ItemTypes = 28
+	ItemTypeMailbox         ItemTypes = 29
+	ItemTypeTrashHolder     ItemTypes = 30
+	ItemTypeDoor            ItemTypes = 31
+	ItemTypeMagicField      ItemTypes = 32
+	ItemTypeTeleport        ItemTypes = 33
+	ItemTypeBed             ItemTypes = 34
+	ItemTypeKey             ItemTypes = 35
+	ItemTypeSupply          ItemTypes = 36
+	ItemTypeRewardChest     ItemTypes = 37
+	ItemTypeCarpet          ItemTypes = 38
+	ItemTypeRetrieve        ItemTypes = 39
+	ItemTypeGold            ItemTypes = 40
+	ItemTypeUnassigned      ItemTypes = 41
+	ItemTypeLadder          ItemTypes = 42
+	ItemTypeDummy           ItemTypes = 43
+)
+
+// itemTypesByName is item_parse.hpp:168 ItemTypesMap: the items.xml `type`
+// attribute values C++ recognises. Anything else leaves the type as NONE.
+var itemTypesByName = map[string]ItemTypes{
+	"key":             ItemTypeKey,
+	"magicfield":      ItemTypeMagicField,
+	"container":       ItemTypeContainer,
+	"depot":           ItemTypeDepot,
+	"rewardchest":     ItemTypeRewardChest,
+	"carpet":          ItemTypeCarpet,
+	"mailbox":         ItemTypeMailbox,
+	"trashholder":     ItemTypeTrashHolder,
+	"teleport":        ItemTypeTeleport,
+	"door":            ItemTypeDoor,
+	"bed":             ItemTypeBed,
+	"rune":            ItemTypeRune,
+	"supply":          ItemTypeSupply,
+	"creatureproduct": ItemTypeCreatureProduct,
+	"food":            ItemTypeFood,
+	"valuable":        ItemTypeValuable,
+	"potion":          ItemTypePotion,
+	"soulcore":        ItemTypeSoulCores,
+	"ladder":          ItemTypeLadder,
+	"dummy":           ItemTypeDummy,
+}
+
+// ItemTypeByName resolves an items.xml `type` attribute to its ItemTypes_t value.
+func ItemTypeByName(name string) ItemTypes { return itemTypesByName[strings.ToLower(name)] }
 
 func (t *ItemType) IsContainer() bool      { return t.Group == GroupContainer }
 func (t *ItemType) IsGround() bool         { return t.Group == GroupGround }
@@ -165,8 +247,8 @@ func (t *ItemType) GetWeight() uint32 {
 
 // Catalog maps client item ids to their metadata.
 type Catalog struct {
-	byID   map[uint16]*ItemType
-	byName map[string]uint16 // lower-cased name -> first id seen
+	byID       map[uint16]*ItemType
+	byName     map[string]uint16 // lower-cased name -> first id seen
 	byClientID map[uint16]uint16 // client ID -> server item ID
 }
 

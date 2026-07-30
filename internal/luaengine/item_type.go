@@ -134,8 +134,15 @@ func (e *Engine) registerItemType() {
 			return 1
 		},
 		"getType": func(L *lua.LState) int {
+			// C++ luaItemTypeGetType returns itemType->type (an ItemTypes_t). This
+			// returned the item id, so every datapack comparison against an
+			// ITEM_TYPE_ constant was false.
 			it := checkItemType(L, 1)
-			L.Push(lua.LNumber(it.id))
+			if it.item != nil {
+				L.Push(lua.LNumber(it.item.Type))
+			} else {
+				L.Push(lua.LNumber(items.ItemTypeNone))
+			}
 			return 1
 		},
 		"hasProperty": func(L *lua.LState) int {
@@ -149,13 +156,20 @@ func (e *Engine) registerItemType() {
 			val := 0 // WEAPON_NONE
 			if it.item != nil {
 				switch it.item.WeaponType {
-				case "sword": val = 1
-				case "club": val = 2
-				case "axe": val = 3
-				case "shield": val = 4
-				case "distance": val = 5
-				case "wand": val = 6
-				case "ammunition": val = 7
+				case "sword":
+					val = 1
+				case "club":
+					val = 2
+				case "axe":
+					val = 3
+				case "shield":
+					val = 4
+				case "distance":
+					val = 5
+				case "wand":
+					val = 6
+				case "ammunition":
+					val = 7
 				}
 			}
 			L.Push(lua.LNumber(val))
@@ -166,13 +180,20 @@ func (e *Engine) registerItemType() {
 			val := 0 // AMMO_NONE
 			if it.item != nil {
 				switch it.item.AmmoType {
-				case "bolt": val = 1
-				case "arrow": val = 2
-				case "spear": val = 3
-				case "throwingstar": val = 4
-				case "throwingknife": val = 5
-				case "stone": val = 6
-				case "snowball": val = 7
+				case "bolt":
+					val = 1
+				case "arrow":
+					val = 2
+				case "spear":
+					val = 3
+				case "throwingstar":
+					val = 4
+				case "throwingknife":
+					val = 5
+				case "stone":
+					val = 6
+				case "snowball":
+					val = 7
 				}
 			}
 			L.Push(lua.LNumber(val))

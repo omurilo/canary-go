@@ -2560,18 +2560,18 @@ func playerHasoutfit(L *lua.LState) int {
 	}
 	lookType := uint16(L.CheckInt(2))
 	addon := uint8(L.OptInt(3, 0))
-	
+
 	if !p.HasOutfit(lookType) {
 		L.Push(lua.LBool(false))
 		return 1
 	}
-	
+
 	if addon > 0 {
 		currentAddons := p.GetOutfitAddons(lookType)
 		L.Push(lua.LBool((currentAddons & addon) == addon))
 		return 1
 	}
-	
+
 	L.Push(lua.LBool(true))
 	return 1
 }
@@ -3073,7 +3073,9 @@ func playerOpenimbuementwindow(L *lua.LState) int {
 		action = game.ImbuementAction(luaOptInt(L, 2))
 	}
 
-	if session, ok := p.Session.(interface{ SendImbuementWindow(game.ImbuementAction, *game.Item) }); ok {
+	if session, ok := p.Session.(interface {
+		SendImbuementWindow(game.ImbuementAction, *game.Item)
+	}); ok {
 		session.SendImbuementWindow(action, nil)
 	}
 
@@ -4246,7 +4248,7 @@ func playerUpdateconcoction(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	concoctionID := uint8(L.CheckInt(2))
+	concoctionID := game.ConcoctionType(L.CheckInt(2))
 	timeLeft := int64(L.CheckNumber(3))
 	game.UpdateConcoction(p, concoctionID, timeLeft)
 	L.Push(lua.LTrue)

@@ -49,6 +49,9 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 		it.ForceUse = (attr.Value == "1")
 	case "type":
 		it.TypeName = attr.Value
+		// C++ resolves the same attribute through ItemTypesMap into it.type,
+		// which is what ItemType:getType reports (item_parse.hpp:168).
+		it.Type = ItemTypeByName(attr.Value)
 		if attr.Value == "ladder" {
 			it.IsLadder = true
 		} else if attr.Value == "door" {

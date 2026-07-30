@@ -179,7 +179,7 @@ func (e *Engine) playerAdditem(L *lua.LState) int {
 func (e *Engine) playerAdditemex(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		L.Push(lua.LNumber(1)) // RETURNVALUE_NOTPOSSIBLE
+		L.Push(lua.LNumber(4)) // RETURNVALUE_NOTPOSSIBLE
 		return 1
 	}
 	it := checkItemAt(L, 2)
@@ -199,7 +199,7 @@ func (e *Engine) playerAdditemex(L *lua.LState) int {
 	placed, ok := p.InternalAddItem(cat, it.item.ID, count, int(it.item.Count), slot)
 	e.refreshInventory(p)
 	if !ok || len(placed) == 0 {
-		L.Push(lua.LNumber(2)) // RETURNVALUE_NOTENOUGHROOM
+		L.Push(lua.LNumber(5)) // RETURNVALUE_NOTENOUGHROOM
 		return 1
 	}
 	L.Push(lua.LNumber(0)) // RETURNVALUE_NOERROR

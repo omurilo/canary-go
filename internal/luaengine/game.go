@@ -356,11 +356,11 @@ func (e *Engine) gameGetReturnMessage(L *lua.LState) int {
 	switch code {
 	case 0:
 		L.Push(lua.LString("No error."))
-	case 1:
+	case 4:
 		L.Push(lua.LString("Sorry, not possible."))
-	case 2:
+	case 5:
 		L.Push(lua.LString("There is not enough room."))
-	case 3:
+	case 6:
 		L.Push(lua.LString("You can not enter a protection zone after attacking another player."))
 	default:
 		L.Push(lua.LString("Unknown error."))
