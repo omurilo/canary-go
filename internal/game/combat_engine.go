@@ -732,50 +732,6 @@ func absDamageRange(minDamage, maxDamage int) (lo, hi int) {
 	return a, b
 }
 
-// rollLoot rolls a monster's loot table into a slice of items for the corpse
-// container. Mirrors MonsterType:generateLootRoll (data/libs/functions/monstertype.lua)
-// / getLootRandom (data/libs/functions/functions.lua): for each entry roll a
-// value in [0, MAX_LOOTCHANCE) and drop the item when it is below the entry's
-// chance. Stackable stacks (CountMax > 1) get a random count in
-// [CountMin, CountMax]. Container entries recurse into their child loot.
-//
-// Simplifications vs C++ (TODOs for later): loot rate/factor multipliers, the
-// dynamic 95..105% jitter, gut/charm bonuses, and unique-item de-duplication are
-// omitted (rate assumed 1x). Stackability is inferred from CountMax rather than
-// item metadata because the combat engine has no item catalog.
-func rollLoot(loot []creatures.LootBlock, lootMultiplier float64) []*Item {
-	var out []*Item
-	for _, lb := range loot {
-		if lb.ID == 0 {
-			continue // unresolved name; skip
-		}
-		chance := int(float64(lb.Chance) * lootMultiplier)
-		if rand.Intn(maxLootChance) >= chance {
-			continue
-		}
-		count := uint16(1)
-		if lb.CountMax > 1 {
-			lo := lb.CountMin
-			if lo < 1 {
-				lo = 1
-			}
-			hi := lb.CountMax
-			if hi < lo {
-				hi = lo
-			}
-			count = uint16(lo + uint32(rand.Intn(int(hi-lo+1))))
-			if count > 100 {
-				count = 100
-			}
-		}
-		item := &Item{ID: lb.ID, Count: count}
-		if len(lb.ChildLoot) > 0 {
-			item.Contents = rollLoot(lb.ChildLoot, lootMultiplier)
-		}
-		out = append(out, item)
-	}
-	return out
-}
 
 // handleDeath mirrors, at a basic level, Creature::onDeath -> dropCorpse ->
 // g_game().removeCreature (src/creatures/creature.cpp): drop a corpse on the
@@ -957,9 +913,14 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	// creature is still on the tile), then remove the creature. The corpse is a
 	// container whose Contents are the rolled loot table.
 	corpse := &Item{ID: corpseID, Count: 1}
+	// Loot generation belongs to the monsterOnDropLoot event, not to the core.
+	// Monster::dropLoot (monster.cpp:3414) only handles the fiendish sliver itself
+	// and then delegates both callbacks; the datapack's base script does the roll
+	// via mType:generateLootRoll and corpse:addLoot. Go used to roll it inline in
+	// rollLoot, which is why none of the seven loot-modifier scripts (boosted, prey,
+	// hazard, wealth duplex, gem atelier) had any effect.
 	if m, ok := victim.(*Monster); ok && m.Type != nil && m.Type.Flags.LootDrop {
-		corpse.Contents = rollLoot(m.Type.Loot, lootMultiplier)
-		if e.world.OnMonsterDropLoot != nil {
+		if !m.Type.Flags.RewardBoss && e.world.OnMonsterDropLoot != nil {
 			e.world.OnMonsterDropLoot(m, corpse)
 		}
 	}

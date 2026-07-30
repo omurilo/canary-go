@@ -127,6 +127,26 @@ func (e *Engine) registerMonsterType() {
 			}
 			return 0
 		},
+		// getLoot returns the loot table in the shape MonsterType:generateLootRoll
+		// expects (data/libs/functions/monstertype.lua:4): an array of entries keyed
+		// by itemId, chance, minCount, maxCount, unique and childLoot.
+		//
+		// This is what the monsterOnDropLoot event needs; without it the base loot
+		// script could not roll anything.
+		"getLoot": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			if m == nil {
+				L.Push(L.NewTable())
+				return 1
+			}
+			L.Push(lootBlocksToLua(L, m.Loot))
+			return 1
+		},
+		"isRewardBoss": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			L.Push(lua.LBool(m != nil && m.Flags.RewardBoss))
+			return 1
+		},
 		"addAttack": func(L *lua.LState) int {
 			m := checkMonsterType(L)
 			ud := L.CheckUserData(2)
@@ -263,6 +283,20 @@ func (e *Engine) registerMonsterType() {
 			L.Push(L.NewFunction(fn))
 			return 1
 		}
+		// Then the global MonsterType class table, which is where the datapack
+		// extends the class: data/libs/functions/monstertype.lua declares
+		// `function MonsterType:generateLootRoll(...)`, and the loot chain is built
+		// on it. Without this lookup that method resolved to the no-op below and
+		// monsterOnDropLoot silently produced nothing.
+		if tbl, ok := L.GetGlobal(luaMonsterTypeName).(*lua.LTable); ok {
+			if v := L.GetField(tbl, key); v != lua.LNil {
+				L.Push(v)
+				return 1
+			}
+		}
+		// TODO: this catch-all hides every genuinely missing MonsterType method (80
+		// of the C++ 100 are still absent). It stays for now because the datapack
+		// calls several of them during load, but it is why those gaps are invisible.
 		noOpFn := L.NewFunction(func(L *lua.LState) int {
 			L.Push(L.Get(1)) // Return self to allow method chaining (e.g. mtype:foo():bar())
 			return 1
@@ -560,4 +594,45 @@ func parseMonsterElements(m *creatures.MonsterType, table *lua.LTable) {
 			m.Elements[actualType] = percent
 		}
 	})
+}
+
+// lootBlocksToLua converts Go loot blocks into the array of tables the datapack's
+// MonsterType:generateLootRoll iterates. Key names are the contract with
+// data/libs/functions/monstertype.lua — renaming one silently drops that field.
+//
+// Go's LootBlock has no `unique` field (the C++ LootBlock does), so it is reported
+// as false; unique-item de-duplication therefore has no effect yet.
+func lootBlocksToLua(L *lua.LState, blocks []creatures.LootBlock) *lua.LTable {
+	out := L.NewTable()
+	for i, lb := range blocks {
+		entry := L.NewTable()
+		L.SetField(entry, "itemId", lua.LNumber(lb.ID))
+		L.SetField(entry, "chance", lua.LNumber(lb.Chance))
+		L.SetField(entry, "minCount", lua.LNumber(max32(lb.CountMin, 1)))
+		L.SetField(entry, "maxCount", lua.LNumber(max32(lb.CountMax, 1)))
+		L.SetField(entry, "unique", lua.LFalse)
+		// subType and actionId must ALWAYS be present and default to -1, not be
+		// omitted: Container:addLoot guards them with `~= -1`
+		// (data/libs/functions/container.lua:48,54), so a nil would be passed
+		// straight into transform/setActionId and error out.
+		subType := int32(-1)
+		if lb.SubType > 0 {
+			subType = lb.SubType
+		}
+		L.SetField(entry, "subType", lua.LNumber(subType))
+		// Go's LootBlock carries no action id, so it is always "none".
+		L.SetField(entry, "actionId", lua.LNumber(-1))
+		if len(lb.ChildLoot) > 0 {
+			L.SetField(entry, "childLoot", lootBlocksToLua(L, lb.ChildLoot))
+		}
+		out.RawSetInt(i+1, entry)
+	}
+	return out
+}
+
+func max32(v, min uint32) uint32 {
+	if v < min {
+		return min
+	}
+	return v
 }

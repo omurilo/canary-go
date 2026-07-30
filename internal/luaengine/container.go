@@ -33,7 +33,21 @@ func (e *Engine) registerContainer() {
 	}
 	e.L.SetField(mt, "__index", indexTbl)
 
-	e.setClassConstructor("Container", e.containerCreate, combinedMethods)
+	// The global class table must BE the metatable, not a separate method table.
+	//
+	// revscriptsys.lua:77 replaces Container.__index with ItemIndex, which resolves
+	// every key as `getmetatable(self)[key]`. The datapack then extends the class
+	// with `function Container:addLoot(loot)`
+	// (data/libs/functions/container.lua:8) — that assignment has to land on the
+	// metatable or the lookup never finds it. C++ has the same identity, because
+	// registerClass/registerMethod write the methods onto the shared class table.
+	//
+	// Without this, corpse:addLoot was nil and the monsterOnDropLoot chain died at
+	// the point where it fills the corpse.
+	ctorMt := e.L.NewTypeMetatable(containerTypeName + "_ClassCtor")
+	e.L.SetField(ctorMt, "__call", e.L.NewFunction(e.containerCreate))
+	e.L.SetMetatable(mt, ctorMt)
+	e.L.SetGlobal(containerTypeName, mt)
 }
 
 func (e *Engine) containerCreate(L *lua.LState) int {
@@ -305,4 +319,17 @@ func (e *Engine) containerMethods() map[string]lua.LGFunction {
 			return 1
 		},
 	}
+}
+
+// ContainerValue returns the Container userdata for an item without pushing it, so
+// callers outside this package (the event engine) can pass a corpse to Lua. The
+// payload must be a luaContainer, which is why this cannot be built elsewhere.
+func (e *Engine) ContainerValue(it *game.Item) lua.LValue {
+	if it == nil {
+		return lua.LNil
+	}
+	ud := e.L.NewUserData()
+	ud.Value = luaContainer{item: it}
+	e.L.SetMetatable(ud, e.L.GetTypeMetatable(containerTypeName))
+	return ud
 }

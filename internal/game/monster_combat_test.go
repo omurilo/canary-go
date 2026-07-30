@@ -71,6 +71,10 @@ func TestDeathAwardsExperienceAndLoot(t *testing.T) {
 	player := &Player{Level: 1, MaxHealth: 150, MaxMana: 30}
 	player.ID = 0x10000001
 
+	var droppedFor, postDroppedFor []*Item
+	w.OnMonsterDropLoot = func(_ *Monster, corpse *Item) { droppedFor = append(droppedFor, corpse) }
+	w.OnMonsterPostDropLoot = func(_ *Monster, corpse *Item) { postDroppedFor = append(postDroppedFor, corpse) }
+
 	e := NewCombatEngine(w)
 	e.handleDeath(monster, player)
 
@@ -92,13 +96,19 @@ func TestDeathAwardsExperienceAndLoot(t *testing.T) {
 	if corpse.ID != 5964 {
 		t.Errorf("corpse id = %d, want 5964", corpse.ID)
 	}
-	// Both loot entries have chance == MAX_LOOTCHANCE, so both always drop.
-	if len(corpse.Contents) != 2 {
-		t.Fatalf("corpse contents = %d items, want 2: %+v", len(corpse.Contents), corpse.Contents)
+	// The core no longer rolls loot: Monster::dropLoot delegates it to the
+	// monsterOnDropLoot event, whose datapack script fills the corpse. What the core
+	// owes is the corpse itself plus the two callbacks, in order.
+	if len(droppedFor) != 1 || droppedFor[0] != corpse {
+		t.Errorf("OnMonsterDropLoot should have been called once with the corpse, got %d call(s)", len(droppedFor))
 	}
-	gold := corpse.Contents[0]
-	if gold.ID != 3031 || gold.Count < 1 || gold.Count > 4 {
-		t.Errorf("gold loot = %+v, want id 3031 count 1..4", gold)
+	if len(postDroppedFor) != 1 || postDroppedFor[0] != corpse {
+		t.Errorf("OnMonsterPostDropLoot should have been called once with the corpse, got %d call(s)", len(postDroppedFor))
+	}
+	// Nothing is in the corpse here because no event engine is wired in this unit
+	// test; internal/luaengine/loot_flow_test.go drives the real chain.
+	if len(corpse.Contents) != 0 {
+		t.Errorf("the core must not put loot in the corpse itself, got %+v", corpse.Contents)
 	}
 }
 
@@ -115,12 +125,20 @@ func TestNoLootWhenLootDropDisabled(t *testing.T) {
 	monster.SetHealth(0)
 	w.AddCreature(monster)
 
+	// With lootDrop off, Monster::dropLoot never reaches the callbacks at all, so
+	// assert on that rather than only on an empty corpse.
+	var dropCalls int
+	w.OnMonsterDropLoot = func(*Monster, *Item) { dropCalls++ }
+
 	e := NewCombatEngine(w)
 	e.handleDeath(monster, nil)
 
 	corpse := w.Map.GetTile(pos).Items[0]
 	if len(corpse.Contents) != 0 {
 		t.Errorf("expected empty corpse with lootDrop=false, got %+v", corpse.Contents)
+	}
+	if dropCalls != 0 {
+		t.Errorf("OnMonsterDropLoot fired %d time(s) with lootDrop disabled, want 0", dropCalls)
 	}
 }
 

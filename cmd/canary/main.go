@@ -558,6 +558,18 @@ func run(o runOpts, log *slog.Logger) error {
 	game.OnPlayerStorageUpdate = func(p *game.Player, key uint32, value, oldValue int32) {
 		eventEngine.ExecutePlayerOnStorageUpdate(p, key, value, oldValue, time.Now().UnixMilli())
 	}
+
+	// The corpse reaches Lua as a Container; only the Lua engine can build that
+	// userdata (see events.Engine.WrapContainer).
+	eventEngine.WrapContainer = lengine.ContainerValue
+
+	// Monster loot: the callbacks generate it, the core no longer rolls it inline.
+	world.OnMonsterDropLoot = func(m *game.Monster, corpse *game.Item) {
+		eventEngine.ExecuteMonsterOnDropLoot(m, corpse)
+	}
+	world.OnMonsterPostDropLoot = func(m *game.Monster, corpse *game.Item) {
+		eventEngine.ExecuteMonsterPostDropLoot(m, corpse)
+	}
 	lengine.SetGameFunc("getPlayerCount", func(L *lua.LState) int {
 		L.Push(lua.LNumber(world.OnlineCount()))
 		return 1

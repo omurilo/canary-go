@@ -9,6 +9,12 @@ func RegisterEnums(L *lua.LState) {
 	enums := map[string]lua.LNumber{
 		// Slots
 		"CONST_SLOT_FIRST":       0,
+		// MAX_LOOTCHANCE (src/utils/const.hpp:12, registered at
+		// lua_enums.cpp:166). Loot chances in monster data are out of this, and
+		// getLootRandom does math.random(0, MAX_LOOTCHANCE) — without it the whole
+		// monsterOnDropLoot chain errors out and nothing drops.
+		"MAX_LOOTCHANCE": 100000,
+
 		// SpeechBubble_t (src/creatures/creatures_definitions.hpp:333). Every npc
 		// script assigns one of these to npcConfig.speechBubble — 1032 uses across
 		// the datapack — and an undefined Lua global is nil, not an error, so the

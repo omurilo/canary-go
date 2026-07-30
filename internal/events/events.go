@@ -81,6 +81,13 @@ type Engine struct {
 	L         *lua.LState
 	log       *slog.Logger
 	callbacks map[EventCallbackType][]lua.LValue
+
+	// WrapContainer builds the Container userdata for an item. The payload shape is
+	// internal to the Lua engine (a luaContainer struct, not a *game.Item), and
+	// events cannot import luaengine because luaengine imports events — so the Lua
+	// engine sets this at startup. Without it the corpse would arrive as the wrong
+	// userdata and Container methods would reject it.
+	WrapContainer func(*game.Item) lua.LValue
 }
 
 // GlobalEngine is the process-wide event callback engine.
@@ -373,7 +380,15 @@ func (e *Engine) ExecuteCreatureOnTargetCombat(creature, target game.Creature) b
 // (monster.cpp:3414), which delegates both.
 func (e *Engine) ExecuteMonsterPostDropLoot(monster *game.Monster, corpse *game.Item) bool {
 	return e.executeCallbacks(EventMonsterPostDropLoot,
-		e.ud(monster, "Monster"), e.ud(corpse, "Container"))
+		e.ud(monster, "Monster"), e.container(corpse))
+}
+
+// container wraps a corpse through WrapContainer, or nil when unset.
+func (e *Engine) container(it *game.Item) lua.LValue {
+	if e.WrapContainer == nil || it == nil {
+		return lua.LNil
+	}
+	return e.WrapContainer(it)
 }
 
 // isNilValue reports whether v holds a typed nil (pointer, map, slice, interface or
@@ -386,4 +401,16 @@ func isNilValue(v any) bool {
 	default:
 		return false
 	}
+}
+
+// ExecuteMonsterOnDropLoot fires monsterOnDropLoot(monster, corpse).
+//
+// This is where the loot actually comes from: Monster::dropLoot (monster.cpp:3431)
+// delegates the whole roll to the callback, and the datapack's base script
+// (data/scripts/eventcallbacks/monster/ondroploot__base.lua) calls
+// mType:generateLootRoll followed by corpse:addLoot. The corpse is passed as a
+// Container so addLoot's self:addItem works on it.
+func (e *Engine) ExecuteMonsterOnDropLoot(monster *game.Monster, corpse *game.Item) bool {
+	return e.executeCallbacks(EventMonsterOnDropLoot,
+		e.ud(monster, "Monster"), e.container(corpse))
 }
