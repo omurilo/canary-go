@@ -9,6 +9,20 @@ func RegisterEnums(L *lua.LState) {
 	enums := map[string]lua.LNumber{
 		// Slots
 		"CONST_SLOT_FIRST":       0,
+		// SpeechBubble_t (src/creatures/creatures_definitions.hpp:333). Every npc
+		// script assigns one of these to npcConfig.speechBubble — 1032 uses across
+		// the datapack — and an undefined Lua global is nil, not an error, so the
+		// bubble was silently dropped for every NPC.
+		// SPEECHBUBBLE_BANKER intentionally aliases TRADE, as upstream does.
+		"SPEECHBUBBLE_NONE":        0,
+		"SPEECHBUBBLE_NORMAL":      1,
+		"SPEECHBUBBLE_TRADE":       2,
+		"SPEECHBUBBLE_QUEST":       3,
+		"SPEECHBUBBLE_QUESTTRADER": 4,
+		"SPEECHBUBBLE_SAILOR":      5,
+		"SPEECHBUBBLE_BANKER":      2,
+		"SPEECHBUBBLE_HIRELING":    7,
+
 		"CONST_SLOT_HEAD":        1,
 		"CONST_SLOT_NECKLACE":    2,
 		"CONST_SLOT_BACKPACK":    3,

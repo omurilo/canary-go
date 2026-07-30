@@ -599,7 +599,11 @@ func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 	if destTile == nil || !destTile.WalkableFor(c, w.Items, w.WorldType) {
 		return c.GetPosition(), false
 	}
-	if c.GetCreatureType() != 0 && destTile.IsProtectionZone() {
+	// Protection zones keep MONSTERS out, not every non-player. Tile::queryAdd
+	// applies the TILESTATE_PROTECTIONZONE rejection inside its monster branch
+	// (src/items/tile.cpp:664); Npc::canWalkTo has no PZ check at all. Blocking
+	// NPCs here meant town NPCs, which stand in a PZ, could never take a step.
+	if c.GetCreatureType() == 1 && destTile.IsProtectionZone() {
 		return c.GetPosition(), false
 	}
 	dest = w.resolveFloorChangeDest(dest, destTile)

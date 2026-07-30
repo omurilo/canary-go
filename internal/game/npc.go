@@ -9,6 +9,18 @@ type Npc struct {
 	// navigation on this, so it must be real (not a stub) for post-greeting
 	// interaction to work. Accessed only under the Lua engine lock.
 	interactions map[uint32]int
+
+	// Type is the definition this NPC was spawned from; the think loop reads its
+	// walk and voice settings.
+	Type *creatures.NpcType
+
+	// MasterPos is the spawn position. Walking stays within WalkRadius of it,
+	// matching Npc::isInSpawnRange against masterPos.
+	MasterPos Position
+
+	// Tick accumulators for onThinkWalk and onThinkYell.
+	walkTicks uint32
+	yellTicks uint32
 }
 
 // SetPlayerInteraction marks playerID as interacting with the NPC at the given
@@ -51,6 +63,13 @@ func NewNpc(id uint32, name string, nType *creatures.NpcType) *Npc {
 	if nType != nil {
 		maxHealth = nType.MaxHealth
 		speed = nType.Speed
+		// NpcInfo defaults baseSpeed to 55 (src/creatures/npcs/npcs.hpp:41). No npc
+		// script in the datapack sets speed, so without this fallback every NPC has
+		// speed 0 — and onThinkWalk bails out on baseSpeed == 0, so none would ever
+		// take a step.
+		if speed == 0 {
+			speed = 55
+		}
 		outfit = Outfit{
 			LookType:  nType.Outfit.LookType,
 			Head:      nType.Outfit.Head,
@@ -71,15 +90,33 @@ func NewNpc(id uint32, name string, nType *creatures.NpcType) *Npc {
 			Speed:     uint16(speed),
 			Outfit:    outfit,
 		},
+		Type: nType,
 	}
 }
 
-func (n *Npc) Say(text string) {
-	// Logic for NPC to say something
+// SpeechBubble returns the SPEECHBUBBLE_* icon the client should draw, defaulting
+// to NORMAL when the type carries none.
+func (n *Npc) SpeechBubble() uint8 {
+	if n.Type == nil || n.Type.SpeechBubble == 0 {
+		return creatures.SpeechBubbleNormal
+	}
+	return n.Type.SpeechBubble
 }
 
+// CurrencyID returns the item the NPC trades in.
+func (n *Npc) CurrencyID() uint16 {
+	if n.Type == nil || n.Type.CurrencyID == 0 {
+		return creatures.DefaultNpcCurrency
+	}
+	return n.Type.CurrencyID
+}
+
+// TurnToCreature faces the NPC toward a creature, mirroring Npc::turnToCreature.
 func (n *Npc) TurnToCreature(c Creature) {
-	// Logic for NPC to turn to a creature
+	if c == nil {
+		return
+	}
+	n.SetDirection(getDirectionTo(n.GetPosition(), c.GetPosition()))
 }
 
 func (n *Npc) GetCreatureType() uint8 { return 2 } // CREATURETYPE_NPC

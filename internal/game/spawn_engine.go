@@ -297,6 +297,8 @@ func (e *SpawnEngine) spawnNPC(name string, pos Position, dir Direction) {
 	npc := NewNpc(nid, name, nType)
 	npc.SetPosition(pos)
 	npc.SetDirection(dir)
+	// MasterPos anchors the walk radius; Npc::isInSpawnRange measures against it.
+	npc.MasterPos = pos
 	e.world.AddCreature(npc)
 	slog.Debug("spawned npc", "name", name, "pos", pos)
 }

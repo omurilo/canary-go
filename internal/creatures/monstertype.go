@@ -145,15 +145,72 @@ type ShopItem struct {
 	SellPrice uint32
 }
 
-type NpcType struct {
-	Name       string
-	Speed      uint32
-	Health     uint32
-	MaxHealth  uint32
-	IsPushable bool
-	Outfit     Outfit
-	ShopItems  []ShopItem
+// NpcVoice is one entry of npcConfig.voices, mirroring voiceBlock_t.
+type NpcVoice struct {
+	Text string
+	Yell bool // yellText: TALKTYPE_YELL instead of TALKTYPE_SAY
 }
+
+// NpcType mirrors the fields of NpcType::NpcInfo (src/creatures/npcs/npcs.hpp:29)
+// that the datapack actually sets. Every one of the 1033 npc scripts in
+// data-otservbr-global sets walkInterval, walkRadius, description, flags and
+// speechBubble, and 264 set voices — none of which existed here before, so they
+// were silently dropped by register().
+type NpcType struct {
+	Name        string
+	Description string
+	Speed       uint32
+	Health      uint32
+	MaxHealth   uint32
+	Outfit      Outfit
+	ShopItems   []ShopItem
+
+	// SpeechBubble is a SPEECHBUBBLE_* value; it drives the icon the client draws
+	// over the NPC. Defaults to SPEECHBUBBLE_NORMAL like C++.
+	SpeechBubble uint8
+
+	// CurrencyID is the item the NPC trades in (ITEM_GOLD_COIN by default).
+	CurrencyID uint16
+
+	// Walking. WalkInterval of 0 disables walking entirely, as in onThinkWalk.
+	WalkInterval uint32
+	WalkRadius   int32
+
+	// Idle voices. YellInterval maps to yellSpeedTicks and YellChance to
+	// yellChance (a percentage rolled against uniform_random(1, 100)).
+	Voices       []NpcVoice
+	YellInterval uint32
+	YellChance   uint32
+
+	// Flags from npcConfig.flags.
+	IsPushable        bool
+	FloorChange       bool
+	CanPushItems      bool
+	CanPushCreatures  bool
+	Profession        string
+
+	RespawnType RespawnType
+}
+
+// RespawnType mirrors the respawnType block (period/underground).
+type RespawnType struct {
+	Period      int32
+	Underground bool
+}
+
+// DefaultNpcCurrency is ITEM_GOLD_COIN.
+const DefaultNpcCurrency uint16 = 2148
+
+// SpeechBubble_t values (src/creatures/creatures_definitions.hpp:333).
+const (
+	SpeechBubbleNone        uint8 = 0
+	SpeechBubbleNormal      uint8 = 1
+	SpeechBubbleTrade       uint8 = 2
+	SpeechBubbleQuest       uint8 = 3
+	SpeechBubbleQuestTrader uint8 = 4
+	SpeechBubbleSailor      uint8 = 5
+	SpeechBubbleHireling    uint8 = 7
+)
 
 type TypeRegistry struct {
 	Monsters map[string]*MonsterType

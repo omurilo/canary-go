@@ -731,6 +731,17 @@ func run(o runOpts, log *slog.Logger) error {
 	aiEngine.Start()
 	combatEngine.Start()
 
+	// NPC think loop: dispatches the NpcType onThink callback (which drives
+	// npcHandler's focus/greeting lifecycle) and handles idle walking and voices.
+	npcEngine := game.NewNpcEngine(world)
+	npcEngine.OnNpcThink = lengine.CallNpcOnThink
+	npcEngine.Say = func(npc *game.Npc, talkType byte, text string) {
+		if world.OnCreatureSay != nil {
+			world.OnCreatureSay(npc, talkType, text)
+		}
+	}
+	npcEngine.Start()
+
 	deps := &protocol.Deps{
 		Cfg: cfg, DB: database, RSA: rsa, World: world, Items: catalog, Lua: lengine, Events: events.GlobalEngine, Log: log,
 	}

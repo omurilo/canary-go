@@ -457,3 +457,44 @@ func (e *Engine) CallNpcOnCreatureSay(npc *game.Npc, player *game.Player, talkTy
 	L.Pop(1)
 	return lua.LVAsBool(ret)
 }
+
+// CallNpcOnThink dispatches the NpcType onThink(npc, interval) callback.
+//
+// This is what makes npcHandler:onThink run, and with it the whole FocusModule
+// lifecycle: greeting timeouts, the farewell when a player walks away, and the
+// NpcHandler message queue. The callback was being registered by every npc script
+// and never called.
+func (e *Engine) CallNpcOnThink(npc *game.Npc, interval uint32) {
+	if npc == nil {
+		return
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.npcCallbacksMu.Lock()
+	if e.npcCallbacks == nil {
+		e.npcCallbacksMu.Unlock()
+		return
+	}
+	callbacks, ok := e.npcCallbacks[strings.ToLower(npc.Name)]
+	if !ok || callbacks["onThink"] == nil {
+		e.npcCallbacksMu.Unlock()
+		return
+	}
+	fn := callbacks["onThink"]
+	e.npcCallbacksMu.Unlock()
+
+	L := e.L
+	L.Push(fn)
+
+	udNpc := L.NewUserData()
+	udNpc.Value = npc
+	L.SetMetatable(udNpc, L.GetTypeMetatable("Npc"))
+	L.Push(udNpc)
+	L.Push(lua.LNumber(interval))
+
+	if err := L.PCall(2, 0, nil); err != nil {
+		e.log.Error("lua npc onThink", "npc", npc.Name, "err", err)
+	}
+}

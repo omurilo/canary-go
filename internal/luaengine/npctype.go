@@ -57,6 +57,88 @@ func (e *Engine) registerNpcType() {
 				}
 			}
 
+			if val := table.RawGetString("description"); val.Type() == lua.LTString {
+				n.Description = val.String()
+			}
+			if val := table.RawGetString("speechBubble"); val.Type() == lua.LTNumber {
+				n.SpeechBubble = uint8(lua.LVAsNumber(val))
+			}
+			if val := table.RawGetString("currency"); val.Type() == lua.LTNumber {
+				n.CurrencyID = uint16(lua.LVAsNumber(val))
+			}
+			if val := table.RawGetString("walkInterval"); val.Type() == lua.LTNumber {
+				n.WalkInterval = uint32(lua.LVAsNumber(val))
+			}
+			if val := table.RawGetString("walkRadius"); val.Type() == lua.LTNumber {
+				n.WalkRadius = int32(lua.LVAsNumber(val))
+			}
+
+			// npcConfig.flags = { floorchange =, pushable =, canPushItems =, ... }
+			if flagsVal := table.RawGetString("flags"); flagsVal.Type() == lua.LTTable {
+				flags := flagsVal.(*lua.LTable)
+				boolFlag := func(key string, dst *bool) {
+					if v := flags.RawGetString(key); v.Type() == lua.LTBool {
+						*dst = lua.LVAsBool(v)
+					}
+				}
+				boolFlag("floorchange", &n.FloorChange)
+				boolFlag("pushable", &n.IsPushable)
+				boolFlag("canPushItems", &n.CanPushItems)
+				boolFlag("canPushCreatures", &n.CanPushCreatures)
+				if v := flags.RawGetString("profession"); v.Type() == lua.LTString {
+					n.Profession = v.String()
+				}
+			}
+
+			// npcConfig.voices = { interval =, chance =, { text =, yell = }, ... }
+			// interval/chance are named keys; the voices themselves are the array
+			// part of the same table, mirroring how the datapack writes it.
+			if voicesVal := table.RawGetString("voices"); voicesVal.Type() == lua.LTTable {
+				voices := voicesVal.(*lua.LTable)
+				if v := voices.RawGetString("interval"); v.Type() == lua.LTNumber {
+					n.YellInterval = uint32(lua.LVAsNumber(v))
+				}
+				if v := voices.RawGetString("chance"); v.Type() == lua.LTNumber {
+					n.YellChance = uint32(lua.LVAsNumber(v))
+				}
+				n.Voices = nil
+				for i := 1; ; i++ {
+					entry := voices.RawGetInt(i)
+					if entry.Type() != lua.LTTable {
+						break
+					}
+					tb := entry.(*lua.LTable)
+					voice := creatures.NpcVoice{}
+					if v := tb.RawGetString("text"); v.Type() == lua.LTString {
+						voice.Text = v.String()
+					}
+					if v := tb.RawGetString("yell"); v.Type() == lua.LTBool {
+						voice.Yell = lua.LVAsBool(v)
+					}
+					if voice.Text != "" {
+						n.Voices = append(n.Voices, voice)
+					}
+				}
+			}
+
+			if rt := table.RawGetString("respawnType"); rt.Type() == lua.LTTable {
+				tb := rt.(*lua.LTable)
+				if v := tb.RawGetString("period"); v.Type() == lua.LTNumber {
+					n.RespawnType.Period = int32(lua.LVAsNumber(v))
+				}
+				if v := tb.RawGetString("underground"); v.Type() == lua.LTBool {
+					n.RespawnType.Underground = lua.LVAsBool(v)
+				}
+			}
+
+			// Defaults matching NpcInfo's initializers.
+			if n.SpeechBubble == 0 {
+				n.SpeechBubble = creatures.SpeechBubbleNormal
+			}
+			if n.CurrencyID == 0 {
+				n.CurrencyID = creatures.DefaultNpcCurrency
+			}
+
 			// npcConfig.shop = { { itemName=, clientId=, buy=, sell=, subType= }, ... }
 			// Most merchant NPCs declare their catalog this way (rather than via
 			// npcType:addShopItem), so parse it into ShopItems — isMerchant() and
