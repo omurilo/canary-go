@@ -194,6 +194,14 @@ func (g *GameProtocol) parseRequestTrade(r *netmsg.Reader) {
 	itemID := r.GetU16()
 	stackPos := r.GetByte()
 	targetPlayerID := r.GetU32()
+	// EventCallback playerOnTradeRequest(player, target, item) — (bool), so a false
+	// return cancels the request.
+	if g.deps.Events != nil {
+		target, _ := g.deps.World.CreatureByID(targetPlayerID).(*game.Player)
+		if !g.deps.Events.ExecutePlayerOnTradeRequest(g.player, target, nil) {
+			return
+		}
+	}
 	g.deps.World.PlayerRequestTrade(g.player.ID, targetPlayerID, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, itemID, stackPos)
 }
 
@@ -289,6 +297,16 @@ func (g *GameProtocol) parseWrapableItem(r *netmsg.Reader) {
 
 // parseLookInBattleList handles 0x8D — look at a creature in the battle list.
 func (g *GameProtocol) parseLookInBattleList(r *netmsg.Reader) {
+	// EventCallback playerOnLookInBattleList(player, creature, distance) — (void).
+	defer func() {
+		if g.deps.Events == nil || g.player == nil {
+			return
+		}
+		if target := g.deps.World.CreatureByID(g.player.TargetID); target != nil {
+			g.deps.Events.ExecutePlayerOnLookInBattleList(g.player, target,
+				chebyshev(g.player.Pos, target.GetPosition()))
+		}
+	}()
 	creatureID := r.GetU32()
 	_ = creatureID
 }
@@ -415,7 +433,19 @@ func (g *GameProtocol) parseBossDifficultySelection(r *netmsg.Reader) { if g.pla
 func (g *GameProtocol) parseAimAtTarget(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetU32() }
 func (g *GameProtocol) parseGetTransactionDetails(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetU32() }
 func (g *GameProtocol) parseCyclopediaMapAction(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte() }
-func (g *GameProtocol) parseBugReport(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte(); _ = r.GetByte(); _ = r.GetString(); _ = r.GetString() }
+func (g *GameProtocol) parseBugReport(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
+	category := r.GetByte()
+	_ = r.GetByte()
+	message := r.GetString()
+	_ = r.GetString()
+	// EventCallback playerOnReportBug(player, message, position, category) — (void).
+	if g.deps.Events != nil {
+		g.deps.Events.ExecutePlayerOnReportBug(g.player, message, g.player.Pos, category)
+	}
+}
 
 // Removed as dead duplicates (each was defined but unreachable, and the opcode
 // it would have served is already handled by a dispatched handler):

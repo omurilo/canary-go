@@ -242,6 +242,7 @@ func run(o runOpts, log *slog.Logger) error {
 	aiEngine := game.NewAIEngine(world)
 	combatEngine := game.NewCombatEngine(world)
 
+	var loadedMapPath string
 	mapFilePath := o.mapFile
 	if mapFilePath == "" && cfg.WorldFile != "" {
 		mapFilePath = cfg.WorldFile
@@ -283,6 +284,9 @@ func run(o runOpts, log *slog.Logger) error {
 		var err error
 		for attempt := 1; attempt <= 5; attempt++ {
 			res, err = otbm.Load(mapFilePath, catalog, world.Map)
+			if err == nil {
+				loadedMapPath = mapFilePath
+			}
 			if err == nil {
 				break
 			}
@@ -548,6 +552,12 @@ func run(o runOpts, log *slog.Logger) error {
 	// Event callback engine — initialized here before Lua scripts load
 	// so that EventCallback:register() calls in scripts don't silently fail.
 	eventEngine := events.NewEngine(lengine.L, log)
+
+	// EventCallback mapOnLoad(mapPath). The map is parsed before the Lua engine
+	// exists, so the hook fires here with the path that was loaded.
+	if loadedMapPath != "" {
+		eventEngine.ExecuteMapOnLoad(loadedMapPath)
+	}
 
 	// EventCallback hooks that fire from the game core rather than the protocol
 	// layer. game cannot import events (events imports game), so they are wired

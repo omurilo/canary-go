@@ -18,6 +18,13 @@ func (g *GameProtocol) parseReportViolation(r *netmsg.Reader) {
 	characterName := r.GetString()
 	comment := r.GetString()
 
+	// EventCallback playerOnReportRuleViolation(player, targetName, reportType,
+	// reportReason, comment, translation) — (void).
+	if g.deps.Events != nil && g.player != nil {
+		g.deps.Events.ExecutePlayerOnReportRuleViolation(
+			g.player, characterName, action, reason, comment, "")
+	}
+
 	// Store the report in memory for potential review by moderators.
 	if p := g.player; p != nil && g.deps != nil && g.deps.Log != nil {
 		p.ViolationReports = append(p.ViolationReports, game.ReportViolationEntry{

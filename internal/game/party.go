@@ -141,6 +141,15 @@ func (pt *Party) Join(p *Player) bool {
 		pt.mu.Unlock()
 		return false
 	}
+	pt.mu.Unlock()
+
+	// partyOnJoin is a (bool) hook: a false return vetoes the join, so it runs
+	// before the member is actually added.
+	if OnPartyJoin != nil && !OnPartyJoin(pt, p) {
+		return false
+	}
+
+	pt.mu.Lock()
 	pt.removeInviteLocked(p)
 	pt.members = append(pt.members, p)
 	pt.mu.Unlock()
@@ -163,6 +172,14 @@ func (pt *Party) Leave(p *Player) bool {
 		pt.mu.Unlock()
 		return false
 	}
+	pt.mu.Unlock()
+
+	// partyOnLeave is a (bool) hook and can veto the departure.
+	if OnPartyLeave != nil && !OnPartyLeave(pt, p) {
+		return false
+	}
+
+	pt.mu.Lock()
 	if isLeader {
 		if len(pt.members) == 0 {
 			pt.mu.Unlock()
@@ -247,6 +264,13 @@ func (pt *Party) PassLeadership(p *Player) bool {
 // it at startup; game cannot import events directly (events imports game), so this
 // follows the same indirection as World.OnCreatureSay.
 var OnPartyDisband func(*Party)
+
+// OnPartyJoin and OnPartyLeave are the EventCallback partyOnJoin/partyOnLeave hooks.
+// Both are (bool) upstream: returning false vetoes the join or leave.
+var (
+	OnPartyJoin  func(*Party, *Player) bool
+	OnPartyLeave func(*Party, *Player) bool
+)
 
 func (pt *Party) Disband() {
 	pt.mu.Lock()

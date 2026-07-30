@@ -375,6 +375,13 @@ func (g *GameProtocol) manualWalk(dir game.Direction) {
 
 // manualTurn runs a turn serialized against movement.
 func (g *GameProtocol) manualTurn(dir game.Direction) {
+	// EventCallback playerOnTurn(player, direction) — (bool), so a false return
+	// cancels the turn.
+	if g.deps.Events != nil && g.player != nil {
+		if !g.deps.Events.ExecutePlayerOnTurn(g.player, uint8(dir)) {
+			return
+		}
+	}
 	g.actionMu.Lock()
 	g.turn(dir)
 	g.actionMu.Unlock()
