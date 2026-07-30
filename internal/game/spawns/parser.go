@@ -30,7 +30,10 @@ type CreatureNode struct {
 	Y         int    `xml:"y,attr"`
 	Z         int    `xml:"z,attr"`
 	SpawnTime int    `xml:"spawntime,attr"`
-	Direction int    `xml:"dir,attr"`
+	// C++ reads the attribute "direction" for both monster and npc nodes
+	// (spawn_monster.cpp:77, spawn_npc.cpp:71). This read "dir", which no spawn
+	// file uses, so every spawned creature faced direction 0.
+	Direction int `xml:"direction,attr"`
 }
 
 func LoadSpawnFile(path string) (*SpawnsData, error) {

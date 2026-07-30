@@ -3,6 +3,7 @@ package game
 import (
 	"log/slog"
 	"math/rand"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -20,14 +21,49 @@ type spawnBlock struct {
 	direction    Direction
 }
 
-// spawnState mirrors the C++ SpawnMonster spawned/not-spawned tracking
-type spawnState int
+// getMonsterType picks which type this slot spawns, porting
+// spawnBlock_t::getMonsterType (spawn_monster.cpp:457): a boss wins outright,
+// otherwise the pick is weighted, walking the types from heaviest to lightest.
+func (sb *spawnBlock) getMonsterType() *creatures.MonsterType {
+	if len(sb.monsterTypes) == 0 {
+		return nil
+	}
 
-const (
-	spawnStateIdle      spawnState = iota
-	spawnStateSpawning
-	spawnStateAlive
-)
+	type weighted struct {
+		mType  *creatures.MonsterType
+		weight uint32
+	}
+	ordered := make([]weighted, 0, len(sb.monsterTypes))
+	var totalWeight uint32
+	for mType, weight := range sb.monsterTypes {
+		if mType == nil {
+			continue
+		}
+		// C++ warns when a boss shares a spawn block with others, then takes it.
+		if mType.IsBoss() {
+			return mType
+		}
+		totalWeight += weight
+		ordered = append(ordered, weighted{mType, weight})
+	}
+	if totalWeight == 0 {
+		return nil
+	}
+	if len(ordered) == 1 {
+		return ordered[0].mType
+	}
+
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].weight > ordered[j].weight })
+
+	randomWeight := uint32(rand.Intn(int(totalWeight)))
+	for _, w := range ordered {
+		if randomWeight < w.weight {
+			return w.mType
+		}
+		randomWeight -= w.weight
+	}
+	return ordered[len(ordered)-1].mType
+}
 
 // SpawnData groups the parsed spawn info for one creature entry.
 type SpawnData struct {
@@ -46,8 +82,10 @@ type SpawnBlock struct {
 	interval  time.Duration
 	blocks    map[uint32]*spawnBlock // spawnId -> block
 	spawned   map[uint32]Creature    // spawnId -> creature
-	state     spawnState
-	stateMu   sync.Mutex
+
+	// stateMu guards blocks/spawned. C++ tracks nothing else per spawn group:
+	// occupancy is spawnedMonsterMap membership, per slot.
+	stateMu sync.Mutex
 
 	// Reference to parent engine
 	engine *SpawnEngine
@@ -55,12 +93,12 @@ type SpawnBlock struct {
 
 // SpawnEngine manages all spawns in the world (C++ SpawnsMonster equivalent).
 type SpawnEngine struct {
-	world         *World
-	Types         *creatures.TypeRegistry
-	blocks        []*SpawnBlock
-	nextSpawnID   uint32
+	world           *World
+	Types           *creatures.TypeRegistry
+	blocks          []*SpawnBlock
+	nextSpawnID     uint32
 	creatureToSpawn map[uint32]*spawnBlock // creatureID -> block (fast death lookup)
-	mu            sync.RWMutex
+	mu              sync.RWMutex
 }
 
 const (
@@ -190,7 +228,6 @@ func (e *SpawnEngine) CreatureDied(c Creature) {
 			for id, cr := range block.spawned {
 				if cr.GetID() == c.GetID() {
 					delete(block.spawned, id)
-					block.state = spawnStateIdle
 					break
 				}
 			}
@@ -206,20 +243,32 @@ func (e *SpawnEngine) Start() {
 
 // checkSpawns runs every 1s, matching C++ SpawnMonster::checkSpawnMonster.
 func (e *SpawnEngine) checkSpawns() {
-	now := time.Now()
+	e.checkSpawnsOnce(time.Now())
+	GlobalDispatcher.AddEvent(1*time.Second, e.checkSpawns)
+}
+
+// checkSpawnsOnce is one pass, split out so it can be driven with an explicit
+// clock instead of only from the dispatcher.
+func (e *SpawnEngine) checkSpawnsOnce(now time.Time) {
 	for _, block := range e.blocks {
 		block.stateMu.Lock()
-		if block.state != spawnStateIdle {
-			block.stateMu.Unlock()
-			continue
-		}
-		// Check all spawn IDs in this block
+		// C++ gates each spawn slot only on spawnedMonsterMap.contains(id): there
+		// is no group-wide state. Gating the whole group on one shared state meant
+		// a single living monster suppressed every other slot in the same spawn,
+		// so a 20-monster spawn kept exactly one alive.
 		for id, sb := range block.blocks {
 			if _, alive := block.spawned[id]; alive {
 				continue
 			}
 
-			// Find player nearby (C++ findPlayer)
+			mType := sb.getMonsterType()
+			if mType == nil {
+				continue
+			}
+
+			// C++ checks canSpawn/findPlayer BEFORE the interval and pushes
+			// lastSpawn forward when blocked, so the respawn clock restarts while
+			// a player stands there instead of firing the moment they leave.
 			if e.findPlayerNear(sb.pos) {
 				sb.lastSpawn = now
 				continue
@@ -230,19 +279,12 @@ func (e *SpawnEngine) checkSpawns() {
 				continue
 			}
 
-			// Pick the monster type (first/only for now)
-			for mType := range sb.monsterTypes {
-				creature := e.spawnCreatureInBlock(block, id, sb, mType, now)
-				if creature != nil {
-					block.spawned[id] = creature
-					block.state = spawnStateAlive
-				}
-				break
+			if creature := e.spawnCreatureInBlock(block, id, sb, mType, now); creature != nil {
+				block.spawned[id] = creature
 			}
 		}
 		block.stateMu.Unlock()
 	}
-	GlobalDispatcher.AddEvent(1*time.Second, e.checkSpawns)
 }
 
 func (e *SpawnEngine) findPlayerNear(pos Position) bool {
