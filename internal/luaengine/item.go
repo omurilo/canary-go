@@ -283,9 +283,25 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			if count < 1 {
 				count = 1
 			}
-			if it.pos.X != 0 && e.world != nil {
-				e.world.InternalRemoveItem(it.pos, it.item, uint16(count))
-			} else {
+			// Item::remove goes through internalRemoveItem, which removes from
+			// whatever cylinder holds the item — a tile, a container or the
+			// inventory. Keying only off it.pos meant an item that was not lying on
+			// that tile (a potion in the hand, loot inside a bag) was never
+			// decremented: the tile removal silently found nothing and the item kept
+			// its count, so potions, food and fluid containers were never consumed.
+			removed := false
+			if it.pos.X != 0 && e.world != nil && e.world.Map != nil {
+				if tile := e.world.Map.GetTile(it.pos); tile != nil {
+					for _, on := range tile.Items {
+						if on == it.item {
+							e.world.InternalRemoveItem(it.pos, it.item, uint16(count))
+							removed = true
+							break
+						}
+					}
+				}
+			}
+			if !removed {
 				if int(it.item.Count) > count {
 					it.item.Count -= uint16(count)
 				} else {

@@ -69,6 +69,13 @@ local function openStore(playerId)
 		for _, category in ipairs(GameStoreCategories) do
 			addCategory(category)
 		end
+		-- The client reads two trailing bytes after the category list from protocol
+		-- 1332 onwards (otclient parseStore, protocolgameparse.cpp:922). Without them
+		-- InputMessage::getU8 throws "eof reached" and the store window never opens.
+		if not oldProtocol then
+			msg:addByte(0)
+			msg:addByte(0)
+		end
 		msg:sendToPlayer(player)
 		sendStoreBalanceUpdating(playerId, true)
 	end
