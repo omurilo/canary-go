@@ -200,6 +200,17 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Warn("ensure houses table", "err", err)
 	}
 
+	// Achievements table. Without this, LoadPlayerAchievements/SavePlayerAchievements
+	// fail against a missing table and achievements never persist.
+	if err := database.EnsureAchievementsTable(ctx); err != nil {
+		log.Warn("ensure achievements table", "err", err)
+	}
+
+	// Titles table. Same as above for SavePlayerTitles.
+	if err := database.EnsureTitlesTable(ctx); err != nil {
+		log.Warn("ensure titles table", "err", err)
+	}
+
 	imbPath := filepath.Join(filepath.Dir(filepath.Dir(o.appearances)), "XML", "imbuements.xml")
 	if imbReg, err := imbuements.LoadRegistry(imbPath); err != nil {
 		log.Warn("imbuements not loaded", "path", imbPath, "err", err)

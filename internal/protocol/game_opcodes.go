@@ -380,12 +380,16 @@ func (g *GameProtocol) parseBossDifficultySelection(r *netmsg.Reader) { if g.pla
 func (g *GameProtocol) parseAimAtTarget(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetU32() }
 func (g *GameProtocol) parseGetTransactionDetails(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetU32() }
 func (g *GameProtocol) parseCyclopediaMapAction(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte() }
-func (g *GameProtocol) parseBlessingWindowRequest(r *netmsg.Reader) { if g.player == nil { return }; g.sendStatusText("Blessings window.") }
-func (g *GameProtocol) parseRequestOutfit(r *netmsg.Reader) { if g.player == nil { return }; g.deps.Lua.Call("onPlayerRequestOutfit", g.player.Name) }
 func (g *GameProtocol) parseBugReport(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte(); _ = r.GetByte(); _ = r.GetString(); _ = r.GetString() }
 
-func (g *GameProtocol) parseMode(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte() }
-func (g *GameProtocol) parsePingBack(r *netmsg.Reader) { if g.player == nil { return } }
-func (g *GameProtocol) parseQuestTracker(r *netmsg.Reader) { if g.player == nil { return }; _ = r.GetByte() }
-func (g *GameProtocol) parseReceivePing(r *netmsg.Reader) { if g.player == nil { return } }
-func (g *GameProtocol) parseTrackAnalysis(r *netmsg.Reader) { if g.player == nil { return } }
+// Removed as dead duplicates (each was defined but unreachable, and the opcode
+// it would have served is already handled by a dispatched handler):
+//
+//	parseMode                  → 0xA0 is parseFightModes
+//	parsePingBack              → 0x1D is dispatched as inPing
+//	parseReceivePing           → 0x1E is dispatched as inPong
+//	parseRequestOutfit         → 0xD2 calls SendOutfitWindow directly
+//	parseBlessingWindowRequest → 0xCF calls SendBlessingsDialog directly
+//	parseWheelOfDestiny        → 0x61/0x62 are parseOpenWheel/parseSaveWheel
+//	parseQuestTracker          → no counterpart in the C++ dispatcher
+//	parseTrackAnalysis         → no counterpart in the C++ dispatcher

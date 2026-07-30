@@ -84,9 +84,12 @@ const (
 	inBuyItem        = 0x7A
 	inSellItem       = 0x7B
 	inCloseShop      = 0x7C
-	inCloseChannel   = 0x97
-	inNpcGreet       = 0xEE
-	inHighscore          = 0xB9
+	// 0x97 is playerRequestChannels in C++ (protocolgame.cpp:1842), NOT close
+	// channel. Closing a channel is 0x99.
+	inRequestChannels = 0x97
+	inCloseChannel    = 0x99
+	inNpcGreet        = 0xEE
+	inHighscore       = 0xB1
 	// Inbound party opcodes (0xA3..0xA8). NOTE: 0xA3 collides with the OUTBOUND
 	// opCancelTarget const — these are a separate inbound namespace.
 	inInviteToParty        = 0xA3
@@ -139,7 +142,34 @@ const (
 	inCloseNpcChannel          = 0x9E
 	inSetMonsterPodium         = 0x9F
 	inFollow                   = 0xA2
+
+	// Batch 2: opcodes whose handlers already existed but were never dispatched.
+	// Values taken from the ProtocolGame::parsePacketFromDispatcher switch
+	// (src/server/network/protocol/protocolgame.cpp:1640-2068).
+	inCharacterTradeConfig    = 0x76
+	inOpenChannel             = 0x98
+	inOpenPrivateChannel      = 0x9A
+	inCreatePrivateChannel    = 0xAA
+	inChannelInvite           = 0xAB
+	inChannelExclude          = 0xAC
+	inClientDetails           = 0xC1
+	inBossDifficultySelection = 0xC2
+	inAimAtTarget             = 0xC8
+	inGetTransactionDetails   = 0xC9
+	inExivaRestrictions       = 0xCA
+	inCyclopediaMapAction     = 0xDB
+	inVIPEdit                 = 0xDE
+	inVipGroupActions         = 0xDF
+	inBugReport               = 0xE6
+	inSendResourceBalance     = 0xED
+	inQuestLog                = 0xF0
+	inQuestLine               = 0xF1
+	inModalWindowAnswer       = 0xF9
+	inRewardChestCollect      = 0xFF
 )
+
+// worldTypeNoPvp mirrors WORLD_TYPE_NO_PVP (src/game/game.hpp).
+const worldTypeNoPvp = 1
 
 // GameProtocol is one game-server session.
 type GameProtocol struct {
@@ -959,9 +989,12 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseSellItem(r)
 	case inCloseShop:
 		g.parseCloseShop(r)
+	case inRequestChannels:
+		g.parseRequestChannels(r)
 	case inCloseChannel:
-	case inHighscore:
 		g.parseCloseChannel(r)
+	case inHighscore:
+		g.parseHighscores(r)
 	case inNpcGreet:
 		g.parseNpcGreet(r)
 	case inInviteToParty:
@@ -1150,6 +1183,52 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.parseSetMonsterPodium(r)
 	case inFollow:
 		g.parseFollow(r)
+
+	// --- Batch 2: previously undispatched handlers ---
+	case inCharacterTradeConfig:
+		g.parseCharacterTradeConfig(r)
+	case inOpenChannel:
+		g.parseOpenChannel(r)
+	case inOpenPrivateChannel:
+		g.parseOpenPrivateChannel(r)
+	case inCreatePrivateChannel:
+		g.parseCreatePrivateChannel(r)
+	case inChannelInvite:
+		g.parseChannelInvite(r)
+	case inChannelExclude:
+		g.parseChannelExclude(r)
+	case inClientDetails:
+		g.parseClientDetails(r)
+	case inBossDifficultySelection:
+		g.parseBossDifficultySelection(r)
+	case inAimAtTarget:
+		g.parseAimAtTarget(r)
+	case inGetTransactionDetails:
+		g.parseGetTransactionDetails(r)
+	case inExivaRestrictions:
+		// C++ gates this on !oldProtocol && getWorldType() == WORLD_TYPE_NO_PVP
+		// (protocolgame.cpp:1947).
+		if g.deps.World != nil && g.deps.World.WorldType == worldTypeNoPvp {
+			g.parseExivaRestrictions(r)
+		}
+	case inCyclopediaMapAction:
+		g.parseCyclopediaMapAction(r)
+	case inVIPEdit:
+		g.parseVIPEdit(r)
+	case inVipGroupActions:
+		g.parseVipGroupActions(r)
+	case inBugReport:
+		g.parseBugReport(r)
+	case inSendResourceBalance:
+		g.parseRequestRuleChannels(r)
+	case inQuestLog:
+		g.parseQuestLog(r)
+	case inQuestLine:
+		g.parseQuestLine(r)
+	case inModalWindowAnswer:
+		g.parseModalWindowAnswer(r)
+	case inRewardChestCollect:
+		g.parseRewardChestCollect(r)
 	default:
 		// Log the remaining payload so each not-yet-migrated action can be
 		// mapped to its C++ parse* handler from the exact wire bytes.

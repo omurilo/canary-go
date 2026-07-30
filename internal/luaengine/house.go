@@ -150,6 +150,58 @@ func (e *Engine) registerHouseMetatable() {
 		"getName":         houseGetName,
 		"getSize":         houseGetSize,
 		"canEditAccessList": houseCanEditAccessList,
+		// setHouseOwner is the name the datapack actually uses (compat.lua:1230,
+		// buy_house.lua:58, house_owner.lua:15,25). It mirrors setOwner but
+		// returns a boolean, which those callers rely on.
+		"setHouseOwner": func(L *lua.LState) int {
+			h := checkHouseArg(L, 1)
+			if h == nil {
+				L.Push(lua.LFalse)
+				return 1
+			}
+			h.SetOwner(uint32(lua.LVAsNumber(L.Get(2))))
+			L.Push(lua.LTrue)
+			return 1
+		},
+		// getDoorIdByPosition returns nil when the door is unknown. game.HouseDoor
+		// carries no position yet (internal/game/house.go:43), so this cannot be
+		// resolved properly; callers guard with `if ... then`, so nil is the safe
+		// answer. TODO: needs door positions on House.DoorList.
+		"getDoorIdByPosition": func(L *lua.LState) int {
+			L.Push(lua.LNil)
+			return 1
+		},
+		// hasNewOwnership reports whether a transfer is pending.
+		"hasNewOwnership": func(L *lua.LState) int {
+			h := checkHouseArg(L, 1)
+			if h == nil {
+				L.Push(lua.LFalse)
+				return 1
+			}
+			L.Push(lua.LBool(h.TransferAccept != 0 || h.TransferToName != ""))
+			return 1
+		},
+		// setNewOwnerGuid(guid) with guid 0 clears the pending transfer.
+		"setNewOwnerGuid": func(L *lua.LState) int {
+			h := checkHouseArg(L, 1)
+			if h == nil {
+				return 0
+			}
+			guid := uint32(lua.LVAsNumber(L.Get(2)))
+			h.TransferAccept = guid
+			if guid == 0 {
+				h.TransferToName = ""
+				h.TransferPrice = 0
+			}
+			return 0
+		},
+		// startTrade is not implemented: House::startTrade in C++
+		// (src/map/house/house.cpp:629) needs the HouseTransferItem/onTradeEvent
+		// machinery, which has no Go counterpart yet. Returns RETURNVALUE_NOTPOSSIBLE.
+		"startTrade": func(L *lua.LState) int {
+			L.Push(lua.LNumber(1)) // RETURNVALUE_NOTPOSSIBLE
+			return 1
+		},
 		"getId": func(L *lua.LState) int {
 			h := checkHouse(L)
 			if h == nil {
@@ -205,4 +257,21 @@ func (e *Engine) registerHouseMetatable() {
 	idx := e.L.NewTable()
 	e.L.SetFuncs(idx, methods)
 	e.L.SetField(mt, "__index", idx)
+
+	// House(id) is used 9 times in the datapack. This global used to be supplied by
+	// the mockClass block, so removing that mock without adding a real constructor
+	// would break those call sites.
+	e.setClassConstructor(houseTypeName, func(L *lua.LState) int {
+		if e.world == nil {
+			L.Push(lua.LNil)
+			return 1
+		}
+		h := e.world.GetHouse(uint32(L.CheckInt(1)))
+		if h == nil {
+			L.Push(lua.LNil)
+			return 1
+		}
+		pushHouse(L, h)
+		return 1
+	}, methods)
 }

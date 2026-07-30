@@ -5,8 +5,13 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
-// parseReportViolation handles a player's rule violation report (opcode 0xE6).
+// parseReportViolation handles a player's rule violation report.
 // Format: [u8 reason][u8 action][str characterName][str comment]
+//
+// Intentionally NOT dispatched: the docstring used to claim 0xE6, but 0xE6 is
+// parseBugReport (protocolgame.cpp:2015). Rule-violation reports are 0xF2, which
+// upstream keeps commented out (`// case 0xF2: parseRuleViolationReport(msg);`).
+// Kept so the logic is ready if 0xF2 is ever enabled.
 func (g *GameProtocol) parseReportViolation(r *netmsg.Reader) {
 	reason := r.GetByte()
 	action := r.GetByte()

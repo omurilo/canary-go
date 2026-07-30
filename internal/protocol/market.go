@@ -12,6 +12,13 @@ import (
 // Market fee: 2% of the total cost.
 const marketFeePercent uint64 = 2
 
+// MarketRequest_t selectors (src/creatures/creatures_definitions.hpp:351).
+const (
+	marketRequestOwnHistory = 1
+	marketRequestOwnOffers  = 2
+	marketRequestItemBrowse = 3
+)
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Outbound packets
 // ──────────────────────────────────────────────────────────────────────────────
@@ -130,7 +137,7 @@ func (g *GameProtocol) aggregateContainerItems(container *game.Item, agg map[uin
 // SendMarketBrowse sends the list of buy/sell offers for a specific item (opcode 0xF9).
 // Mirrors C++ ProtocolGame::sendMarketBrowseItem:
 //
-//	[0xF9][u8 MARKETREQUEST_ITEM_BROWSE=2][u16 itemId][u8 tier?]
+//	[0xF9][u8 MARKETREQUEST_ITEM_BROWSE=3][u16 itemId][u8 tier?]
 //	[u32 buyCount] per-offer: [u32 timestamp][u16 counter][u16 amount][u64 price][string playerName]
 //	[u32 sellCount] per-offer: [u32 timestamp][u16 counter][u16 amount][u64 price][string playerName]
 //
@@ -145,7 +152,7 @@ func (g *GameProtocol) SendMarketBrowse(itemId uint16, tier uint8) {
 
 	w := netmsg.NewWriter()
 	w.AddByte(0xF9) // opcode for market browse response
-	w.AddByte(3)    // MARKETREQUEST_ITEM_BROWSE
+	w.AddByte(marketRequestItemBrowse)
 
 	w.AddU16(itemId)
 	t := g.deps.Items.Get(itemId)
@@ -212,7 +219,7 @@ func (g *GameProtocol) SendMarketAccept(timestamp uint32, counter uint16, amount
 
 // SendMarketBrowseOwnOffers sends the player's own active offers (opcode 0xF9).
 // Mirrors C++ ProtocolGame::sendMarketBrowseOwnOffers:
-//   [0xF9][u8 MARKETREQUEST_OWN_OFFERS=1]
+//   [0xF9][u8 MARKETREQUEST_OWN_OFFERS=2]
 //   [u32 buyCount] per-offer: [u32 timestamp][u16 counter][u16 itemId][u8 tier][u16 amount][u64 price]
 //   [u32 sellCount] per-offer: [u32 timestamp][u16 counter][u16 itemId][u8 tier][u16 amount][u64 price]
 // Tier byte is only sent when the item has forge tier > 0.
@@ -228,7 +235,7 @@ func (g *GameProtocol) SendMarketBrowseOwnOffers() {
 
 	w := netmsg.NewWriter()
 	w.AddByte(0xF9) // opcode for own offers response
-	w.AddByte(2)    // MARKETREQUEST_OWN_OFFERS
+	w.AddByte(marketRequestOwnOffers)
 
 	w.AddU32(uint32(len(buyOffers)))
 	for _, offer := range buyOffers {
@@ -259,24 +266,61 @@ func (g *GameProtocol) SendMarketBrowseOwnOffers() {
 	g.SendToClient(w)
 }
 
-// SendMarketBrowseOwnHistory sends the player's historical market offers (opcode 0xF5).
+// SendMarketBrowseOwnHistory sends the player's historical market offers.
+// Mirrors ProtocolGame::sendMarketBrowseOwnHistory (protocolgame.cpp:6930):
+// [0xF9][u8 MARKETREQUEST_OWN_HISTORY][u32 buyCount]...[u32 sellCount]...
+//
+// The opcode used to be 0xF5, which is sendInventoryIds — the client would
+// mis-parse this entirely.
 func (g *GameProtocol) SendMarketBrowseOwnHistory() {
 	if g.player == nil || g.player.World == nil || g.player.World.Market == nil {
 		return
 	}
-	// TODO: implement history tracking; send empty lists for now.
+	// TODO: implement history tracking (market_history table); send empty lists.
 	w := netmsg.NewWriter()
-	w.AddByte(0xF5) // same opcode for own offers and history
-	w.AddByte(1)    // MARKETREQUEST_OWN_HISTORY
-	w.AddU32(0)     // buy history count
-	w.AddU32(0)     // sell history count
+	w.AddByte(0xF9)
+	w.AddByte(marketRequestOwnHistory)
+	w.AddU32(0) // buy history count
+	w.AddU32(0) // sell history count
 	g.SendToClient(w)
 }
 
-// SendMarketCancel confirms an offer was cancelled (opcode 0xFA).
-func (g *GameProtocol) SendMarketCancel() {
+// SendMarketCancel confirms an offer was cancelled, porting
+// ProtocolGame::sendMarketCancelOffer (protocolgame.cpp:6887).
+//
+// The opcode used to be a bare 0xFA — which is sendModalWindow — with no payload.
+// The real packet is 0xF9 + MARKETREQUEST_OWN_OFFERS + the cancelled offer, laid
+// out differently for buy and sell so the client can drop it from the right list.
+func (g *GameProtocol) SendMarketCancel(offer *game.MarketOffer) {
+	if offer == nil {
+		return
+	}
+
 	w := netmsg.NewWriter()
-	w.AddByte(0xFA) // opMarketCancelOffer
+	w.AddByte(0xF9)
+	w.AddByte(marketRequestOwnOffers)
+
+	writeOffer := func() {
+		w.AddU32(uint32(offer.Timestamp))
+		w.AddU16(offer.Counter)
+		w.AddU16(offer.ItemID)
+		if t := g.deps.Items.Get(offer.ItemID); t != nil && t.UpgradeClassification > 0 {
+			w.AddByte(offer.Tier)
+		}
+		w.AddU16(offer.Amount)
+		w.AddU64(offer.Price)
+	}
+
+	if offer.Action == game.MarketActionBuy {
+		w.AddU32(0x01)
+		writeOffer()
+		w.AddU32(0x00) // empty sell list
+	} else {
+		w.AddU32(0x00) // empty buy list
+		w.AddU32(0x01)
+		writeOffer()
+	}
+
 	g.SendToClient(w)
 }
 
@@ -307,9 +351,6 @@ func (g *GameProtocol) parseMarketBrowse(r *netmsg.Reader) {
 	if !g.player.InMarket {
 		g.SendOpenMarket()
 	}
-
-	const marketRequestOwnHistory = 1
-	const marketRequestOwnOffers = 2
 
 	switch browseId {
 	case marketRequestOwnOffers:
@@ -466,7 +507,7 @@ func (g *GameProtocol) parseMarketCancelOffer(r *netmsg.Reader) {
 			slog.Default().Info("failed to remove market offer from DB", "err", err)
 		}
 	g.SendOpenMarket()
-	g.SendMarketCancel()
+	g.SendMarketCancel(offer)
 	g.SendMarketBrowse(offer.ItemID, offer.Tier)
 	g.SendMarketBrowseOwnOffers()
 }

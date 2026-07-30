@@ -227,6 +227,9 @@ func (e *Engine) registerAPI() {
 	e.registerGlobalEventClass()
 	e.registerVocation()
 	e.registerModalWindowType()
+	e.registerWeaponType()
+	e.registerWebhookType()
+	e.registerMetrics()
 
 	// HirelingsInit is a no-op stub called by server_initialization.lua.
 	// The full hireling system is not ported to Go yet.
@@ -292,7 +295,15 @@ func (e *Engine) registerAPI() {
 
 	L.SetGlobal("AUTH_TYPE", lua.LString("password"))
 
-	mockClass("Weapon")
+	// IMPORTANT: mockClass installs a catch-all __index on the type metatable.
+	// Because gopher-lua's NewTypeMetatable returns the *existing* table when the
+	// name is already registered, mocking a name that has a real binding silently
+	// destroys that binding. Never mock a name that appears in the e.register*()
+	// block above.
+	//
+	// Guild, House, Party and Weapon used to be mocked here even though they have
+	// real bindings, which made every guild:/house:/party: call return a mock
+	// userdata instead of the real value.
 	mockClass("Result")
 	mockClass("Achievement")
 	mockClass("BestiaryCharm")
@@ -301,17 +312,20 @@ func (e *Engine) registerAPI() {
 	mockClass("BedItem")
 	mockClass("DropLoot")
 	mockClass("Charm")
-	mockClass("Teleport")
 	mockClass("GemAtelier")
-	mockClass("Guild")
 	mockClass("Group")
-	mockClass("House")
-	mockClass("Zone")
 	mockClass("Hazard")
 	mockClass("ZoneEvent")
 	mockClass("HazardMonster")
-	mockClass("Party")
-	mockClass("Webhook")
+	// Zone and Teleport stay mocked on purpose. registerZone/registerTeleportType
+	// exist but are NOT drop-in replacements: their constructors return nil, and
+	// their method sets miss what the datapack actually calls (zone:addArea is
+	// used 32 times and is absent, likewise setRemoveDestination/removePlayers/
+	// removeMonsters/register/randomPosition). Wiring them today would turn 33
+	// zone scripts from silently-wrong into hard "index a nil value" errors.
+	// Same for Imbuement: registerImbuementType is intentionally left unwired.
+	mockClass("Teleport")
+	mockClass("Zone")
 
 	// ItemClassification has a real binding (not a mock) so it can be
 	// populated from data/scripts/systems/item_tiers.lua.

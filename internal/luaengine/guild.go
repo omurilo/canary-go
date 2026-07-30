@@ -7,7 +7,7 @@ import (
 
 func (e *Engine) registerGuildType() {
 	mt := e.L.NewTypeMetatable("Guild")
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), map[string]lua.LGFunction{
+	methods := map[string]lua.LGFunction{
 		"getId":             guildGetid,
 		"getName":           guildGetname,
 		"getMembersOnline":  guildGetmembersonline,
@@ -21,9 +21,14 @@ func (e *Engine) registerGuildType() {
 		"addMember":         guildAddmember,
 		"removeMember":      guildRemovemember,
 		"getMemberCount":    guildGetmembercount,
-	}))
+	}
+	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), methods))
 
-	e.L.SetGlobal("Guild", e.L.NewFunction(func(L *lua.LState) int {
+	// The global must be a callable TABLE, not a plain function: the datapack both
+	// calls Guild(id) and *extends* the class (data/libs/compat/compat.lua:1496
+	// `function Guild.addMember(self, player)`). A bare function global makes that
+	// assignment fail with "attempt to index a non-table object (function)".
+	e.setClassConstructor("Guild", func(L *lua.LState) int {
 		id := uint32(L.CheckInt(1))
 		guild := e.world.GetGuild(id)
 		if guild == nil {
@@ -35,7 +40,7 @@ func (e *Engine) registerGuildType() {
 		L.SetMetatable(ud, L.GetTypeMetatable("Guild"))
 		L.Push(ud)
 		return 1
-	}))
+	}, methods)
 }
 
 func checkGuild(L *lua.LState) *game.Guild {

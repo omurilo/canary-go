@@ -36,6 +36,17 @@ func (s *recordSession) SendCloseShop()                      {}
 func (s *recordSession) SendChangeSpeed(game.Creature)       {}
 func (s *recordSession) SendIcons()                          {}
 func (s *recordSession) SendOpenForge()                      {}
+func (s *recordSession) SendOpenStash()                      {}
+func (s *recordSession) SendOpenMarket()                     {}
+func (s *recordSession) SendTextMessage(uint8, string)        {}
+func (s *recordSession) SendChannelEvent(uint16, string, byte) {}
+func (s *recordSession) SendChannelsDialog([]*game.ChatChannel) {}
+func (s *recordSession) SendOpenChannel(*game.ChatChannel)     {}
+func (s *recordSession) SendOpenPrivateChannel(string)         {}
+func (s *recordSession) SendCreatePrivateChannel(uint16, string, string) {}
+func (s *recordSession) SendClosePrivateChannel(uint16)        {}
+func (s *recordSession) SendToChannel(uint32, string, uint16, byte, uint16, string) {
+}
 
 // TestNpcTradeOpensShop drives the full post-greeting interaction: greet the
 // merchant, then say "trade", and assert the shop-open packet (0x7A) is sent.

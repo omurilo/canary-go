@@ -8,36 +8,83 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
-// SendVIPList sends the VIP list (Opcode 0xD4).
+// VipStatus_t values (src/creatures/creatures_definitions.hpp:783).
+const (
+	vipStatusOffline  = 0
+	vipStatusOnline   = 1
+	vipStatusPending  = 2
+	vipStatusTraining = 3
+)
+
+// maxVipGroupEntries mirrors PlayerVIP::getMaxGroupEntries for a premium account
+// (src/creatures/players/components/player_vip.cpp:34): 5 custom + 3 default.
+const maxVipGroupEntries = 8
+
+// SendVIPList sends the VIP groups followed by one packet per VIP entry.
+//
+// This whole area used to be a single invented packet on 0xD4 carrying groups and
+// entries together, with u16 counts and u32 group ids. Canary 13.x splits it:
+// 0xD4 = sendVIPGroups, and one 0xD2 = sendVIP per entry. 0xD5/0xD6 (previously
+// used for online/offline) are not VIP opcodes at all.
 func (g *GameProtocol) SendVIPList() {
 	if g.player == nil {
 		return
 	}
+	g.sendVIPGroups()
+	for _, entry := range g.player.VIPList {
+		g.sendVIPEntry(entry)
+	}
+}
+
+// sendVIPGroups ports ProtocolGame::sendVIPGroups (protocolgame.cpp:9293):
+// [0xD4][u8 groupCount] per group { u8 id, str name, u8 customizable }
+// [u8 remainingGroupSlots]
+func (g *GameProtocol) sendVIPGroups() {
+	groups := g.player.VIPGroups
 
 	w := netmsg.NewWriter()
 	w.AddByte(0xD4)
-
-	w.AddU16(uint16(len(g.player.VIPGroups)))
-	for _, group := range g.player.VIPGroups {
-		w.AddU32(group.ID)
+	w.AddByte(uint8(len(groups)))
+	for _, group := range groups {
+		w.AddByte(uint8(group.ID))
 		w.AddString(group.Name)
 		w.AddByte(boolToByte(group.Customizable))
 	}
 
-	w.AddU16(uint16(len(g.player.VIPList)))
-	for _, entry := range g.player.VIPList {
-		w.AddU32(entry.PlayerID)
-		w.AddString(entry.PlayerName)
-		w.AddByte(entry.Icon)
-		w.AddByte(boolByte(entry.Notify))
+	remaining := 0
+	if maxVipGroupEntries > len(groups) {
+		remaining = maxVipGroupEntries - len(groups)
+	}
+	w.AddByte(uint8(remaining))
 
-		online := g.playerOnlineInVIP(entry.PlayerID)
-		w.AddByte(boolByte(online))
+	g.SendToClient(w)
+}
 
-		w.AddU16(uint16(len(entry.Groups)))
-		for _, gid := range entry.Groups {
-			w.AddU32(gid)
-		}
+// sendVIPEntry ports ProtocolGame::sendVIP (protocolgame.cpp:9260):
+// [0xD2][u32 guid][str name][str description][u32 min(10,icon)][u8 notify]
+// [u8 status][u8 groupCount][u8 groupIds...]
+func (g *GameProtocol) sendVIPEntry(entry game.VIPEntry) {
+	icon := uint32(entry.Icon)
+	if icon > 10 {
+		icon = 10
+	}
+
+	status := uint8(vipStatusOffline)
+	if g.playerOnlineInVIP(entry.PlayerID) {
+		status = vipStatusOnline
+	}
+
+	w := netmsg.NewWriter()
+	w.AddByte(0xD2)
+	w.AddU32(entry.PlayerID)
+	w.AddString(entry.PlayerName)
+	w.AddString(entry.Description)
+	w.AddU32(icon)
+	w.AddByte(boolByte(entry.Notify))
+	w.AddByte(status)
+	w.AddByte(uint8(len(entry.Groups)))
+	for _, gid := range entry.Groups {
+		w.AddByte(uint8(gid))
 	}
 
 	g.SendToClient(w)
@@ -48,25 +95,18 @@ func (g *GameProtocol) playerOnlineInVIP(dbID uint32) bool {
 	return g.deps.World.PlayerByDBID(dbID) != nil
 }
 
-// SendVIPOnline sends a notification that a VIP player came online (Opcode 0xD5).
-func (g *GameProtocol) SendVIPOnline(playerID uint32) {
+// SendUpdatedVIPStatus ports ProtocolGame::sendUpdatedVIPStatus
+// (protocolgame.cpp:9241): [0xD3][u32 guid][u8 status]. It replaces the previous
+// SendVIPOnline/SendVIPOffline pair, which used 0xD5/0xD6 — neither of which is a
+// VIP opcode in 13.x.
+func (g *GameProtocol) SendUpdatedVIPStatus(playerID uint32, status uint8) {
 	if g.player == nil {
 		return
 	}
 	w := netmsg.NewWriter()
-	w.AddByte(0xD5)
+	w.AddByte(0xD3)
 	w.AddU32(playerID)
-	g.SendToClient(w)
-}
-
-// SendVIPOffline sends a notification that a VIP player went offline (Opcode 0xD6).
-func (g *GameProtocol) SendVIPOffline(playerID uint32) {
-	if g.player == nil {
-		return
-	}
-	w := netmsg.NewWriter()
-	w.AddByte(0xD6)
-	w.AddU32(playerID)
+	w.AddByte(status)
 	g.SendToClient(w)
 }
 

@@ -122,22 +122,9 @@ func (g *GameProtocol) wheelOptions() byte {
 	return 2
 }
 
-// parseWheelOfDestiny handles opcode 0xEC (Legacy / Alternative Wheel request).
-func (g *GameProtocol) parseWheelOfDestiny(r *netmsg.Reader) {
-	if g.player == nil {
-		return
-	}
-	if r.Remaining() < 1 {
-		return
-	}
-	subOp := r.GetByte()
-	switch subOp {
-	case 0: // Request / Open Wheel Data
-		g.SendWheelOfDestiny()
-	case 1: // Save Wheel Allocation / Preset
-		g.applyWheelSave(r)
-	}
-}
+// parseWheelOfDestiny was removed: it claimed opcode 0xEC (which is actually
+// parseSetHirelingName in C++, protocolgame.cpp:2027) and was never dispatched.
+// The wheel is served by parseOpenWheel (0x61) and parseSaveWheel (0x62).
 
 // parseWheelGemAction handles opcode 0xE7 (Wheel of Destiny Gem actions / enhance mod grade).
 // Wire format (C++): [u8 action][u8 param][u8 pos] — param and pos are BOTH u8!

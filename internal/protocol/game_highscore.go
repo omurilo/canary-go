@@ -8,7 +8,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
-// parseHighscores handles the highscore request (opcode 0xB9).
+// parseHighscores handles the highscore request (opcode 0xB1).
 // Packet format:
 //
 //	u8: type (0=get entries, 1=get categories)
@@ -45,10 +45,10 @@ func (g *GameProtocol) parseHighscores(r *netmsg.Reader) {
 	g.sendHighscores(entries, categoryID, vocationID, page, uint16(totalPages), 60)
 }
 
-// sendHighscoreCategories sends the list of categories (0xB9 response).
+// sendHighscoreCategories sends the list of categories (0xB1 response).
 func (g *GameProtocol) sendHighscoreCategories() {
 	w := netmsg.NewWriter()
-	w.AddByte(0xB9)
+	w.AddByte(0xB1)
 	w.AddByte(0x00) // no data flag
 	w.AddByte(byte(len(game.DefaultHighscoreCategories)))
 	for _, cat := range game.DefaultHighscoreCategories {
@@ -61,7 +61,7 @@ func (g *GameProtocol) sendHighscoreCategories() {
 // sendHighscores sends highscore entries to the client.
 func (g *GameProtocol) sendHighscores(entries []game.HighscoreEntry, categoryID uint8, vocationID uint32, page, totalPages uint16, updateTimer uint32) {
 	w := netmsg.NewWriter()
-	w.AddByte(0xB9)
+	w.AddByte(0xB1)
 	w.AddByte(0x01) // data flag
 	w.AddByte(categoryID)
 	w.AddU32(vocationID)
@@ -83,7 +83,7 @@ func (g *GameProtocol) sendHighscores(entries []game.HighscoreEntry, categoryID 
 // sendHighscoresNoData sends an empty highscore response.
 func (g *GameProtocol) sendHighscoresNoData() {
 	w := netmsg.NewWriter()
-	w.AddByte(0xB9)
+	w.AddByte(0xB1)
 	w.AddByte(0x00) // no data
 	w.AddByte(0x00) // zero categories
 	g.SendToClient(w)

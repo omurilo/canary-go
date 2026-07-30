@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/io/propstream"
@@ -173,21 +174,33 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	           WHERE m.player_id = ? LIMIT 1`
 	_ = d.SQL.QueryRowContext(ctx, gQuery, p.DBID).Scan(&p.GuildName, &p.GuildRankName, &p.GuildNick)
 
-	// Load Wheel of Destiny slot allocations
-	_ = d.LoadPlayerWheel(ctx, p)
-	_ = d.LoadPlayerPrey(ctx, p)
-	_ = d.LoadPlayerTaskHunter(ctx, p)
-	_ = d.LoadPlayerBosstiary(ctx, p)
-	_ = d.LoadPlayerCharms(ctx, p)
-	_ = d.LoadPlayerSpells(ctx, p)
-	_ = d.LoadPlayerVIP(ctx, p)
-	_ = d.LoadPlayerAchievements(ctx, p)
-	_ = d.LoadPlayerTitles(ctx, p)
-	_ = d.LoadPlayerFamiliars(ctx, p)
-	_ = d.LoadPlayerHazard(ctx, p)
-	_ = d.LoadPlayerConcoctions(ctx, p)
-	_ = d.LoadPlayerHirelings(ctx, p)
-	_ = d.LoadPlayerAnimusMastery(ctx, p)
+	// Per-subsystem loads. These used to be `_ = ...`, which hid real failures —
+	// notably a missing player_achievements/player_titles table, so achievements
+	// silently never persisted.
+	for _, sub := range []struct {
+		name string
+		load func(context.Context, *game.Player) error
+	}{
+		{"wheel", d.LoadPlayerWheel},
+		{"prey", d.LoadPlayerPrey},
+		{"task_hunter", d.LoadPlayerTaskHunter},
+		{"bosstiary", d.LoadPlayerBosstiary},
+		{"charms", d.LoadPlayerCharms},
+		{"spells", d.LoadPlayerSpells},
+		{"vip", d.LoadPlayerVIP},
+		{"achievements", d.LoadPlayerAchievements},
+		{"titles", d.LoadPlayerTitles},
+		{"familiars", d.LoadPlayerFamiliars},
+		{"hazard", d.LoadPlayerHazard},
+		{"concoctions", d.LoadPlayerConcoctions},
+		{"hirelings", d.LoadPlayerHirelings},
+		{"animus_mastery", d.LoadPlayerAnimusMastery},
+	} {
+		if err := sub.load(ctx, p); err != nil {
+			slog.Default().Warn("load player subsystem failed",
+				"subsystem", sub.name, "player", p.Name, "err", err)
+		}
+	}
 
 	return p, nil
 }
@@ -437,21 +450,33 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 	}
 
 	// Save Wheel of Destiny, Prey and Task Hunting slots.
-	_ = d.SavePlayerWheel(ctx, p)
-	_ = d.SavePlayerPrey(ctx, p)
-	_ = d.SavePlayerBosstiary(ctx, p)
-	_ = d.SavePlayerCharms(ctx, p)
-	_ = d.SavePlayerTaskHunter(ctx, p)
-	_ = d.SaveAccountCoins(ctx, p)
-	_ = d.SavePlayerSpells(ctx, p)
-	_ = d.SavePlayerVIP(ctx, p)
-	_ = d.SavePlayerAchievements(ctx, p)
-	_ = d.SavePlayerTitles(ctx, p)
-	_ = d.SavePlayerFamiliars(ctx, p)
-	_ = d.SavePlayerHazard(ctx, p)
-	_ = d.SavePlayerConcoctions(ctx, p)
-	_ = d.SavePlayerHirelings(ctx, p)
-	_ = d.SavePlayerAnimusMastery(ctx, p)
+	// Per-subsystem saves. These used to be `_ = ...`; a missing table or a broken
+	// blob encoder therefore lost player state with no trace in the log.
+	for _, sub := range []struct {
+		name string
+		save func(context.Context, *game.Player) error
+	}{
+		{"wheel", d.SavePlayerWheel},
+		{"prey", d.SavePlayerPrey},
+		{"bosstiary", d.SavePlayerBosstiary},
+		{"charms", d.SavePlayerCharms},
+		{"task_hunter", d.SavePlayerTaskHunter},
+		{"account_coins", d.SaveAccountCoins},
+		{"spells", d.SavePlayerSpells},
+		{"vip", d.SavePlayerVIP},
+		{"achievements", d.SavePlayerAchievements},
+		{"titles", d.SavePlayerTitles},
+		{"familiars", d.SavePlayerFamiliars},
+		{"hazard", d.SavePlayerHazard},
+		{"concoctions", d.SavePlayerConcoctions},
+		{"hirelings", d.SavePlayerHirelings},
+		{"animus_mastery", d.SavePlayerAnimusMastery},
+	} {
+		if err := sub.save(ctx, p); err != nil {
+			slog.Default().Warn("save player subsystem failed",
+				"subsystem", sub.name, "player", p.Name, "err", err)
+		}
+	}
 
 	if err := d.SavePlayerDepot(ctx, p); err != nil {
 		return err

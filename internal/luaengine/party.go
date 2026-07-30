@@ -154,6 +154,17 @@ func (e *Engine) registerParty() {
 			L.Push(L.NewTable())
 			return 1
 		},
+		// getInvitees is the name the datapack uses (data/libs/compat/compat.lua:835).
+		"getInvitees": func(L *lua.LState) int {
+			L.Push(L.NewTable())
+			return 1
+		},
+		// refreshHazard is a no-op: party-wide hazard recalculation has no Go
+		// counterpart yet. Called from data/events/scripts/party.lua, which the
+		// Go loader does not read today anyway.
+		"refreshHazard": func(L *lua.LState) int {
+			return 0
+		},
 		"isMember": func(L *lua.LState) int {
 			L.Push(lua.LFalse)
 			return 1
@@ -188,6 +199,10 @@ func (e *Engine) registerParty() {
 	e.L.SetFuncs(idx, methods)
 	e.L.SetField(mt, "__index", idx)
 
+	// setClassConstructor makes the global a callable TABLE, which the datapack
+	// needs because it extends the class (data/libs/functions/party.lua:
+	// `function Party.broadcastPartyLoot`, hasVocation, hasKnight, ...). This was
+	// already correct; mockClass("Party") in api.go was overwriting it.
 	e.setClassConstructor(partyTypeName, e.partyCreate, methods)
 }
 
