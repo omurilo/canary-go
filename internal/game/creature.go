@@ -44,8 +44,13 @@ type BaseCreature struct {
 	LightLevel uint8
 	LightColor uint8
 	Speed      uint16
+	// OTCR attached effects
+	Shader          string
+	AttachedEffects []uint16
 }
 
+func (c *BaseCreature) GetShader() string            { return c.Shader }
+func (c *BaseCreature) GetAttachedEffects() []uint16 { return c.AttachedEffects }
 func (c *BaseCreature) GetID() uint32 { return c.ID }
 func (c *BaseCreature) GetName() string { return c.Name }
 func (c *BaseCreature) GetHealth() uint32 { return c.Health }

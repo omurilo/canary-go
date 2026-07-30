@@ -459,6 +459,11 @@ type Outfit struct {
 	MountLegs  uint8
 	MountFeet  uint8
 	FamiliarsType uint16
+	// OTCR extension fields for wings, auras, effects, and shaders.
+	LookWing   uint16
+	LookAura   uint16
+	LookEffect uint16
+	LookShader uint16
 }
 
 // GetWeight returns the total weight of the item (and its contents if it's a container).

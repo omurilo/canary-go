@@ -156,6 +156,16 @@ func (g *GameProtocol) addCreature(w *netmsg.Writer, c game.Creature) {
 		walkthrough = byte(0x00)
 	}
 	w.AddByte(walkthrough) // walkthrough (can walk through: 0, solid: 1)
+
+	// OTCR extension: shader name + attached effects list.
+	if bc, ok := c.(interface{ GetShader() string; GetAttachedEffects() []uint16 }); ok {
+		w.AddString(bc.GetShader())
+		effects := bc.GetAttachedEffects()
+		w.AddByte(byte(len(effects)))
+		for _, id := range effects {
+			w.AddU16(id)
+		}
+	}
 }
 
 // isTopItem reports whether an item stacks below creatures (always-on-top).

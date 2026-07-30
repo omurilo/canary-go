@@ -255,6 +255,9 @@ type Player struct {
 	// regen ticker. Persisted for cyclopedia display.
 	ActiveFoodItems map[uint16]uint32 // itemID -> remaining time in seconds
 
+	// Hirelings (B19) — player-owned hirelings.
+	Hirelings []*Hireling
+
 	// Animus Mastery (B16) — unlocked animus masteries.
 	AnimusMastery      []byte         // raw blob from DB (for serialization)
 	AnimMastery        *AnimusMastery // runtime struct (lazy init via GetAnimusMastery)
@@ -376,6 +379,12 @@ type Player struct {
 	// to the database for moderator review.
 	ViolationReports []ReportViolationEntry
 }
+
+// GetHirelings returns the player's hirelings.
+func (p *Player) GetHirelings() []*Hireling { return p.Hirelings }
+
+// GetHirelingCount returns the number of hirelings owned.
+func (p *Player) GetHirelingCount() int { return len(p.Hirelings) }
 
 // GetAnimusMastery returns the player's animus mastery tracker (lazy init).
 func (p *Player) GetAnimusMastery() *AnimusMastery {

@@ -587,8 +587,9 @@ func (g *GameProtocol) sendCyclopediaCharacterStoreSummary() {
 	w.AddByte(0) // preyWildcards
 	w.AddByte(0) // instantRewards
 	w.AddByte(0) // hasCharmExpansion
-	w.AddByte(0) // hirelingsObtained
-	w.AddByte(0) // reserved
+	hirelingCount := byte(p.GetHirelingCount())
+	w.AddByte(hirelingCount) // hirelingsObtained
+	w.AddByte(0)             // reserved
 
 	w.AddByte(0) // hirelingSkillsCount
 	w.AddByte(0) // hirelingOutfitsCount

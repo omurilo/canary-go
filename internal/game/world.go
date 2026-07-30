@@ -113,6 +113,7 @@ type World struct {
 	TypeRegistry *creatures.TypeRegistry
 	Fiendish     *FiendishManager
 	Raids        *Raids
+	HirelingMgr  *HirelingManager
 }
 
 // PlayerByName returns an online player by (case-insensitive) name, or nil.
@@ -156,7 +157,8 @@ func NewWorld() *World {
 		ItemClassifications: make(map[uint8]*ItemClassification),
 			Market:       NewMarket(),
 		Fiendish:     NewFiendishManager(3),
-	}
+			HirelingMgr:  NewHirelingManager(),
+		}
 	w.Combat = NewCombatEngine(w)
 	w.Decay = NewDecayManager(w)
 	w.nextCreatureID.Store(0x10000000) // player creature ids start high, like TFS
