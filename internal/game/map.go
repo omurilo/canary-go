@@ -109,13 +109,22 @@ func (t *Tile) BlocksSolid(catalog *items.Catalog) bool {
 
 // Map is a sparse tile store keyed by position.
 type Map struct {
-	mu    sync.RWMutex
-	tiles map[Position]*Tile
+	mu       sync.RWMutex
+	tiles    map[Position]*Tile
+	navCache *navCache
 }
 
 // NewMap returns an empty map.
 func NewMap() *Map {
-	return &Map{tiles: make(map[Position]*Tile)}
+	return &Map{
+		tiles:    make(map[Position]*Tile),
+		navCache: newNavCache(),
+	}
+}
+
+// GetSectorSnapshot returns a walkability snapshot for the sector at (x,y,z).
+func (m *Map) GetSectorSnapshot(x, y, z int) *NavSectorSnapshot {
+	return m.navCache.getOrCreateSnapshot(m, x, y, z)
 }
 
 // GetTile returns the tile at pos, or nil.
@@ -141,6 +150,7 @@ func (m *Map) SetTile(pos Position, t *Tile) {
 	m.mu.Lock()
 	m.tiles[pos] = t
 	m.mu.Unlock()
+	m.navCache.invalidate(int(pos.X), int(pos.Y), int(pos.Z))
 }
 
 // AddItem inserts an item to the front of the tile stack at pos. Returns false if there is no

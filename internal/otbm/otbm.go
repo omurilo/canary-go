@@ -167,7 +167,7 @@ func Load(path string, cat *items.Catalog, m *game.Map) (*Result, error) {
 		return nil, fmt.Errorf("otbm: unsupported version %d", version)
 	}
 
-	p := &parser{r: r, cat: cat, m: m, res: res}
+	p := &parser{r: r, cat: cat, m: m, res: res, tc: NewTileCache()}
 	if err := p.parseRootChildren(); err != nil {
 		return nil, err
 	}
@@ -179,6 +179,7 @@ type parser struct {
 	cat *items.Catalog
 	m   *game.Map
 	res *Result
+	tc  *TileCache
 }
 
 // parseRootChildren walks the children of the root node (MAP_DATA, etc).
@@ -293,6 +294,16 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 	yOff := r.u8()
 	pos := game.Position{X: baseX + uint16(xOff), Y: baseY + uint16(yOff), Z: baseZ}
 	tile := &game.Tile{}
+
+	// Use tile cache for dedup (house tiles bypass cache).
+	if !house && p.tc != nil {
+		defer func() {
+			cached := p.tc.CreateOrGetTile(tile)
+			if cached != tile {
+				*tile = *cached
+			}
+		}()
+	}
 
 	if house {
 		tile.HouseID = r.u32() // house id

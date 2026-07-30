@@ -133,8 +133,9 @@ func FindPath(m *Map, catalog *items.Catalog, start, end Position, maxNodes int)
 				continue
 			}
 			
-			tile := m.GetTile(nextPos)
-			if tile == nil || !tile.Walkable(catalog) {
+			snap := m.GetSectorSnapshot(int(nextPos.X), int(nextPos.Y), int(nextPos.Z))
+			cell := snap.Cell(int(nextPos.X)%8, int(nextPos.Y)%8)
+			if !cell.HasGround || cell.BlockSolid {
 				if nextPos != end {
 					continue
 				}

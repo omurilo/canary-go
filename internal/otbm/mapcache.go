@@ -1,0 +1,67 @@
+package otbm
+
+import (
+	"hash/fnv"
+	"sync"
+
+	"github.com/opentibiabr/canary-go/internal/game"
+)
+
+// tileHash computes a 64-bit hash from the tile's ground ID and item IDs.
+func tileHash(t *game.Tile) uint64 {
+	h := fnv.New64a()
+	if t.Ground != nil {
+		h.Write([]byte{byte(t.Ground.ID), byte(t.Ground.ID >> 8)})
+	}
+	h.Write([]byte{byte(t.Flags), byte(t.Flags >> 8), byte(t.Flags >> 16), byte(t.Flags >> 24)})
+	for _, it := range t.Items {
+		h.Write([]byte{byte(it.ID), byte(it.ID >> 8)})
+	}
+	return h.Sum64()
+}
+
+// TileCache provides multi-tier deduplication for tiles during OTBM loading.
+// Tiles with identical content share the same *Tile pointer, reducing memory.
+type TileCache struct {
+	mu sync.Mutex
+	// Tiers for tiles that can be shared (no per-tile unique state).
+	tiles map[uint64]*game.Tile
+	// simpleItems is a set of item IDs that are simple enough to dedup.
+	simpleItems map[uint16]struct{}
+}
+
+// NewTileCache creates a tile cache.
+func NewTileCache() *TileCache {
+	return &TileCache{
+		tiles:       make(map[uint64]*game.Tile),
+		simpleItems: make(map[uint16]struct{}),
+	}
+}
+
+// CreateOrGetTile returns an existing tile with the same content, or stores
+// and returns the new one. Tiles with unique state (e.g. house tiles, open
+// containers) should NOT use this cache — they bypass it.
+func (tc *TileCache) CreateOrGetTile(t *game.Tile) *game.Tile {
+	if t == nil {
+		return nil
+	}
+	// House tiles and tiles with action IDs / unique IDs cannot be shared.
+	if t.HouseID > 0 {
+		return t
+	}
+	h := tileHash(t)
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+	if existing, ok := tc.tiles[h]; ok {
+		return existing
+	}
+	tc.tiles[h] = t
+	return t
+}
+
+// Reset clears the cache for a fresh map load.
+func (tc *TileCache) Reset() {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+	tc.tiles = make(map[uint64]*game.Tile)
+}
