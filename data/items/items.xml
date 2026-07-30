@@ -18146,8 +18146,12 @@
 		<attribute key="primarytype" value="food"/>
 		<attribute key="weight" value="5"/>
 	</item>
-	<item fromid="6570" toid="6571" article="a" name="surprise bag">
+	<item id="6570" article="a" name="surprise bag">
 		<attribute key="weight" value="1000"/>
+	</item>
+	<item id="6571" article="a" name="mystic bag">
+		<attribute key="weight" value="100"/>
+		<attribute key="description" value="You will find one item, whether it's common or rare. But not everything can be obtained."/>
 	</item>
 	<item id="6572" article="a" name="party trumpet">
 		<attribute key="primarytype" value="party items"/>
