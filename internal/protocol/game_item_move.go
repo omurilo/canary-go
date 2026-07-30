@@ -248,8 +248,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	if moveItem == item {
 		if fromPos.X != 0xFFFF {
 			pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+			actualStack := g.stackPosOfItem(pos, item)
 			g.deps.World.Map.RemoveItemPtr(pos, item)
-			g.onRemoveTileItem(pos, fromStack, item)
+			g.onRemoveTileItem(pos, actualStack, item)
 		} else {
 			if fromPos.Y >= 0x40 {
 				fromContainer.Contents = append(fromContainer.Contents[:fromSlot], fromContainer.Contents[fromSlot+1:]...)
@@ -273,7 +274,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	} else {
 		// Just update the source count
 		if fromPos.X != 0xFFFF {
-			g.broadcastUpdateTileThing(game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}, fromStack, item)
+			pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+			actualStack := g.stackPosOfItem(pos, item)
+			g.broadcastUpdateTileThing(pos, actualStack, item)
 		} else {
 			if fromPos.Y >= 0x40 {
 				g.sendUpdateContainerItem(uint8(fromPos.Y-0x40), fromSlot, item)
