@@ -53,7 +53,18 @@ func (e *Engine) registerAPI() {
 	registerBitLib(L)
 
 	// Set package.path so require(...) can find scripts across the datapack and core libs
+	// The datapack requires modules by a path rooted ABOVE the datapack directory:
+	// data-otservbr-global/lib/core/load.lua:3 does
+	// require("data-otservbr-global.lib.core.quests"), which resolves to
+	// <parent>/data-otservbr-global/lib/core/quests.lua. Without the parent
+	// directories here the lookup doubled the datapack name
+	// (data-otservbr-global/data-otservbr-global/...) and every require failed,
+	// aborting lib/core/load.lua and the quests library it pulls in.
 	pkgPath := strings.Join([]string{
+		filepath.Dir(dataDirResolved) + "/?.lua",
+		filepath.Dir(dataDirResolved) + "/?/init.lua",
+		filepath.Dir(coreDirResolved) + "/?.lua",
+		filepath.Dir(coreDirResolved) + "/?/init.lua",
 		coreDirResolved + "/libs/?.lua",
 		coreDirResolved + "/libs/?/init.lua",
 		dataDirResolved + "/?.lua",
