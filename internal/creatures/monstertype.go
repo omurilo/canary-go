@@ -198,8 +198,9 @@ type RespawnType struct {
 	Underground bool
 }
 
-// DefaultNpcCurrency is ITEM_GOLD_COIN.
-const DefaultNpcCurrency uint16 = 2148
+// DefaultNpcCurrency is ITEM_GOLD_COIN (src/utils/utils_definitions.hpp:601),
+// the SERVER item id — not the client id 2148.
+const DefaultNpcCurrency uint16 = 3031
 
 // SpeechBubble_t values (src/creatures/creatures_definitions.hpp:333).
 const (

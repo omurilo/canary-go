@@ -1,11 +1,14 @@
 package luaengine
 
 import (
+	"fmt"
 	"strings"
-	
+
 	lua "github.com/yuin/gopher-lua"
-	"github.com/opentibiabr/canary-go/internal/game"
+
 	"github.com/opentibiabr/canary-go/internal/creatures"
+	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/items"
 )
 
 func checkNpc(L *lua.LState) *game.Npc {
@@ -28,6 +31,7 @@ func (e *Engine) registerNpc() {
 	e.L.SetField(mt, "say", e.L.NewFunction(e.npcSay))
 	e.L.SetField(mt, "openShopWindow", e.L.NewFunction(e.npcOpenshopwindow))
 	e.L.SetField(mt, "isMerchant", e.L.NewFunction(e.npcIsmerchant))
+	e.L.SetField(mt, "sellItem", e.L.NewFunction(e.npcSellItem))
 	e.L.SetField(mt, "teleportTo", e.L.NewFunction(e.creatureTeleportto))
 	e.L.SetField(mt, "changeSpeed", e.L.NewFunction(e.creatureChangespeed))
 	e.L.SetField(mt, "setSpeed", e.L.NewFunction(e.creatureSetspeed))
@@ -80,7 +84,6 @@ var npcMethods = map[string]lua.LGFunction{
 	"getShopItem": npcGetshopitem,
 	"turn": npcTurn,
 	"follow": npcFollow,
-	"sellItem": npcSellitem,
 	"getDistanceTo": npcGetdistanceto,
 }
 
@@ -92,8 +95,12 @@ func npcFollow(L *lua.LState) int {
 }
 
 func npcGetcurrency(L *lua.LState) int {
-	// Default shop currency: gold coin (client id 3031).
-	L.Push(lua.LNumber(3031))
+	// Reads the type's currency (npcConfig.currency), defaulting to ITEM_GOLD_COIN.
+	if n := checkNpc(L); n != nil {
+		L.Push(lua.LNumber(n.CurrencyID()))
+		return 1
+	}
+	L.Push(lua.LNumber(creatures.DefaultNpcCurrency))
 	return 1
 }
 
@@ -136,8 +143,12 @@ func npcGetshopitem(L *lua.LState) int {
 }
 
 func npcGetspeechbubble(L *lua.LState) int {
-	// SPEECHBUBBLE_NORMAL (1).
-	L.Push(lua.LNumber(1))
+	// Reads the type's npcConfig.speechBubble, defaulting to SPEECHBUBBLE_NORMAL.
+	if n := checkNpc(L); n != nil {
+		L.Push(lua.LNumber(n.SpeechBubble()))
+		return 1
+	}
+	L.Push(lua.LNumber(creatures.SpeechBubbleNormal))
 	return 1
 }
 
@@ -323,10 +334,82 @@ func (e *Engine) npcSay(L *lua.LState) int {
 	return 0
 }
 
-func npcSellitem(L *lua.LState) int {
-	// The concrete buy/sell flow is handled by the onBuyItem/onSellItem NPC
-	// callbacks; this helper is a no-op in this slice.
-	return 0
+// npcSellItem implements
+// npc:sellItem(player, itemId, amount, subType=1, actionId=0, ignoreCap=false, inBackpacks=false)
+// porting luaNpcSellItem (npc_functions.cpp:569).
+//
+// This is the delivery half of an NPC purchase and the datapack depends on it: 306
+// npc scripts define onBuyItem, and every one of them just calls
+// npc:sellItem(...). It used to be a no-op, so nothing was ever delivered through
+// the Lua path.
+//
+// actionId is accepted and ignored: Go's InternalAddItem cannot stamp an action id
+// on creation yet, and no shop in the datapack passes a non-zero one.
+func (e *Engine) npcSellItem(L *lua.LState) int {
+	n := checkNpc(L)
+	if n == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	p := checkPlayerArg(L, 2)
+	if p == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+
+	itemID := uint16(L.CheckInt(3))
+	amount := uint16(L.CheckInt(4))
+	subType := 1
+	if L.GetTop() >= 5 && L.Get(5).Type() == lua.LTNumber {
+		subType = L.CheckInt(5)
+	}
+	// arg 6 is actionId; see the note above.
+	inBackpacks := false
+	if L.GetTop() >= 8 {
+		inBackpacks = lua.LVAsBool(L.Get(8))
+	}
+
+	if e.world == nil || e.world.Items == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+
+	result, ok := n.SellItemTo(p, e.world.Items, itemID, amount, subType, inBackpacks)
+	if !ok {
+		p.SendTextMessage(messageFailure, "You do not have enough room to carry this item.")
+		L.Push(lua.LFalse)
+		return 1
+	}
+
+	name := itemDisplayName(e.world.Items, itemID)
+	if result.BagsCost > 0 {
+		p.SendTextMessage(messageTrade, fmt.Sprintf(
+			"Bought %dx %s and shopping bags for %d gold coins.",
+			result.Delivered, name, result.Charged))
+	} else {
+		p.SendTextMessage(messageTrade, fmt.Sprintf(
+			"Bought %dx %s for %d gold coins.", result.Delivered, name, result.Charged))
+	}
+
+	L.Push(lua.LTrue)
+	return 1
+}
+
+// Message classes used by the shop replies (MESSAGE_FAILURE / MESSAGE_TRADE).
+const (
+	messageFailure = 0x13
+	messageTrade   = 0x14
+)
+
+// itemDisplayName resolves an item's name for a shop message, falling back to the
+// numeric id when the catalog has no entry.
+func itemDisplayName(catalog *items.Catalog, itemID uint16) string {
+	if catalog != nil {
+		if it := catalog.Get(itemID); it != nil && it.Name != "" {
+			return it.Name
+		}
+	}
+	return fmt.Sprintf("item %d", itemID)
 }
 
 func npcSetcurrency(L *lua.LState) int { return 0 }

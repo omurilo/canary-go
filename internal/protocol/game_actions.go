@@ -1075,24 +1075,16 @@ func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 	}
 	subType := r.GetByte()
 	amount := r.GetU16()
-	_ = r.GetByte() // ignoreCapacity (capacity is not gated yet)
-	_ = r.GetByte() // buyWithBackpacks (shopping bags not modelled yet)
+	ignoreCap := r.GetByte() != 0
+	inBackpacks := r.GetByte() != 0
 
-	nType := g.shopOwnerType()
-	if nType == nil {
+	npc := g.shopOwner()
+	if npc == nil {
 		return
 	}
 
-	var price uint32
-	var found bool
-	for _, si := range nType.ShopItems {
-		if si.ID == itemID && (si.SubType == 0 || si.SubType == subType) {
-			price = si.BuyPrice
-			found = true
-			break
-		}
-	}
-	if !found || price == 0 {
+	price, found := npc.ShopBuyPrice(itemID, subType)
+	if !found {
 		g.player.SendTextMessage(0x13, "This item is not available.")
 		return
 	}
@@ -1111,14 +1103,41 @@ func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 		amount = maxAmount
 	}
 
+	// Validations ported from Npc::onPlayerBuyItem (npc.cpp:738). Both answer
+	// RETURNVALUE_NOTENOUGHROOM.
+	if g.player.IsBackpackSlotUnavailable(g.deps.Items, itemID, ignoreCap) {
+		g.player.SendTextMessage(0x13, "You do not have enough room to carry this item.")
+		return
+	}
+	if g.deps.World.ExceedsTileLimit(g.player, it, amount, inBackpacks, ignoreCap) {
+		g.player.SendTextMessage(0x13, "You do not have enough room to carry this item.")
+		return
+	}
+
 	totalCost := uint64(price) * uint64(amount)
-	g.deps.Log.Debug("parseBuyItem: starting transaction", "player", g.player.Name, "itemID", itemID, "amount", amount, "price", price, "totalCost", totalCost, "playerMoney", g.player.GetMoney(), "bankBalance", g.player.BankBalance)
-	
-	invMoney := g.player.GetMoney()
-	if invMoney+g.player.BankBalance < totalCost {
+	bagsCost := game.CalculateBagsCost(it, amount, inBackpacks)
+	currency := npc.CurrencyID()
+
+	if g.player.HasInsufficientFunds(g.deps.Items, currency, totalCost, bagsCost) {
 		g.player.SendTextMessage(0x13, "You do not have enough money.")
 		return
 	}
+
+	// Only gold purchases are settled through the money helpers below. A custom
+	// currency (a token, a coin item) would have to be removed as items, which
+	// addCustomCurrencyItems does upstream and has no Go counterpart yet — so those
+	// shops are refused rather than silently handing out free goods.
+	if currency != game.GoldCoinID {
+		g.player.SendTextMessage(0x13, "You cannot trade with this merchant right now.")
+		return
+	}
+
+	// Shopping bags are charged on top of the goods.
+	totalCost += bagsCost
+
+	g.deps.Log.Debug("parseBuyItem: starting transaction", "player", g.player.Name, "itemID", itemID, "amount", amount, "price", price, "totalCost", totalCost, "bagsCost", bagsCost, "playerMoney", g.player.GetMoney(), "bankBalance", g.player.BankBalance)
+
+	invMoney := g.player.GetMoney()
 
 	// Safely deduct the funds first. Keep track of how much bank balance is utilized.
 	bankDebited := uint64(0)
@@ -1146,7 +1165,10 @@ func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 		return
 	}
 
-	charge := uint64(price) * uint64(deliveredCount)
+	// Charge for what was actually delivered, bags included — recomputing the bag
+	// cost for the delivered amount so a partial delivery does not refund every bag.
+	charge := uint64(price)*uint64(deliveredCount) +
+		game.CalculateBagsCost(it, uint16(deliveredCount), inBackpacks)
 	if deliveredCount < uint32(amount) {
 		// Partial refund
 		refund := totalCost - charge
@@ -1213,6 +1235,27 @@ func (g *GameProtocol) shopOwnerType() *creatures.NpcType {
 		return nil
 	}
 	return g.deps.World.TypeRegistry.Npcs[strings.ToLower(npc.Name)]
+}
+
+// shopOwner returns the NPC the player currently has a shop open with, applying the
+// same liveness and range checks as shopOwnerType. Needed alongside it because the
+// currency and price lookups live on the NPC, not on its type.
+func (g *GameProtocol) shopOwner() *game.Npc {
+	if g.player == nil || g.player.ShopOwnerID == 0 {
+		return nil
+	}
+	npc, ok := g.deps.World.CreatureByID(g.player.ShopOwnerID).(*game.Npc)
+	if !ok {
+		g.player.CloseShop()
+		g.SendCloseShop()
+		return nil
+	}
+	if !sameFloorWithin(g.player.Pos, npc.GetPosition(), 4) {
+		g.player.CloseShop()
+		g.SendCloseShop()
+		return nil
+	}
+	return npc
 }
 
 func sameFloorWithin(a, b game.Position, dist int) bool {
