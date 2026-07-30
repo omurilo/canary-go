@@ -607,9 +607,18 @@ func (e *Engine) registerItemType() {
 	}))
 
 	e.setClassConstructor("ItemType", func(L *lua.LState) int {
+		// setClassConstructor installs this as __call, so Lua passes the class table
+		// as argument 1 and the real id as argument 2. Reading argument 1 meant the
+		// id was never picked up: every ItemType(id) resolved to id 0 with a nil
+		// catalog entry, so getName answered "An Item" and isStackable answered
+		// false — which is why generateLootRoll never applied a loot count range.
+		// Argument 1 is still accepted for a direct call.
 		var id uint16
-		if L.GetTop() >= 1 && L.Get(1).Type() == lua.LTNumber {
-			id = uint16(L.CheckInt(1))
+		for _, idx := range []int{2, 1} {
+			if L.GetTop() >= idx && L.Get(idx).Type() == lua.LTNumber {
+				id = uint16(L.CheckInt(idx))
+				break
+			}
 		}
 		var item *items.ItemType
 		if cat := e.itemCatalog(); cat != nil {

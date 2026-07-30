@@ -506,6 +506,9 @@ func parseLootBlock(lt *lua.LTable) creatures.LootBlock {
 	if val := lt.RawGetString("subType"); val.Type() == lua.LTNumber {
 		lb.SubType = int32(lua.LVAsNumber(val))
 	}
+	if val := lt.RawGetString("unique"); val.Type() == lua.LTBool {
+		lb.Unique = lua.LVAsBool(val)
+	}
 	if child, ok := lt.RawGetString("child").(*lua.LTable); ok {
 		lb.ChildLoot = parseLootList(child)
 	}
@@ -600,8 +603,6 @@ func parseMonsterElements(m *creatures.MonsterType, table *lua.LTable) {
 // MonsterType:generateLootRoll iterates. Key names are the contract with
 // data/libs/functions/monstertype.lua — renaming one silently drops that field.
 //
-// Go's LootBlock has no `unique` field (the C++ LootBlock does), so it is reported
-// as false; unique-item de-duplication therefore has no effect yet.
 func lootBlocksToLua(L *lua.LState, blocks []creatures.LootBlock) *lua.LTable {
 	out := L.NewTable()
 	for i, lb := range blocks {
@@ -610,7 +611,7 @@ func lootBlocksToLua(L *lua.LState, blocks []creatures.LootBlock) *lua.LTable {
 		L.SetField(entry, "chance", lua.LNumber(lb.Chance))
 		L.SetField(entry, "minCount", lua.LNumber(max32(lb.CountMin, 1)))
 		L.SetField(entry, "maxCount", lua.LNumber(max32(lb.CountMax, 1)))
-		L.SetField(entry, "unique", lua.LFalse)
+		L.SetField(entry, "unique", lua.LBool(lb.Unique))
 		// subType and actionId must ALWAYS be present and default to -1, not be
 		// omitted: Container:addLoot guards them with `~= -1`
 		// (data/libs/functions/container.lua:48,54), so a nil would be passed

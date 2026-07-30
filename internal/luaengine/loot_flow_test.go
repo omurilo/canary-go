@@ -118,12 +118,13 @@ func TestMonsterOnDropLootFillsCorpse(t *testing.T) {
 	if seen[3492] == 0 {
 		t.Errorf("worms never dropped in %d dispatches", dispatches)
 	}
-	// KNOWN GAP, not asserted: gold is declared with minCount/maxCount 5, so each
-	// drop should arrive as a stack of 5. It arrives as 1 because
-	// generateLootRoll only applies the count range when iType:isStackable() is
-	// true (data/libs/functions/monstertype.lua:57), and that binding does not
-	// report Stackable through the ItemType(id) constructor on this path. The
-	// chain itself works; stackable loot counts do not yet.
+	// Gold is declared with minCount/maxCount 5, and generateLootRoll only applies
+	// that range when iType:isStackable() is true — which needs ItemType(id) to
+	// actually resolve the id. It used to resolve to 0, so gold arrived as a single
+	// item; each drop must now be a stack of 5.
+	if seen[3031]%5 != 0 {
+		t.Errorf("gold arrived in a count that is not a multiple of 5: %d", seen[3031])
+	}
 	t.Logf("dispatches=%d gold=%d worms=%d", dispatches, seen[3031], seen[3492])
 }
 
@@ -136,7 +137,7 @@ func TestGetLootTableShape(t *testing.T) {
 	defer e.Close()
 
 	mType := &creatures.MonsterType{Name: "Shape Test", Loot: []creatures.LootBlock{
-		{ID: 3031, Chance: 50000, CountMin: 2, CountMax: 9, SubType: 3,
+		{ID: 3031, Chance: 50000, CountMin: 2, CountMax: 9, SubType: 3, Unique: true,
 			ChildLoot: []creatures.LootBlock{{ID: 3492, Chance: 1000}}},
 	}}
 	mType.Flags.RewardBoss = true
@@ -151,7 +152,7 @@ func TestGetLootTableShape(t *testing.T) {
 		assert(entry.chance == 50000, "chance")
 		assert(entry.minCount == 2, "minCount")
 		assert(entry.maxCount == 9, "maxCount")
-		assert(entry.unique == false, "unique")
+		assert(entry.unique == true, "unique must round-trip from the loot block")
 		assert(entry.subType == 3, "subType")
 		assert(entry.actionId == -1, "actionId must default to -1, not nil")
 		assert(entry.childLoot ~= nil and #entry.childLoot == 1, "childLoot")

@@ -111,6 +111,9 @@ type LootBlock struct {
 	CountMin  uint32
 	CountMax  uint32
 	SubType   int32
+	// Unique marks an entry that may drop at most once per corpse. Mirrors
+	// LootBlock::unique; generateLootRoll de-duplicates on it.
+	Unique    bool
 	ChildLoot []LootBlock // nested loot for container items
 }
 
