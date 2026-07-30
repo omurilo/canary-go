@@ -36,6 +36,11 @@ npcConfig.shop = {
 	{ itemName = "parcel", clientId = 3503, buy = 15 },
 }
 
+-- On buy npc shop message
+npcType.onBuyItem = function(npc, player, itemId, subType, amount, ignore, inBackpacks, totalCost)
+	npc:sellItem(player, itemId, amount, subType, 0, ignore, inBackpacks)
+end
+
 local keywordHandler = KeywordHandler:new()
 local npcHandler = NpcHandler:new(keywordHandler)
 

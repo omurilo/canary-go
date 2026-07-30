@@ -47,6 +47,10 @@ npcConfig.shop = { -- Sellable items
 	{ itemName = "sais of enlightenment", clientId = 50272, buy = 100000, sell = 100 },
 }
 
+-- On buy npc shop message
+npcType.onBuyItem = function(npc, player, itemId, subType, amount, ignore, inBackpacks, totalCost)
+	npc:sellItem(player, itemId, amount, subType, 0, ignore, inBackpacks)
+end
 -- On sell npc shop message
 npcType.onSellItem = function(npc, player, itemId, subtype, amount, ignore, name, totalCost)
 	player:sendTextMessage(MESSAGE_TRADE, string.format("Sold %ix %s for %i gold.", amount, name, totalCost))
