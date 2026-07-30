@@ -422,12 +422,24 @@ func playerAddanimusmastery(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	masteryID := uint8(L.CheckInt(2))
-	if int(masteryID) >= len(p.AnimusMastery) {
-		L.Push(lua.LFalse)
-		return 1
+	am := p.GetAnimusMastery()
+	arg := L.Get(2)
+	switch arg.Type() {
+	case lua.LTString:
+		name := arg.String()
+		var raceID uint16
+		if p.World != nil && p.World.TypeRegistry != nil {
+			if mt, ok := p.World.TypeRegistry.Monsters[strings.ToLower(name)]; ok {
+				raceID = mt.RaceID
+			}
+		}
+		if raceID > 0 {
+			am.Add(raceID, name)
+		}
+	case lua.LTNumber:
+		raceID := uint16(lua.LVAsNumber(arg))
+		am.Add(raceID, "")
 	}
-	p.AnimusMastery[masteryID] = 1
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -2451,16 +2463,25 @@ func playerHasachievement(L *lua.LState) int {
 
 func playerHasanimusmastery(L *lua.LState) int {
 	p := checkPlayer(L)
-	if p == nil {
-		L.Push(lua.LNil)
+	if p == nil || p.AnimMastery == nil {
+		L.Push(lua.LFalse)
 		return 1
 	}
-	masteryID := uint8(L.CheckInt(2))
-	if int(masteryID) < len(p.AnimusMastery) {
-		L.Push(lua.LBool(p.AnimusMastery[masteryID] > 0))
-		return 1
+	arg := L.Get(2)
+	var has bool
+	switch arg.Type() {
+	case lua.LTString:
+		name := arg.String()
+		if p.World != nil && p.World.TypeRegistry != nil {
+			if mt, ok := p.World.TypeRegistry.Monsters[strings.ToLower(name)]; ok {
+				has = p.AnimMastery.Has(mt.RaceID)
+			}
+		}
+	case lua.LTNumber:
+		raceID := uint16(lua.LVAsNumber(arg))
+		has = p.AnimMastery.Has(raceID)
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LBool(has))
 	return 1
 }
 
@@ -3132,9 +3153,12 @@ func playerRemoveachievementpoints(L *lua.LState) int {
 
 func playerRemoveanimusmastery(L *lua.LState) int {
 	p := checkPlayer(L)
-	if p == nil {
-		return 0
+	if p == nil || p.AnimMastery == nil {
+		L.Push(lua.LFalse)
+		return 1
 	}
+	raceID := uint16(L.CheckInt(2))
+	p.AnimMastery.Remove(raceID)
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -4222,6 +4246,9 @@ func playerUpdateconcoction(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
+	concoctionID := uint8(L.CheckInt(2))
+	timeLeft := int64(L.CheckNumber(3))
+	game.UpdateConcoction(p, concoctionID, timeLeft)
 	L.Push(lua.LTrue)
 	return 1
 }

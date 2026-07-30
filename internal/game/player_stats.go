@@ -591,6 +591,46 @@ func concoctionNameToID(name string) uint16 {
 		return 26034
 	case "relic":
 		return 26035
+	case "kooldown-aid":
+		return 36723
+	case "stamina-extension":
+		return 36724
+	case "strike-enhancement":
+		return 36725
+	case "charm-upgrade":
+		return 36726
+	case "wealth-duplex":
+		return 36727
+	case "bestiary-betterment":
+		return 36728
+	case "fire-resilience":
+		return 36729
+	case "ice-resilience":
+		return 36730
+	case "earth-resilience":
+		return 36731
+	case "energy-resilience":
+		return 36732
+	case "holy-resilience":
+		return 36733
+	case "death-resilience":
+		return 36734
+	case "physical-resilience":
+		return 36735
+	case "fire-amplification":
+		return 36736
+	case "ice-amplification":
+		return 36737
+	case "earth-amplification":
+		return 36738
+	case "energy-amplification":
+		return 36739
+	case "holy-amplification":
+		return 36740
+	case "death-amplification":
+		return 36741
+	case "physical-amplification":
+		return 36742
 	default:
 		// Try numeric ID from C++ naming like "24325"
 		if id, err := strconv.ParseUint(name, 10, 16); err == nil {

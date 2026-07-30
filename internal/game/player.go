@@ -255,8 +255,9 @@ type Player struct {
 	// regen ticker. Persisted for cyclopedia display.
 	ActiveFoodItems map[uint16]uint32 // itemID -> remaining time in seconds
 
-	// Animus Mastery (B16) — unlocked animus masteries (blob from DB).
-	AnimusMastery []byte
+	// Animus Mastery (B16) — unlocked animus masteries.
+	AnimusMastery      []byte         // raw blob from DB (for serialization)
+	AnimMastery        *AnimusMastery // runtime struct (lazy init via GetAnimusMastery)
 
 	// BossPoints is the bosstiary points total (players.boss_points), earned by
 	// reaching boss unlock levels and spent implicitly via the loot bonus.
@@ -374,6 +375,14 @@ type Player struct {
 	// during the current session. A full implementation would persist them
 	// to the database for moderator review.
 	ViolationReports []ReportViolationEntry
+}
+
+// GetAnimusMastery returns the player's animus mastery tracker (lazy init).
+func (p *Player) GetAnimusMastery() *AnimusMastery {
+	if p.AnimMastery == nil {
+		p.AnimMastery = NewAnimusMastery()
+	}
+	return p.AnimMastery
 }
 
 // Cooldowns returns the player's spell cooldown manager, creating it on first
@@ -862,6 +871,14 @@ func (p *Player) AddExperience(exp uint64) {
 	currLevelExp := ExpForLevel(uint64(p.Level))
 	if currLevelExp >= nextLevelExp {
 		return // already at max level
+	}
+
+	// Apply Animus Mastery experience multiplier.
+	if am := p.GetAnimusMastery(); am != nil && am.Count() > 0 {
+		multiplier := am.GetExperienceMultiplier()
+		if multiplier > 1.0 {
+			exp = uint64(float64(exp) * multiplier)
+		}
 	}
 
 	p.Experience += exp
