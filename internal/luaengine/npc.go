@@ -321,17 +321,27 @@ func (e *Engine) npcSay(L *lua.LState) int {
 		return 0
 	}
 	text := L.CheckString(2)
-	talkType := byte(1) // SAY
+	// C++ default is TALKTYPE_PRIVATE_NP, not TALKTYPE_SAY (npc_functions.cpp
+	// luaNpcSay). Every npclib reply omits the type, so defaulting to 1 sent NPC
+	// dialogue as public speech.
+	talkType := byte(10)
 	if L.GetTop() >= 3 && L.Get(3).Type() == lua.LTNumber {
 		talkType = byte(L.ToNumber(3))
 	}
-	
-	game.GlobalDispatcher.AddEvent(0, func() {
-		if e.world != nil && e.world.OnCreatureSay != nil {
-			e.world.OnCreatureSay(n, talkType, text)
-		}
-	})
-	return 0
+	ghost := L.GetTop() >= 4 && lua.LVAsBool(L.Get(4))
+
+	// C++ calls internalCreatureSay inline and returns whether it was delivered.
+	// This used to defer through GlobalDispatcher, so an NPC never spoke unless
+	// the dispatcher happened to be running, and the caller got no return value.
+	// The spectator narrowing from the target/position arguments is not modelled:
+	// OnCreatureSay resolves spectators itself.
+	delivered := false
+	if !ghost && e.world != nil && e.world.OnCreatureSay != nil {
+		e.world.OnCreatureSay(n, talkType, text)
+		delivered = true
+	}
+	L.Push(lua.LBool(delivered))
+	return 1
 }
 
 // npcSellItem implements

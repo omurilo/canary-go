@@ -75,14 +75,19 @@ func (e *Engine) itemCreate(L *lua.LState) int {
 }
 
 func (e *Engine) pushItem(L *lua.LState, it *game.Item) {
+	L.Push(e.itemValue(L, it))
+}
+
+// itemValue wraps an item as a Lua value without pushing it, for the call sites
+// that store items in a table instead of returning them directly.
+func (e *Engine) itemValue(L *lua.LState, it *game.Item) lua.LValue {
 	if it == nil {
-		L.Push(lua.LNil)
-		return
+		return lua.LNil
 	}
 	ud := L.NewUserData()
 	ud.Value = luaItem{item: it}
 	L.SetMetatable(ud, L.GetTypeMetatable(itemTypeName))
-	L.Push(ud)
+	return ud
 }
 
 func checkItem(L *lua.LState) luaItem {

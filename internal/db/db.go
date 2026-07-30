@@ -60,6 +60,20 @@ func Connect(ctx context.Context, cfg *config.Config) (*DB, error) {
 // Close releases the pool.
 func (d *DB) Close() { _ = d.SQL.Close() }
 
+// IsDatabaseSetup reports whether the configured schema already holds any table,
+// porting DatabaseManager::isDatabaseSetup (databasemanager.cpp:65).
+func (d *DB) IsDatabaseSetup(ctx context.Context, cfg *config.Config) (bool, error) {
+	const q = "SELECT `TABLE_NAME` FROM `information_schema`.`tables` WHERE `TABLE_SCHEMA` = ? LIMIT 1"
+	var name string
+	switch err := d.SQL.QueryRowContext(ctx, q, cfg.DBName).Scan(&name); {
+	case err == sql.ErrNoRows:
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("db: is database setup: %w", err)
+	}
+	return true, nil
+}
+
 // ApplySchema runs a MySQL schema file (may contain multiple statements). It
 // opens a dedicated multiStatements connection so it does not require the pool
 // to be configured for it.

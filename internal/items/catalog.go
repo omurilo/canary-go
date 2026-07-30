@@ -150,6 +150,12 @@ func (t *ItemType) IsFluidContainer() bool { return t.ID > 1 && t.Group == Group
 func (t *ItemType) IsSplash() bool         { return t.Group == GroupSplash }
 func (t *ItemType) IsMailbox() bool        { return t.TypeName == "mailbox" }
 
+// HasSubType reports whether the item's count field carries a subtype rather
+// than a stack size (C++ ItemType::hasSubType, items.hpp:188).
+func (t *ItemType) HasSubType() bool {
+	return t.IsFluidContainer() || t.IsSplash() || t.Stackable || t.Charges != 0
+}
+
 func (t *ItemType) GetWeight() uint32 {
 	if t == nil {
 		return 0

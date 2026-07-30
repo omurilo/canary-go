@@ -24,7 +24,21 @@ echo "== starting server =="
   > /tmp/canary-server.log 2>&1 &
 SERVER_PID=$!
 trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-sleep 3
+
+# Wait for the login port instead of guessing: loading the datapack takes longer
+# than the old fixed 3s sleep, so the client raced the listener and failed with
+# "connection refused" on a perfectly healthy boot.
+for _ in $(seq 1 60); do
+  if ! kill -0 $SERVER_PID 2>/dev/null; then
+    echo "== server died during boot =="
+    tail -n 20 /tmp/canary-server.log
+    exit 1
+  fi
+  if nc -z 127.0.0.1 7171 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
 
 echo "== running client =="
 ./bin/canary-client -account god -password god -rsa key.pem

@@ -8,10 +8,19 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/actions"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/items"
 )
 
 func TestFluidsAction(t *testing.T) {
 	w := game.NewWorld()
+	// Game.createItem splits its count argument into a stack count and a subtype
+	// based on the item type, so the fluid container and the splash it pours must
+	// be in the catalog or the pour would produce two stacks instead of one pool.
+	w.Items = items.NewCatalog(
+		&items.ItemType{ID: 2874, Group: items.GroupFluid},
+		&items.ItemType{ID: 2886, Group: items.GroupSplash},
+		&items.ItemType{ID: 101, Group: items.GroupGround},
+	)
 	e := New(w, slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	defer e.Close()
 
@@ -70,6 +79,11 @@ func TestFluidsAction(t *testing.T) {
 	}
 
 	// 3. Test pouring fluid on ground tile (target item on ground, e.g. tile 101)
+	// Game.createItem needs an existing tile: C++ uses map.getTile, not
+	// getOrCreateTile, and returns nil for a position the map does not cover
+	// (game_functions.cpp:488-495).
+	w.Map.SetTile(pos, &game.Tile{Ground: &game.Item{ID: 101}})
+
 	groundTile := &game.Item{ID: 101, Count: 1}
 	vialWine := &game.Item{ID: 2874, Count: 2} // wine
 	ok = e.CallAction(act, p, vialWine, pos, groundTile, pos, false)

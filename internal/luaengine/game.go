@@ -360,37 +360,87 @@ func (e *Engine) gameCreateItem(L *lua.LState) int {
 	id := L.CheckInt(1)
 	count := L.OptInt(2, 1)
 
-	cat := e.itemCatalog()
-	if it := cat.Get(uint16(id)); it != nil && it.Stackable && count > 100 {
-		count = 100
-	}
-
-	item := &game.Item{
-		ID:    uint16(id),
-		Count: uint16(count),
-	}
-
-	// C++ Container constructor: ITEM_GOLD_POUCH -> pagination, maxSize=32
-	if item.ID == game.ItemGoldPouch {
-		item.Pagination = true
-		item.Contents = make([]*game.Item, 0)
-		item.MaxSize = 32
-		// C++: m_maxItems = g_configManager().getNumber(LOOTPOUCH_MAXLIMIT)
-		lootPouchMaxLimit := L.GetGlobal("lootPouchMaxLimit")
-		if v, ok := lootPouchMaxLimit.(lua.LNumber); ok && v > 0 {
-			item.MaxItems = uint16(v)
-		} else {
-			item.MaxItems = 2000
+	// C++ splits count into a stack count and a subtype depending on the type
+	// (game_functions.cpp:445-458). Without that split a fluid's subtype was
+	// being written straight into Count and every stack ignored stackSize.
+	itemCount, subType := 1, 1
+	it := e.itemCatalog().Get(uint16(id))
+	if it != nil && it.HasSubType() {
+		if it.Stackable {
+			stackSize := int(it.StackSize)
+			if stackSize <= 0 {
+				stackSize = 100
+			}
+			itemCount = (count + stackSize - 1) / stackSize // ceil
 		}
+		subType = count
+	} else {
+		itemCount = max(1, count)
 	}
 
+	// A single call may have to produce several stacks; C++ then returns a table.
+	hasTable := itemCount > 1
+	var tbl *lua.LTable
+	if hasTable {
+		tbl = L.NewTable()
+	} else if itemCount == 0 {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	var pos game.Position
+	var havePos bool
 	if L.GetTop() >= 3 {
-		if pos, ok := parsePosition(L, 3); ok && e.world != nil && e.world.Map != nil {
-			e.world.AddItem(pos, item)
+		pos, havePos = parsePosition(L, 3)
+	}
+
+	for i := 1; i <= itemCount; i++ {
+		stackCount := subType
+		if it != nil && it.Stackable {
+			stackSize := int(it.StackSize)
+			if stackSize <= 0 {
+				stackSize = 100
+			}
+			stackCount = min(stackCount, stackSize)
+			subType -= stackCount
+		}
+
+		item := &game.Item{ID: uint16(id), Count: uint16(stackCount)}
+
+		// C++ Container constructor: ITEM_GOLD_POUCH -> pagination, maxSize=32
+		if item.ID == game.ItemGoldPouch {
+			item.Pagination = true
+			item.Contents = make([]*game.Item, 0)
+			item.MaxSize = 32
+			// C++: m_maxItems = g_configManager().getNumber(LOOTPOUCH_MAXLIMIT)
+			if v, ok := L.GetGlobal("lootPouchMaxLimit").(lua.LNumber); ok && v > 0 {
+				item.MaxItems = uint16(v)
+			} else {
+				item.MaxItems = 2000
+			}
+		}
+
+		if havePos {
+			// C++ uses map.getTile, not getOrCreateTile: a position with no tile
+			// yields nil and places nothing (game_functions.cpp:488-495).
+			if e.world == nil || e.world.Map == nil || !e.world.AddItem(pos, item) {
+				if !hasTable {
+					L.Push(lua.LNil)
+				}
+				return 1
+			}
+		}
+
+		if hasTable {
+			L.RawSetInt(tbl, i, e.itemValue(L, item))
+		} else {
+			e.pushItem(L, item)
 		}
 	}
 
-	e.pushItem(L, item)
+	if hasTable {
+		L.Push(tbl)
+	}
 	return 1
 }
 func (e *Engine) gameCreateContainer(L *lua.LState) int { return 0 }

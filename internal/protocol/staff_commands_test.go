@@ -48,8 +48,16 @@ func TestStaffCommandPermissions(t *testing.T) {
 		t.Error("handleCommand should return true for slash command")
 	}
 
+	// An UNKNOWN slash command must report false. handleCommand's contract is
+	// "did I consume this?", and its caller (game_actions.go:548) falls through to
+	// spells, then Lua talkactions, then chat when it does not — the same order as
+	// Game::playerSay. Reporting true here would swallow every custom talkaction.
 	gpGod := &GameProtocol{player: godPlayer}
-	if !gpGod.handleCommand("/nonexistent") {
-		t.Error("handleCommand should handle slash command without error")
+	if gpGod.handleCommand("/nonexistent") {
+		t.Error("an unknown slash command must fall through so talkactions get a chance")
+	}
+	// A known one is consumed.
+	if !gpGod.handleCommand("/pos") {
+		t.Error("handleCommand should consume a known command")
 	}
 }

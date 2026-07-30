@@ -10,6 +10,7 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -54,6 +55,9 @@ func TestAddPlayerEventForwardsTargetAndArgs(t *testing.T) {
 func TestStoreInboxDelivery(t *testing.T) {
 	w := game.NewWorld()
 	w.TypeRegistry = creatures.NewTypeRegistry()
+	// Gold has to be in the catalog for Game.createItem to read its count as a
+	// stack size rather than a plain item count (C++ ItemType::hasSubType).
+	w.Items = items.NewCatalog(&items.ItemType{ID: 3031, Stackable: true, StackSize: 100})
 	e := New(w, slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})))
 
 	player := &game.Player{Name: "Buyer", DBID: 42, Vocation: 1}

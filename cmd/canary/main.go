@@ -131,10 +131,23 @@ func run(o runOpts, log *slog.Logger) error {
 	defer database.Close()
 
 	if migrate {
-		if err := database.ApplySchema(ctx, cfg, schemaPath); err != nil {
+		// C++ never imports the schema itself: it aborts when the database is
+		// empty and tells the operator to import schema.sql (canary_server.cpp:490).
+		// -schema keeps that bootstrap automatic for docker/smoke runs, but it must
+		// only fire on an empty database — re-applying over a populated one dies on
+		// the server_config 'db_version' insert. Upgrades are the migrations' job.
+		setUp, err := database.IsDatabaseSetup(ctx, cfg)
+		if err != nil {
 			return err
 		}
-		log.Info("schema applied", "path", schemaPath)
+		if setUp {
+			log.Info("database already set up, skipping schema import", "path", schemaPath)
+		} else {
+			if err := database.ApplySchema(ctx, cfg, schemaPath); err != nil {
+				return err
+			}
+			log.Info("schema applied", "path", schemaPath)
+		}
 	}
 	if seed {
 		if err := database.SeedTestAccount(ctx, "god", "god@canary.local", "god", "Gm Test"); err != nil {
