@@ -1,0 +1,15 @@
+{
+    "Character": "Gm Test",
+    "EngineID": "0",
+    "HardwareID": "96fcdc6517f873eddb3cd2c54c556bc37122a64a",
+    "LogMessages": "[{\"Message\":\"Error while processing network packet target field not existing\",\"Timestamp\":1785463062},{\"Message\":\"\\\"bV5+3H0HAV1+3H0H\\\"\",\"Timestamp\":1785463062}]",
+    "LoginHost": "127.0.0.1",
+    "OperatingSystem": "Windows 11 Version 25H2",
+    "Position": "[32358,32224,7]",
+    "ProductName": "Tibia Client",
+    "ProtectedWorldAddress": "tcp://127.0.0.1:7172",
+    "Server": "Canary-Go",
+    "Timestamp": "1785463062",
+    "UnprotectedWorldAddress": "tcp://127.0.0.1:7172",
+    "Version": "15.25.0a00a0d67311e057aa8e659a84cdf51db9c08c03"
+}

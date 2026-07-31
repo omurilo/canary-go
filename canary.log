@@ -1,186 +1,188 @@
-time=2026-07-31T00:29:47.206Z level=INFO msg="configuration loaded" server=Canary-Go loginPort=7171 gamePort=7172 db=canary
-time=2026-07-31T00:29:47.211Z level=INFO msg="database already set up, skipping schema import" path=schema/schema.sql
-time=2026-07-31T00:29:47.215Z level=INFO msg="seeded test account" account=god password=god character="Gm Test"
-time=2026-07-31T00:29:47.568Z level=INFO msg="item catalog loaded" types=42107
-time=2026-07-31T00:29:47.568Z level=INFO msg="WDRR dispatcher started"
-time=2026-07-31T00:29:47.570Z level=INFO msg="imbuements loaded" imbuements=72
-time=2026-07-31T00:29:47.574Z level=INFO msg="loaded vocations" path=data/XML/vocations.xml
-time=2026-07-31T00:29:47.575Z level=INFO msg="loaded mounts" path=data/XML/mounts.xml count=236
-time=2026-07-31T00:30:05.636Z level=INFO msg="loaded OTBM map" file=data-otservbr-global/world/otservbr.otbm tiles=18102439 items=23619919 towns=28
-time=2026-07-31T00:30:06.212Z level=INFO msg="loaded houses from XML" count=1029
-time=2026-07-31T00:30:06.212Z level=INFO msg="spawn set to town temple" town="Dawnport Tutorial" pos="{X:32069 Y:31901 Z:6}"
-time=2026-07-31T00:30:06.308Z level=INFO msg="loaded custom houses" map=otservbr-custom.otbm count=0
-time=2026-07-31T00:30:06.309Z level=INFO msg="loaded custom map" file=otservbr-custom.otbm tiles=96077 items=131481
-time=2026-07-31T00:30:14.397Z level=INFO msg="houses loaded and tiles registered" count=1086
-time=2026-07-31T00:30:14.402Z level=INFO msg="database migrations applied" db_version=58
-time=2026-07-31T00:30:14.402Z level=INFO msg="loadScripts starting walkthrough" dir=data-otservbr-global/lib absDir=/app/data-otservbr-global/lib
-time=2026-07-31T00:30:14.756Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data-otservbr-global/lib
-time=2026-07-31T00:30:14.956Z level=INFO msg="loadScripts starting walkthrough" dir=data/lib absDir=/app/data/lib
-time=2026-07-31T00:30:14.956Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data/lib
-time=2026-07-31T00:30:14.956Z level=INFO msg="loadScripts starting walkthrough" dir=data/libs absDir=/app/data/libs
-time=2026-07-31T00:30:15.120Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data/libs
-time=2026-07-31T00:30:15.120Z level=INFO msg="loadScripts starting walkthrough" dir=data/npclib absDir=/app/data/npclib
-time=2026-07-31T00:30:15.146Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data/npclib
-time=2026-07-31T00:30:15.146Z level=INFO msg="loadScripts starting walkthrough" dir=data/scripts absDir=/app/data/scripts
-time=2026-07-31T00:30:15.452Z level=WARN msg="script error" file=data/scripts/weapons/scripts/burst_arrow.lua err="data/scripts/lib/helper_constructors.lua:11: bad argument #1 to DefaultConstructor (number expected, got table)\nstack traceback:\n\t[G]: in function 'DefaultConstructor'\n\tdata/scripts/lib/helper_constructors.lua:11: in function 'Weapon'\n\tdata/scripts/weapons/scripts/burst_arrow.lua:17: in main chunk\n\t[G]: ?"
-time=2026-07-31T00:30:15.453Z level=WARN msg="script error" file=data/scripts/weapons/scripts/diamond_arrow.lua err="data/scripts/lib/helper_constructors.lua:11: bad argument #1 to DefaultConstructor (number expected, got table)\nstack traceback:\n\t[G]: in function 'DefaultConstructor'\n\tdata/scripts/lib/helper_constructors.lua:11: in function 'Weapon'\n\tdata/scripts/weapons/scripts/diamond_arrow.lua:26: in main chunk\n\t[G]: ?"
-time=2026-07-31T00:30:15.453Z level=WARN msg="script error" file=data/scripts/weapons/scripts/poison_arrow.lua err="data/scripts/lib/helper_constructors.lua:11: bad argument #1 to DefaultConstructor (number expected, got table)\nstack traceback:\n\t[G]: in function 'DefaultConstructor'\n\tdata/scripts/lib/helper_constructors.lua:11: in function 'Weapon'\n\tdata/scripts/weapons/scripts/poison_arrow.lua:14: in main chunk\n\t[G]: ?"
-time=2026-07-31T00:30:15.454Z level=WARN msg="script error" file=data/scripts/weapons/scripts/viper_star.lua err="data/scripts/lib/helper_constructors.lua:11: bad argument #1 to DefaultConstructor (number expected, got table)\nstack traceback:\n\t[G]: in function 'DefaultConstructor'\n\tdata/scripts/lib/helper_constructors.lua:11: in function 'Weapon'\n\tdata/scripts/weapons/scripts/viper_star.lua:16: in main chunk\n\t[G]: ?"
-time=2026-07-31T00:30:15.454Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data/scripts
-time=2026-07-31T00:30:15.454Z level=INFO msg="loadScripts starting walkthrough" dir=data-otservbr-global/scripts absDir=/app/data-otservbr-global/scripts
-time=2026-07-31T00:30:17.354Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data-otservbr-global/scripts
-time=2026-07-31T00:30:17.376Z level=INFO msg="loaded in-game store module" path=data/modules/scripts/gamestore/gamestore.lua
-time=2026-07-31T00:30:17.376Z level=INFO msg="store catalog loaded" categories=25 offers=759
-time=2026-07-31T00:30:17.376Z level=INFO msg="registered actions (lua)" count=14378
-time=2026-07-31T00:30:17.376Z level=INFO msg="registered instant spells (lua)" count=800
-time=2026-07-31T00:30:17.376Z level=INFO msg="loadScripts starting walkthrough" dir=data-otservbr-global/monster absDir=/app/data-otservbr-global/monster
-time=2026-07-31T00:30:17.962Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data-otservbr-global/monster
-time=2026-07-31T00:30:17.963Z level=WARN msg="some monster loot names could not be resolved to item ids" count=7
-time=2026-07-31T00:30:17.963Z level=INFO msg="loaded monster types (lua)" count=1666
-time=2026-07-31T00:30:17.964Z level=INFO msg="boosted boss" name=Deathstrike
-time=2026-07-31T00:30:17.964Z level=INFO msg="boosted creature" name=Flamingo
-time=2026-07-31T00:30:17.964Z level=INFO msg="loadScripts starting walkthrough" dir=data-otservbr-global/npc absDir=/app/data-otservbr-global/npc
-time=2026-07-31T00:30:20.815Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data-otservbr-global/npc
-time=2026-07-31T00:30:22.140Z level=INFO msg="loaded monster spawns" file=data-otservbr-global/world/otservbr-monster.xml
-time=2026-07-31T00:30:22.182Z level=INFO msg="loaded npc spawns" file=data-otservbr-global/world/otservbr-npc.xml
-time=2026-07-31T00:30:22.182Z level=INFO msg="loaded custom monster spawns" base=data-otservbr-global/world/custom/otservbr-custom
-time=2026-07-31T00:30:22.183Z level=INFO msg="loaded custom npc spawns" base=data-otservbr-global/world/custom/otservbr-custom
-time=2026-07-31T00:30:22.183Z level=INFO msg=lua msg="[migration] === Executing game migrations ==="
-time=2026-07-31T00:30:22.183Z level=INFO msg=lua msg="[migration] Executing game migration 20231128213158_move_hireling_data_to_kv"
-time=2026-07-31T00:30:22.186Z level=INFO msg=lua msg="[migration] Executing game migration 20241708000535_move_achievement_to_kv"
-time=2026-07-31T00:30:22.186Z level=INFO msg=lua msg="[migration] Executing game migration 20241708362079_move_vip_system_to_kv"
-time=2026-07-31T00:30:22.187Z level=INFO msg=lua msg="[migration] Executing game migration 20241715984294_quests_storages_to_kv"
-time=2026-07-31T00:30:22.187Z level=INFO msg=lua msg="[migration] Executing game migration 20251737599334_reset_charms"
-time=2026-07-31T00:30:22.187Z level=INFO msg=lua msg="[Migration] Resetting old charms for all players. This may take some time..."
-time=2026-07-31T00:30:22.188Z level=INFO msg=lua msg="[Migration] Successfully reset charms for 0 players."
-time=2026-07-31T00:30:22.188Z level=INFO msg=lua msg="[migration] === Game migrations executed in 0s ==="
-time=2026-07-31T00:30:22.468Z level=INFO msg=lua msg="Checking Global: No duplicate values found."
-time=2026-07-31T00:30:22.487Z level=INFO msg=lua msg="Checking GlobalStorage: No duplicate values found."
-time=2026-07-31T00:30:22.551Z level=INFO msg=lua msg="Checking Storage: No duplicate values found."
-time=2026-07-31T00:30:22.611Z level=ERROR msg=lua msg="[loadLuaMapSign] - Wrong item id 2012 found"
-time=2026-07-31T00:30:22.611Z level=WARN msg=lua msg="Sign id: 1, position 32073, 31936, 7, item id: wrong"
-time=2026-07-31T00:30:22.611Z level=ERROR msg=lua msg="[loadLuaMapSign] - Wrong item id 2031 found"
-time=2026-07-31T00:30:22.614Z level=WARN msg=lua msg="Sign id: 7, position 32064, 31891, 6, item id: wrong"
-time=2026-07-31T00:30:22.617Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 5972 found"
-time=2026-07-31T00:30:22.617Z level=WARN msg=lua msg="Unique id: 6203, position 32854, 32325, 11"
-time=2026-07-31T00:30:22.617Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 5972 found"
-time=2026-07-31T00:30:22.617Z level=WARN msg=lua msg="Unique id: 6204, position 32832, 32277, 10"
-time=2026-07-31T00:30:22.618Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 408 found"
-time=2026-07-31T00:30:22.618Z level=WARN msg=lua msg="Unique id: 6236, position 33194, 32458, 7"
-time=2026-07-31T00:30:22.618Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 2433 found"
-time=2026-07-31T00:30:22.618Z level=WARN msg=lua msg="Unique id: 6243, position 32311, 32177, 5"
-time=2026-07-31T00:30:22.618Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 2473 found"
-time=2026-07-31T00:30:22.618Z level=WARN msg=lua msg="Unique id: 6246, position 32907, 32012, 6"
-time=2026-07-31T00:30:22.619Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 2473 found"
-time=2026-07-31T00:30:22.619Z level=WARN msg=lua msg="Unique id: 14092, position 33074, 31170, 8"
-time=2026-07-31T00:30:22.627Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 11239 found"
-time=2026-07-31T00:30:22.627Z level=WARN msg=lua msg="Unique id: 22001, position 32055, 31885, 6"
-time=2026-07-31T00:30:22.627Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 17709 found"
-time=2026-07-31T00:30:22.627Z level=WARN msg=lua msg="Unique id: 22005, position 32908, 32112, 7"
-time=2026-07-31T00:30:22.637Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 7890 found"
-time=2026-07-31T00:30:22.637Z level=WARN msg=lua msg="Action id: 12501, position 32337, 31814, 7"
-time=2026-07-31T00:30:22.637Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 7891 found"
-time=2026-07-31T00:30:22.637Z level=WARN msg=lua msg="Action id: 12502, position 32337, 31814, 6"
-time=2026-07-31T00:30:22.637Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 7892 found"
-time=2026-07-31T00:30:22.637Z level=WARN msg=lua msg="Action id: 12503, position 32337, 31812, 6"
-time=2026-07-31T00:30:22.637Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 16622 found"
-time=2026-07-31T00:30:22.637Z level=WARN msg=lua msg="Action id: 12550, position 32893, 32013, 6"
-time=2026-07-31T00:30:22.637Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 16485 found"
-time=2026-07-31T00:30:22.637Z level=WARN msg=lua msg="Action id: 12551, position 32894, 32013, 6"
-time=2026-07-31T00:30:22.645Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 2523 found"
-time=2026-07-31T00:30:22.645Z level=WARN msg=lua msg="Unique id: 23105, position 33578, 32527, 14"
-time=2026-07-31T00:30:22.646Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 111 found"
-time=2026-07-31T00:30:22.646Z level=WARN msg=lua msg="Unique id: 40044, position 32135, 32133, 8"
-time=2026-07-31T00:30:22.659Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.659Z level=WARN msg=lua msg="Action id: 20001, position 32064, 31880, 5"
-time=2026-07-31T00:30:22.659Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.659Z level=WARN msg=lua msg="Action id: 20001, position 32065, 31880, 5"
-time=2026-07-31T00:30:22.659Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.659Z level=WARN msg=lua msg="Action id: 20001, position 32066, 31880, 5"
-time=2026-07-31T00:30:22.659Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.659Z level=WARN msg=lua msg="Action id: 20001, position 32075, 31890, 5"
-time=2026-07-31T00:30:22.659Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.659Z level=WARN msg=lua msg="Action id: 20001, position 32075, 31891, 5"
-time=2026-07-31T00:30:22.659Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.659Z level=WARN msg=lua msg="Action id: 20001, position 32075, 31892, 5"
-time=2026-07-31T00:30:22.659Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.659Z level=WARN msg=lua msg="Action id: 20001, position 32064, 31901, 5"
-time=2026-07-31T00:30:22.659Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.659Z level=WARN msg=lua msg="Action id: 20001, position 32065, 31901, 5"
-time=2026-07-31T00:30:22.659Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.659Z level=WARN msg=lua msg="Action id: 20001, position 32066, 31901, 5"
-time=2026-07-31T00:30:22.660Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.660Z level=WARN msg=lua msg="Action id: 20001, position 32054, 31890, 5"
-time=2026-07-31T00:30:22.660Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.660Z level=WARN msg=lua msg="Action id: 20001, position 32054, 31891, 5"
-time=2026-07-31T00:30:22.660Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
-time=2026-07-31T00:30:22.660Z level=WARN msg=lua msg="Action id: 20001, position 32054, 31892, 5"
-time=2026-07-31T00:30:22.660Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 1947 found"
-time=2026-07-31T00:30:22.660Z level=WARN msg=lua msg="Action id: 25009, position 32063, 31889, 6"
-time=2026-07-31T00:30:22.660Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 1947 found"
-time=2026-07-31T00:30:22.660Z level=WARN msg=lua msg="Action id: 25009, position 32064, 31889, 6"
-time=2026-07-31T00:30:22.660Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 1947 found"
-time=2026-07-31T00:30:22.660Z level=WARN msg=lua msg="Action id: 25009, position 32065, 31889, 6"
-time=2026-07-31T00:30:22.660Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 1947 found"
-time=2026-07-31T00:30:22.660Z level=WARN msg=lua msg="Action id: 25009, position 32066, 31889, 6"
-time=2026-07-31T00:30:22.660Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.660Z level=WARN msg=lua msg="Action id: 25010, position 32053, 31884, 6"
-time=2026-07-31T00:30:22.660Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25010, position 32054, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25010, position 32055, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25011, position 32072, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25011, position 32073, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25011, position 32074, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25012, position 32058, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25012, position 32059, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25012, position 32060, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25013, position 32067, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25013, position 32068, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25013, position 32069, 31884, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25014, position 32054, 31880, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25015, position 32073, 31880, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25016, position 32059, 31880, 6"
-time=2026-07-31T00:30:22.661Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
-time=2026-07-31T00:30:22.661Z level=WARN msg=lua msg="Action id: 25017, position 32068, 31880, 6"
-time=2026-07-31T00:30:22.732Z level=INFO msg=lua msg="Rashid arrived at Darashia"
-time=2026-07-31T00:30:22.835Z level=INFO msg=lua msg="[World Change] The Dream Courts today's boss is: Izcandar the Banished!"
-time=2026-07-31T00:30:22.836Z level=INFO msg=lua msg="[World Change] Fury Gate has arrived in Port Hope!"
-time=2026-07-31T00:30:22.839Z level=INFO msg=lua msg="[World Change] Nightmare Isle is active in North of Ankrahmun"
-time=2026-07-31T00:30:22.840Z level=INFO msg=lua msg="[World Change] Yasir has arrived in Liberty Bay today!"
-time=2026-07-31T00:30:22.840Z level=INFO msg="executed startup global events" count=19
-time=2026-07-31T00:30:22.848Z level=INFO msg="raids loaded" count=62
-time=2026-07-31T00:30:22.848Z level=INFO msg="raids loaded and scheduler started" path=data-otservbr-global/raids/raids.xml
-time=2026-07-31T00:30:22.849Z level=INFO msg="legacy 11.00 protocol enabled" port=7174
-time=2026-07-31T00:30:22.849Z level=INFO msg="legacy 8.60 protocol enabled" port=7175
-time=2026-07-31T00:30:22.849Z level=INFO msg="canary-go is running" login=7171 game=7172 legacy1100=7174 legacy860=7175
-time=2026-07-31T00:30:22.856Z level=INFO msg="async job worker polling table async_jobs"
-time=2026-07-31T00:30:22.865Z level=INFO msg="service listening" service=legacy-860 addr=:7175
-time=2026-07-31T00:30:22.865Z level=INFO msg="service listening" service=status addr=:7173
-time=2026-07-31T00:30:22.866Z level=INFO msg="service listening" service=legacy-1100 addr=:7174
-time=2026-07-31T00:30:22.866Z level=INFO msg="service listening" service=login addr=:7171
-time=2026-07-31T00:30:22.866Z level=INFO msg="service listening" service=game addr=:7172
-time=2026-07-31T00:30:23.842Z level=INFO msg=lua msg="Starting raid thais.wild-horses"
-time=2026-07-31T00:30:27.841Z level=INFO msg=lua msg="NpcByTime: Valindara spawned successfully."
-time=2026-07-31T00:30:41.943Z level=INFO msg="house: sendHousesInfo start" player="Gm Test" totalHouses=1086
-time=2026-07-31T00:30:41.944Z level=INFO msg="house: sent 0xC6" player="Gm Test" houseClientID=0 accountCount=0 totalHouses=1086
-time=2026-07-31T00:30:41.948Z level=INFO msg="player entered world" service=game peer=172.21.0.1:36258 name="Gm Test" pos="{X:32344 Y:32228 Z:7}" online=1
-time=2026-07-31T00:30:42.813Z level=INFO msg="player logged out" service=game peer=172.21.0.1:36258 name="Gm Test" online=0
-time=2026-07-31T00:31:20.544Z level=INFO msg="house: sendHousesInfo start" player="Gm Test" totalHouses=1086
-time=2026-07-31T00:31:20.545Z level=INFO msg="house: sent 0xC6" player="Gm Test" houseClientID=0 accountCount=0 totalHouses=1086
-time=2026-07-31T00:31:20.549Z level=INFO msg="player entered world" service=game peer=172.21.0.1:38206 name="Gm Test" pos="{X:32344 Y:32228 Z:7}" online=1
-time=2026-07-31T00:31:21.067Z level=INFO msg="DEBUG: sendContainer CALLED" cid=0 itemId=21557
-time=2026-07-31T00:31:21.068Z level=INFO msg="STACK TRACE FOR 21557: \ngoroutine 271 [running]:\nruntime/debug.Stack()\n\truntime/debug/stack.go:26 +0x5e\ngithub.com/opentibiabr/canary-go/internal/protocol.(*GameProtocol).sendContainer(0xc0b2c5d280, 0x0, 0xc07851d420, 0x0)\n\tgithub.com/opentibiabr/canary-go/internal/protocol/game_containers.go:362 +0x14d\ngithub.com/opentibiabr/canary-go/internal/protocol.(*GameProtocol).openContainerWithPos(0xc0b2c5d280, 0xc07851d420, {0x47?, 0x0?, 0x0?}, 0x0?)\n\tgithub.com/opentibiabr/canary-go/internal/protocol/game_containers.go:354 +0x4f\ngithub.com/opentibiabr/canary-go/internal/protocol.(*GameProtocol).openContainer(...)\n\tgithub.com/opentibiabr/canary-go/internal/protocol/game_containers.go:342\ngithub.com/opentibiabr/canary-go/internal/protocol.(*GameProtocol).OpenContainer(0xc0b2c5d280?, 0xc0119a5d36?)\n\tgithub.com/opentibiabr/canary-go/internal/protocol/game_session.go:38 +0x25\ngithub.com/opentibiabr/canary-go/internal/protocol.(*GameProtocol).parseOpenRewardChest(0x0?, 0xc011338008?)\n\tgithub.com/opentibiabr/canary-go/internal/protocol/reward_handlers.go:21 +0x3e\ngithub.com/opentibiabr/canary-go/internal/protocol.(*GameProtocol).OnPacket(0xc0b2c5d280, 0xc0efa5b2b0?, 0xc0def97be0)\n\tgithub.com/opentibiabr/canary-go/internal/protocol/game.go:1038 +0xd4d\ngithub.com/opentibiabr/canary-go/internal/network.(*Connection).serve(0xc07850db90)\n\tgithub.com/opentibiabr/canary-go/internal/network/connection.go:205 +0x3d8\ncreated by github.com/opentibiabr/canary-go/internal/network.(*Service).Start in goroutine 134\n\tgithub.com/opentibiabr/canary-go/internal/network/server.go:64 +0x519\n"
-time=2026-07-31T00:31:21.068Z level=WARN msg="encoding item with unknown type: the client will read a zero appearance id and the rest of the frame will shift" itemId=21557 count=0
+time=2026-07-31T01:55:02.616Z level=INFO msg="configuration loaded" server=Canary-Go loginPort=7171 gamePort=7172 db=canary
+time=2026-07-31T01:55:02.622Z level=INFO msg="database already set up, skipping schema import" path=schema/schema.sql
+time=2026-07-31T01:55:02.636Z level=INFO msg="seeded test account" account=god password=god character="Gm Test"
+time=2026-07-31T01:55:03.103Z level=INFO msg="item catalog loaded" types=42107
+time=2026-07-31T01:55:03.103Z level=INFO msg="WDRR dispatcher started"
+time=2026-07-31T01:55:03.109Z level=INFO msg="imbuements loaded" imbuements=72
+time=2026-07-31T01:55:03.113Z level=INFO msg="loaded vocations" path=data/XML/vocations.xml
+time=2026-07-31T01:55:03.114Z level=INFO msg="loaded mounts" path=data/XML/mounts.xml count=236
+time=2026-07-31T01:55:24.619Z level=INFO msg="loaded OTBM map" file=data-otservbr-global/world/otservbr.otbm tiles=18102439 items=23619919 towns=28
+time=2026-07-31T01:55:25.277Z level=INFO msg="loaded houses from XML" count=1029
+time=2026-07-31T01:55:25.277Z level=INFO msg="spawn set to town temple" town="Dawnport Tutorial" pos="{X:32069 Y:31901 Z:6}"
+time=2026-07-31T01:55:25.568Z level=INFO msg="loaded custom houses" map=otservbr-custom.otbm count=0
+time=2026-07-31T01:55:25.568Z level=INFO msg="loaded custom map" file=otservbr-custom.otbm tiles=96077 items=131481
+time=2026-07-31T01:55:34.024Z level=INFO msg="houses loaded and tiles registered" count=1086
+time=2026-07-31T01:55:34.031Z level=INFO msg="database migrations applied" db_version=58
+time=2026-07-31T01:55:34.031Z level=INFO msg="loadScripts starting walkthrough" dir=data-otservbr-global/lib absDir=/app/data-otservbr-global/lib
+time=2026-07-31T01:55:34.642Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data-otservbr-global/lib
+time=2026-07-31T01:55:34.877Z level=INFO msg="loadScripts starting walkthrough" dir=data/lib absDir=/app/data/lib
+time=2026-07-31T01:55:34.878Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data/lib
+time=2026-07-31T01:55:34.879Z level=INFO msg="loadScripts starting walkthrough" dir=data/libs absDir=/app/data/libs
+time=2026-07-31T01:55:35.092Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data/libs
+time=2026-07-31T01:55:35.092Z level=INFO msg="loadScripts starting walkthrough" dir=data/npclib absDir=/app/data/npclib
+time=2026-07-31T01:55:35.133Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data/npclib
+time=2026-07-31T01:55:35.133Z level=INFO msg="loadScripts starting walkthrough" dir=data/scripts absDir=/app/data/scripts
+time=2026-07-31T01:55:35.928Z level=WARN msg="script error" file=data/scripts/weapons/scripts/burst_arrow.lua err="data/scripts/weapons/scripts/burst_arrow.lua:31: attempt to call a non-function object\nstack traceback:\n\tdata/scripts/weapons/scripts/burst_arrow.lua:31: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:55:35.929Z level=WARN msg="script error" file=data/scripts/weapons/scripts/diamond_arrow.lua err="data/scripts/weapons/scripts/diamond_arrow.lua:38: attempt to call a non-function object\nstack traceback:\n\tdata/scripts/weapons/scripts/diamond_arrow.lua:38: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:55:35.930Z level=WARN msg="script error" file=data/scripts/weapons/scripts/poison_arrow.lua err="data/scripts/weapons/scripts/poison_arrow.lua:24: attempt to call a non-function object\nstack traceback:\n\tdata/scripts/weapons/scripts/poison_arrow.lua:24: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:55:35.931Z level=WARN msg="script error" file=data/scripts/weapons/scripts/viper_star.lua err="data/scripts/weapons/scripts/viper_star.lua:34: attempt to call a non-function object\nstack traceback:\n\tdata/scripts/weapons/scripts/viper_star.lua:34: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:55:35.931Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data/scripts
+time=2026-07-31T01:55:35.931Z level=INFO msg="loadScripts starting walkthrough" dir=data-otservbr-global/scripts absDir=/app/data-otservbr-global/scripts
+time=2026-07-31T01:55:39.779Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data-otservbr-global/scripts
+time=2026-07-31T01:55:39.823Z level=INFO msg="loaded in-game store module" path=data/modules/scripts/gamestore/gamestore.lua
+time=2026-07-31T01:55:39.823Z level=INFO msg="store catalog loaded" categories=25 offers=759
+time=2026-07-31T01:55:39.823Z level=INFO msg="registered actions (lua)" count=14378
+time=2026-07-31T01:55:39.823Z level=INFO msg="registered instant spells (lua)" count=800
+time=2026-07-31T01:55:39.823Z level=INFO msg="loadScripts starting walkthrough" dir=data-otservbr-global/monster absDir=/app/data-otservbr-global/monster
+time=2026-07-31T01:55:40.967Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data-otservbr-global/monster
+time=2026-07-31T01:55:40.969Z level=WARN msg="some monster loot names could not be resolved to item ids" count=7
+time=2026-07-31T01:55:40.969Z level=INFO msg="loaded monster types (lua)" count=1666
+time=2026-07-31T01:55:40.970Z level=INFO msg="boosted boss" name=Deathstrike
+time=2026-07-31T01:55:40.970Z level=INFO msg="boosted creature" name=Flamingo
+time=2026-07-31T01:55:40.970Z level=INFO msg="loadScripts starting walkthrough" dir=data-otservbr-global/npc absDir=/app/data-otservbr-global/npc
+time=2026-07-31T01:55:45.391Z level=INFO msg="loadScripts WalkDir finished successfully" dir=data-otservbr-global/npc
+time=2026-07-31T01:55:46.518Z level=INFO msg="loaded monster spawns" file=data-otservbr-global/world/otservbr-monster.xml
+time=2026-07-31T01:55:46.538Z level=INFO msg="loaded npc spawns" file=data-otservbr-global/world/otservbr-npc.xml
+time=2026-07-31T01:55:46.538Z level=INFO msg="loaded custom monster spawns" base=data-otservbr-global/world/custom/otservbr-custom
+time=2026-07-31T01:55:46.539Z level=INFO msg="loaded custom npc spawns" base=data-otservbr-global/world/custom/otservbr-custom
+time=2026-07-31T01:55:46.539Z level=INFO msg=lua msg="[migration] === Executing game migrations ==="
+time=2026-07-31T01:55:46.539Z level=INFO msg=lua msg="[migration] Executing game migration 20231128213158_move_hireling_data_to_kv"
+time=2026-07-31T01:55:46.540Z level=INFO msg=lua msg="[migration] Executing game migration 20241708000535_move_achievement_to_kv"
+time=2026-07-31T01:55:46.541Z level=INFO msg=lua msg="[migration] Executing game migration 20241708362079_move_vip_system_to_kv"
+time=2026-07-31T01:55:46.542Z level=INFO msg=lua msg="[migration] Executing game migration 20241715984294_quests_storages_to_kv"
+time=2026-07-31T01:55:46.543Z level=INFO msg=lua msg="[migration] Executing game migration 20251737599334_reset_charms"
+time=2026-07-31T01:55:46.543Z level=INFO msg=lua msg="[Migration] Resetting old charms for all players. This may take some time..."
+time=2026-07-31T01:55:46.543Z level=INFO msg=lua msg="[Migration] Successfully reset charms for 0 players."
+time=2026-07-31T01:55:46.543Z level=INFO msg=lua msg="[migration] === Game migrations executed in 0s ==="
+time=2026-07-31T01:55:46.613Z level=INFO msg=lua msg="Checking Global: No duplicate values found."
+time=2026-07-31T01:55:46.614Z level=INFO msg=lua msg="Checking GlobalStorage: No duplicate values found."
+time=2026-07-31T01:55:46.617Z level=INFO msg=lua msg="Checking Storage: No duplicate values found."
+time=2026-07-31T01:55:46.634Z level=ERROR msg=lua msg="[loadLuaMapSign] - Wrong item id 2012 found"
+time=2026-07-31T01:55:46.634Z level=WARN msg=lua msg="Sign id: 1, position 32073, 31936, 7, item id: wrong"
+time=2026-07-31T01:55:46.634Z level=ERROR msg=lua msg="[loadLuaMapSign] - Wrong item id 2031 found"
+time=2026-07-31T01:55:46.634Z level=WARN msg=lua msg="Sign id: 7, position 32064, 31891, 6, item id: wrong"
+time=2026-07-31T01:55:46.635Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 5972 found"
+time=2026-07-31T01:55:46.635Z level=WARN msg=lua msg="Unique id: 6203, position 32854, 32325, 11"
+time=2026-07-31T01:55:46.635Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 5972 found"
+time=2026-07-31T01:55:46.636Z level=WARN msg=lua msg="Unique id: 6204, position 32832, 32277, 10"
+time=2026-07-31T01:55:46.636Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 408 found"
+time=2026-07-31T01:55:46.636Z level=WARN msg=lua msg="Unique id: 6236, position 33194, 32458, 7"
+time=2026-07-31T01:55:46.636Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 2433 found"
+time=2026-07-31T01:55:46.636Z level=WARN msg=lua msg="Unique id: 6243, position 32311, 32177, 5"
+time=2026-07-31T01:55:46.636Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 2473 found"
+time=2026-07-31T01:55:46.636Z level=WARN msg=lua msg="Unique id: 6246, position 32907, 32012, 6"
+time=2026-07-31T01:55:46.636Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 2473 found"
+time=2026-07-31T01:55:46.636Z level=WARN msg=lua msg="Unique id: 14092, position 33074, 31170, 8"
+time=2026-07-31T01:55:46.639Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 11239 found"
+time=2026-07-31T01:55:46.639Z level=WARN msg=lua msg="Unique id: 22001, position 32055, 31885, 6"
+time=2026-07-31T01:55:46.639Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 17709 found"
+time=2026-07-31T01:55:46.639Z level=WARN msg=lua msg="Unique id: 22005, position 32908, 32112, 7"
+time=2026-07-31T01:55:46.642Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 7890 found"
+time=2026-07-31T01:55:46.642Z level=WARN msg=lua msg="Action id: 12501, position 32337, 31814, 7"
+time=2026-07-31T01:55:46.642Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 7891 found"
+time=2026-07-31T01:55:46.642Z level=WARN msg=lua msg="Action id: 12502, position 32337, 31814, 6"
+time=2026-07-31T01:55:46.642Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 7892 found"
+time=2026-07-31T01:55:46.642Z level=WARN msg=lua msg="Action id: 12503, position 32337, 31812, 6"
+time=2026-07-31T01:55:46.642Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 16622 found"
+time=2026-07-31T01:55:46.642Z level=WARN msg=lua msg="Action id: 12550, position 32893, 32013, 6"
+time=2026-07-31T01:55:46.642Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 16485 found"
+time=2026-07-31T01:55:46.642Z level=WARN msg=lua msg="Action id: 12551, position 32894, 32013, 6"
+time=2026-07-31T01:55:45.390Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 2523 found"
+time=2026-07-31T01:55:45.390Z level=WARN msg=lua msg="Unique id: 23105, position 33578, 32527, 14"
+time=2026-07-31T01:55:45.390Z level=ERROR msg=lua msg="[loadLuaMapUnique] - Wrong item id 111 found"
+time=2026-07-31T01:55:45.390Z level=WARN msg=lua msg="Unique id: 40044, position 32135, 32133, 8"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32064, 31880, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32065, 31880, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32066, 31880, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32075, 31890, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32075, 31891, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32075, 31892, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32064, 31901, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32065, 31901, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32066, 31901, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32054, 31890, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32054, 31891, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 416 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 20001, position 32054, 31892, 5"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 1947 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 25009, position 32063, 31889, 6"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 1947 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 25009, position 32064, 31889, 6"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 1947 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 25009, position 32065, 31889, 6"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 1947 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 25009, position 32066, 31889, 6"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 25010, position 32053, 31884, 6"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 25010, position 32054, 31884, 6"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 25010, position 32055, 31884, 6"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 25011, position 32072, 31884, 6"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.393Z level=WARN msg=lua msg="Action id: 25011, position 32073, 31884, 6"
+time=2026-07-31T01:55:45.393Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25011, position 32074, 31884, 6"
+time=2026-07-31T01:55:45.394Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25012, position 32058, 31884, 6"
+time=2026-07-31T01:55:45.394Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25012, position 32059, 31884, 6"
+time=2026-07-31T01:55:45.394Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25012, position 32060, 31884, 6"
+time=2026-07-31T01:55:45.394Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25013, position 32067, 31884, 6"
+time=2026-07-31T01:55:45.394Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25013, position 32068, 31884, 6"
+time=2026-07-31T01:55:45.394Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25013, position 32069, 31884, 6"
+time=2026-07-31T01:55:45.394Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25014, position 32054, 31880, 6"
+time=2026-07-31T01:55:45.394Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25015, position 32073, 31880, 6"
+time=2026-07-31T01:55:45.394Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25016, position 32059, 31880, 6"
+time=2026-07-31T01:55:45.394Z level=ERROR msg=lua msg="[loadLuaMapAction] - Wrong item id 409 found"
+time=2026-07-31T01:55:45.394Z level=WARN msg=lua msg="Action id: 25017, position 32068, 31880, 6"
+time=2026-07-31T01:55:45.399Z level=INFO msg=lua msg="Rashid arrived at Darashia"
+time=2026-07-31T01:55:45.430Z level=INFO msg=lua msg="[World Change] The Dream Courts today's boss is: Izcandar the Banished!"
+time=2026-07-31T01:55:45.430Z level=INFO msg=lua msg="[World Change] Fury Gate has arrived in Ankrahmun!"
+time=2026-07-31T01:55:45.432Z level=INFO msg=lua msg="[World Change] Nightmare Isle is active in West of Darashia"
+time=2026-07-31T01:55:45.432Z level=INFO msg=lua msg="Yasir: not this time"
+time=2026-07-31T01:55:45.438Z level=INFO msg="executed startup global events" count=19
+time=2026-07-31T01:55:45.453Z level=INFO msg="raids loaded" count=62
+time=2026-07-31T01:55:45.453Z level=INFO msg="raids loaded and scheduler started" path=data-otservbr-global/raids/raids.xml
+time=2026-07-31T01:55:45.453Z level=INFO msg="legacy 11.00 protocol enabled" port=7174
+time=2026-07-31T01:55:45.453Z level=INFO msg="legacy 8.60 protocol enabled" port=7175
+time=2026-07-31T01:55:45.453Z level=INFO msg="canary-go is running" login=7171 game=7172 legacy1100=7174 legacy860=7175
+time=2026-07-31T01:55:45.454Z level=INFO msg="async job worker polling table async_jobs"
+time=2026-07-31T01:55:45.458Z level=INFO msg="service listening" service=legacy-860 addr=:7175
+time=2026-07-31T01:55:45.458Z level=INFO msg="service listening" service=login addr=:7171
+time=2026-07-31T01:55:45.458Z level=INFO msg="service listening" service=legacy-1100 addr=:7174
+time=2026-07-31T01:55:45.458Z level=INFO msg="service listening" service=game addr=:7172
+time=2026-07-31T01:55:45.458Z level=INFO msg="service listening" service=status addr=:7173
+time=2026-07-31T01:55:46.438Z level=INFO msg=lua msg="Starting raid thais.wild-horses"
+time=2026-07-31T01:55:50.433Z level=INFO msg=lua msg="NpcByTime: Valindara spawned successfully."
+time=2026-07-31T01:55:54.716Z level=INFO msg="house: sendHousesInfo start" player="Gm Test" totalHouses=1086
+time=2026-07-31T01:55:54.716Z level=INFO msg="house: sent 0xC6" player="Gm Test" houseClientID=0 accountCount=0 totalHouses=1086
+time=2026-07-31T01:55:54.722Z level=INFO msg="player entered world" service=game peer=172.21.0.1:55540 name="Gm Test" pos="{X:32366 Y:32214 Z:7}" online=1
+time=2026-07-31T01:56:12.620Z level=ERROR msg="action error" err="data-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: attempt to call a non-function object\nstack traceback:\n\tdata-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:56:12.815Z level=ERROR msg="action error" err="data-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: attempt to call a non-function object\nstack traceback:\n\tdata-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:56:13.004Z level=ERROR msg="action error" err="data-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: attempt to call a non-function object\nstack traceback:\n\tdata-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:56:13.158Z level=ERROR msg="action error" err="data-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: attempt to call a non-function object\nstack traceback:\n\tdata-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:56:13.337Z level=ERROR msg="action error" err="data-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: attempt to call a non-function object\nstack traceback:\n\tdata-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:56:13.529Z level=ERROR msg="action error" err="data-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: attempt to call a non-function object\nstack traceback:\n\tdata-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:56:13.719Z level=ERROR msg="action error" err="data-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: attempt to call a non-function object\nstack traceback:\n\tdata-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:56:13.905Z level=ERROR msg="action error" err="data-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: attempt to call a non-function object\nstack traceback:\n\tdata-otservbr-global/scripts/actions/system/quest_reward_common.lua:163: in main chunk\n\t[G]: ?"
+time=2026-07-31T01:57:42.045Z level=INFO msg="player logged out" service=game peer=172.21.0.1:55540 name="Gm Test" online=0
