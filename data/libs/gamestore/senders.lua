@@ -69,10 +69,16 @@ local function openStore(playerId)
 		for _, category in ipairs(GameStoreCategories) do
 			addCategory(category)
 		end
-		-- The client reads two trailing bytes after the category list from protocol
-		-- 1332 onwards (otclient parseStore, protocolgameparse.cpp:922). Without them
-		-- InputMessage::getU8 throws "eof reached" and the store window never opens.
-		if not oldProtocol then
+		-- OTClient reads two trailing bytes after the category list from client
+		-- version 1332 onwards (parseStore, protocolgameparse.cpp:923). The official
+		-- Tibia client does NOT, at any version: it stops after the last category and
+		-- reads the next byte as an opcode, reporting "Unknown Gameserver Message: 0"
+		-- and dying.
+		--
+		-- The two clients genuinely disagree at the same protocol version, so this
+		-- cannot be decided from the version alone — it has to branch on the client
+		-- family, the way the C++ side gates its own OTC-only fields on isOTC.
+		if not oldProtocol and player:isUsingOtClient() then
 			msg:addByte(0)
 			msg:addByte(0)
 		end

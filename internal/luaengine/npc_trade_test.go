@@ -16,35 +16,48 @@ import (
 type recordSession struct {
 	p    *game.Player
 	sent [][]byte
+	os   uint16
 }
 
-func (s *recordSession) SendToClient(w *netmsg.Writer) { s.sent = append(s.sent, append([]byte(nil), w.Bytes()...)) }
-func (s *recordSession) Player() *game.Player          { return s.p }
-func (s *recordSession) Disconnect()                  {}
+func (s *recordSession) SendToClient(w *netmsg.Writer) {
+	s.sent = append(s.sent, append([]byte(nil), w.Bytes()...))
+}
+func (s *recordSession) Player() *game.Player { return s.p }
+func (s *recordSession) Disconnect()          {}
+
+// clientOS lets a test choose the client family. 0 means "not reported", which
+// Player:getClient falls back to as a stock client.
+func (s *recordSession) ClientOS() uint16 {
+	if s.os == 0 {
+		return 2 // CLIENTOS_WINDOWS
+	}
+	return s.os
+}
+func (s *recordSession) ClientVersion() uint16 { return 1525 }
 
 // The remaining game.Session methods are no-ops for the trade test; it only
 // asserts on raw packets captured via SendToClient.
-func (s *recordSession) SendInventoryItem(uint8, *game.Item) {}
-func (s *recordSession) SendInventoryEmpty(uint8)            {}
-func (s *recordSession) SendInventoryIds()                   {}
-func (s *recordSession) SendStats()                          {}
-func (s *recordSession) SendSkills()                         {}
-func (s *recordSession) OpenContainer(*game.Item)            {}
-func (s *recordSession) RefreshContainer(*game.Item)         {}
-func (s *recordSession) CloseClientContainer(uint8)          {}
-func (s *recordSession) SendCloseShop()                      {}
-func (s *recordSession) SendChangeSpeed(game.Creature)       {}
-func (s *recordSession) SendIcons()                          {}
-func (s *recordSession) SendOpenForge()                      {}
-func (s *recordSession) SendOpenStash()                      {}
-func (s *recordSession) SendOpenMarket()                     {}
-func (s *recordSession) SendTextMessage(uint8, string)        {}
-func (s *recordSession) SendChannelEvent(uint16, string, byte) {}
-func (s *recordSession) SendChannelsDialog([]*game.ChatChannel) {}
-func (s *recordSession) SendOpenChannel(*game.ChatChannel)     {}
-func (s *recordSession) SendOpenPrivateChannel(string)         {}
+func (s *recordSession) SendInventoryItem(uint8, *game.Item)             {}
+func (s *recordSession) SendInventoryEmpty(uint8)                        {}
+func (s *recordSession) SendInventoryIds()                               {}
+func (s *recordSession) SendStats()                                      {}
+func (s *recordSession) SendSkills()                                     {}
+func (s *recordSession) OpenContainer(*game.Item)                        {}
+func (s *recordSession) RefreshContainer(*game.Item)                     {}
+func (s *recordSession) CloseClientContainer(uint8)                      {}
+func (s *recordSession) SendCloseShop()                                  {}
+func (s *recordSession) SendChangeSpeed(game.Creature)                   {}
+func (s *recordSession) SendIcons()                                      {}
+func (s *recordSession) SendOpenForge()                                  {}
+func (s *recordSession) SendOpenStash()                                  {}
+func (s *recordSession) SendOpenMarket()                                 {}
+func (s *recordSession) SendTextMessage(uint8, string)                   {}
+func (s *recordSession) SendChannelEvent(uint16, string, byte)           {}
+func (s *recordSession) SendChannelsDialog([]*game.ChatChannel)          {}
+func (s *recordSession) SendOpenChannel(*game.ChatChannel)               {}
+func (s *recordSession) SendOpenPrivateChannel(string)                   {}
 func (s *recordSession) SendCreatePrivateChannel(uint16, string, string) {}
-func (s *recordSession) SendClosePrivateChannel(uint16)        {}
+func (s *recordSession) SendClosePrivateChannel(uint16)                  {}
 func (s *recordSession) SendToChannel(uint32, string, uint16, byte, uint16, string) {
 }
 

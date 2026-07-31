@@ -105,6 +105,25 @@ func TestStoreInboxDelivery(t *testing.T) {
 // reads (leftover bytes or an underrun), the client drops the category tree —
 // which is the "only recently added shows" bug. This is the end-to-end guard.
 func TestOpenStorePacketOnWire(t *testing.T) {
+	// Run the whole flow once per client family. The two trailing bytes after the
+	// category list are an OTCLIENT extension — its parseStore reads them from
+	// client version 1332 up, the official Tibia client never does — so the same
+	// protocol version must produce different packets, and a stock client that
+	// receives them reads the leftovers as an opcode and dies with
+	// "Unknown Gameserver Message: 0".
+	for _, tc := range []struct {
+		name         string
+		clientOS     uint16
+		wantTrailing bool
+	}{
+		{"stock tibia client", 2, false},
+		{"otclient", 10, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) { runOpenStoreWireCheck(t, tc.clientOS, tc.wantTrailing) })
+	}
+}
+
+func runOpenStoreWireCheck(t *testing.T, clientOS uint16, wantTrailing bool) {
 	repo := filepath.Join("..", "..") // canary-go root — the datapack the server actually uses
 	core := filepath.Join(repo, "data")
 	gs := filepath.Join(core, "modules", "scripts", "gamestore", "gamestore.lua")
@@ -130,7 +149,7 @@ func TestOpenStorePacketOnWire(t *testing.T) {
 	e.SyncStoreGlobal()
 
 	player := &game.Player{Name: "Buyer", Level: 20, Vocation: 1, Health: 100, MaxHealth: 100}
-	sess := &recordSession{p: player}
+	sess := &recordSession{p: player, os: clientOS}
 	w.AddPlayer(player, sess)
 
 	// Fire onRecvbyte(player, msg, C_OpenStore=0xFA) through real bindings.
@@ -199,8 +218,12 @@ func TestOpenStorePacketOnWire(t *testing.T) {
 		need(2, "parent len")
 		_ = r.GetString() // parent
 	}
-	if clientVersion >= 1332 {
-		need(2, "two trailing bytes (>=1332)")
+	// The two trailing bytes are an OTCLIENT extension, not a protocol-version one:
+	// otclient's parseStore reads them from client version 1332 up, and the official
+	// Tibia client never does. Sending them to a stock client leaves two bytes it
+	// reads as the next opcode — "Unknown Gameserver Message: 0" — and it dies.
+	if wantTrailing {
+		need(2, "two trailing bytes (otclient)")
 		_ = r.GetByte()
 		_ = r.GetByte()
 	}
@@ -270,8 +293,10 @@ func TestGamestoreCatalogLoads(t *testing.T) {
 
 	// Drive the real openStore() through mock NetworkMessage/Player and decode
 	// the resulting byte stream exactly like the otclient parseStore() does. A
-	// 1525 client reads two trailing bytes after the category list; if openStore
-	// is short, the real client underruns and drops the whole category tree.
+	// Checks the byte budget of openStore for a STOCK client: opcode, count and the
+	// categories, with no OTC trailing bytes. Getting this wrong in either direction
+	// desyncs the client — short and it underruns, long and it reads the leftovers as
+	// an opcode.
 	if err := e.DoString(`
 		-- Mock NetworkMessage that just tallies bytes written, matching the
 		-- wire sizes of each adder.
@@ -288,6 +313,10 @@ func TestGamestoreCatalogLoads(t *testing.T) {
 		_G.Player = function()
 			return {
 				getClient = function() return { version = 1525, os = 2 } end,
+				-- os 2 is a stock client, so no OTC-only trailing bytes. The real
+				-- predicate lives in data/libs/functions/player.lua, which this
+				-- harness does not load.
+				isUsingOtClient = function() return false end,
 				getVocation = function() return { getId = function() return 1 end } end,
 				getId = function() return 1 end,
 			}
@@ -297,10 +326,13 @@ func TestGamestoreCatalogLoads(t *testing.T) {
 		if type(openStore) ~= "function" then error("openStore global not exposed") end
 		openStore(1)
 
-		-- Expected minimum: opcode(1) + count(2) + per category
-		-- [name str + state(1) + iconCount(1) + icons + parent str] + 2 trailing.
+		-- Expected: opcode(1) + count(2) + per category
+		-- [name str + state(1) + iconCount(1) + icons + parent str].
 		local cats = _G.GameStore.Categories
-		local expected = 1 + 2 + 2 -- opcode + u16 count + 2 trailing
+		-- No trailing bytes: this harness has no session, so getClient reports a stock
+		-- client and isUsingOtClient() is false. The OTC case is covered end to end by
+		-- TestOpenStorePacketOnWire.
+		local expected = 1 + 2 -- opcode + u16 count
 		for _, c in ipairs(cats) do
 			expected = expected + (2 + #c.name) + 1 + 1
 			for _, ic in ipairs(c.icons or {}) do expected = expected + 2 + #ic end

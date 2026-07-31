@@ -1304,15 +1304,29 @@ func playerGetclient(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	// Return a client info table. Scripts read `.version` to branch protocol
-	// behaviour (e.g. the gamestore module's openStore/parseRequestStoreOffers
-	// serialize different fields per version). This MUST match the version the
-	// client actually negotiated, or the client desyncs and drops packets — the
-	// game handshake enforces protocol 1525 (see protocol.ClientVersion), so
-	// report that. os=2 is the standard "new client" (CIPSOFT/OTClientV8) flag.
+	// {version, os}, the same two fields luaPlayerGetClient returns
+	// (player_functions.cpp). Both come from what the client actually announced at
+	// login: os was hardcoded to 2 here, so a script could not tell an OTC client
+	// from a stock Tibia one and had to guess from the version — which is the same
+	// for both. That is what made the gamestore append OTClient-only trailing bytes
+	// to every client and crash the official one.
+	const (
+		fallbackVersion = 1525
+		clientOSWindows = 2
+	)
+	version, os := uint16(fallbackVersion), uint16(clientOSWindows)
+	if c, ok := p.Session.(interface {
+		ClientOS() uint16
+		ClientVersion() uint16
+	}); ok {
+		os = c.ClientOS()
+		if v := c.ClientVersion(); v != 0 {
+			version = v
+		}
+	}
 	t := L.NewTable()
-	L.SetField(t, "version", lua.LNumber(1525))
-	L.SetField(t, "os", lua.LNumber(2))
+	L.SetField(t, "version", lua.LNumber(version))
+	L.SetField(t, "os", lua.LNumber(os))
 	L.Push(t)
 	return 1
 }

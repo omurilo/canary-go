@@ -188,6 +188,9 @@ type GameProtocol struct {
 	// (protocolgame.cpp:1158). It is what tells an OTC client apart from a stock
 	// Tibia one, and therefore which protocol extensions may be written.
 	clientOS uint16
+	// clientVersion is the protocol version it announced, the value
+	// Player::getProtocolVersion returns to Lua.
+	clientVersion uint16
 
 	player  *game.Player
 	knownMu sync.RWMutex
@@ -349,6 +352,19 @@ func (g *GameProtocol) isOTC() bool {
 //
 // Whoever ports sendOTCRFeatures flips this to a field set by it — never to a test
 // on the operating system, which says what the client IS, not what it was told.
+// ClientOS is the OperatingSystem_t the client announced. Player:getClient()
+// reports it to Lua, which is how the datapack branches on client family — C++
+// returns player->getOperatingSystem() from the same binding.
+func (g *GameProtocol) ClientOS() uint16 { return g.clientOS }
+
+// ClientVersion is the protocol version the client announced.
+func (g *GameProtocol) ClientVersion() uint16 {
+	if g.clientVersion == 0 {
+		return ClientVersion
+	}
+	return g.clientVersion
+}
+
 func (g *GameProtocol) isOTCR() bool {
 	return false
 }
@@ -481,8 +497,8 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	}
 	r := netmsg.NewReader(body[skip:])
 
-	g.clientOS = r.GetU16() // OperatingSystem_t (protocolgame.cpp:1158)
-	_ = r.GetU16()          // protocol version
+	g.clientOS = r.GetU16()      // OperatingSystem_t (protocolgame.cpp:1158)
+	g.clientVersion = r.GetU16() // protocol version
 
 	var clientVersion uint32
 	var contentRevision uint16
