@@ -215,6 +215,15 @@ func (e *CombatEngine) tryAttack(attacker, target Creature, interval time.Durati
 			return
 		}
 	}
+	// Record player-on-player aggression, as Player::onAttackedCreature does. This
+	// set is what separates the aggressor from the defender when the kill is judged:
+	// only someone who attacked first can earn an unjustified kill.
+	if ap, ok := attacker.(*Player); ok {
+		if tp, ok := target.(*Player); ok {
+			ap.AddAttacked(tp)
+		}
+	}
+
 	// Monsters never harm players who cannot be attacked (staff/ghost),
 	// mirroring PlayerFlags_t::CannotBeAttacked.
 	if _, atkIsMonster := attacker.(*Monster); atkIsMonster {

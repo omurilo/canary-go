@@ -596,7 +596,22 @@ func run(o runOpts, log *slog.Logger) error {
 			if mostDamage == nil {
 				mostDamage = killer
 			}
-			lengine.ExecuteCreatureOnDeath(p, nil, lastHit, mostDamage, false, false)
+			// Judge the kill: only a player killer can be unjustified, and the two
+			// flags are judged independently because the last hitter and the biggest
+			// contributor can be different people with different histories.
+			lastHitUnjustified := false
+			mostDamageUnjustified := false
+			if killerPlayer, ok := lastHit.(*game.Player); ok {
+				lastHitUnjustified = killerPlayer.OnKilledPlayer(p, true)
+			}
+			if mostDamage != lastHit {
+				if mostPlayer, ok := mostDamage.(*game.Player); ok {
+					mostDamageUnjustified = mostPlayer.OnKilledPlayer(p, false)
+				}
+			} else {
+				mostDamageUnjustified = lastHitUnjustified
+			}
+			lengine.ExecuteCreatureOnDeath(p, nil, lastHit, mostDamage, lastHitUnjustified, mostDamageUnjustified)
 		}
 		protocol.HandlePlayerDeath(world, p, killer)
 		// Persist the penalty immediately so a crash/relog can't revert it.

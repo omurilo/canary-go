@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/bestiary"
@@ -332,7 +333,12 @@ type Player struct {
 	Dead          bool
 	IsTraining    bool
 	SkillLoss     bool
-	Skull         uint8
+	// attackedSet is the set of player guids this player has attacked, the
+	// aggressor record Player::hasAttacked reads. Only someone who attacked first
+	// can earn an unjustified kill.
+	attackedMu  sync.RWMutex
+	attackedSet map[uint32]struct{}
+	Skull       uint8
 	// UnjustifiedKills is the frag list behind the skull system, persisted in
 	// player_kills. LastKillTime is the newest entry, cached the way C++ caches it
 	// (Player::updateLastKillTimeCache).
