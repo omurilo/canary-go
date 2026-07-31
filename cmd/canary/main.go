@@ -585,11 +585,18 @@ func run(o runOpts, log *slog.Logger) error {
 		// (data/scripts/creaturescripts/player/death.lua). They were registered into a
 		// no-op, so the death list stayed empty no matter how often a character died.
 		//
-		// killer stands in for mostDamageKiller: tracking per-attacker damage to pick a
-		// different one is a separate gap, and passing the same creature is closer than
-		// passing nil, which the script would record as an environmental death.
+		// The per-attacker damage map picks the two killers the way Creature::onDeath
+		// does: the last hitter, and whoever dealt the most damage while still in the
+		// fight. They differ whenever someone softens a target and another finishes it.
 		if lengine != nil {
-			lengine.ExecuteCreatureOnDeath(p, nil, killer, killer, false, false)
+			lastHit, mostDamage := world.Killers(p)
+			if lastHit == nil {
+				lastHit = killer
+			}
+			if mostDamage == nil {
+				mostDamage = killer
+			}
+			lengine.ExecuteCreatureOnDeath(p, nil, lastHit, mostDamage, false, false)
 		}
 		protocol.HandlePlayerDeath(world, p, killer)
 		// Persist the penalty immediately so a crash/relog can't revert it.

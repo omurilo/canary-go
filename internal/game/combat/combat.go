@@ -194,6 +194,12 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 	}
 
 	if finalDamage != 0 {
+		// Attribute the hit BEFORE applying it, mirroring the order in
+		// Creature::drainHealth -> addDamagePoints: the map has to be current by the
+		// time this blow is the one that kills, or the killer is missing from it.
+		if caster != nil && finalDamage < 0 {
+			target.AddDamagePoints(caster.GetId(), -finalDamage)
+		}
 		target.ChangeHealth(finalDamage)
 		target.NotifyStatsChange()
 

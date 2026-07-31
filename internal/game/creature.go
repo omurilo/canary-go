@@ -29,6 +29,7 @@ type Creature interface {
 
 type BaseCreature struct {
 	conditionStore
+	damageTracker
 
 	World     *World
 	ID        uint32

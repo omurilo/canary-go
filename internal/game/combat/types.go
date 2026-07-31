@@ -115,6 +115,9 @@ type Creature interface {
 	RemoveCondition(conditionType ConditionType)
 	HasCondition(conditionType ConditionType) bool
 	ChangeHealth(amount int32)
+	// AddDamagePoints attributes damage to an attacker, feeding the per-attacker map
+	// Creature::onDeath reads to pick the most-damage killer.
+	AddDamagePoints(attackerID uint32, points int32)
 	ChangeMana(amount int32)
 	NotifyStatsChange()
 	GetBaseSpeed() uint16

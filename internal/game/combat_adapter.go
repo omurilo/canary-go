@@ -60,6 +60,14 @@ func (a combatAdapter) GetMaxMana() int32 {
 // (src/creatures/creature.cpp): drainHealth calls changeHealth(-damage).
 func (a combatAdapter) ChangeHealth(amount int32) { a.c.AddHealth(amount) }
 
+// AddDamagePoints forwards to the creature's damage tracker. BaseCreature and Player
+// both embed it, so every creature type answers.
+func (a combatAdapter) AddDamagePoints(attackerID uint32, points int32) {
+	if d, ok := a.c.(interface{ AddDamagePoints(uint32, int32) }); ok {
+		d.AddDamagePoints(attackerID, points)
+	}
+}
+
 func (a combatAdapter) GetBaseSpeed() uint16 { return a.c.GetBaseSpeed() }
 
 func (a combatAdapter) ChangeSpeed(delta int32) {

@@ -109,6 +109,7 @@ const (
 // keep the model flat for now.
 type Player struct {
 	conditionStore
+	damageTracker
 
 	ID            uint32 // creature id (assigned at spawn)
 	DBID          uint32 // players.id
