@@ -581,6 +581,16 @@ func run(o runOpts, log *slog.Logger) error {
 		if events.GlobalEngine != nil {
 			events.GlobalEngine.ExecuteOnDeath(p, killer)
 		}
+		// The CreatureEvent onDeath handlers are what write player_deaths
+		// (data/scripts/creaturescripts/player/death.lua). They were registered into a
+		// no-op, so the death list stayed empty no matter how often a character died.
+		//
+		// killer stands in for mostDamageKiller: tracking per-attacker damage to pick a
+		// different one is a separate gap, and passing the same creature is closer than
+		// passing nil, which the script would record as an environmental death.
+		if lengine != nil {
+			lengine.ExecuteCreatureOnDeath(p, nil, killer, killer, false, false)
+		}
 		protocol.HandlePlayerDeath(world, p, killer)
 		// Persist the penalty immediately so a crash/relog can't revert it.
 		if err := database.SavePlayer(context.Background(), p); err != nil {

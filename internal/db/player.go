@@ -125,6 +125,11 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	if err := d.LoadPlayerItems(ctx, p); err != nil {
 		return nil, err
 	}
+	if err := d.LoadPlayerKills(ctx, p); err != nil {
+		// A frag list that fails to load must not block the login; it degrades to
+		// "no frags", which is what the server did unconditionally before.
+		slog.Default().Warn("load player kills", "player", p.Name, "err", err)
+	}
 	if err := d.LoadPlayerDepot(ctx, p); err != nil {
 		return nil, err
 	}
@@ -276,10 +281,10 @@ func (d *DB) LoadPlayerWheel(ctx context.Context, p *game.Player) error {
 	// Parse JSON payload (gems, revelation stages, scrolls)
 	if propEnd < len(slotBlob) {
 		var extra struct {
-			Gems              *game.WheelGemPersistData `json:"gems"`
-			RevelationStages  map[string]uint8          `json:"revelationStages"`
-			RevelationPoints  map[string]uint16         `json:"revelationPoints"`
-			UsedScrolls       map[string]bool           `json:"usedScrolls"`
+			Gems             *game.WheelGemPersistData `json:"gems"`
+			RevelationStages map[string]uint8          `json:"revelationStages"`
+			RevelationPoints map[string]uint16         `json:"revelationPoints"`
+			UsedScrolls      map[string]bool           `json:"usedScrolls"`
 		}
 		if err := json.Unmarshal(slotBlob[propEnd:], &extra); err == nil {
 			if extra.Gems != nil {
@@ -422,7 +427,6 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		}
 	}
 
-
 	// Save Wheel of Destiny, Prey and Task Hunting slots.
 	// Per-subsystem saves. These used to be `_ = ...`; a missing table or a broken
 	// blob encoder therefore lost player state with no trace in the log.
@@ -455,6 +459,9 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		}
 	}
 
+	if err := d.SavePlayerKills(ctx, p); err != nil {
+		return err
+	}
 	if err := d.SavePlayerDepot(ctx, p); err != nil {
 		return err
 	}

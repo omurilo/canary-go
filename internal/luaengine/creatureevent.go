@@ -8,10 +8,11 @@ import (
 const luaCreatureEventTypeName = "CreatureEvent"
 
 type LuaCreatureEvent struct {
-	Name        string
-	OnLogin     *lua.LFunction
-	OnLogout    *lua.LFunction
+	Name          string
+	OnLogin       *lua.LFunction
+	OnLogout      *lua.LFunction
 	OnModalWindow *lua.LFunction
+	OnDeath       *lua.LFunction
 }
 
 // registerCreatureEvent registers the CreatureEvent global constructor and metatable
@@ -34,18 +35,27 @@ func (e *Engine) registerCreatureEvent() {
 			}
 			return 0
 		},
-		"onThink":          func(L *lua.LState) int { return 0 },
-		"onPrepareDeath":   func(L *lua.LState) int { return 0 },
-		"onDeath":          func(L *lua.LState) int { return 0 },
-		"onKill":           func(L *lua.LState) int { return 0 },
-		"onAdvance":        func(L *lua.LState) int { return 0 },
+		"onThink":        func(L *lua.LState) int { return 0 },
+		"onPrepareDeath": func(L *lua.LState) int { return 0 },
+		// onDeath was a no-op, so data/scripts/creaturescripts/player/death.lua
+		// registered its handler into nothing and player_deaths was never written —
+		// the death list stayed empty however many times a character died.
+		"onDeath": func(L *lua.LState) int {
+			ev := checkCreatureEvent(L)
+			if fn, ok := L.Get(2).(*lua.LFunction); ok {
+				ev.OnDeath = fn
+			}
+			return 0
+		},
+		"onKill":    func(L *lua.LState) int { return 0 },
+		"onAdvance": func(L *lua.LState) int { return 0 },
 		"onModalWindow": func(L *lua.LState) int {
-		ev := checkCreatureEvent(L)
-		if fn, ok := L.Get(2).(*lua.LFunction); ok {
-			ev.OnModalWindow = fn
-		}
-		return 0
-	},
+			ev := checkCreatureEvent(L)
+			if fn, ok := L.Get(2).(*lua.LFunction); ok {
+				ev.OnModalWindow = fn
+			}
+			return 0
+		},
 		"onTextEdit":       func(L *lua.LState) int { return 0 },
 		"onHealthChange":   func(L *lua.LState) int { return 0 },
 		"onManaChange":     func(L *lua.LState) int { return 0 },
@@ -90,6 +100,13 @@ func creatureEventNewIndex(L *lua.LState) int {
 		if fn, ok := val.(*lua.LFunction); ok {
 			ev.OnLogout = fn
 		}
+	} else if key == "onDeath" {
+		// The datapack installs this by assignment
+		// (`function playerDeath.onDeath(...)`, death.lua:181), not by calling the
+		// method, so __newindex is the path that actually matters.
+		if fn, ok := val.(*lua.LFunction); ok {
+			ev.OnDeath = fn
+		}
 	} else if key == "onModalWindow" {
 		if fn, ok := val.(*lua.LFunction); ok {
 			ev.OnModalWindow = fn
@@ -113,6 +130,9 @@ func (e *Engine) creatureEventRegister(L *lua.LState) int {
 	}
 	if ev.OnModalWindow != nil {
 		e.creatureEventsOnModalWindow = append(e.creatureEventsOnModalWindow, ev.OnModalWindow)
+	}
+	if ev.OnDeath != nil {
+		e.creatureEventsOnDeath = append(e.creatureEventsOnDeath, ev.OnDeath)
 	}
 	L.Push(lua.LTrue)
 	return 1
@@ -197,4 +217,57 @@ func (e *Engine) ExecuteCreatureOnModalWindow(player *game.Player, modalWindowID
 			e.log.Warn("Error executing CreatureEvent onModalWindow", "err", err)
 		}
 	}
+}
+
+// ExecuteCreatureOnDeath runs the registered onDeath handlers. The datapack's
+// signature is onDeath(player, corpse, killer, mostDamageKiller, unjustified,
+// mostDamageUnjustified) — death.lua uses every argument to build the player_deaths
+// row, so passing fewer would write a row with the wrong killer.
+//
+// corpse is passed as nil when the caller has none to hand: the script only reads it
+// for the description, and Lua guards it.
+func (e *Engine) ExecuteCreatureOnDeath(player *game.Player, corpse *game.Item, killer, mostDamageKiller game.Creature, unjustified, mostDamageUnjustified bool) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	result := true
+	for _, fn := range e.creatureEventsOnDeath {
+		e.L.Push(fn)
+
+		pUd := e.L.NewUserData()
+		pUd.Value = player
+		e.L.SetMetatable(pUd, e.L.GetTypeMetatable("Player"))
+		e.L.Push(pUd)
+
+		if corpse != nil {
+			e.pushItem(e.L, corpse)
+		} else {
+			e.L.Push(lua.LNil)
+		}
+		e.pushCreatureOrNil(killer)
+		e.pushCreatureOrNil(mostDamageKiller)
+		e.L.Push(lua.LBool(unjustified))
+		e.L.Push(lua.LBool(mostDamageUnjustified))
+
+		if err := e.L.PCall(6, 1, nil); err != nil {
+			e.log.Warn("Error executing CreatureEvent onDeath", "err", err)
+			continue
+		}
+		ret := e.L.Get(-1)
+		e.L.Pop(1)
+		if luaBool, ok := ret.(lua.LBool); ok && !bool(luaBool) {
+			result = false
+		}
+	}
+	return result
+}
+
+// pushCreatureOrNil pushes a creature userdata, or nil for an absent killer (a
+// player who drowned has no killer at all).
+func (e *Engine) pushCreatureOrNil(c game.Creature) {
+	if c == nil {
+		e.L.Push(lua.LNil)
+		return
+	}
+	e.pushCreature(e.L, c)
 }

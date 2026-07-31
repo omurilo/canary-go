@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/db"
 	"github.com/opentibiabr/canary-go/internal/config"
+	"github.com/opentibiabr/canary-go/internal/db"
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/globalevents"
 	"github.com/opentibiabr/canary-go/internal/spells"
@@ -51,6 +51,7 @@ type Engine struct {
 
 	creatureEventsOnLogin       []*lua.LFunction
 	creatureEventsOnLogout      []*lua.LFunction
+	creatureEventsOnDeath       []*lua.LFunction
 	creatureEventsOnModalWindow []*lua.LFunction
 
 	// GlobalEvents is the scheduling engine for server-wide startup/think/time
@@ -355,8 +356,6 @@ func (e *Engine) DoFile(path string) error {
 
 	}
 
-
-
 	// Bytecode cache support (config.lua: luaScriptBytecodeCache).
 
 	cacheEnabled := false
@@ -378,8 +377,6 @@ func (e *Engine) DoFile(path string) error {
 		}
 
 	}
-
-
 
 	if cacheEnabled && cacheDir != "" {
 
@@ -405,8 +402,6 @@ func (e *Engine) DoFile(path string) error {
 
 	}
 
-
-
 	src := preprocessLuaSource(string(data))
 
 	e.mu.Lock()
@@ -421,8 +416,6 @@ func (e *Engine) DoFile(path string) error {
 
 	}
 
-
-
 	// Save bytecode to cache when enabled.
 
 	if cacheEnabled && cacheDir != "" {
@@ -436,8 +429,6 @@ func (e *Engine) DoFile(path string) error {
 		}
 
 	}
-
-
 
 	e.L.Push(fn)
 

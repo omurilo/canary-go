@@ -212,14 +212,14 @@ type Player struct {
 
 	// WheelGemManager holds the player gem Atelier data (separate from Wheel).
 	WheelGemManager *WheelGemCollection
-		// WeaponProficiency tracks per-weapon bonus stats. It is DERIVED state:
-		// C++ recomputes it from Proficiency via applyPerks and never persists it.
-		WeaponProficiency *WeaponProficiency
+	// WeaponProficiency tracks per-weapon bonus stats. It is DERIVED state:
+	// C++ recomputes it from Proficiency via applyPerks and never persists it.
+	WeaponProficiency *WeaponProficiency
 
-		// Proficiency is the persisted per-weapon progression, keyed by item id.
-		// It lives in the KV store under player.<guid>.weapon-proficiency.<weaponId>,
-		// matching WeaponProficiency::load/save (weapon_proficiency.cpp:253-291).
-		Proficiency map[uint16]WeaponProficiencyData
+	// Proficiency is the persisted per-weapon progression, keyed by item id.
+	// It lives in the KV store under player.<guid>.weapon-proficiency.<weaponId>,
+	// matching WeaponProficiency::load/save (weapon_proficiency.cpp:253-291).
+	Proficiency map[uint16]WeaponProficiencyData
 
 	// Prey & Task Hunting systems. PreyCards is the wildcard/prey-card resource
 	// (schema players.prey_wildcard) spent on bonus rerolls and list selection.
@@ -246,12 +246,12 @@ type Player struct {
 	Familiars      []Familiar
 	ActiveFamiliar uint16 // lookType of active familiar (0 = none)
 
-		// Badges (B10/cyclopedia) — unlocked account badges. Mirrors C++
-		// PlayerBadge (player_badge.hpp).
-		Badges *PlayerBadges
+	// Badges (B10/cyclopedia) — unlocked account badges. Mirrors C++
+	// PlayerBadge (player_badge.hpp).
+	Badges *PlayerBadges
 
-		// Titles (B11/cyclopedia) — unlocked character titles.
-		Titles   *PlayerTitles
+	// Titles (B11/cyclopedia) — unlocked character titles.
+	Titles *PlayerTitles
 
 	// Hazard (B17) — current hazard system points.
 	HazardPoints uint32
@@ -273,8 +273,8 @@ type Player struct {
 	Hirelings []*Hireling
 
 	// Animus Mastery (B16) — unlocked animus masteries.
-	AnimusMastery      []byte         // raw blob from DB (for serialization)
-	AnimMastery        *AnimusMastery // runtime struct (lazy init via GetAnimusMastery)
+	AnimusMastery []byte         // raw blob from DB (for serialization)
+	AnimMastery   *AnimusMastery // runtime struct (lazy init via GetAnimusMastery)
 
 	// BossPoints is the bosstiary points total (players.boss_points), earned by
 	// reaching boss unlock levels and spent implicitly via the loot bonus.
@@ -326,12 +326,17 @@ type Player struct {
 	// Death / respawn state (Phase 5). LoginPosition is the temple the player
 	// returns to on death; TownID selects it. SkillLoss gates the exp/skill
 	// penalty. Blessings/SkillTries/ManaSpent feed the penalty math.
-	TownID               uint16
-	LoginPosition        Position
-	Dead                 bool
-	IsTraining           bool
-	SkillLoss            bool
-	Skull                uint8
+	TownID        uint16
+	LoginPosition Position
+	Dead          bool
+	IsTraining    bool
+	SkillLoss     bool
+	Skull         uint8
+	// UnjustifiedKills is the frag list behind the skull system, persisted in
+	// player_kills. LastKillTime is the newest entry, cached the way C++ caches it
+	// (Player::updateLastKillTimeCache).
+	UnjustifiedKills     []Kill
+	LastKillTime         int64
 	SkullTime            int64
 	ConditionsBlob       []byte
 	Blessings            [8]uint8
@@ -416,7 +421,6 @@ func (p *Player) Cooldowns() *combat.CooldownManager {
 	}
 	return p.cooldowns
 }
-
 
 // GetBadges returns the player badge state, initialising it on first use.
 func (p *Player) GetBadges() *PlayerBadges {
@@ -929,7 +933,7 @@ func (p *Player) AddExperience(exp uint64) {
 
 	if p.Level != prevLevel {
 		levelsGained := p.Level - prevLevel
-		
+
 		// Apply vocation stats if vocation is valid
 		if voc := vocations.GetVocation(uint32(p.Vocation)); voc != nil {
 			p.MaxHealth += voc.GainHP * uint32(levelsGained)
@@ -955,14 +959,14 @@ func (p *Player) SetTarget(target Creature) {
 // Crit and leech read straight out of the skills array, which is where C++ keeps
 // them (player->skills[SKILL_CRITICAL_HIT_CHANCE] and friends). They used to be
 // separate fields that nothing ever wrote, so every one of these returned 0.
-func (p *Player) GetCriticalChance() uint16  { return p.Skills[SkillCriticalHitChance] }
-func (p *Player) GetCriticalDamage() uint16  { return p.Skills[SkillCriticalHitDamage] }
-func (p *Player) GetLifeLeechChance() uint16 { return p.Skills[SkillLifeLeechChance] }
-func (p *Player) GetLifeLeechAmount() uint16 { return p.Skills[SkillLifeLeechAmount] }
-func (p *Player) GetManaLeechChance() uint16 { return p.Skills[SkillManaLeechChance] }
-func (p *Player) GetManaLeechAmount() uint16 { return p.Skills[SkillManaLeechAmount] }
-func (p *Player) GetReflectPercent() uint16 { return p.ReflectPercent }
-func (p *Player) GetAbsorbPercent() uint16 { return p.AbsorbPercent }
+func (p *Player) GetCriticalChance() uint16           { return p.Skills[SkillCriticalHitChance] }
+func (p *Player) GetCriticalDamage() uint16           { return p.Skills[SkillCriticalHitDamage] }
+func (p *Player) GetLifeLeechChance() uint16          { return p.Skills[SkillLifeLeechChance] }
+func (p *Player) GetLifeLeechAmount() uint16          { return p.Skills[SkillLifeLeechAmount] }
+func (p *Player) GetManaLeechChance() uint16          { return p.Skills[SkillManaLeechChance] }
+func (p *Player) GetManaLeechAmount() uint16          { return p.Skills[SkillManaLeechAmount] }
+func (p *Player) GetReflectPercent() uint16           { return p.ReflectPercent }
+func (p *Player) GetAbsorbPercent() uint16            { return p.AbsorbPercent }
 func (p *Player) SetAttackTarget(id uint32)           { p.TargetID = id }
 func (p *Player) ChangeTargetDistance(distance int32) {}
 func (p *Player) GetPosition() Position               { return p.Pos }
@@ -2248,7 +2252,6 @@ func (p *Player) CanFightBoss(boss string, now int64) bool {
 	return now >= p.GetBossCooldown(boss)
 }
 
-
 // VIPEntry represents a single player added to the VIP list.
 type VIPEntry struct {
 	PlayerID    uint32 // DBID of the target player
@@ -2266,7 +2269,7 @@ type VIPGroup struct {
 	Customizable bool
 }
 
-func (p *Player) IsPremium() bool { return true }
+func (p *Player) IsPremium() bool              { return true }
 func (p *Player) GetPossessivePronoun() string { return "his" }
 
 // ReportViolationEntry stores a single rule violation report submitted by a
@@ -2280,10 +2283,10 @@ type ReportViolationEntry struct {
 	Comment    string
 }
 
-func (p *Player) AddModalWindow(id uint32) {}
+func (p *Player) AddModalWindow(id uint32)      {}
 func (p *Player) HasModalWindow(id uint32) bool { return false }
-func (p *Player) RemoveModalWindow(id uint32) {}
-func (p *Player) ClearModalWindows() {}
+func (p *Player) RemoveModalWindow(id uint32)   {}
+func (p *Player) ClearModalWindows()            {}
 
 // GetStepHeight returns the step height for movement.
 func (p *Player) GetStepHeight() uint8 { return 0 }
@@ -2383,3 +2386,11 @@ func (p *Player) SetTown(id uint16) { p.TownID = id }
 
 // GetTown returns the player's town ID.
 func (p *Player) GetTown() uint16 { return p.TownID }
+
+// Kill is one entry of the unjustified-kill list (struct Kill,
+// src/creatures/creatures_definitions.hpp:1613). Target is the victim's guid.
+type Kill struct {
+	Target    uint32
+	Time      int64
+	Unavenged bool
+}
