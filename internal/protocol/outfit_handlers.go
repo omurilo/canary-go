@@ -236,6 +236,10 @@ func (g *GameProtocol) parseToggleMount(r *netmsg.Reader) {
 
 // SendCreatureOutfit sends opcode 0x8E (opCreatureOutfit) for a given creature.
 func (g *GameProtocol) SendCreatureOutfit(c game.Creature, o game.Outfit) {
+	// canSee-gated in C++ (protocolgame.cpp sendCreatureOutfit).
+	if c == nil || !g.canSee(c.GetPosition()) {
+		return
+	}
 	w := netmsg.NewWriter()
 	w.AddByte(0x8E) // opCreatureOutfit
 	w.AddU32(c.GetID())

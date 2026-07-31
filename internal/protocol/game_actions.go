@@ -739,10 +739,17 @@ func (g *GameProtocol) SendCreatureMove(oldPos game.Position, oldStack uint8, ne
 // SendAppendCreature adds a creature onto a tile in this client's view.
 func (g *GameProtocol) SendAppendCreature(p game.Creature, pos game.Position) {
 	
+	// sendAddCreature opens with `if (!canSee(pos)) return;` and then drops anything
+	// at stackpos >= 10 (protocolgame.cpp). Spectator range is wider than the client
+	// window, so without the first check every widened spectator is told to add a
+	// creature to a tile it does not hold.
+	if !g.canSee(pos) {
+		return
+	}
 	// C++ only reaches sendAddCreature with an index the tile actually yielded;
 	// an add at a made-up stackpos desyncs the client's tile stack.
 	idx := g.ClientIndexOfCreature(pos, p.GetID())
-	if idx < 0 {
+	if idx < 0 || idx >= 10 {
 		return
 	}
 	stack := uint8(idx)
@@ -756,6 +763,11 @@ func (g *GameProtocol) SendAppendCreature(p game.Creature, pos game.Position) {
 
 // SendRemoveCreatureAt removes a thing at a tile stack position.
 func (g *GameProtocol) SendRemoveCreatureAt(pos game.Position, stack uint8) {
+	// sendRemoveTileThing is canSee-gated in C++ (protocolgame.cpp): a remove naming
+	// a tile the client does not hold is exactly what it reports as "no thing at pos".
+	if !g.canSee(pos) {
+		return
+	}
 	w := netmsg.NewWriter()
 	w.AddByte(0x6C) // TileRemoveThing
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})

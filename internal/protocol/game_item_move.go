@@ -524,6 +524,10 @@ func (g *GameProtocol) revertMove(fromPos netmsg.Position, toPos netmsg.Position
 
 // sendUpdateTile sends opUpdateTile to force a client to redraw a single tile.
 func (g *GameProtocol) sendUpdateTile(pos game.Position, tile *game.Tile) {
+	// canSee-gated in C++ (protocolgame.cpp sendUpdateTile).
+	if !g.canSee(pos) {
+		return
+	}
 	w := netmsg.NewWriter()
 	w.AddByte(opUpdateTile)
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
@@ -588,6 +592,10 @@ func (g *GameProtocol) broadcastAddTileItem(pos game.Position, item *game.Item) 
 }
 
 func (g *GameProtocol) sendAddTileItem(pos game.Position, stack uint8, item *game.Item) {
+	// canSee-gated in C++ (protocolgame.cpp sendAddTileItem).
+	if !g.canSee(pos) {
+		return
+	}
 	w := netmsg.NewWriter()
 	w.AddByte(0x6A) // TileAddThing
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})

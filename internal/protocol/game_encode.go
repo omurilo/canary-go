@@ -432,7 +432,10 @@ func (g *GameProtocol) StackPosOf(pos game.Position, creatureID uint32) uint8 {
 
 // SendCreatureWalkthrough sends opcode 0x92 to update a creature's walkthrough state on client.
 func (g *GameProtocol) SendCreatureWalkthrough(c game.Creature, walkthrough bool) {
-	if c == nil || !g.canSeeCreature(c) {
+	// Two different questions: canSeeCreature is about the creature (ghost,
+	// invisible), canSee is about whether its tile is in this client's window. C++
+	// checks the position one (protocolgame.cpp sendCreatureWalkthrough).
+	if c == nil || !g.canSeeCreature(c) || !g.canSee(c.GetPosition()) {
 		return
 	}
 	w := netmsg.NewWriter()

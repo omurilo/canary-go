@@ -24,6 +24,10 @@ const (
 // sendMagicEffect shows a graphical effect at pos, mirroring the modern layout of
 // ProtocolGame::sendMagicEffect: create-effect, u16 type, source byte, end-loop.
 func (g *GameProtocol) sendMagicEffect(pos game.Position, effect uint16) {
+	// C++ gates this one on canSee too (protocolgame.cpp sendMagicEffect).
+	if !g.canSee(pos) {
+		return
+	}
 	w := netmsg.NewWriter()
 	w.AddByte(opMagicEffect)
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})

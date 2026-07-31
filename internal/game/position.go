@@ -48,15 +48,48 @@ func (p Position) Offset(d Direction) Position {
 	return p
 }
 
-// InRangeOf reports whether other is within the client view distance of p (same
-// floor). Uses the 8x6 half-viewport plus a small margin.
+// Spectator view range (src/map/map_const.hpp:12-19). It is deliberately WIDER
+// than the client's own window (8x6): the server tracks events a little beyond
+// what the player can draw, so a creature stepping into view is already known.
+const (
+	MapMaxViewPortX     = 11 // MAP_MAX_CLIENT_VIEW_PORT_X + 3
+	MapMaxViewPortY     = 11 // MAP_MAX_CLIENT_VIEW_PORT_Y + 5
+	MapInitSurfaceLayer = 7
+	MapLayerViewLimit   = 2
+)
+
+// InRangeOf reports whether other is within spectator range of p — the port of
+// Creature::canSee (src/creatures/creature.cpp:90), which calls the shared canSee
+// with MAP_MAX_VIEW_PORT_X/Y. It is symmetric, unlike the client window, and it
+// DOES span floors:
+//
+//   - on or above the surface (z <= 7) the view covers 7 -> 0;
+//   - underground it covers +/- 2 floors from the one we stand on;
+//   - and the window shifts diagonally by the floor delta, because that is how a
+//     tile one floor down is drawn.
+//
+// This used to be abs(dx) <= 9 && abs(dy) <= 7 with an early return on any floor
+// difference, which was wrong three ways: two columns too narrow, four rows too
+// short, and it delivered no cross-floor events at all — a creature on the floor
+// below was invisible to every spectator loop, so it never appeared, spoke, or
+// showed an effect.
+//
+// This is NOT the predicate for deciding what a client can render; that is
+// ProtocolGame::canSee, ported separately in the protocol layer, and it is
+// narrower and asymmetric.
 func (p Position) InRangeOf(other Position) bool {
-	if p.Z != other.Z {
+	if p.Z <= MapInitSurfaceLayer {
+		if other.Z > MapInitSurfaceLayer {
+			return false
+		}
+	} else if abs(int(p.Z)-int(other.Z)) > MapLayerViewLimit {
 		return false
 	}
-	dx := int(p.X) - int(other.X)
-	dy := int(p.Y) - int(other.Y)
-	return abs(dx) <= 9 && abs(dy) <= 7
+	offsetz := int(p.Z) - int(other.Z)
+	x, y := int(other.X), int(other.Y)
+	px, py := int(p.X), int(p.Y)
+	return x >= px-MapMaxViewPortX+offsetz && x <= px+MapMaxViewPortX+offsetz &&
+		y >= py-MapMaxViewPortY+offsetz && y <= py+MapMaxViewPortY+offsetz
 }
 
 // MaxDistance returns the max Chebyshev distance (max(dx, dy)) to other on same floor.
@@ -85,4 +118,3 @@ func abs(v int) int {
 func (p Position) DistanceTo(other Position) int {
 	return p.MaxDistance(other)
 }
-
