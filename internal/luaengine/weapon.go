@@ -20,36 +20,36 @@ var registeredWeapons []*LuaWeapon
 
 // weaponMethods has all Weapon methods.
 var weaponMethods = map[string]lua.LGFunction{
-	"action":              weaponAction,
-	"register":            weaponRegister,
-	"id":                  weaponID,
-	"level":               weaponLevel,
-	"magicLevel":          weaponMagicLevel,
-	"mana":                weaponMana,
-	"manaPercent":         weaponManaPercent,
-	"health":              weaponHealth,
-	"healthPercent":       weaponHealthPercent,
-	"soul":                weaponSoul,
-	"breakChance":         weaponBreakChance,
-	"premium":             weaponPremium,
-	"wieldUnproperly":     weaponWieldUnproperly,
-	"vocation":            weaponVocation,
-	"onUseWeapon":         weaponOnUseWeapon,
-	"element":             weaponElement,
-	"attack":              weaponAttack,
-	"defense":             weaponDefense,
-	"range":               weaponRange,
-	"charges":             weaponCharges,
-	"duration":            weaponDuration,
-	"decayTo":             weaponDecayTo,
-	"transformEquipTo":    weaponTransformEquipTo,
-	"transformDeEquipTo":  weaponTransformDeEquipTo,
-	"slotType":            weaponSlotType,
-	"hitChance":           weaponHitChance,
-	"extraElement":        weaponExtraElement,
-	"ammoType":            weaponAmmoType,
-	"maxHitChance":        weaponMaxHitChance,
-	"damage":              weaponWandDamage,
+	"action":             weaponAction,
+	"register":           weaponRegister,
+	"id":                 weaponID,
+	"level":              weaponLevel,
+	"magicLevel":         weaponMagicLevel,
+	"mana":               weaponMana,
+	"manaPercent":        weaponManaPercent,
+	"health":             weaponHealth,
+	"healthPercent":      weaponHealthPercent,
+	"soul":               weaponSoul,
+	"breakChance":        weaponBreakChance,
+	"premium":            weaponPremium,
+	"wieldUnproperly":    weaponWieldUnproperly,
+	"vocation":           weaponVocation,
+	"onUseWeapon":        weaponOnUseWeapon,
+	"element":            weaponElement,
+	"attack":             weaponAttack,
+	"defense":            weaponDefense,
+	"range":              weaponRange,
+	"charges":            weaponCharges,
+	"duration":           weaponDuration,
+	"decayTo":            weaponDecayTo,
+	"transformEquipTo":   weaponTransformEquipTo,
+	"transformDeEquipTo": weaponTransformDeEquipTo,
+	"slotType":           weaponSlotType,
+	"hitChance":          weaponHitChance,
+	"extraElement":       weaponExtraElement,
+	"ammoType":           weaponAmmoType,
+	"maxHitChance":       weaponMaxHitChance,
+	"damage":             weaponWandDamage,
 }
 
 // registerWeaponType registers the Weapon global constructor and metatable.
@@ -61,7 +61,17 @@ func (e *Engine) registerWeaponType() {
 
 // weaponConstructor creates a new Weapon with the given item id.
 func weaponConstructor(L *lua.LState) int {
-	id := uint16(L.CheckInt(1))
+	// __call puts the class table at index 1, so Weapon(WEAPON_AMMO) arrives as
+	// (class, WEAPON_AMMO). Reading index 1 as a number made every weapon script
+	// abort with "number expected, got table"; the table form Weapon{...} passes
+	// no id at all, which is why the fallback is a zero id rather than an error.
+	var id uint16
+	for _, idx := range []int{2, 1} {
+		if L.GetTop() >= idx && L.Get(idx).Type() == lua.LTNumber {
+			id = uint16(L.CheckInt(idx))
+			break
+		}
+	}
 	w := &LuaWeapon{
 		Weapon: &game.Weapon{ID: id},
 	}

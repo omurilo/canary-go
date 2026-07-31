@@ -29,7 +29,6 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 		}
 	}
 
-
 	// 3. Load Inbox
 	if p.Inbox == nil {
 		p.Inbox = &game.Item{ID: game.ItemInbox}
@@ -52,7 +51,11 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 
 	// 4. Load Reward Chest
 	if p.RewardChest == nil {
-		p.RewardChest = &game.Item{ID: 21557} // ITEM_REWARD_CHEST
+		// ITEM_REWARD_CHEST is 19250 (utils_definitions.hpp:610). 21557 is not an
+		// item id in C++ or in items.xml, so nothing could resolve it: the client
+		// read a zero appearance id for the reward chest and the rest of the frame
+		// shifted from there.
+		p.RewardChest = &game.Item{ID: 19250}
 	}
 	rewardItemsBySID, rewardRows, err := d.loadItemsFromTable(ctx, p.DBID, "player_rewards")
 	if err != nil {
@@ -231,7 +234,6 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 	if err := saveTree("player_items", invRoots); err != nil {
 		return err
 	}
-
 
 	// 3. Save Inbox
 	var inboxRoots []itemRow
