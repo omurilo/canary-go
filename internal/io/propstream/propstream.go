@@ -108,6 +108,12 @@ func (p *PropWriteStream) GetStream() []byte {
 	return p.buf
 }
 
+// WriteBytes appends a pre-encoded blob verbatim, used when an attribute list has
+// already been serialised elsewhere (tile_store nests one item inside another).
+func (p *PropWriteStream) WriteBytes(b []byte) {
+	p.buf = append(p.buf, b...)
+}
+
 func (p *PropWriteStream) Clear() {
 	p.buf = p.buf[:0]
 }

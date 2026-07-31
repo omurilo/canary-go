@@ -71,9 +71,31 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 	if len(blob) == 0 {
 		return nil, subType, nil
 	}
+	a, sub, children, err := DecodeItemAttributesFrom(propstream.NewPropStream(blob), subType)
+	if err != nil {
+		return nil, subType, err
+	}
+	if children >= 0 {
+		// A whole-blob caller (player_items) has no way to read the nested children:
+		// those rows link containers by pid/sid instead, so the tag never appears
+		// there. Reject it rather than silently dropping the contents.
+		return nil, subType, fmt.Errorf("item attr %d not supported for decode", attrContainerItems)
+	}
+	return a, sub, nil
+}
 
-	ps := propstream.NewPropStream(blob)
+// DecodeItemAttributesFrom reads ONE item's attribute list from ps, stopping at the
+// ATTR_NONE terminator, and reports how far it got. It is the streaming half of
+// DecodeItemAttributes, needed because tile_store nests whole items inside an
+// attribute list (IOMapSerialize::saveItem) and a whole-blob decoder cannot tell the
+// caller where one item's attributes end.
+//
+// children is -1 when the list ended at the terminator, and >= 0 when it stopped on
+// ATTR_CONTAINER_ITEMS — in which case it is the declared child count and the caller
+// must read that many nested items before the terminator.
+func DecodeItemAttributesFrom(ps *propstream.PropStream, subType uint16) (*ItemAttributes, uint16, int64, error) {
 	a := &ItemAttributes{}
+	children := int64(-1)
 
 	for ps.Size() > 0 {
 		attrType, err := ps.ReadUint8()
@@ -88,14 +110,14 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 		case attrStore: // int64
 			v, err := ps.ReadInt64()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.StoreTimestamp = &v
 
 		case attrCount, attrRuneCharges: // uint8 -> subtype
 			v, err := ps.ReadUint8()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			subType = uint16(v)
 			a.HasCount = true
@@ -103,169 +125,169 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 		case attrActionID: // uint16
 			v, err := ps.ReadUint16()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.ActionID = &v
 
 		case attrUniqueID: // uint16
 			v, err := ps.ReadUint16()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.UniqueID = &v
 
 		case attrTeleDest:
 			x, err := ps.ReadUint16()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			y, err := ps.ReadUint16()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			z, err := ps.ReadUint8()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.TeleDest = &Position{X: x, Y: y, Z: z}
 
 		case attrText:
 			v, err := ps.ReadString()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Text = &v
 
 		case attrWrittenDate: // uint64
 			v, err := ps.ReadUint64()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.WrittenDate = &v
 
 		case attrWrittenBy:
 			v, err := ps.ReadString()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.WrittenBy = &v
 
 		case attrDesc:
 			v, err := ps.ReadString()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Description = &v
 
 		case attrCharges: // uint16
 			v, err := ps.ReadUint16()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Charges = &v
 
 		case attrDuration: // int32
 			v, err := ps.ReadInt32()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Duration = &v
 
 		case attrDecayingState: // uint8
 			v, err := ps.ReadUint8()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.DecayState = &v
 
 		case attrName:
 			v, err := ps.ReadString()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Name = &v
 
 		case attrArticle:
 			v, err := ps.ReadString()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Article = &v
 
 		case attrPluralName:
 			v, err := ps.ReadString()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.PluralName = &v
 
 		case attrWeight: // uint32
 			v, err := ps.ReadUint32()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Weight = &v
 
 		case attrAttack: // int32
 			v, err := ps.ReadInt32()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Attack = &v
 
 		case attrDefense: // int32
 			v, err := ps.ReadInt32()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Defense = &v
 
 		case attrExtraDefense: // int32
 			v, err := ps.ReadInt32()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.ExtraDefense = &v
 
 		case attrArmor: // int32
 			v, err := ps.ReadInt32()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Armor = &v
 
 		case attrHitChance: // int8
 			v, err := ps.ReadInt8()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.HitChance = &v
 
 		case attrShootRange: // uint8
 			v, err := ps.ReadUint8()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.ShootRange = &v
 
 		case attrTier: // uint8
 			v, err := ps.ReadUint8()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Tier = &v
 
 		case attrAmount: // uint16
 			v, err := ps.ReadUint16()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Amount = &v
 
 		case attrOwner: // uint32
 			v, err := ps.ReadUint32()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.Owner = &v
 
@@ -276,62 +298,71 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 		// unmodelled content (see DecodeItemAttributes callers).
 		case attrTileFlags: // uint32 (map tiles)
 			if err := ps.Skip(4); err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 		case attrDepotID: // uint16
 			if err := ps.Skip(2); err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 		case attrHouseDoorID: // uint8
 			v, err := ps.ReadUint8()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.HouseDoorID = &v
 		case attrSleeperGUID: // uint32
 			if err := ps.Skip(4); err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 		case attrSleepStart: // uint32
 			if err := ps.Skip(4); err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 
 		case attrItem: // uint16
 			if err := ps.Skip(2); err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 		case attrImbuementSlot, attrMantra: // int32
 			if err := ps.Skip(4); err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 		case attrOpenContainer: // uint8
 			v, err := ps.ReadUint8()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.OpenContainer = &v
 		case attrQuickLootContainer: // uint32 category bitmask
 			v, err := ps.ReadUint32()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.QuickLootContainer = &v
 		case attrObtainContainer: // uint32 category bitmask
 			v, err := ps.ReadUint32()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			a.ObtainContainer = &v
 		case attrSpecial, attrStoreInboxCategory: // string
 			if _, err := ps.ReadString(); err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 
 		// Tags whose payload is a nested structure we cannot faithfully parse
 		// yet: signal the caller to preserve the raw blob instead.
-		case attrContainerItems, attrCustomAttributes:
-			return nil, subType, fmt.Errorf("item attr %d not supported for decode", attrType)
+		case attrContainerItems:
+			// Hand control back so the caller can read the nested items: tile_store
+			// writes whole items inside the attribute list.
+			n, err := ps.ReadUint32()
+			if err != nil {
+				return nil, subType, children, err
+			}
+			return a, subType, int64(n), nil
+
+		case attrCustomAttributes:
+			return nil, subType, children, fmt.Errorf("item attr %d not supported for decode", attrType)
 
 		// ATTR_CUSTOM carries key-value pairs (e.g. imbuement data). We skip
 		// over it so DecodeItemAttributes succeeds and Attr stays non-nil,
@@ -339,24 +370,24 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 		case attrCustom:
 			count, err := ps.ReadUint64()
 			if err != nil {
-				return nil, subType, err
+				return nil, subType, children, err
 			}
 			for i := uint64(0); i < count; i++ {
 				if _, err := ps.ReadString(); err != nil {
-					return nil, subType, err
+					return nil, subType, children, err
 				}
 				valType, err := ps.ReadUint8()
 				if err != nil {
-					return nil, subType, err
+					return nil, subType, children, err
 				}
 				switch valType {
 				case 1: // string
 					if _, err := ps.ReadString(); err != nil {
-						return nil, subType, err
+						return nil, subType, children, err
 					}
 				case 2: // int64
 					if _, err := ps.ReadInt64(); err != nil {
-						return nil, subType, err
+						return nil, subType, children, err
 					}
 				default:
 					ps.Skip(8)
@@ -364,11 +395,11 @@ func DecodeItemAttributes(blob []byte, subType uint16) (*ItemAttributes, uint16,
 			}
 
 		default:
-			return nil, subType, fmt.Errorf("unknown item attr %d", attrType)
+			return nil, subType, children, fmt.Errorf("unknown item attr %d", attrType)
 		}
 	}
 
-	return a, subType, nil
+	return a, subType, children, nil
 }
 
 // Encode serialises the structured attributes back into an OTBR ATTR_* blob,

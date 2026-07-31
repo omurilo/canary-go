@@ -473,6 +473,15 @@ func run(o runOpts, log *slog.Logger) error {
 	} else {
 		world.RegisterHouseTiles()
 		log.Info("houses loaded and tiles registered", "count", len(world.Houses))
+
+		// Furniture and container contents inside houses live in tile_store. Nothing
+		// read this table before, so everything a player left in their house was lost
+		// on every restart (IOMapSerialize::loadHouseItems).
+		if restored, err := database.LoadHouseItems(ctx, world); err != nil {
+			log.Warn("load house items", "err", err)
+		} else {
+			log.Info("house items loaded", "items", restored)
+		}
 	}
 
 	// Load houses from DB and register their map tiles.
@@ -903,11 +912,43 @@ func run(o runOpts, log *slog.Logger) error {
 		"legacy1100", cfg.Legacy1100Port,
 		"legacy860", cfg.Legacy860Port)
 
+	// saveHouseItems rewrites tile_store from the live map. It runs on shutdown and
+	// periodically, because a crash between saves loses whatever changed since the
+	// last one — the same reason C++ has both a save-on-exit and a save interval.
+	saveHouseItems := func(reason string) {
+		saveCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		saved, err := database.SaveHouseItems(saveCtx, world)
+		if err != nil {
+			log.Error("save house items", "reason", reason, "err", err)
+			return
+		}
+		log.Info("house items saved", "reason", reason, "tiles", saved)
+	}
+
+	houseSaveInterval := time.Duration(cfg.Number("houseStoreInterval", 15)) * time.Minute
+	if houseSaveInterval > 0 {
+		go func() {
+			t := time.NewTicker(houseSaveInterval)
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.C:
+					saveHouseItems("interval")
+				}
+			}
+		}()
+	}
+
 	select {
 	case <-ctx.Done():
 		log.Info("shutting down")
+		saveHouseItems("shutdown")
 		return nil
 	case err := <-errCh:
+		saveHouseItems("shutdown")
 		return err
 	}
 }
