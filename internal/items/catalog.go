@@ -127,6 +127,13 @@ type ItemType struct {
 	ShootRange   uint8
 	// IsCorpse comes from the appearance flags, not items.xml (items.cpp:233).
 	IsCorpse bool
+	// The remaining blocking/orientation flags Item::hasProperty answers with
+	// (items.cpp:237-251). BlockSolid above is unpass; these complete the set.
+	BlockProjectile bool // unsight
+	BlockPathFind   bool // avoid
+	Movable         bool // !unmove
+	IsVertical      bool // hook direction south
+	IsHorizontal    bool // hook direction east
 	// ShootType is the numeric ShootType_t, as C++ stores it. Weapon:shootType sets
 	// it from Lua, so it cannot be the items.xml name string it used to be.
 	ShootType ShootTypes
@@ -343,6 +350,13 @@ func Load(path string) (*Catalog, error) {
 			it.WrapKit = f.GetWrapkit()
 			// ItemType::isCorpse (items.cpp:233): either flag counts.
 			it.IsCorpse = f.GetCorpse() || f.GetPlayerCorpse()
+			it.BlockProjectile = f.GetUnsight()
+			it.BlockPathFind = f.GetAvoid()
+			it.Movable = !f.GetUnmove()
+			if h := f.GetHook(); h != nil {
+				it.IsVertical = h.GetDirection() == appproto.HOOK_TYPE_HOOK_TYPE_SOUTH
+				it.IsHorizontal = h.GetDirection() == appproto.HOOK_TYPE_HOOK_TYPE_EAST
+			}
 			it.BlockSolid = f.GetUnpass()
 			it.Pickupable = f.GetTake()
 			if h := f.GetHeight(); h != nil && h.GetElevation() > 0 {

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/items"
 )
 
 // The Zone class used to sit behind mockClass, so every one of these calls returned
@@ -136,6 +137,81 @@ func TestZonePositionsFilterByTile(t *testing.T) {
 			if pos:getTile() then withTiles = withTiles + 1 end
 		end
 		assert(withTiles == 2, "expected 2 positions with tiles, got " .. withTiles)
+	`); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+// The datapack defines Tile:isWalkable itself (data/libs/functions/tile.lua:39) and
+// Go's class-table sharing makes it reachable, so there was never a Go method to
+// add. What it needs underneath is a hasProperty that answers the property it was
+// actually asked about — this exercises the real thing end to end.
+func TestDatapackIsWalkableRunsAgainstRealProperties(t *testing.T) {
+	e := newTestEngine()
+	defer e.Close()
+	e.world.Items = items.NewCatalog(
+		&items.ItemType{ID: 1, Name: "grass", Movable: false},
+		&items.ItemType{ID: 2, Name: "wall", BlockSolid: true, BlockProjectile: true, Movable: false},
+	)
+
+	open := game.Position{X: 10, Y: 10, Z: 7}
+	blocked := game.Position{X: 11, Y: 10, Z: 7}
+	noGround := game.Position{X: 12, Y: 10, Z: 7}
+	e.world.Map.SetTile(open, &game.Tile{Ground: &game.Item{ID: 1}})
+	e.world.Map.SetTile(blocked, &game.Tile{Ground: &game.Item{ID: 1}, Items: []*game.Item{{ID: 2}}})
+	e.world.Map.SetTile(noGround, &game.Tile{})
+
+	// The subset of data/libs/functions/tile.lua the callers actually reach, with
+	// the same argument list the datapack uses: (pz, creature, floorchange, block, proj).
+	if err := e.L.DoString(`
+		function Tile:isWalkable(pz, creature, floorchange, block, proj)
+			if not self then return false end
+			if not self:getGround() then return false end
+			if self:hasProperty(CONST_PROP_BLOCKSOLID) or self:hasProperty(CONST_PROP_BLOCKPROJECTILE) then
+				return false
+			end
+			if self:hasProperty(CONST_PROP_IMMOVABLEBLOCKSOLID) then return false end
+			if creature and self:getTopCreature() ~= nil then return false end
+			return true
+		end
+
+		local openTile = Position(10, 10, 7):getTile()
+		assert(openTile ~= nil, "the open tile must exist")
+		assert(openTile:isWalkable(false, false, false, false, true) == true, "plain ground is walkable")
+
+		local blockedTile = Position(11, 10, 7):getTile()
+		assert(blockedTile ~= nil, "the blocked tile must exist")
+		assert(blockedTile:isWalkable(false, false, false, false, true) == false,
+			"a tile holding a solid wall must not be walkable")
+
+		local groundless = Position(12, 10, 7):getTile()
+		assert(groundless ~= nil)
+		assert(groundless:isWalkable(false, false, false, false, true) == false, "no ground, not walkable")
+	`); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+// hasProperty must answer the question asked. With the argument discarded, every
+// property returned whatever BlockSolid was, so a tile that only blocks projectiles
+// looked walkable.
+func TestTileHasPropertyDistinguishesProperties(t *testing.T) {
+	e := newTestEngine()
+	defer e.Close()
+	e.world.Items = items.NewCatalog(
+		&items.ItemType{ID: 1, Name: "grass"},
+		// Blocks projectiles and pathfinding, but is NOT solid.
+		&items.ItemType{ID: 3, Name: "bush", BlockProjectile: true, BlockPathFind: true},
+	)
+	pos := game.Position{X: 5, Y: 5, Z: 7}
+	e.world.Map.SetTile(pos, &game.Tile{Ground: &game.Item{ID: 1}, Items: []*game.Item{{ID: 3}}})
+
+	if err := e.L.DoString(`
+		local tile = Position(5, 5, 7):getTile()
+		assert(tile:hasProperty(CONST_PROP_BLOCKSOLID) == false, "the bush is not solid")
+		assert(tile:hasProperty(CONST_PROP_BLOCKPROJECTILE) == true, "but it does block projectiles")
+		assert(tile:hasProperty(CONST_PROP_BLOCKPATH) == true, "and pathfinding")
+		assert(tile:hasProperty(CONST_PROP_HASHEIGHT) == false)
 	`); err != nil {
 		t.Fatalf("%v", err)
 	}

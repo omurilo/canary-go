@@ -2,6 +2,7 @@ package luaengine
 
 import (
 	"fmt"
+	"github.com/opentibiabr/canary-go/internal/items"
 	"math"
 	"strconv"
 
@@ -142,14 +143,16 @@ func itemRemove(L *lua.LState) int {
 func (e *Engine) itemMethods() map[string]lua.LGFunction {
 	return map[string]lua.LGFunction{
 		"isItem": func(L *lua.LState) int { L.Push(lua.LTrue); return 1 },
+		// item:hasProperty(prop), a port of Item::hasProperty (item.cpp). The property
+		// argument used to be discarded and BlockSolid answered every question, so
+		// asking about BLOCKPROJECTILE, BLOCKPATH or any of the immovable/nofield
+		// variants got the wrong answer for every item that is not simply solid.
 		"hasProperty": func(L *lua.LState) int {
 			it := checkItem(L)
-			_ = L.OptInt(2, 0)
+			prop := items.ItemProperty(L.OptInt(2, 0))
 			var has bool
-			if cat := e.itemCatalog(); cat != nil {
-				if ct := cat.Get(it.item.ID); ct != nil {
-					has = ct.BlockSolid
-				}
+			if cat := e.itemCatalog(); cat != nil && it.item != nil {
+				has = cat.Get(it.item.ID).HasProperty(prop)
 			}
 			L.Push(lua.LBool(has))
 			return 1

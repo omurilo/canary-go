@@ -2,6 +2,7 @@ package luaengine
 
 import (
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/items"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -241,11 +242,19 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			L.Push(tbl)
 			return 1
 		},
+		// tile:hasProperty(prop) ports Tile::hasProperty (tile.cpp), which reads the
+		// TILESTATE_ flag the tile accumulated as items were added. Go's Tile keeps
+		// only the OTBM flags, so the value is derived the way setTileFlags builds it:
+		// the tile has a property when any thing on it does.
+		//
+		// The property argument used to be discarded and BlocksSolid answered
+		// everything, which made the datapack's Tile:isWalkable — the one that filters
+		// zone positions and teleport destinations — accept tiles that block
+		// projectiles or pathfinding.
 		"hasProperty": func(L *lua.LState) int {
 			t := checkTile(L, 1)
-			_ = L.OptInt(2, 0)
-			has := t.tile.BlocksSolid(e.itemCatalog())
-			L.Push(lua.LBool(has))
+			prop := items.ItemProperty(L.OptInt(2, 0))
+			L.Push(lua.LBool(tileHasProperty(t.tile, e.itemCatalog(), prop)))
 			return 1
 		},
 		"getItemCount": func(L *lua.LState) int {
@@ -306,7 +315,10 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		},
 		"getFieldItem": func(L *lua.LState) int {
 			t := checkTile(L, 1)
-			if t.tile == nil { L.Push(lua.LNil); return 1 }
+			if t.tile == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			cat := e.itemCatalog()
 			for _, it := range t.tile.Items {
 				if cat != nil {
@@ -321,7 +333,10 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		},
 		"getItemByTopOrder": func(L *lua.LState) int {
 			t := checkTile(L, 1)
-			if t.tile == nil { L.Push(lua.LNil); return 1 }
+			if t.tile == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			order := L.CheckInt(2)
 			cat := e.itemCatalog()
 			for _, it := range t.tile.Items {
@@ -337,7 +352,10 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		},
 		"getBottomVisibleCreature": func(L *lua.LState) int {
 			t := checkTile(L, 1)
-			if t.tile == nil { L.Push(lua.LNil); return 1 }
+			if t.tile == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			if len(t.tile.Creatures) > 0 {
 				e.pushCreature(L, t.tile.Creatures[len(t.tile.Creatures)-1])
 				return 1
@@ -347,7 +365,10 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		},
 		"getDownItemCount": func(L *lua.LState) int {
 			t := checkTile(L, 1)
-			if t.tile == nil { L.Push(lua.LNumber(0)); return 1 }
+			if t.tile == nil {
+				L.Push(lua.LNumber(0))
+				return 1
+			}
 			count := 0
 			cat := e.itemCatalog()
 			for _, it := range t.tile.Items {
@@ -362,7 +383,10 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		},
 		"getTopItemCount": func(L *lua.LState) int {
 			t := checkTile(L, 1)
-			if t.tile == nil { L.Push(lua.LNumber(0)); return 1 }
+			if t.tile == nil {
+				L.Push(lua.LNumber(0))
+				return 1
+			}
 			count := 0
 			cat := e.itemCatalog()
 			for _, it := range t.tile.Items {
@@ -377,10 +401,19 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		},
 		"getThingIndex": func(L *lua.LState) int {
 			t := checkTile(L, 1)
-			if t.tile == nil { L.Push(lua.LNumber(0)); return 1 }
-			if L.GetTop() < 2 { L.Push(lua.LNumber(0)); return 1 }
+			if t.tile == nil {
+				L.Push(lua.LNumber(0))
+				return 1
+			}
+			if L.GetTop() < 2 {
+				L.Push(lua.LNumber(0))
+				return 1
+			}
 			ud, ok := L.Get(2).(*lua.LUserData)
-			if !ok { L.Push(lua.LNumber(0)); return 1 }
+			if !ok {
+				L.Push(lua.LNumber(0))
+				return 1
+			}
 			// Check for creature
 			for i, cr := range t.tile.Creatures {
 				if ud.Value == cr {
@@ -405,4 +438,22 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 			return 1
 		},
 	}
+}
+
+// tileHasProperty reports whether any thing on the tile has the property, which is
+// how Tile::setTileFlags accumulates the TILESTATE_ flags that Tile::hasProperty
+// then reads back.
+func tileHasProperty(t *game.Tile, cat *items.Catalog, prop items.ItemProperty) bool {
+	if t == nil || cat == nil {
+		return false
+	}
+	if t.Ground != nil && cat.Get(t.Ground.ID).HasProperty(prop) {
+		return true
+	}
+	for _, it := range t.Items {
+		if it != nil && cat.Get(it.ID).HasProperty(prop) {
+			return true
+		}
+	}
+	return false
 }
