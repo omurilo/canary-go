@@ -112,14 +112,21 @@ type Player struct {
 	conditionStore
 	damageTracker
 
-	ID            uint32 // creature id (assigned at spawn)
-	DBID          uint32 // players.id
-	AccountID     uint32
-	AccountType   uint8
-	GroupID       uint16 // players.group_id — staff groups 4/5/6 cannot be attacked
-	Ghost         bool   // ghost mode (invisible; not targetable by monsters)
-	Name          string
-	GuildName     string
+	ID          uint32 // creature id (assigned at spawn)
+	DBID        uint32 // players.id
+	AccountID   uint32
+	AccountType uint8
+	GroupID     uint16 // players.group_id — staff groups 4/5/6 cannot be attacked
+	Ghost       bool   // ghost mode (invisible; not targetable by monsters)
+	Name        string
+	// GuildID is the guilds.id row, needed to query guild_wars; GuildName alone
+	// cannot, and looking the guild up by name only works once it is registered in
+	// the world.
+	GuildID   uint32
+	GuildName string
+	// GuildWarList holds the guild ids this player's guild is at war with, loaded at
+	// login (IOGuild::getWarList). Kills between guilds at war are justified.
+	GuildWarList  []uint32
 	GuildRankName string
 	GuildNick     string
 

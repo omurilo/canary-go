@@ -156,12 +156,24 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 
 	// Mounts and outfits are loaded from the KV store by the subsystem loop below.
 	// Load player guild membership
-	gQuery := `SELECT g.name, r.name, m.nick
+	gQuery := `SELECT g.id, g.name, r.name, m.nick
 	           FROM guild_membership m
 	           JOIN guilds g ON m.guild_id = g.id
 	           JOIN guild_ranks r ON m.rank_id = r.id
 	           WHERE m.player_id = ? LIMIT 1`
-	_ = d.SQL.QueryRowContext(ctx, gQuery, p.DBID).Scan(&p.GuildName, &p.GuildRankName, &p.GuildNick)
+	_ = d.SQL.QueryRowContext(ctx, gQuery, p.DBID).Scan(&p.GuildID, &p.GuildName, &p.GuildRankName, &p.GuildNick)
+
+	// The war list is loaded with the guild, as IOLoginDataLoad does
+	// (iologindata_load_player.cpp:432). Without it every kill between warring
+	// guilds counts as a frag.
+	if p.GuildID != 0 {
+		wars, err := d.LoadGuildWarList(ctx, p.GuildID)
+		if err != nil {
+			slog.Default().Warn("load guild war list", "player", p.Name, "guild", p.GuildID, "err", err)
+		} else {
+			p.GuildWarList = wars
+		}
+	}
 
 	// Per-subsystem loads. These used to be `_ = ...`, which hid real failures.
 	// Everything not backed by a canonical column now reads from the KV store.

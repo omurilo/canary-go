@@ -98,15 +98,10 @@ func (p *Player) IsPartner(other *Player) bool {
 
 // IsGuildMate reports shared guild membership (Player::isGuildMate).
 func (p *Player) IsGuildMate(other *Player) bool {
-	if other == nil {
+	if other == nil || p.GuildID == 0 {
 		return false
 	}
-	mine := p.GetGuild()
-	if mine == nil {
-		return false
-	}
-	theirs := other.GetGuild()
-	return theirs != nil && mine.ID == theirs.ID
+	return p.GuildID == other.GuildID
 }
 
 // CannotGainInFight is PlayerFlags_t::NotGainInFight, the staff flag that keeps a
@@ -169,12 +164,29 @@ func (p *Player) OnKilledPlayer(target *Player, lastHit bool) bool {
 	return unjustified
 }
 
-// IsInWarWith reports an active guild war, which makes kills between the two guilds
-// justified. guild_wars is not ported, so this is always false — and that is the
-// safe direction: it can only make a kill count that should not have, never hide
-// one, and the wrong answer is visible as an unexpected skull rather than as a
-// silently missing frag.
+// IsInWarWith reports an active guild war between the two players' guilds, which
+// makes kills between them justified. Port of Player::isInWar.
+//
+// The check is deliberately SYMMETRIC — each side must carry the other's guild in
+// its own war list. The lists are snapshots taken at login, so one player can be
+// holding a stale one; requiring both to agree means a war that ended, or one that
+// started after someone logged in, cannot silently excuse a murder in one direction
+// only.
 func (p *Player) IsInWarWith(other *Player) bool {
+	if other == nil || p.GuildID == 0 || other.GuildID == 0 {
+		return false
+	}
+	return p.IsInWarList(other.GuildID) && other.IsInWarList(p.GuildID)
+}
+
+// IsInWarList reports whether guildID is in this player's war list
+// (Player::isInWarList).
+func (p *Player) IsInWarList(guildID uint32) bool {
+	for _, id := range p.GuildWarList {
+		if id == guildID {
+			return true
+		}
+	}
 	return false
 }
 

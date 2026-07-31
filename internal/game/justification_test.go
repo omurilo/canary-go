@@ -255,3 +255,81 @@ func TestHasAttackedAndHasKilled(t *testing.T) {
 		t.Errorf("a kill past the orange-skull window must not count")
 	}
 }
+
+// Player::isInWar is symmetric: each side must carry the other's guild in its own
+// list. The lists are login-time snapshots, so requiring agreement is what stops a
+// stale one from excusing a murder in a single direction.
+func TestIsInWarWithIsSymmetric(t *testing.T) {
+	_, a, b := pvpPair(t)
+	a.GuildID, b.GuildID = 1, 2
+
+	if a.IsInWarWith(b) {
+		t.Errorf("no war declared, must be false")
+	}
+
+	// Only one side knows about the war — a stale snapshot.
+	a.GuildWarList = []uint32{2}
+	if a.IsInWarWith(b) {
+		t.Errorf("a one-sided war list must not count")
+	}
+	if b.IsInWarWith(a) {
+		t.Errorf("and it must not count from the other direction either")
+	}
+
+	// Both agree.
+	b.GuildWarList = []uint32{1}
+	if !a.IsInWarWith(b) {
+		t.Errorf("a mutual war list must count")
+	}
+	if !b.IsInWarWith(a) {
+		t.Errorf("war must be symmetric")
+	}
+
+	// Guildless players are never at war.
+	b.GuildID = 0
+	if a.IsInWarWith(b) {
+		t.Errorf("a guildless player cannot be at war")
+	}
+}
+
+// A kill between guilds at war is justified: it is the one case where an
+// unprovoked kill of an unskulled player does NOT earn a frag.
+func TestGuildWarKillIsJustified(t *testing.T) {
+	_, killer, victim := pvpPair(t)
+	killer.GuildID, victim.GuildID = 1, 2
+	killer.AddAttacked(victim)
+
+	// Without the war, the same situation is a frag.
+	if !killer.OnKilledPlayer(victim, true) {
+		t.Fatalf("precondition: an unprovoked kill is unjustified without a war")
+	}
+
+	_, warKiller, warVictim := pvpPair(t)
+	warKiller.GuildID, warVictim.GuildID = 1, 2
+	warKiller.GuildWarList = []uint32{2}
+	warVictim.GuildWarList = []uint32{1}
+	warKiller.AddAttacked(warVictim)
+
+	if warKiller.OnKilledPlayer(warVictim, true) {
+		t.Errorf("a kill between guilds at war must be justified")
+	}
+	if len(warKiller.UnjustifiedKills) != 0 {
+		t.Errorf("no frag for a war kill: %+v", warKiller.UnjustifiedKills)
+	}
+}
+
+// Guild mates never frag each other, now keyed on the id rather than the name.
+func TestGuildMatesAreJustified(t *testing.T) {
+	_, killer, victim := pvpPair(t)
+	killer.GuildID, victim.GuildID = 7, 7
+	killer.AddAttacked(victim)
+	if killer.OnKilledPlayer(victim, true) {
+		t.Errorf("killing a guild mate must be justified")
+	}
+	// A guildless pair is not "the same guild".
+	_, a, b := pvpPair(t)
+	a.AddAttacked(b)
+	if a.IsGuildMate(b) {
+		t.Errorf("two guildless players must not count as guild mates")
+	}
+}
