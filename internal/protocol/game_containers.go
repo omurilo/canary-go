@@ -1,10 +1,8 @@
 package protocol
 
 import (
-	"runtime/debug"
-	"fmt"
-	"strings"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/opentibiabr/canary-go/internal/actions"
@@ -45,7 +43,7 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	if t == nil {
 		return
 	}
-	
+
 	// Execute Lua action first
 	action := actions.FindAction(item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
 	if action != nil {
@@ -100,7 +98,7 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	// Fallback to FloorChange if the item has it
 	if t.FloorChange != "" {
 		teleportPos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
-		// Typically, using a ladder/sewer drops you at the same X/Y but different Z, 
+		// Typically, using a ladder/sewer drops you at the same X/Y but different Z,
 		// but let's apply the floor change shift if any.
 		switch t.FloorChange {
 		case "down":
@@ -118,16 +116,16 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 			teleportPos.Z--
 			teleportPos.X--
 		}
-		
+
 		g.broadcastRemove(g.player)
 		g.deps.World.SetPosition(g.player, teleportPos)
-		
+
 		w := netmsg.NewWriter()
 		w.AddByte(opFullMap)
 		w.AddPosition(netmsg.Position{X: g.player.Pos.X, Y: g.player.Pos.Y, Z: g.player.Pos.Z})
 		g.addMapDescription(w, int(g.player.Pos.X)-viewportX, int(g.player.Pos.Y)-viewportY, g.player.Pos.Z, mapWidth, mapHeight)
 		g.SendToClient(w)
-		
+
 		g.broadcastAppear(g.player)
 		return
 	}
@@ -153,13 +151,9 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		g.SendOpenMarket()
 		return
 	}
-	if item.ID == 21557 {
-		slog.Default().Info("parseUseItem CALLED FOR REWARD CHEST", "pos", pos, "index", index)
-	}
-
-		// Gold pouch (ITEM_GOLD_POUCH = 23721) pode nao ser marcado como container no protobuf
-		// Tratar explicitamente como container (C++ Container subclass)
-		if item.ID == game.ItemGoldPouch || t.IsContainer() {
+	// Gold pouch (ITEM_GOLD_POUCH = 23721) pode nao ser marcado como container no protobuf
+	// Tratar explicitamente como container (C++ Container subclass)
+	if item.ID == game.ItemGoldPouch || t.IsContainer() {
 		if cid := g.player.GetContainerID(item); cid != -1 {
 			g.player.CloseContainer(uint8(cid))
 			w := netmsg.NewWriter()
@@ -205,10 +199,10 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 			teleportPos.X--
 		case "southalt":
 			teleportPos.Z--
-			teleportPos.Y+=2
+			teleportPos.Y += 2
 		case "eastalt":
 			teleportPos.Z--
-			teleportPos.X+=2
+			teleportPos.X += 2
 		}
 
 		g.broadcastRemove(g.player)
@@ -224,17 +218,17 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	} else if (t.ForceUse || t.IsLadder) && pos.X != 0xFFFF {
 		teleportPos := game.Position{X: pos.X, Y: pos.Y + 1, Z: pos.Z - 1}
 		p := g.player
-		
+
 		g.broadcastRemove(p)
-		
+
 		g.deps.World.SetPosition(p, teleportPos)
-		
+
 		w := netmsg.NewWriter()
 		w.AddByte(opFullMap)
 		w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
 		g.addMapDescription(w, int(p.Pos.X)-viewportX, int(p.Pos.Y)-viewportY, p.Pos.Z, mapWidth, mapHeight)
 		g.SendToClient(w)
-		
+
 		g.broadcastAppear(p)
 	}
 }
@@ -282,11 +276,11 @@ func (g *GameProtocol) reconcileUsedItem(item *game.Item, pos netmsg.Position, s
 		}
 		if pos.Y >= 0x40 { // inside a container
 			cid := uint8(pos.Y - 0x40)
-		cont, offset, ok := g.openContainerByCID(cid)
-		if !ok {
-			return
-		}
-		slot := uint8(int(pos.Z) + offset)
+			cont, offset, ok := g.openContainerByCID(cid)
+			if !ok {
+				return
+			}
+			slot := uint8(int(pos.Z) + offset)
 			if !ok {
 				return
 			}
@@ -357,10 +351,6 @@ func (g *GameProtocol) openContainerWithPos(item *game.Item, pos game.Position, 
 // sendContainer sends the container window (0x6E), mirroring the modern layout of
 // the original protocol.
 func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool) {
-	slog.Default().Info("DEBUG: sendContainer CALLED", "cid", cid, "itemId", item.ID)
-	if item.ID == 21557 {
-		slog.Default().Info(fmt.Sprintf("STACK TRACE FOR 21557: \n%s", string(debug.Stack())))
-	}
 	t := g.deps.Items.Get(item.ID)
 	name := "Container"
 	movable := byte(0)
@@ -816,7 +806,6 @@ func (g *GameProtocol) isExAction(item *game.Item) bool {
 	return false
 }
 
-
 // restoreOpenContainers recursively scans the player's inventory and depot
 // to restore any containers that were left open by the client (attrOpenContainer).
 func (g *GameProtocol) restoreOpenContainers() {
@@ -831,9 +820,9 @@ func (g *GameProtocol) restoreOpenContainers() {
 		}
 		if item.Attr != nil && item.Attr.OpenContainer != nil {
 			cid := *item.Attr.OpenContainer
-			
+
 			slog.Default().Info("Restoring open container", "cid", cid, "itemId", item.ID)
-			
+
 			g.player.OpenContainerAtWithPos(cid, item, game.Position{}, false)
 			g.sendContainer(cid, item, item.Parent != nil)
 			// Clear it so it gets wiped from the DB on next save, preventing it from
