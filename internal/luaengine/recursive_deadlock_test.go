@@ -24,7 +24,7 @@ func TestRecursiveDeadlockAvoidanceOnMoveAndSay(t *testing.T) {
 	npc.SetPlayerInteraction(player.ID, 0)
 
 	// Wire OnCreatureMove and OnCreatureSay like main.go
-	e.world.OnCreatureMove = func(c game.Creature, oldPos game.Position, newPos game.Position, oldTileIndex int) {
+	e.world.OnCreatureMove = func(c game.Creature, oldPos game.Position, newPos game.Position, oldStackPos map[uint32]int) {
 		if playerObj, ok := c.(*game.Player); ok {
 			for _, cr := range e.world.Creatures() {
 				if npcObj, ok := cr.(*game.Npc); ok && npcObj.IsInteractingWithPlayer(playerObj.ID) {

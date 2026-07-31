@@ -48,10 +48,21 @@ type World struct {
 	Decay *DecayManager
 	BrowseFields map[Position]*Item
 
-	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldTileIndex int)
+	// oldStackPos maps a spectating player's creature id to the client stack index
+	// the moving/removed creature occupied in THAT player's view, captured while it
+	// was still on the tile. -1, or a missing key, means the spectator could not see
+	// it and must receive no packet at all. C++ builds the same per-spectator vector
+	// before the removal (Map::moveCreature, src/map/map.cpp:739-747); reconstructing
+	// a single index afterwards is wrong for every spectator whose view differs, and
+	// races with concurrent edits to the tile.
+	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldStackPos map[uint32]int)
 	OnCreatureAppear func(c Creature)
-	OnCreatureRemove func(c Creature, oldTileIndex int)
+	OnCreatureRemove func(c Creature, oldStackPos map[uint32]int)
 	OnGhostModeChange func(p *Player)
+
+	// CaptureStackPositions is populated by the protocol layer. It is always called
+	// with w.mu already held, so its implementation must not take the lock again.
+	CaptureStackPositions func(pos Position, c Creature) map[uint32]int
 
 	// Combat hooks, populated by the protocol layer so the combat engine can
 	// push updates to clients without importing the protocol package.
@@ -364,10 +375,11 @@ func (w *World) RemovePlayer(id uint32) {
  ok {
 		delete(w.players, id)
 		delete(w.byName, strings.ToLower(p.Name))
-		oldIdx := w.removeCreatureFromTile(p)
+		oldStackPos := w.captureStackPositions(p.Pos, p)
+		w.removeCreatureFromTile(p)
 		w.mu.Unlock()
 		if w.OnCreatureRemove != nil {
-			w.OnCreatureRemove(p, oldIdx)
+			w.OnCreatureRemove(p, oldStackPos)
 		}
 		return
 	}
@@ -428,31 +440,37 @@ func (w *World) addCreatureToTile(c Creature) {
 	}
 }
 
-func (w *World) removeCreatureFromTile(c Creature) int {
+// removeCreatureFromTile takes c off its tile and reports whether it was found.
+// It deliberately does NOT return the slice index: an index cannot be turned back
+// into a client stack position afterwards (that needs the creatures which were
+// above it, and each spectator's visibility), so callers snapshot the
+// per-spectator stack positions with captureStackPositions first.
+func (w *World) removeCreatureFromTile(c Creature) bool {
 	t := w.Map.GetTile(c.GetPosition())
 	if t != nil {
 		for i, v := range t.Creatures {
 			if v.GetID() == c.GetID() {
 				t.Creatures = append(t.Creatures[:i], t.Creatures[i+1:]...)
-				return i
+				return true
 			}
 		}
 	}
-	return -1
+	return false
 }
 
 // RemoveCreature removes a non-player creature from the world.
 func (w *World) RemoveCreature(id uint32) {
 	w.mu.Lock()
 	c, exists := w.creatures[id]
-	var oldIdx int
+	var oldStackPos map[uint32]int
 	if exists {
 		delete(w.creatures, id)
-		oldIdx = w.removeCreatureFromTile(c)
+		oldStackPos = w.captureStackPositions(c.GetPosition(), c)
+		w.removeCreatureFromTile(c)
 	}
 	w.mu.Unlock()
 	if exists && w.OnCreatureRemove != nil {
-		w.OnCreatureRemove(c, oldIdx)
+		w.OnCreatureRemove(c, oldStackPos)
 	}
 }
 
@@ -468,6 +486,12 @@ func (w *World) OnlineCount() int {
 func (w *World) Spectators(pos Position, excludeID uint32) []*Player {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
+	return w.SpectatorsLocked(pos, excludeID)
+}
+
+// SpectatorsLocked is Spectators without the lock, for callers that already hold
+// w.mu (the stack-position capture runs inside the move critical section).
+func (w *World) SpectatorsLocked(pos Position, excludeID uint32) []*Player {
 	var out []*Player
 	for id, p := range w.players {
 		if id == excludeID {
@@ -478,6 +502,17 @@ func (w *World) Spectators(pos Position, excludeID uint32) []*Player {
 		}
 	}
 	return out
+}
+
+// captureStackPositions snapshots the per-spectator client stack index of c on its
+// current tile. It must be called with w.mu held and BEFORE c is taken off the
+// tile: the index depends on which creatures are above it and on what each
+// spectator can see, neither of which is recoverable once it is gone.
+func (w *World) captureStackPositions(pos Position, c Creature) map[uint32]int {
+	if w.CaptureStackPositions == nil {
+		return nil
+	}
+	return w.CaptureStackPositions(pos, c)
 }
 
 func (w *World) SpectatorCreatures(pos Position) []Creature {
@@ -557,14 +592,15 @@ func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 	w.mu.Lock()
 	p.IsTraining = false
 	oldPos := p.Pos
-	oldTileIndex := w.removeCreatureFromTile(p)
+	oldStackPos := w.captureStackPositions(oldPos, p)
+	w.removeCreatureFromTile(p)
 	p.Pos = dest
 	p.Direction = dir
 	w.addCreatureToTile(p)
 	w.mu.Unlock()
 
 	if w.OnCreatureMove != nil {
-		w.OnCreatureMove(p, oldPos, dest, oldTileIndex)
+		w.OnCreatureMove(p, oldPos, dest, oldStackPos)
 	}
 
 	return dest, true
@@ -581,13 +617,14 @@ func (w *World) TeleportCreature(c Creature, dest Position) {
 		player.IsTraining = false
 	}
 	oldPos := c.GetPosition()
-	oldTileIndex := w.removeCreatureFromTile(c)
+	oldStackPos := w.captureStackPositions(oldPos, c)
+	w.removeCreatureFromTile(c)
 	c.SetPosition(dest)
 	w.addCreatureToTile(c)
 	w.mu.Unlock()
 
 	if w.OnCreatureMove != nil {
-		w.OnCreatureMove(c, oldPos, dest, oldTileIndex)
+		w.OnCreatureMove(c, oldPos, dest, oldStackPos)
 	}
 }
 
@@ -613,16 +650,18 @@ func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 		player.IsTraining = false
 	}
 	oldPos := c.GetPosition()
-	oldTileIndex := w.removeCreatureFromTile(c)
+	oldStackPos := w.captureStackPositions(oldPos, c)
+	w.removeCreatureFromTile(c)
 	c.SetPosition(dest)
 	c.SetDirection(dir)
 	w.addCreatureToTile(c)
 	w.mu.Unlock()
-	
+
 	if w.OnCreatureMove != nil {
-		w.OnCreatureMove(c, oldPos, dest, oldTileIndex)
+		w.OnCreatureMove(c, oldPos, dest, oldStackPos)
 	}
-	
+
+
 	return dest, true
 }
 

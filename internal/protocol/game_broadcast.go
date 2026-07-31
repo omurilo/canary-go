@@ -32,8 +32,70 @@ func BroadcastCreatureSay(w *game.World, c game.Creature, talkType byte, text st
 	}
 }
 
-// BroadcastCreatureMove tells spectators about a creature's movement.
-func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position, newPos game.Position, oldTileIndex int) {
+// CaptureStackPositions snapshots, for every player spectating pos, the client
+// stack index c currently occupies in that player's view. It is wired into
+// World.CaptureStackPositions and runs INSIDE the world lock, before the creature
+// leaves the tile — the port of the oldStackPosVector loop in Map::moveCreature
+// (src/map/map.cpp:739-747). A spectator who cannot see c is recorded as -1 and
+// receives no packet, matching the `if (stackpos != -1)` guard at map.cpp:783.
+func CaptureStackPositions(w *game.World, pos game.Position, c game.Creature) map[uint32]int {
+	if c == nil {
+		return nil
+	}
+	out := make(map[uint32]int)
+	for _, s := range w.SpectatorsLocked(pos, c.GetID()) {
+		gp, ok := s.Session.(*GameProtocol)
+		if !ok {
+			continue
+		}
+		if !gp.canSeeCreature(c) {
+			out[s.ID] = -1
+			continue
+		}
+		out[s.ID] = gp.clientIndexOfCreatureLocked(pos, c.GetID())
+	}
+	return out
+}
+
+// moveAction is what a single spectator must receive for one creature move.
+type moveAction int
+
+const (
+	// moveActionNone sends nothing at all. C++ reaches it via the
+	// `if (stackpos != -1)` guard at src/map/map.cpp:783.
+	moveActionNone      moveAction = iota
+	moveActionShift                // 0x6D, the cheap same-floor step
+	moveActionRemoveAdd            // 0x6C + 0x6A, when a shift cannot express the move
+	moveActionRemove               // 0x6C only, the creature left this client's view
+)
+
+// creatureMoveAction is the branch table of ProtocolGame::sendMoveCreature
+// (protocolgame.cpp:8700), restricted to the non-self case — a moving player's own
+// client is re-centred separately, above. captured reports whether the spectator
+// had a stack position snapshotted at all; oldStack < 0 means they could not see
+// the creature. Either way they get nothing: a remove at a guessed stackpos
+// deletes whatever else the client has on that tile.
+func creatureMoveAction(oldStack int, captured, seesNew, teleport, known bool) moveAction {
+	if !captured || oldStack < 0 {
+		return moveActionNone
+	}
+	if !seesNew {
+		return moveActionRemove
+	}
+	// A teleport, a floor change, or a stackpos past the client's 10-thing window
+	// cannot be followed by a shift, so C++ degrades to remove + add. `known` is
+	// the Go stand-in for sendAddCreature's known-creature handshake: a 0x6D naming
+	// a creature the client has never seen has nothing to move.
+	if teleport || oldStack >= 10 || !known {
+		return moveActionRemoveAdd
+	}
+	return moveActionShift
+}
+
+// BroadcastCreatureMove tells spectators about a creature's movement. oldStackPos
+// carries the per-spectator stack index captured before the creature left the old
+// tile; it cannot be recomputed here, because the creature is already gone.
+func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position, newPos game.Position, oldStackPos map[uint32]int) {
 	// A far move (teleport: different floor or beyond an adjacent step) has no
 	// client-side map shift, so the moved player's OWN client must be re-centred
 	// with a full map description. Normal 1-tile walks are handled by walk()
@@ -50,6 +112,11 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 		}
 	}
 
+	// Same predicate the self-recentre above uses, and the same one C++ derives in
+	// Map::moveCreature (map.cpp:706): anything that is not an adjacent same-floor
+	// step cannot be expressed as a 0x6D shift.
+	teleport := oldPos.Z != newPos.Z || chebyshev(oldPos, newPos) > 1
+
 	visited := map[uint32]bool{c.GetID(): true}
 
 	for _, s := range w.Spectators(oldPos, c.GetID()) {
@@ -58,13 +125,16 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 			continue
 		}
 		visited[s.ID] = true
-		if s.Pos.InRangeOf(newPos) && gp.isKnown(c.GetID()) {
-			// Stack position in the old tile
-			oldStack := gp.StackPosWithIndex(oldPos, oldTileIndex)
-			gp.SendCreatureMove(oldPos, oldStack, newPos)
-		} else {
-			oldStack := gp.StackPosWithIndex(oldPos, oldTileIndex)
-			gp.SendRemoveCreatureAt(oldPos, oldStack)
+
+		oldStack, captured := oldStackPos[s.ID]
+		switch creatureMoveAction(oldStack, captured, s.Pos.InRangeOf(newPos), teleport, gp.isKnown(c.GetID())) {
+		case moveActionShift:
+			gp.SendCreatureMove(oldPos, uint8(oldStack), newPos)
+		case moveActionRemoveAdd:
+			gp.SendRemoveCreatureAt(oldPos, uint8(oldStack))
+			gp.SendAppendCreature(c, newPos)
+		case moveActionRemove:
+			gp.SendRemoveCreatureAt(oldPos, uint8(oldStack))
 		}
 	}
 	for _, s := range w.Spectators(newPos, c.GetID()) {
@@ -86,14 +156,19 @@ func BroadcastCreatureAppear(w *game.World, c game.Creature) {
 	}
 }
 
-// BroadcastCreatureRemove tells spectators a creature was removed.
-// oldTileIndex is the creature's index in tile.Creatures before removal.
-func BroadcastCreatureRemove(w *game.World, c game.Creature, oldTileIndex int) {
+// BroadcastCreatureRemove tells spectators a creature was removed. oldStackPos
+// holds the per-spectator stack index captured while it was still on the tile.
+func BroadcastCreatureRemove(w *game.World, c game.Creature, oldStackPos map[uint32]int) {
 	for _, s := range w.Spectators(c.GetPosition(), c.GetID()) {
-		if gp, ok := s.Session.(*GameProtocol); ok {
-			stack := gp.StackPosWithIndex(c.GetPosition(), oldTileIndex)
-			gp.SendRemoveCreatureAt(c.GetPosition(), stack)
+		gp, ok := s.Session.(*GameProtocol)
+		if !ok {
+			continue
 		}
+		stack, captured := oldStackPos[s.ID]
+		if !captured || stack < 0 {
+			continue
+		}
+		gp.SendRemoveCreatureAt(c.GetPosition(), uint8(stack))
 	}
 }
 
@@ -106,9 +181,12 @@ func BroadcastGhostModeChange(w *game.World, p *game.Player) {
 		}
 		if p.Ghost {
 			if !gp.canSeeCreature(p) {
-				stack := gp.StackPosOf(p.Pos, p.ID)
-				gp.SendRemoveCreatureAt(p.Pos, stack)
-				gp.setKnown(p.ID, false)
+				// Resolved in the spectator's own view, and only if it is actually
+				// there: a remove at a guessed stackpos deletes the wrong thing.
+				if stack := gp.ClientIndexOfCreature(p.Pos, p.ID); stack >= 0 {
+					gp.SendRemoveCreatureAt(p.Pos, uint8(stack))
+					gp.setKnown(p.ID, false)
+				}
 			}
 		} else {
 			if gp.canSeeCreature(p) {

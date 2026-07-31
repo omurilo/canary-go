@@ -489,14 +489,25 @@ func (g *GameProtocol) sendMapShift(dir game.Direction, pos game.Position) {
 func (g *GameProtocol) turn(dir game.Direction) {
 	p := g.player
 	p.Direction = dir
-	
-	stack := g.StackPosOf(p.Pos, p.ID)
 
+	// Per Player::sendCreatureTurn (src/creatures/players/player.cpp:8671) the
+	// stack position is resolved in EACH receiver's view — one value taken from the
+	// turning player's own view is wrong for anyone whose tile stack differs (an
+	// invisible creature between them, say). Out of range, C++ falls back to a full
+	// tile update rather than naming a stackpos the client cannot address.
 	notify := func(gp *GameProtocol) {
+		if !gp.canSeeCreature(p) {
+			return
+		}
+		stack := gp.ClientIndexOfCreature(p.Pos, p.ID)
+		if stack < 0 || stack >= 10 {
+			gp.sendUpdateTile(p.Pos, gp.deps.World.Map.GetTile(p.Pos))
+			return
+		}
 		w := netmsg.NewWriter()
 		w.AddByte(opTileTransform)
 		w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
-		w.AddByte(stack)
+		w.AddByte(uint8(stack))
 		w.AddU16(creatureTurnMark)
 		w.AddU32(p.ID)
 		w.AddByte(byte(dir))
@@ -696,14 +707,22 @@ func (g *GameProtocol) broadcastAppear(p game.Creature) {
 	}
 }
 
-// broadcastRemove tells nearby players a creature left.
+// broadcastRemove tells nearby players a creature left. It must run while the
+// creature is still on its tile — the stack position is resolved per receiver
+// (Map::moveCreature builds the same per-spectator vector before the removal), so
+// a single value from the leaver's own view is wrong for anyone whose stack differs.
 func (g *GameProtocol) broadcastRemove(p game.Creature) {
-	
-	stack := g.StackPosOf(p.GetPosition(), p.GetID())
-	for _, s := range g.deps.World.Spectators(p.GetPosition(), p.GetID()) {
-		if gp, ok := s.Session.(*GameProtocol); ok {
-			gp.SendRemoveCreatureAt(p.GetPosition(), stack)
+	pos := p.GetPosition()
+	for _, s := range g.deps.World.Spectators(pos, p.GetID()) {
+		gp, ok := s.Session.(*GameProtocol)
+		if !ok {
+			continue
 		}
+		stack := gp.ClientIndexOfCreature(pos, p.GetID())
+		if stack < 0 {
+			continue // this client never had it on the tile
+		}
+		gp.SendRemoveCreatureAt(pos, uint8(stack))
 	}
 }
 
@@ -720,7 +739,13 @@ func (g *GameProtocol) SendCreatureMove(oldPos game.Position, oldStack uint8, ne
 // SendAppendCreature adds a creature onto a tile in this client's view.
 func (g *GameProtocol) SendAppendCreature(p game.Creature, pos game.Position) {
 	
-	stack := g.StackPosOf(pos, p.GetID())
+	// C++ only reaches sendAddCreature with an index the tile actually yielded;
+	// an add at a made-up stackpos desyncs the client's tile stack.
+	idx := g.ClientIndexOfCreature(pos, p.GetID())
+	if idx < 0 {
+		return
+	}
+	stack := uint8(idx)
 	w := netmsg.NewWriter()
 	w.AddByte(0x6A) // TileAddThing
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})

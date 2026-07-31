@@ -57,7 +57,7 @@ func TestCombatEngine_Death(t *testing.T) {
 
 	var itemsAppeared, removed, targetsLost int
 	w.OnItemAppear = func(Position, *Item) { itemsAppeared++ }
-	w.OnCreatureRemove = func(Creature, int) { removed++ }
+	w.OnCreatureRemove = func(Creature, map[uint32]int) { removed++ }
 	w.OnTargetLost = func(*Player) { targetsLost++ }
 
 	pos := Position{X: 101, Y: 100, Z: 7}

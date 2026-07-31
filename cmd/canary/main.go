@@ -428,8 +428,14 @@ func run(o runOpts, log *slog.Logger) error {
 
 	var lengine *luaengine.Engine
 
-	world.OnCreatureMove = func(c game.Creature, oldPos game.Position, newPos game.Position, oldTileIndex int) {
-		protocol.BroadcastCreatureMove(world, c, oldPos, newPos, oldTileIndex)
+	// Runs inside the world lock, before the creature leaves its tile: the client
+	// stack index is only knowable while it is still there.
+	world.CaptureStackPositions = func(pos game.Position, c game.Creature) map[uint32]int {
+		return protocol.CaptureStackPositions(world, pos, c)
+	}
+
+	world.OnCreatureMove = func(c game.Creature, oldPos game.Position, newPos game.Position, oldStackPos map[uint32]int) {
+		protocol.BroadcastCreatureMove(world, c, oldPos, newPos, oldStackPos)
 		if lengine != nil {
 			if player, ok := c.(*game.Player); ok {
 				for _, cr := range world.Creatures() {
@@ -463,8 +469,8 @@ func run(o runOpts, log *slog.Logger) error {
 	world.OnCreatureAppear = func(c game.Creature) {
 		protocol.BroadcastCreatureAppear(world, c)
 	}
-	world.OnCreatureRemove = func(c game.Creature, oldTileIndex int) {
-		protocol.BroadcastCreatureRemove(world, c, oldTileIndex)
+	world.OnCreatureRemove = func(c game.Creature, oldStackPos map[uint32]int) {
+		protocol.BroadcastCreatureRemove(world, c, oldStackPos)
 	}
 	world.OnGhostModeChange = func(p *game.Player) {
 		protocol.BroadcastGhostModeChange(world, p)

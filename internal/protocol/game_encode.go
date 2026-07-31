@@ -317,56 +317,61 @@ func (g *GameProtocol) addMapDescription(w *netmsg.Writer, x, y int, z uint8, wi
 	}
 }
 
-// StackPosOf returns the tile stack position of the given creature, matching the
-// order addTileDescription emits: ground, always-on-top items, then creatures.
-func (g *GameProtocol) StackPosOf(pos game.Position, creatureID uint32) uint8 {
+// ClientIndexOfCreature ports Tile::getClientIndexOfCreature
+// (src/items/tile.cpp:1433). It is the index this client's tile stack assigns to
+// creatureID: ground, then always-on-top items, then the creatures ABOVE the
+// target that this player can see — walked in reverse, because the client stacks
+// the most recently added creature lowest. Returns -1 when the creature is not on
+// the tile, exactly like the C++; -1 means "send no packet", not "stackpos 0".
+//
+// Note the upstream method has no cap: the 10-thing limit is applied by the
+// sender (sendMoveCreature falls back to remove+add when oldStackPos >= 10), not
+// here. Tile::getStackposOfCreature is the capped variant and has no callers.
+func (g *GameProtocol) ClientIndexOfCreature(pos game.Position, creatureID uint32) int {
 	g.deps.World.RLock()
 	defer g.deps.World.RUnlock()
-	stack := 0
-	tile := g.deps.World.Map.GetTile(pos)
-	if tile != nil {
-		if tile.Ground != nil {
-			stack++
-		}
-		for _, it := range tile.Items {
-			if g.isTopItem(it) {
-				stack++
-			}
-		}
-		for i := len(tile.Creatures) - 1; i >= 0; i-- {
-			c := tile.Creatures[i]
-			if c.GetID() == creatureID {
-				return uint8(stack)
-			}
-			if g.canSeeCreature(c) {
-				stack++
-			}
-		}
-	}
-	return uint8(stack)
+	return g.clientIndexOfCreatureLocked(pos, creatureID)
 }
 
-// StackPosWithIndex returns the tile stack position for a creature that was at the
-// specified index in the Tile.Creatures slice before it was removed.
-func (g *GameProtocol) StackPosWithIndex(pos game.Position, tileIndex int) uint8 {
-	g.deps.World.RLock()
-	defer g.deps.World.RUnlock()
-	stack := 0
+// clientIndexOfCreatureLocked is ClientIndexOfCreature for callers that already
+// hold the world lock (the pre-removal capture runs inside it).
+func (g *GameProtocol) clientIndexOfCreatureLocked(pos game.Position, creatureID uint32) int {
 	tile := g.deps.World.Map.GetTile(pos)
-	if tile != nil {
-		if tile.Ground != nil {
-			stack++
-		}
-		for _, it := range tile.Items {
-			if g.isTopItem(it) {
-				stack++
-			}
-		}
-		if tileIndex >= 0 {
-			stack += len(tile.Creatures) - tileIndex
+	if tile == nil {
+		return -1
+	}
+	n := 0
+	if tile.Ground != nil {
+		n = 1
+	}
+	for _, it := range tile.Items {
+		if g.isTopItem(it) {
+			n++
 		}
 	}
-	return uint8(stack)
+	for i := len(tile.Creatures) - 1; i >= 0; i-- {
+		c := tile.Creatures[i]
+		if c.GetID() == creatureID {
+			return n
+		}
+		if g.canSeeCreature(c) {
+			n++
+		}
+	}
+	return -1
+}
+
+// StackPosOf returns the tile stack position of a creature known to be on the
+// tile: it is only used for the moving player's own view, taken before the step,
+// mirroring the newStackPos argument C++ passes to sendAddCreature. Everything
+// that resolves another player's view must use ClientIndexOfCreature and honour
+// its -1.
+func (g *GameProtocol) StackPosOf(pos game.Position, creatureID uint32) uint8 {
+	idx := g.ClientIndexOfCreature(pos, creatureID)
+	if idx < 0 {
+		return 0
+	}
+	return uint8(idx)
 }
 
 // SendCreatureWalkthrough sends opcode 0x92 to update a creature's walkthrough state on client.
