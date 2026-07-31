@@ -77,14 +77,42 @@ func (e *Engine) registerPosition() {
 			L.Push(lua.LTrue)
 			return 1
 		},
+		// position:getTile() was a stub returning nil for every position, which made
+		// every caller take its "no tile here" branch on a fully loaded map. That is
+		// what made Zone:randomPosition report "no valid positions" for a zone whose
+		// addArea had worked: it tests `tile and ...` per position and the tile was
+		// always nil (PositionFunctions::luaPositionGetTile).
 		"getTile": func(L *lua.LState) int {
 			pos := checkPosition(L, 1)
-			_ = pos
-			L.Push(lua.LNil)
+			if e.world == nil || e.world.Map == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			t := e.world.Map.GetTile(pos)
+			if t == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			pushTile(L, t, pos)
 			return 1
 		},
+		// position:getZones() returns nil when there is no tile, and the zones covering
+		// it otherwise (luaPositionGetZones). It used to always return an empty table,
+		// which reads as "this position is in no zone".
 		"getZones": func(L *lua.LState) int {
-			L.Push(L.NewTable())
+			pos := checkPosition(L, 1)
+			if e.world == nil || e.world.Map == nil || e.world.Map.GetTile(pos) == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			zones := e.world.Zones.At(pos)
+			tbl := L.CreateTable(len(zones), 0)
+			for i, z := range zones {
+				pushZone(L, z)
+				tbl.RawSetInt(i+1, L.Get(-1))
+				L.Pop(1)
+			}
+			L.Push(tbl)
 			return 1
 		},
 		"removeMagicEffect": func(L *lua.LState) int {
@@ -240,5 +268,3 @@ func positionEq(L *lua.LState) int {
 	L.Push(lua.LBool(p1.X == p2.X && p1.Y == p2.Y && p1.Z == p2.Z))
 	return 1
 }
-
-

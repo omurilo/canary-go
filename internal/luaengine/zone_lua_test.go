@@ -79,3 +79,64 @@ func TestZoneLuaSeesMapZones(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+// position:getTile() was a stub that returned nil for every position, so every
+// caller took its "no tile here" branch even on a fully loaded map. That is what
+// made Zone:randomPosition (data/libs/systems/zones.lua) report "no valid
+// positions" for a zone whose addArea had worked perfectly: it filters positions
+// with `tile and ...` and the tile was always nil.
+func TestPositionGetTileAndGetZones(t *testing.T) {
+	e := newTestEngine()
+	defer e.Close()
+
+	here := game.Position{X: 500, Y: 500, Z: 7}
+	e.world.Map.SetTile(here, &game.Tile{Ground: &game.Item{ID: 1}})
+
+	z, _ := e.world.Zones.Add("plaza", 0)
+	z.AddArea(game.Area{From: here, To: here})
+
+	if err := e.L.DoString(`
+		local tile = Position(500, 500, 7):getTile()
+		assert(tile ~= nil, "a loaded tile must be returned, not nil")
+		local p = tile:getPosition()
+		assert(p.x == 500 and p.y == 500 and p.z == 7, "the tile must carry its position")
+
+		-- No tile at all is still nil, which is what the datapack guards on.
+		assert(Position(1, 1, 7):getTile() == nil)
+
+		local zones = Position(500, 500, 7):getZones()
+		assert(zones ~= nil, "getZones on a real tile must return a table")
+		assert(#zones == 1, "expected one zone, got " .. #zones)
+		assert(zones[1]:getName() == "plaza")
+
+		-- C++ returns nil rather than an empty table when there is no tile.
+		assert(Position(1, 1, 7):getZones() == nil)
+	`); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+// The end-to-end shape of the raid script that was failing: build a zone from two
+// areas, then filter its positions by whether a tile exists there.
+func TestZonePositionsFilterByTile(t *testing.T) {
+	e := newTestEngine()
+	defer e.Close()
+	// Two of the four positions have tiles.
+	for _, p := range []game.Position{{X: 10, Y: 10, Z: 7}, {X: 11, Y: 10, Z: 7}} {
+		e.world.Map.SetTile(p, &game.Tile{Ground: &game.Item{ID: 1}})
+	}
+	if err := e.L.DoString(`
+		local z = Zone("raid-area")
+		z:addArea(Position(10, 10, 7), Position(11, 10, 7))
+		z:addArea(Position(20, 20, 7), Position(21, 20, 7))
+		local positions = z:getPositions()
+		assert(#positions == 4, "zone should span 4 positions, got " .. #positions)
+		local withTiles = 0
+		for _, pos in ipairs(positions) do
+			if pos:getTile() then withTiles = withTiles + 1 end
+		end
+		assert(withTiles == 2, "expected 2 positions with tiles, got " .. withTiles)
+	`); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
