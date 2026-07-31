@@ -347,6 +347,47 @@ func run(o runOpts, log *slog.Logger) error {
 				world.TownNames[uint16(t.ID)] = t.Name
 			}
 
+			// Zones: the OTBM tiles carry the ids, `<map>-zones.xml` carries the names.
+			// Positions go in first and the XML names them afterwards, which is exactly
+			// the order C++ uses (tiles auto-create by id, addZone then links the name).
+			world.Zones.ApplyZonePositions(res.ZonePositions)
+
+			// IOMap::loadZones takes the name from the OTBM header and only derives
+			// `<mapname>-zones.xml` when the header is silent. Maps in the wild carry a
+			// stale header — otservbr.otbm names "canary-zones.xml" while the file next
+			// to it is "otservbr-zones.xml" — and upstream simply loads no zones there.
+			// The derived name is therefore tried as a FALLBACK when the header's file
+			// is missing. It only fires where C++ would already have failed, so it
+			// cannot change behaviour on a map whose header is right.
+			derived := filepath.Join(mapDir, strings.TrimSuffix(filepath.Base(mapFilePath), filepath.Ext(mapFilePath))+"-zones.xml")
+			candidates := []string{derived}
+			if res.ZoneFile != "" {
+				candidates = []string{filepath.Join(mapDir, res.ZoneFile), derived}
+			}
+			zonesLoaded := false
+			for i, zonesPath := range candidates {
+				named, err := world.Zones.LoadZonesFromXML(zonesPath, 0)
+				if err != nil && os.IsNotExist(err) {
+					log.Debug("no zones file", "path", zonesPath)
+					continue
+				}
+				if err != nil {
+					log.Warn("load zones", "path", zonesPath, "err", err)
+				}
+				if i > 0 {
+					log.Warn("the OTBM header points at a zones file that does not exist; used the map-derived name instead",
+						"header", candidates[0], "used", zonesPath)
+				}
+				log.Info("loaded zones", "file", zonesPath, "named", named,
+					"total", world.Zones.Count(), "positioned", len(res.ZonePositions))
+				zonesLoaded = true
+				break
+			}
+			if !zonesLoaded && len(res.ZonePositions) > 0 {
+				log.Warn("the map has zone tiles but no zones file named them",
+					"zoneIds", len(res.ZonePositions), "tried", candidates)
+			}
+
 			// Load houses from the house XML file (OTBM reference).
 			if res.HouseFile != "" {
 				housePath := filepath.Join(mapDir, res.HouseFile)

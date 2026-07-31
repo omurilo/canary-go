@@ -17,36 +17,36 @@ import (
 // World is the authoritative in-memory game state: the map plus all online
 // players. It is safe for concurrent use.
 type World struct {
-	mu             sync.RWMutex
-	Map            *Map
-	Towns          map[string]Position
-	TownsByID      map[uint16]Position // town id -> temple position (from the OTBM)
-	TownNames      map[uint16]string   // town id -> name (from the OTBM)
-	DefaultSpawn   Position
-	WorldType      uint8 // 1 = WORLD_TYPE_NO_PVP, 2 = WORLD_TYPE_PVP, 3 = WORLD_TYPE_PVP_ENFORCED
-	AutoBank       bool
+	mu                  sync.RWMutex
+	Map                 *Map
+	Towns               map[string]Position
+	TownsByID           map[uint16]Position // town id -> temple position (from the OTBM)
+	TownNames           map[uint16]string   // town id -> name (from the OTBM)
+	DefaultSpawn        Position
+	WorldType           uint8 // 1 = WORLD_TYPE_NO_PVP, 2 = WORLD_TYPE_PVP, 3 = WORLD_TYPE_PVP_ENFORCED
+	AutoBank            bool
 	OnModalWindowAnswer func(p *Player, id uint32, button uint8, choice uint8)
-	ChatManager     *ChatManager
-	WaitingList     *WaitingList
-	BoostedCreature string
-	BoostedBoss     string
-	players        map[uint32]*Player
-	byName         map[string]*Player
-	creatures      map[uint32]Creature
-	nextCreatureID atomic.Uint32
-	guilds         map[uint32]*Guild
+	ChatManager         *ChatManager
+	WaitingList         *WaitingList
+	BoostedCreature     string
+	BoostedBoss         string
+	players             map[uint32]*Player
+	byName              map[string]*Player
+	creatures           map[uint32]Creature
+	nextCreatureID      atomic.Uint32
+	guilds              map[uint32]*Guild
 
-	Items *items.Catalog
-	Monsters *creatures.TypeRegistry
-	Charms *charms.Registry
-	Imbuements *imbuements.Registry
-	Achievements    *AchievementRegistry
+	Items               *items.Catalog
+	Monsters            *creatures.TypeRegistry
+	Charms              *charms.Registry
+	Imbuements          *imbuements.Registry
+	Achievements        *AchievementRegistry
 	ItemClassifications map[uint8]*ItemClassification
-	Dispatcher      *WDRRDispatcher
-	Houses          map[uint32]*House
-	Market       *Market
-	Decay *DecayManager
-	BrowseFields map[Position]*Item
+	Dispatcher          *WDRRDispatcher
+	Houses              map[uint32]*House
+	Market              *Market
+	Decay               *DecayManager
+	BrowseFields        map[Position]*Item
 
 	// oldStackPos maps a spectating player's creature id to the client stack index
 	// the moving/removed creature occupied in THAT player's view, captured while it
@@ -55,9 +55,9 @@ type World struct {
 	// before the removal (Map::moveCreature, src/map/map.cpp:739-747); reconstructing
 	// a single index afterwards is wrong for every spectator whose view differs, and
 	// races with concurrent edits to the tile.
-	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldStackPos map[uint32]int)
-	OnCreatureAppear func(c Creature)
-	OnCreatureRemove func(c Creature, oldStackPos map[uint32]int)
+	OnCreatureMove    func(c Creature, oldPos Position, newPos Position, oldStackPos map[uint32]int)
+	OnCreatureAppear  func(c Creature)
+	OnCreatureRemove  func(c Creature, oldStackPos map[uint32]int)
 	OnGhostModeChange func(p *Player)
 
 	// CaptureStackPositions is populated by the protocol layer. It is always called
@@ -90,8 +90,8 @@ type World struct {
 	// layer applies the death penalty, teleports the player to their temple,
 	// and refreshes the client (the model-side penalty is applied before this
 	// callback runs).
-	OnPlayerDeath func(p *Player, killer Creature)
-	OnCreatureDied func(c Creature) // monster/NPC death, fires before RemoveCreature
+	OnPlayerDeath    func(p *Player, killer Creature)
+	OnCreatureDied   func(c Creature) // monster/NPC death, fires before RemoveCreature
 	OnGainExperience func(p *Player, source Creature, exp uint64, rawExp uint64) uint64
 
 	// OnShieldUpdate asks the protocol layer to send `viewer` a party-shield
@@ -128,6 +128,10 @@ type World struct {
 	// spell damage/heal through the same hit/death path as melee.
 	Combat *CombatEngine
 
+	// Zones is the registry of map/script zones (src/game/zones/). The OTBM's
+	// per-tile zone ids and `<map>-zones.xml` both feed into it.
+	Zones *ZoneRegistry
+
 	TypeRegistry *creatures.TypeRegistry
 	Fiendish     *FiendishManager
 	Raids        *Raids
@@ -146,8 +150,7 @@ func (w *World) CreatureByName(name string) Creature {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	target := strings.ToLower(strings.TrimSpace(name))
-	if p, ok := w.byName[target]
- ok {
+	if p, ok := w.byName[target]; ok {
 		return p
 	}
 	for _, c := range w.creatures {
@@ -161,22 +164,23 @@ func (w *World) CreatureByName(name string) Creature {
 // NewWorld creates an empty world with a fresh map.
 func NewWorld() *World {
 	w := &World{
-		Map:          NewMap(),
-		Towns:        make(map[string]Position),
-		TownsByID:    make(map[uint16]Position),
-		TownNames:    make(map[uint16]string),
-		players:      make(map[uint32]*Player),
-		byName:       make(map[string]*Player),
-		creatures:    make(map[uint32]Creature),
-		guilds:       make(map[uint32]*Guild),
-		TypeRegistry: creatures.NewTypeRegistry(),
-		Charms:       charms.NewRegistry(),
-		Imbuements:        imbuements.NewRegistry(),
+		Map:                 NewMap(),
+		Towns:               make(map[string]Position),
+		TownsByID:           make(map[uint16]Position),
+		TownNames:           make(map[uint16]string),
+		players:             make(map[uint32]*Player),
+		byName:              make(map[string]*Player),
+		creatures:           make(map[uint32]Creature),
+		guilds:              make(map[uint32]*Guild),
+		TypeRegistry:        creatures.NewTypeRegistry(),
+		Charms:              charms.NewRegistry(),
+		Imbuements:          imbuements.NewRegistry(),
 		ItemClassifications: make(map[uint8]*ItemClassification),
-			Market:       NewMarket(),
-		Fiendish:     NewFiendishManager(3),
-			HirelingMgr:  NewHirelingManager(),
-		}
+		Market:              NewMarket(),
+		Fiendish:            NewFiendishManager(3),
+		HirelingMgr:         NewHirelingManager(),
+	}
+	w.Zones = NewZoneRegistry(w)
 	w.Combat = NewCombatEngine(w)
 	w.Decay = NewDecayManager(w)
 	w.nextCreatureID.Store(0x10000000) // player creature ids start high, like TFS
@@ -237,8 +241,7 @@ func (w *World) AddItem(pos Position, it *Item) bool {
 		w.OnItemAppear(pos, it)
 	}
 	if w.Items != nil && w.Decay != nil {
-		if itemType := w.Items.Get(it.ID)
- itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
+		if itemType := w.Items.Get(it.ID); itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
 			w.Decay.StartDecaying(pos, it, itemType.Duration, itemType.DecayTo)
 		}
 	}
@@ -297,8 +300,7 @@ func (w *World) StartDecayingMap() {
 	defer w.Map.mu.RUnlock()
 	for pos, tile := range w.Map.tiles {
 		for _, it := range tile.Items {
-			if itemType := w.Items.Get(it.ID)
- itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
+			if itemType := w.Items.Get(it.ID); itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
 				w.Decay.StartDecaying(pos, it, itemType.Duration, itemType.DecayTo)
 			}
 		}
@@ -356,8 +358,7 @@ func (w *World) GenerateCreatureID() uint32 {
 func (w *World) AddPlayer(p *Player, sess Session) bool {
 	w.mu.Lock()
 	key := strings.ToLower(p.Name)
-	if _, online := w.byName[key]
- online {
+	if _, online := w.byName[key]; online {
 		w.mu.Unlock()
 		return false
 	}
@@ -378,8 +379,7 @@ func (w *World) AddPlayer(p *Player, sess Session) bool {
 // RemovePlayer unregisters a player by creature id.
 func (w *World) RemovePlayer(id uint32) {
 	w.mu.Lock()
-	if p, ok := w.players[id]
- ok {
+	if p, ok := w.players[id]; ok {
 		delete(w.players, id)
 		delete(w.byName, strings.ToLower(p.Name))
 		oldStackPos := w.captureStackPositions(p.Pos, p)
@@ -416,12 +416,10 @@ func (w *World) PlayerByDBID(dbID uint32) *Player {
 func (w *World) CreatureByID(id uint32) Creature {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	if c, ok := w.creatures[id]
- ok {
+	if c, ok := w.creatures[id]; ok {
 		return c
 	}
-	if p, ok := w.players[id]
- ok {
+	if p, ok := w.players[id]; ok {
 		return p
 	}
 	return nil
@@ -437,8 +435,6 @@ func (w *World) AddCreature(c Creature) {
 		w.OnCreatureAppear(c)
 	}
 }
-
-
 
 func (w *World) addCreatureToTile(c Creature) {
 	t := w.Map.GetTile(c.GetPosition())
@@ -540,8 +536,7 @@ func (w *World) SpectatingNpcs(pos Position) []*Npc {
 	defer w.mu.RUnlock()
 	var out []*Npc
 	for _, c := range w.creatures {
-		if npc, ok := c.(*Npc)
- ok {
+		if npc, ok := c.(*Npc); ok {
 			if npc.Pos.InRangeOf(pos) {
 				out = append(out, npc)
 			}
@@ -619,8 +614,7 @@ func (w *World) TryMove(p *Player, dir Direction) (Position, bool) {
 // not require the destination to be adjacent. Used by scripted travel/teleport.
 func (w *World) TeleportCreature(c Creature, dest Position) {
 	w.mu.Lock()
-	if player, ok := c.(*Player)
- ok {
+	if player, ok := c.(*Player); ok {
 		player.IsTraining = false
 	}
 	oldPos := c.GetPosition()
@@ -652,8 +646,7 @@ func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 	}
 	dest = w.resolveFloorChangeDest(dest, destTile)
 	w.mu.Lock()
-	if player, ok := c.(*Player)
- ok {
+	if player, ok := c.(*Player); ok {
 		player.IsTraining = false
 	}
 	oldPos := c.GetPosition()
@@ -668,7 +661,6 @@ func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 		w.OnCreatureMove(c, oldPos, dest, oldStackPos)
 	}
 
-
 	return dest, true
 }
 
@@ -678,15 +670,13 @@ func (w *World) resolveFloorChangeDest(dest Position, destTile *Tile) Position {
 	}
 	floorChange := ""
 	if destTile.Ground != nil {
-		if ct := w.Items.Get(destTile.Ground.ID)
- ct != nil && ct.FloorChange != "" {
+		if ct := w.Items.Get(destTile.Ground.ID); ct != nil && ct.FloorChange != "" {
 			floorChange = ct.FloorChange
 		}
 	}
 	if floorChange == "" {
 		for _, it := range destTile.Items {
-			if ct := w.Items.Get(it.ID)
- ct != nil && ct.FloorChange != "" {
+			if ct := w.Items.Get(it.ID); ct != nil && ct.FloorChange != "" {
 				floorChange = ct.FloorChange
 				break
 			}
@@ -696,14 +686,18 @@ func (w *World) resolveFloorChangeDest(dest Position, destTile *Tile) Position {
 	if floorChange != "" {
 		dx, dy, dz := dest.X, dest.Y, dest.Z
 		hasFC := func(t *Tile, expected string) bool {
-			if t == nil { return false }
+			if t == nil {
+				return false
+			}
 			if t.Ground != nil {
-				if ct := w.Items.Get(t.Ground.ID)
- ct != nil && ct.FloorChange == expected { return true }
+				if ct := w.Items.Get(t.Ground.ID); ct != nil && ct.FloorChange == expected {
+					return true
+				}
 			}
 			for _, it := range t.Items {
-				if ct := w.Items.Get(it.ID)
- ct != nil && ct.FloorChange == expected { return true }
+				if ct := w.Items.Get(it.ID); ct != nil && ct.FloorChange == expected {
+					return true
+				}
 			}
 			return false
 		}
@@ -713,23 +707,46 @@ func (w *World) resolveFloorChangeDest(dest Position, destTile *Tile) Position {
 				dy -= 2
 			} else if hasFC(w.Map.GetTile(Position{X: dx - 1, Y: dy, Z: dz}), "eastalt") {
 				dx -= 2
-			} else if downTile := w.Map.GetTile(Position{X: dx, Y: dy, Z: dz})
- downTile != nil {
-				if hasFC(downTile, "north") { dy++ }
-				if hasFC(downTile, "south") { dy-- }
-				if hasFC(downTile, "southalt") { dy -= 2 }
-				if hasFC(downTile, "east") { dx-- }
-				if hasFC(downTile, "eastalt") { dx -= 2 }
-				if hasFC(downTile, "west") { dx++ }
+			} else if downTile := w.Map.GetTile(Position{X: dx, Y: dy, Z: dz}); downTile != nil {
+				if hasFC(downTile, "north") {
+					dy++
+				}
+				if hasFC(downTile, "south") {
+					dy--
+				}
+				if hasFC(downTile, "southalt") {
+					dy -= 2
+				}
+				if hasFC(downTile, "east") {
+					dx--
+				}
+				if hasFC(downTile, "eastalt") {
+					dx -= 2
+				}
+				if hasFC(downTile, "west") {
+					dx++
+				}
 			}
 		} else {
 			dz--
-			if floorChange == "north" { dy-- }
-			if floorChange == "south" { dy++ }
-			if floorChange == "southalt" { dy += 2 }
-			if floorChange == "east" { dx++ }
-			if floorChange == "eastalt" { dx += 2 }
-			if floorChange == "west" { dx-- }
+			if floorChange == "north" {
+				dy--
+			}
+			if floorChange == "south" {
+				dy++
+			}
+			if floorChange == "southalt" {
+				dy += 2
+			}
+			if floorChange == "east" {
+				dx++
+			}
+			if floorChange == "eastalt" {
+				dx += 2
+			}
+			if floorChange == "west" {
+				dx--
+			}
 		}
 		return Position{X: dx, Y: dy, Z: dz}
 	}
@@ -777,8 +794,7 @@ func (w *World) GetBoostedCreature() string {
 		if w.BoostedCreature != "" && w.BoostedCreature != "default" {
 			return w.BoostedCreature
 		}
-		if m, ok := w.Monsters.Monsters["dragon"]
- ok {
+		if m, ok := w.Monsters.Monsters["dragon"]; ok {
 			w.BoostedCreature = m.Name
 			return w.BoostedCreature
 		}
@@ -836,27 +852,33 @@ func (w *World) PlayerAnswerModalWindow(p *Player, id uint32, button uint8, choi
 }
 
 // Team Finder stubs
-func (w *World) PlayerFindTeam(playerID uint32, category uint8, itemID uint16, stackPos uint8, isLoot bool) {}
-func (w *World) RemoveTeamFinder(playerID uint32) {}
-func (w *World) UpdateTeamMemberStatus(playerID, memberID uint32, status byte) {}
-func (w *World) SendTeamFinderList(playerID uint32) {}
-func (w *World) JoinTeamFinder(playerID, leaderID uint32) {}
-func (w *World) LeaveTeamFinder(playerID, leaderID uint32) {}
+func (w *World) PlayerFindTeam(playerID uint32, category uint8, itemID uint16, stackPos uint8, isLoot bool) {
+}
+func (w *World) RemoveTeamFinder(playerID uint32)                                  {}
+func (w *World) UpdateTeamMemberStatus(playerID, memberID uint32, status byte)     {}
+func (w *World) SendTeamFinderList(playerID uint32)                                {}
+func (w *World) JoinTeamFinder(playerID, leaderID uint32)                          {}
+func (w *World) LeaveTeamFinder(playerID, leaderID uint32)                         {}
 func (w *World) CreateTeamFinder(playerID uint32, r interface{ ReadU16() uint16 }) {}
 func (w *World) PlayerSetVocation(playerID uint32, voc uint8) {
-	if p := w.PlayerByID(playerID); p != nil { p.Vocation = uint16(voc) }
+	if p := w.PlayerByID(playerID); p != nil {
+		p.Vocation = uint16(voc)
+	}
 }
 func (w *World) PlayerTeleport(playerID uint32, pos Position) {
-	if p := w.PlayerByID(playerID); p != nil { p.Pos = pos }
+	if p := w.PlayerByID(playerID); p != nil {
+		p.Pos = pos
+	}
 }
-func (w *World) PlayerCloseNpcChannel(playerID uint32) {}
+func (w *World) PlayerCloseNpcChannel(playerID uint32)                                        {}
 func (w *World) PlayerRotateItem(playerID uint32, pos Position, itemID uint16, stackPos byte) {}
-func (w *World) PlayerExivaRestrictions(playerID uint32, action byte, name string) {}
-func (w *World) PlayerBrowseField(playerID uint32, pos Position) {}
-func (w *World) PlayerSetBossDifficulty(playerID uint32, bossID uint16, difficulty byte) {}
-func (w *World) PlayerCollectReward(playerID uint32) {}
-func (w *World) PlayerJoinAggression(playerID, targetID uint32) {}
-func (w *World) PlayerRequestTrade(playerID, targetID uint32, pos Position, itemID uint16, stackPos byte) {}
-func (w *World) PlayerAcceptTrade(playerID uint32) {}
-func (w *World) PlayerCloseTrade(playerID uint32) {}
+func (w *World) PlayerExivaRestrictions(playerID uint32, action byte, name string)            {}
+func (w *World) PlayerBrowseField(playerID uint32, pos Position)                              {}
+func (w *World) PlayerSetBossDifficulty(playerID uint32, bossID uint16, difficulty byte)      {}
+func (w *World) PlayerCollectReward(playerID uint32)                                          {}
+func (w *World) PlayerJoinAggression(playerID, targetID uint32)                               {}
+func (w *World) PlayerRequestTrade(playerID, targetID uint32, pos Position, itemID uint16, stackPos byte) {
+}
+func (w *World) PlayerAcceptTrade(playerID uint32)      {}
+func (w *World) PlayerCloseTrade(playerID uint32)       {}
 func (w *World) PlayerFollow(playerID, targetID uint32) {}

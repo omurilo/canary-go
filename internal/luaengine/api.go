@@ -226,6 +226,7 @@ func (e *Engine) registerAPI() {
 	e.registerParty()
 	e.registerHouseMetatable()
 	e.registerTown()
+	e.registerZone()
 	e.registerCreatureEvent()
 	e.registerGlobalEventClass()
 	e.registerVocation()
@@ -320,15 +321,11 @@ func (e *Engine) registerAPI() {
 	mockClass("Hazard")
 	mockClass("ZoneEvent")
 	mockClass("HazardMonster")
-	// Zone and Teleport stay mocked on purpose. registerZone/registerTeleportType
-	// exist but are NOT drop-in replacements: their constructors return nil, and
-	// their method sets miss what the datapack actually calls (zone:addArea is
-	// used 32 times and is absent, likewise setRemoveDestination/removePlayers/
-	// removeMonsters/register/randomPosition). Wiring them today would turn 33
-	// zone scripts from silently-wrong into hard "index a nil value" errors.
-	// Same for Imbuement: registerImbuementType is intentionally left unwired.
+	// Teleport stays mocked: registerTeleportType exists but its method set still
+	// misses what the datapack calls. Zone no longer does — it is backed by the real
+	// registry now, with the nineteen methods C++ registers.
+	// Same caveat for Imbuement: registerImbuementType is intentionally left unwired.
 	mockClass("Teleport")
-	mockClass("Zone")
 
 	// ItemClassification has a real binding (not a mock) so it can be
 	// populated from data/scripts/systems/item_tiers.lua.

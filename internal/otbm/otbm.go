@@ -52,6 +52,7 @@ const (
 	attrSleepStart   = 21
 	attrCharges      = 22
 	attrExtSpawnNPC  = 23
+	attrExtZoneFile  = 24
 	attrName         = 24
 	attrArticle      = 25
 	attrPluralName   = 26
@@ -85,6 +86,14 @@ type Result struct {
 	SpawnMonFile  string
 	SpawnNPCFile  string
 	Towns         []Town
+	// ZoneFile is OTBM_ATTR_EXT_ZONE_FILE (iomap.cpp:116): the `<map>-zones.xml`
+	// that gives the tile zone ids their names. Empty means the caller should fall
+	// back to `<mapname>-zones.xml`, as IOMap::loadZones does.
+	ZoneFile string
+	// ZonePositions maps a map-editor zone id to every tile carrying it
+	// (OTBM_TILE_ZONE, iomap.cpp:226). These were read and thrown away, which is why
+	// no zone had any positions and the whole Zone family was unusable.
+	ZonePositions map[uint16][]game.Position
 	TileCount     int
 	ItemCount     int
 }
@@ -234,8 +243,8 @@ func (p *parser) parseMapData() error {
 			p.res.SpawnMonFile = r.str()
 		case attrExtSpawnNPC:
 			p.res.SpawnNPCFile = r.str()
-		case 24: // 24 = EXT_ZONE_FILE at map level
-			_ = r.str()
+		case attrExtZoneFile:
+			p.res.ZoneFile = r.str()
 		default:
 			r.pos-- // not an attribute; a control byte / child
 			goto children
@@ -368,9 +377,19 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 		case nodeItem:
 			p.parseItemNode(tile)
 		case nodeTileZone:
+			// OTBM_TILE_ZONE: a u16 count then that many u16 zone ids, each claiming
+			// this tile. Id 0 is invalid upstream (IOMapException) — skip it rather
+			// than inventing a zone for it.
 			cnt := int(r.u16())
 			for i := 0; i < cnt; i++ {
-				_ = r.u16()
+				zoneID := r.u16()
+				if zoneID == 0 {
+					continue
+				}
+				if p.res.ZonePositions == nil {
+					p.res.ZonePositions = map[uint16][]game.Position{}
+				}
+				p.res.ZonePositions[zoneID] = append(p.res.ZonePositions[zoneID], pos)
 			}
 			p.expectEndNode()
 		default:
