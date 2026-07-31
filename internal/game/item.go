@@ -694,15 +694,16 @@ func (i *Item) Range(catalog *items.Catalog) int32 {
 	return 0
 }
 
-// ShootType returns the projectile/missile animation shoot type of this item.
-func (i *Item) ShootType(catalog *items.Catalog) string {
+// ShootType returns the projectile animation this item flies with, or
+// CONST_ANI_NONE when it has none.
+func (i *Item) ShootType(catalog *items.Catalog) items.ShootTypes {
 	if catalog == nil {
-		return ""
+		return items.ShootTypeNone
 	}
 	if t := catalog.Get(i.ID); t != nil {
 		return t.ShootType
 	}
-	return ""
+	return items.ShootTypeNone
 }
 
 // AmmoType returns the ammunition type used or provided by this item.

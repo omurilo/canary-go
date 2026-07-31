@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/opentibiabr/canary-go/internal/items"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -13,6 +14,9 @@ const luaWeaponTypeName = "Weapon"
 type LuaWeapon struct {
 	*game.Weapon
 	onUseWeapon *lua.LFunction
+	// fields holds arbitrary values a script assigns on the weapon object, so
+	// `weapon.foo = x` behaves like it would on a table instead of vanishing.
+	fields map[string]lua.LValue
 }
 
 // registeredWeapons holds weapons that have been registered via weapon:register()
@@ -55,8 +59,100 @@ var weaponMethods = map[string]lua.LGFunction{
 // registerWeaponType registers the Weapon global constructor and metatable.
 func (e *Engine) registerWeaponType() {
 	mt := e.L.NewTypeMetatable(luaWeaponTypeName)
-	e.setClassConstructor("Weapon", weaponConstructor, weaponMethods)
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), weaponMethods))
+	// shootType writes to the item type rather than the weapon, so it needs the
+	// catalog; the rest of weaponMethods are plain package-level functions.
+	methods := make(map[string]lua.LGFunction, len(weaponMethods)+1)
+	for name, fn := range weaponMethods {
+		methods[name] = fn
+	}
+	methods["shootType"] = e.weaponShootType
+
+	e.setClassConstructor("Weapon", weaponConstructor, methods)
+	// __index resolves methods first, then anything a script stashed via __newindex,
+	// so a stored field can be read back rather than disappearing.
+	methodsTable := e.L.SetFuncs(e.L.NewTable(), methods)
+	e.L.SetField(mt, "__index", e.L.NewFunction(func(L *lua.LState) int {
+		key := L.CheckString(2)
+		if fn := L.GetField(methodsTable, key); fn != lua.LNil {
+			L.Push(fn)
+			return 1
+		}
+		if ud, ok := L.Get(1).(*lua.LUserData); ok {
+			if w, ok := ud.Value.(*LuaWeapon); ok && w.fields != nil {
+				if v, ok := w.fields[key]; ok {
+					L.Push(v)
+					return 1
+				}
+			}
+		}
+		L.Push(lua.LNil)
+		return 1
+	}))
+	// Every weapon script in the datapack installs its callback by ASSIGNING the
+	// field, not by calling the method:
+	//
+	//	function poisonArrow.onUseWeapon(player, variant) ... end
+	//	burstArrow.onUseWeapon = function(player, variant) ... end
+	//
+	// A userdata with no __newindex cannot be assigned to at all — Lua raises
+	// "attempt to index a non-table object(userdata)" — so without this every one of
+	// those scripts aborts on its first callback line.
+	e.L.SetField(mt, "__newindex", e.L.NewFunction(weaponNewIndex))
+}
+
+// weaponNewIndex routes `weapon.field = value` to the same place the equivalent
+// method writes. Only onUseWeapon is meaningful today; anything else is kept on a
+// per-weapon table so a script can stash its own state on the object, which is what
+// assigning to a plain table would have given it.
+func weaponNewIndex(L *lua.LState) int {
+	w := checkWeapon(L)
+	if w == nil {
+		return 0
+	}
+	key := L.CheckString(2)
+	val := L.Get(3)
+	if key == "onUseWeapon" {
+		if fn, ok := val.(*lua.LFunction); ok {
+			w.onUseWeapon = fn
+			return 0
+		}
+	}
+	if w.fields == nil {
+		w.fields = map[string]lua.LValue{}
+	}
+	w.fields[key] = val
+	return 0
+}
+
+// weaponShootType ports WeaponFunctions::luaWeaponShootType
+// (src/lua/functions/items/weapon_functions.cpp:535): weapon:shootType(type)
+// stores the projectile animation on the weapon's ITEM TYPE, not on the weapon.
+//
+// It was missing entirely, and a missing method is not a no-op in Lua: the call
+// raised "attempt to call a non-function object" and aborted the whole script at
+// that line, so burst_arrow, diamond_arrow, poison_arrow and viper_star never
+// reached their maxHitChance or register() calls either.
+func (e *Engine) weaponShootType(L *lua.LState) int {
+	w := checkWeapon(L)
+	if w == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if e.world == nil || e.world.Items == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	it := e.world.Items.Get(w.ID)
+	if it == nil {
+		// C++ getItemType inserts a blank type for an unknown id; there is nothing
+		// useful to attach the animation to, so say so instead of failing silently.
+		e.log.Warn("weapon:shootType on an item id that is not in the catalog", "itemId", w.ID)
+		L.Push(lua.LNil)
+		return 1
+	}
+	it.ShootType = items.ShootTypes(L.CheckInt(2))
+	L.Push(lua.LTrue)
+	return 1
 }
 
 // weaponConstructor creates a new Weapon with the given item id.

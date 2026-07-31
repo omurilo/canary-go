@@ -113,7 +113,11 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 			it.Range = int32(v)
 		}
 	case "shoottype", "shootType":
-		it.ShootType = attr.Value
+		// An unknown name leaves the field at CONST_ANI_NONE, like the C++ parser,
+		// rather than defaulting to an arrow.
+		if st, ok := ShootTypeByName(attr.Value); ok {
+			it.ShootType = st
+		}
 	case "ammotype", "ammoType":
 		it.AmmoType = attr.Value
 	case "primarytype", "primaryType":

@@ -499,11 +499,13 @@ func (e *Engine) registerItemType() {
 			L.Push(lua.LString(val))
 			return 1
 		},
+		// C++ has no ItemType:getShootType; this predates the numeric field, so it
+		// keeps returning the items.xml name to avoid changing what scripts read.
 		"getShootType": func(L *lua.LState) int {
 			it := checkItemType(L, 1)
 			val := ""
 			if it.item != nil {
-				val = it.item.ShootType
+				val = items.ShootTypeName(it.item.ShootType)
 			}
 			L.Push(lua.LString(val))
 			return 1

@@ -11,6 +11,7 @@ import (
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 	"github.com/opentibiabr/canary-go/internal/game/vocations"
+	"github.com/opentibiabr/canary-go/internal/items"
 )
 
 const (
@@ -437,12 +438,12 @@ func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item, lau
 	}
 
 	// Dispatch distance shoot effect
-	shootStr := ammo.ShootType(e.world.Items)
-	if shootStr == "" {
-		shootStr = "arrow"
+	shoot := ammo.ShootType(e.world.Items)
+	if shoot == items.ShootTypeNone {
+		shoot = items.ShootTypes(3) // CONST_ANI_ARROW
 	}
 	if e.world.OnDistanceEffect != nil {
-		e.world.OnDistanceEffect(p.GetPosition(), target.GetPosition(), mapShootType(shootStr))
+		e.world.OnDistanceEffect(p.GetPosition(), target.GetPosition(), uint16(shoot))
 	}
 
 	effect := uint16(effectDrawBlood)
@@ -481,17 +482,19 @@ func (e *CombatEngine) doWandHit(p *Player, target Creature, wand *Item) {
 	dmg := applyDamageModifiers(p, target, randomRange(lo, hi))
 
 	combatType := combat.CombatEnergy
-	shootStr := wand.ShootType(e.world.Items)
-	switch strings.ToLower(shootStr) {
-	case "fire":
+	shoot := wand.ShootType(e.world.Items)
+	// CONST_ANI_ values; the wand's projectile stands in for its element, which is
+	// what the datapack encodes in items.xml.
+	switch shoot {
+	case 4: // fire
 		combatType = combat.CombatFire
-	case "earth", "poison":
+	case 30, 15: // earth, poison
 		combatType = combat.CombatEarth
-	case "ice":
+	case 29: // ice
 		combatType = combat.CombatIce
-	case "death":
+	case 11: // death
 		combatType = combat.CombatDeath
-	case "holy":
+	case 31: // holy
 		combatType = combat.CombatHoly
 	}
 
@@ -514,7 +517,7 @@ func (e *CombatEngine) doWandHit(p *Player, target Creature, wand *Item) {
 
 	// Dispatch distance projectile effect
 	if e.world.OnDistanceEffect != nil {
-		e.world.OnDistanceEffect(p.GetPosition(), target.GetPosition(), mapShootType(shootStr))
+		e.world.OnDistanceEffect(p.GetPosition(), target.GetPosition(), uint16(shoot))
 	}
 
 	impactEffect := uint16(effectDrawBlood)
@@ -681,44 +684,6 @@ func (e *CombatEngine) meleeDamage(attacker Creature) int {
 	}
 }
 
-func mapShootType(s string) uint16 {
-	switch strings.ToLower(s) {
-	case "spear":
-		return 1
-	case "bolt":
-		return 2
-	case "arrow":
-		return 3
-	case "fire":
-		return 4
-	case "energy":
-		return 5
-	case "poisonarrow":
-		return 6
-	case "burstarrow":
-		return 7
-	case "throwingstar":
-		return 8
-	case "throwingknife":
-		return 9
-	case "smallstone":
-		return 10
-	case "death":
-		return 11
-	case "holy":
-		return 31
-	case "ice":
-		return 29
-	case "earth":
-		return 30
-	case "suddendeath":
-		return 32
-	case "diamondarrow":
-		return 57
-	default:
-		return 3 // default arrow
-	}
-}
 
 // absDamageRange converts a monster attack's raw min/max combat values (which
 // are negative for damage) into a positive [lo, hi] damage span. Mirrors

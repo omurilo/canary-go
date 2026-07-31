@@ -125,8 +125,10 @@ type ItemType struct {
 	HitChance    int32
 	Range        int32
 	ShootRange   uint8
-	ShootType    string
-	AmmoType     string
+	// ShootType is the numeric ShootType_t, as C++ stores it. Weapon:shootType sets
+	// it from Lua, so it cannot be the items.xml name string it used to be.
+	ShootType ShootTypes
+	AmmoType  string
 
 	TransformEquipTo   uint16
 	TransformDeEquipTo uint16
