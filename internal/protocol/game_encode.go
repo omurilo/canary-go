@@ -59,6 +59,17 @@ func (g *GameProtocol) addItem(w *netmsg.Writer, it *game.Item) {
 	w.AddU16(it.ID)
 	t := g.deps.Items.Get(it.ID)
 	if t == nil {
+		// C++ indexes Item::items[id] and keeps going with the dummy type, which is
+		// only safe because an item with an unknown id cannot exist there:
+		// Item::CreateItem returns null for one. Here it can, and the cost is
+		// twofold — the client reads a zero appearance id, and the count/subtype
+		// byte this type would have contributed is missing, so every field after it
+		// in the frame shifts. That is what "field has more than one zero id
+		// appearance" looks like from the client side.
+		if g.deps.Log != nil {
+			g.deps.Log.Warn("encoding item with unknown type: the client will read a zero appearance id and the rest of the frame will shift",
+				"itemId", it.ID, "count", it.Count)
+		}
 		return
 	}
 	switch {
