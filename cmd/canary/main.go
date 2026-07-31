@@ -958,6 +958,31 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Info("house items saved", "reason", reason, "tiles", saved)
 	}
 
+	// Market offers expire on a sweep, as IOMarket::checkExpiredOffers reschedules
+	// itself. It refunds escrowed gold and returns unsold items, so it has to run
+	// even on a quiet server — an offer that never expires locks both away forever.
+	if interval := db.MarketExpiryInterval(); interval > 0 {
+		go func() {
+			t := time.NewTicker(interval)
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.C:
+					sweepCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+					n, err := database.ExpireMarketOffers(sweepCtx, world)
+					cancel()
+					if err != nil {
+						log.Warn("expire market offers", "err", err)
+					} else if n > 0 {
+						log.Info("expired market offers", "count", n)
+					}
+				}
+			}
+		}()
+	}
+
 	houseSaveInterval := time.Duration(cfg.Number("houseStoreInterval", 15)) * time.Minute
 	if houseSaveInterval > 0 {
 		go func() {
