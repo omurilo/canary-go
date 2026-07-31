@@ -112,6 +112,18 @@ func (g *GameProtocol) SendInventoryIds() {
 			if it == nil {
 				continue
 			}
+			// C++ builds this from getAllItemTypeCount, which is keyed by real item
+			// types, so an id of 0 cannot appear. Here an empty or half-initialised
+			// slot can carry one, and the client reads the list as appearances: two
+			// zero ids in it is exactly the "field has more than one zero id
+			// appearance" it throws on, right after entering the world.
+			if it.ID == 0 {
+				if g.deps != nil && g.deps.Log != nil {
+					g.deps.Log.Warn("inventory holds an item with id 0; skipping it in the 0xF5 list",
+						"player", g.player.Name, "count", it.Count)
+				}
+				continue
+			}
 			var tier uint8
 			if it.Attr != nil && it.Attr.Tier != nil {
 				tier = *it.Attr.Tier
