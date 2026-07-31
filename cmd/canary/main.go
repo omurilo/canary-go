@@ -561,6 +561,11 @@ func run(o runOpts, log *slog.Logger) error {
 	lengine.SetDB(database)
 	defer lengine.Close()
 
+	// A datapack weapon with an onUseWeapon script replaces the built-in damage,
+	// the way Weapon::internalUseWeapon branches on isLoadedScriptId. Registered
+	// weapons had nowhere to be consulted from before this.
+	world.OnUseWeapon = lengine.UseWeapon
+
 	// Database migrations, mirroring DatabaseManager::updateDatabase. They run
 	// after the schema and before the datapack loads, and they need the Lua state
 	// because the migration scripts are Lua files exposing onUpdateDatabase().

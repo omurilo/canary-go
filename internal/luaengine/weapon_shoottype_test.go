@@ -3,7 +3,9 @@ package luaengine
 import (
 	"testing"
 
+	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/items"
+	lua "github.com/yuin/gopher-lua"
 )
 
 // weapon:shootType did not exist, and a missing method is not a no-op in Lua: the
@@ -138,5 +140,56 @@ func TestShootTypeByNameCoversTheUpstreamTable(t *testing.T) {
 	// Case and whitespace are normalised, like the lowercase upstream keys.
 	if got, _ := items.ShootTypeByName("  BurstArrow "); got != 7 {
 		t.Errorf("ShootTypeByName is not normalising case/space: got %d", got)
+	}
+}
+
+// A registered weapon with an onUseWeapon script must be reachable from the combat
+// engine and must run. registeredWeapons used to be appended and never read, so the
+// callback these scripts install could never fire — the whole family was inert.
+func TestUseWeaponRunsTheRegisteredCallback(t *testing.T) {
+	e := newTestEngine()
+	defer e.Close()
+	e.world.Items = items.NewCatalog(&items.ItemType{ID: 3449, Name: "burst arrow"})
+	weaponsByItemID = nil // isolate from other tests in this package
+
+	if err := e.L.DoString(`
+		calls = 0
+		gotTargetID = nil
+		local burstArrow = Weapon(WEAPON_AMMO)
+		burstArrow:id(3449)
+		function burstArrow.onUseWeapon(player, variant)
+			calls = calls + 1
+			gotTargetID = variant:getNumber()
+			return true
+		end
+		burstArrow:register()
+	`); err != nil {
+		t.Fatalf("script: %v", err)
+	}
+
+	p := &game.Player{ID: 1, Name: "Shooter"}
+	target := game.NewMonster(77, "Rat", nil)
+
+	if !e.UseWeapon(p, 3449, target) {
+		t.Fatalf("UseWeapon returned false for a registered weapon with a script")
+	}
+	if n := e.L.GetGlobal("calls"); n != lua.LNumber(1) {
+		t.Errorf("callback ran %v times, want 1", n)
+	}
+	// Weapon::executeUseWeapon passes a NUMBER variant holding the target's id.
+	if got := e.L.GetGlobal("gotTargetID"); got != lua.LNumber(77) {
+		t.Errorf("variant number = %v, want 77 (the target's creature id)", got)
+	}
+
+	// An item with no registered weapon must fall through to the built-in damage.
+	if e.UseWeapon(p, 9999, target) {
+		t.Errorf("UseWeapon returned true for an unregistered item")
+	}
+	// So must a registered weapon that never installed a callback.
+	if err := e.L.DoString(`local w = Weapon(WEAPON_AMMO) w:id(3450) w:register()`); err != nil {
+		t.Fatalf("script: %v", err)
+	}
+	if e.UseWeapon(p, 3450, target) {
+		t.Errorf("UseWeapon returned true for a weapon with no onUseWeapon")
 	}
 }

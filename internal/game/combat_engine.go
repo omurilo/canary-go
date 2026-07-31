@@ -373,7 +373,40 @@ func (e *CombatEngine) doMeleeHit(c *combat.Combat, attacker, target Creature) {
 	}
 }
 
+// consumeDistanceAmmo spends one shot: real ammunition from the quiver/slot, or the
+// throwable weapon itself when it is held in a hand (a spear).
+func (e *CombatEngine) consumeDistanceAmmo(p *Player, ammo *Item) {
+	if ammo == nil {
+		return
+	}
+	ammoType := ammo.AmmoType(e.world.Items)
+	if ammoType != "" && ammoType != "none" {
+		p.ConsumeAmmo(e.world.Items, ammoType)
+		return
+	}
+	if p.Inventory[ConstSlotLeft] == ammo {
+		p.ConsumeWeaponInHand(ConstSlotLeft)
+	} else if p.Inventory[ConstSlotRight] == ammo {
+		p.ConsumeWeaponInHand(ConstSlotRight)
+	}
+}
+
 func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item, launcher *Item) {
+	// A datapack weapon script replaces the built-in damage entirely, exactly like
+	// the isLoadedScriptId branch of Weapon::internalUseWeapon (weapons.cpp): the
+	// script applies its own damage, conditions and shoot effect through
+	// combat:execute. Ammo bookkeeping still happens below in either case.
+	if e.world.OnUseWeapon != nil && ammo != nil {
+		if e.world.OnUseWeapon(p, ammo.ID, target) {
+			e.consumeDistanceAmmo(p, ammo)
+			p.AddSkillTries(SkillDistance, 1)
+			p.AddInFightTicks()
+			if tp, ok := target.(*Player); ok {
+				tp.AddInFightTicks()
+			}
+			return
+		}
+	}
 	skill := int(p.GetEffectiveSkill(SkillDistance))
 	voc := vocations.GetVocation(uint32(p.Vocation))
 	attackValue := int(ammo.Attack(e.world.Items))
@@ -402,19 +435,7 @@ func (e *CombatEngine) doDistanceHit(p *Player, target Creature, ammo *Item, lau
 	}
 	dmg = applyDamageModifiers(p, target, dmg)
 
-	// Consume ammunition
-	ammoType := ammo.AmmoType(e.world.Items)
-	if ammoType != "" && ammoType != "none" {
-		p.ConsumeAmmo(e.world.Items, ammoType)
-	} else {
-		// It's a throwable weapon (e.g. spear) equipped in Left or Right slot.
-		// Consume the weapon itself!
-		if p.Inventory[ConstSlotLeft] == ammo {
-			p.ConsumeWeaponInHand(ConstSlotLeft)
-		} else if p.Inventory[ConstSlotRight] == ammo {
-			p.ConsumeWeaponInHand(ConstSlotRight)
-		}
-	}
+	e.consumeDistanceAmmo(p, ammo)
 
 	p.AddSkillTries(SkillDistance, 1)
 

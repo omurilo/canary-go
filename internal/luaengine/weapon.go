@@ -501,6 +501,57 @@ func weaponAction(L *lua.LState) int {
 func weaponRegister(L *lua.LState) int {
 	w := checkWeapon(L)
 	registeredWeapons = append(registeredWeapons, w)
+	// Index by item id so the combat engine can find the script for the item a
+	// player is actually shooting. Weapons::registerLuaEvent keys off getID() the
+	// same way. Only the last registration for an id wins, as in C++.
+	if w.ID != 0 {
+		if weaponsByItemID == nil {
+			weaponsByItemID = map[uint16]*LuaWeapon{}
+		}
+		weaponsByItemID[w.ID] = w
+	}
 	L.Push(lua.LTrue)
 	return 1
+}
+
+// weaponsByItemID indexes registered weapons by the item id they apply to.
+var weaponsByItemID map[uint16]*LuaWeapon
+
+// UseWeapon runs the datapack onUseWeapon callback for the item a player is
+// attacking with, and reports whether one existed. It is the port of the
+// isLoadedScriptId branch of Weapon::internalUseWeapon (weapons.cpp): a weapon with
+// a script attached applies its own damage through combat:execute, and the
+// built-in damage is skipped entirely.
+//
+// The callback signature is onUseWeapon(player, variant) where the variant is a
+// NUMBER carrying the target's creature id, matching Weapon::executeUseWeapon.
+func (e *Engine) UseWeapon(p *game.Player, weaponItemID uint16, target game.Creature) bool {
+	if p == nil || target == nil {
+		return false
+	}
+	w := weaponsByItemID[weaponItemID]
+	if w == nil || w.onUseWeapon == nil {
+		return false
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.pushPlayerUserdata(p)
+	playerArg := e.L.Get(-1)
+	e.L.Pop(1)
+
+	v := &luaVariant{vtype: VariantNumber, number: target.GetID()}
+	ud := e.L.NewUserData()
+	ud.Value = v
+	e.L.SetMetatable(ud, e.L.GetTypeMetatable(variantTypeName))
+
+	if err := e.L.CallByParam(lua.P{Fn: w.onUseWeapon, NRet: 1, Protect: true}, playerArg, ud); err != nil {
+		e.log.Warn("onUseWeapon error", "itemId", weaponItemID, "err", err)
+		// C++ treats a failed script as handled: it does not fall back to the
+		// built-in damage, and neither do we.
+		return true
+	}
+	e.L.Pop(e.L.GetTop())
+	return true
 }

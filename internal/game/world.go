@@ -64,6 +64,13 @@ type World struct {
 	// with w.mu already held, so its implementation must not take the lock again.
 	CaptureStackPositions func(pos Position, c Creature) map[uint32]int
 
+	// OnUseWeapon is populated by the Lua engine. It runs a datapack weapon's
+	// onUseWeapon callback for the wielded item and reports whether one existed.
+	// Weapon::internalUseWeapon branches on exactly this: with a script attached it
+	// runs the script INSTEAD of the built-in damage (weapons.cpp), which is what the
+	// arrow/star scripts rely on to apply their own conditions and effects.
+	OnUseWeapon func(p *Player, weaponItemID uint16, target Creature) bool
+
 	// Combat hooks, populated by the protocol layer so the combat engine can
 	// push updates to clients without importing the protocol package.
 	OnCreatureHealthChange func(c Creature)
