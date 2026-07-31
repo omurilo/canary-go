@@ -8,8 +8,11 @@ import (
 	"github.com/opentibiabr/canary-go/internal/game"
 )
 
-// LoadPlayerDepot loads all depot items for a player from the player_depotitems table.
-// It populates the individual depot chests (boxes 1-17+) in the DepotManager.
+// LoadPlayerDepot loads all depot items for a player from the player_depotitems
+// table, populating the depot boxes in the DepotManager. Mirrors
+// IOLoginDataLoad::loadPlayerDepotItems: a pid below 100 is the box number the item
+// sits in (0 included — GetDepotChest maps it the way the C++ does), anything else
+// is the sid of the container holding it.
 func (d *DB) LoadPlayerDepot(ctx context.Context, p *game.Player) error {
 	itemsBySID, loadedRows, err := d.loadItemsFromTable(ctx, p.DBID, "player_depotitems")
 	if err != nil {
@@ -41,7 +44,7 @@ func (d *DB) LoadPlayerDepot(ctx context.Context, p *game.Player) error {
 	// Second pass: put top-level items into their respective depot chests
 	for _, row := range loadedRows {
 		if row.pid >= 0 && row.pid < 100 {
-			// pid is the depotId (1-17)
+			// pid is the depot box number.
 			chest := p.DepotManager.GetDepotChest(uint16(row.pid), true)
 			if chest != nil {
 				if chest.Contents == nil {

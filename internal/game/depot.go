@@ -1,5 +1,39 @@
 package game
 
+import "github.com/opentibiabr/canary-go/internal/config"
+
+// Depot box item ids (src/utils/utils_definitions.hpp:546-571). Boxes I..XVII are
+// contiguous from ITEM_DEPOT_NULL, and then the sequence BREAKS: XVIII, XIX and XX
+// live in unrelated ranges. Deriving them by arithmetic yields 22814/22815/22816,
+// two of which are not item ids at all, and an unknown id in a container frame
+// makes the client read a zero appearance and lose the rest of the packet.
+const (
+	ItemDepotNull  = 22796 // for internal use — actual item id 168
+	ItemDepotI     = 22797
+	ItemDepotXVII  = 22813
+	ItemDepotXVIII = 31915
+	ItemDepotXIX   = 39723
+	ItemDepotXX    = 39724
+)
+
+// defaultDepotBoxes mirrors `depotBoxes = 20` in config.lua.dist.
+const defaultDepotBoxes = 20
+
+// depotBoxes is g_configManager().getNumber(DEPOT_BOXES): how many boxes a locker
+// holds, and the capacity of the depot container that holds them.
+func depotBoxes() uint16 {
+	n := config.Number("depotBoxes", defaultDepotBoxes)
+	if n < 1 {
+		return 1
+	}
+	if n > defaultDepotBoxes {
+		// Beyond box XX there is no item id to give a box, so the C++ hands them all
+		// ITEM_DEPOT_XX. Capping keeps the locker from listing duplicates.
+		return defaultDepotBoxes
+	}
+	return uint16(n)
+}
+
 const (
 	MaxDepotItems = 2000
 
@@ -25,7 +59,7 @@ const (
 type PlayerDepotManager struct {
 	player  *Player
 	Lockers map[uint16]*Item // keyed by town ID
-	Chests  map[uint16]*Item // keyed by depot chest ID (1-17)
+	Chests  map[uint16]*Item // keyed by depot box number (1..depotBoxes)
 }
 
 func NewPlayerDepotManager(p *Player) *PlayerDepotManager {
@@ -44,13 +78,18 @@ func (dm *PlayerDepotManager) GetDepotChest(depotId uint16, autoCreate bool) *It
 		return nil
 	}
 
-	chestID := uint16(22796 + depotId) // ITEM_DEPOT_NULL + depotId
-	if depotId == 18 {
-		chestID = 22814 // ITEM_DEPOT_XVIII
-	} else if depotId == 19 {
-		chestID = 22815 // ITEM_DEPOT_XIX
-	} else if depotId > 19 {
-		chestID = 22816 // ITEM_DEPOT_XX
+	// Player::getDepotChest (src/creatures/players/player.cpp), branch for branch.
+	// Note 0 falls to the last case in C++ too, not to ITEM_DEPOT_NULL.
+	var chestID uint16
+	switch {
+	case depotId > 0 && depotId < 18:
+		chestID = ItemDepotNull + depotId
+	case depotId == 18:
+		chestID = ItemDepotXVIII
+	case depotId == 19:
+		chestID = ItemDepotXIX
+	default:
+		chestID = ItemDepotXX
 	}
 
 	chest := &Item{ID: chestID, Contents: make([]*Item, 0), Pagination: true, MaxSize: 36}
@@ -64,11 +103,16 @@ func (dm *PlayerDepotManager) GetDepotLocker(depotId uint16) *Item {
 		return locker
 	}
 
-	locker := &Item{ID: ItemLocker, Contents: make([]*Item, 0), Pagination: true, MaxSize: 36}
+	// DepotLocker(ITEM_LOCKER, 4): market, inbox, stash and the depot container are
+	// all it ever holds. It was 36, which advertises 32 empty slots the locker does
+	// not have.
+	locker := &Item{ID: ItemLocker, Contents: make([]*Item, 0), Pagination: true, MaxSize: 4}
 
-	// Depot Box container that holds the 17 nested boxes
-	depotChestContainer := &Item{ID: ItemDepot, Contents: make([]*Item, 0), Pagination: true}
-	for i := uint16(1); i <= 17; i++ {
+	// CreateItemAsContainer(ITEM_DEPOT, DEPOT_BOXES): the container's capacity is the
+	// box count, not a fixed 17.
+	boxes := depotBoxes()
+	depotChestContainer := &Item{ID: ItemDepot, Contents: make([]*Item, 0), Pagination: true, MaxSize: boxes}
+	for i := uint16(1); i <= boxes; i++ {
 		chest := dm.GetDepotChest(i, true)
 		depotChestContainer.Contents = append(depotChestContainer.Contents, chest)
 		if chest.Parent == nil {
