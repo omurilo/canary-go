@@ -178,9 +178,6 @@ func (e *Engine) registerAPI() {
 	}
 
 	// Item and fluid enums used across Lua scripts
-	L.SetGlobal("HIRELING_LAMP", lua.LNumber(29432))
-	L.SetGlobal("ITEM_STORE_COIN", lua.LNumber(22118))
-	L.SetGlobal("ITEM_PRIMAL_POD", lua.LNumber(39176))
 	L.SetGlobal("FLUID_NONE", lua.LNumber(0))
 	L.SetGlobal("FLUID_WATER", lua.LNumber(1))
 	L.SetGlobal("FLUID_WINE", lua.LNumber(2))
@@ -204,13 +201,8 @@ func (e *Engine) registerAPI() {
 	L.SetGlobal("FLUID_CHOCOLATE", lua.LNumber(20))
 
 	// Daily reward status enums
-	L.SetGlobal("DAILY_REWARD_COLLECTED", lua.LNumber(0))
-	L.SetGlobal("DAILY_REWARD_NOTCOLLECTED", lua.LNumber(1))
-	L.SetGlobal("DAILY_REWARD_NOTAVAILABLE", lua.LNumber(2))
 
 	// Player sex enums
-	L.SetGlobal("PLAYERSEX_FEMALE", lua.LNumber(0))
-	L.SetGlobal("PLAYERSEX_MALE", lua.LNumber(1))
 
 	e.registerGame()
 	e.registerCreatureType()
@@ -251,7 +243,7 @@ func (e *Engine) registerAPI() {
 	// Mock constructors for unused revscriptsys classes so scripts don't crash
 	mockClass := func(name string) {
 		mt := L.NewTypeMetatable(name)
-		
+
 		idxTable := L.NewTable()
 		idxMt := L.NewTable()
 		L.SetField(idxMt, "__index", L.NewFunction(func(L *lua.LState) int {
@@ -274,10 +266,10 @@ func (e *Engine) registerAPI() {
 			return 1
 		}))
 		L.SetMetatable(idxTable, idxMt)
-		
+
 		L.SetField(mt, "__index", idxTable)
 		L.SetField(mt, "__newindex", L.NewFunction(func(L *lua.LState) int { return 0 }))
-		
+
 		// The constructor (__call) returns a new userdata
 		L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int {
 			ud := L.NewUserData()
@@ -367,7 +359,7 @@ func (e *Engine) registerAPI() {
 		}
 		return 1
 	}))
-	
+
 	// Ensure these class tables exist so scripts can inject methods into them (e.g. Player.feed = ...)
 	ensureClassTable := func(name string) {
 		if L.GetGlobal(name) == lua.LNil {
@@ -383,7 +375,7 @@ func (e *Engine) registerAPI() {
 			mt := L.NewTypeMetatable(name + "_ClassDummy")
 			// Dummy __call returning nil so scripts don't crash when calling Player(cid)
 			L.SetField(mt, "__call", L.NewFunction(func(L *lua.LState) int { return 0 }))
-			
+
 			// Dummy __index returning a dummy function so arbitrary method calls don't crash
 			L.SetField(mt, "__index", L.NewFunction(func(L *lua.LState) int {
 				L.Push(L.NewFunction(func(L *lua.LState) int { return 0 }))
@@ -429,10 +421,10 @@ func (e *Engine) registerAPI() {
 		if childMt == nil || parentMt == nil {
 			return
 		}
-		
+
 		childIdx, _ := L.RawGet(childMt, lua.LString("__index")).(*lua.LTable)
 		parentIdx, _ := L.RawGet(parentMt, lua.LString("__index")).(*lua.LTable)
-		
+
 		if childIdx != nil && parentIdx != nil {
 			idxMt := L.GetMetatable(childIdx)
 			if idxMt == nil || idxMt == lua.LNil {

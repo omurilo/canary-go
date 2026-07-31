@@ -575,5 +575,12 @@ func RegisterEnums(L *lua.LState) {
 		L.SetGlobal(k, v)
 	}
 
+	// The rest of what lua_enums.cpp registers, generated from the C++ enum
+	// bodies. Applied after the hand-written table, which it never overlaps:
+	// the generator refuses names already defined here.
+	for k, v := range generatedEnums {
+		L.SetGlobal(k, v)
+	}
+
 	registerSpellEnums(L)
 }

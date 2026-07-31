@@ -36,17 +36,17 @@ func (e *Engine) registerCombat() {
 		key := L.CheckInt(2)
 		funcName := L.CheckString(3)
 		switch key {
-		case 1: // CALLBACK_PARAM_LEVELMAGICVALUE
+		case 0: // CALLBACK_PARAM_LEVELMAGICVALUE
 			c.CallbackLevelMagicValue = funcName
-		case 2: // CALLBACK_PARAM_SKILLVALUE
+		case 1: // CALLBACK_PARAM_SKILLVALUE
 			c.CallbackSkillValue = funcName
-		case 3: // CALLBACK_PARAM_TARGETTILE
+		case 2: // CALLBACK_PARAM_TARGETTILE
 			c.CallbackTargetTile = funcName
-		case 4: // CALLBACK_PARAM_TARGETCREATURE
+		case 3: // CALLBACK_PARAM_TARGETCREATURE
 			c.CallbackTargetCreature = funcName
-		case 5: // CALLBACK_PARAM_CHAINVALUE
+		case 4: // CALLBACK_PARAM_CHAINVALUE
 			c.ChainCallback = funcName
-		case 6: // CALLBACK_PARAM_CHAINPICKER
+		case 5: // CALLBACK_PARAM_CHAINPICKER
 			c.ChainPickerCallback = funcName
 		}
 		L.Push(lua.LTrue)
@@ -204,23 +204,23 @@ func (e *Engine) combatMethods() map[string]lua.LGFunction {
 			key := L.CheckInt(2)
 			funcName := L.CheckString(3)
 			switch key {
-			case 1: // CALLBACK_PARAM_LEVELMAGICVALUE
+			case 0: // CALLBACK_PARAM_LEVELMAGICVALUE
 				c.CallbackLevelMagicValue = funcName
-			case 2: // CALLBACK_PARAM_SKILLVALUE
+			case 1: // CALLBACK_PARAM_SKILLVALUE
 				c.CallbackSkillValue = funcName
-			case 3: // CALLBACK_PARAM_TARGETTILE
+			case 2: // CALLBACK_PARAM_TARGETTILE
 				c.CallbackTargetTile = funcName
-			case 4: // CALLBACK_PARAM_TARGETCREATURE
+			case 3: // CALLBACK_PARAM_TARGETCREATURE
 				c.CallbackTargetCreature = funcName
-			case 5: // CALLBACK_PARAM_CHAINVALUE
+			case 4: // CALLBACK_PARAM_CHAINVALUE
 				c.ChainCallback = funcName
-			case 6: // CALLBACK_PARAM_CHAINPICKER
+			case 5: // CALLBACK_PARAM_CHAINPICKER
 				c.ChainPickerCallback = funcName
 			}
 			L.Push(lua.LTrue)
 			return 1
 		},
-		"execute":     e.combatExecute,
+		"execute": e.combatExecute,
 	}
 }
 
@@ -243,7 +243,7 @@ func (e *Engine) combatExecute(L *lua.LState) int {
 			level = int(p.Level)
 			maglevel = int(p.MagLevel)
 		}
-		
+
 		fn := e.L.GetGlobal(c.CallbackLevelMagicValue)
 		if fn.Type() == lua.LTFunction {
 			ud := e.L.NewUserData()
@@ -279,66 +279,66 @@ func (e *Engine) combatExecute(L *lua.LState) int {
 			e.log.Error("combat callback is not a function", "func", c.CallbackLevelMagicValue, "type", fn.Type().String())
 		}
 	} else if c.CallbackSkillValue != "" {
-			fn := e.L.GetGlobal(c.CallbackSkillValue)
-			if fn.Type() == lua.LTFunction {
-				ud := e.L.NewUserData()
-				ud.Value = caster
-				if _, isPlayer := caster.(*game.Player); isPlayer {
-					e.L.SetMetatable(ud, e.L.GetTypeMetatable("Player"))
-				} else if _, isMonster := caster.(*game.Monster); isMonster {
-					e.L.SetMetatable(ud, e.L.GetTypeMetatable("Monster"))
-				} else {
-					e.L.SetMetatable(ud, e.L.GetTypeMetatable("Creature"))
-				}
-
-				skill := int32(0)
-				attack := int32(7)
-				factor := float32(1.0)
-
-				if p, ok := caster.(*game.Player); ok {
-					if e.world != nil {
-						catalog := e.world.Items
-						tool := p.GetWeapon(catalog, false)
-						if tool != nil {
-							attack = tool.Attack(catalog)
-							if tool.WeaponType(catalog) == "ammo" {
-								launcher := p.GetWeapon(catalog, true)
-								if launcher != nil {
-									attack += launcher.Attack(catalog)
-								}
-							}
-							skill = int32(p.GetWeaponSkillForItem(catalog, tool))
-						} else {
-							skill = int32(p.GetWeaponSkillForItem(catalog, nil))
-						}
-					} else {
-						skill = int32(p.GetWeaponSkillForItem(nil, nil))
-					}
-					factor = float32(p.GetAttackFactor())
-				}
-
-				if err := e.L.CallByParam(lua.P{
-					Fn:      fn,
-					NRet:    2,
-					Protect: true,
-				}, ud, lua.LNumber(skill), lua.LNumber(attack), lua.LNumber(factor)); err == nil {
-					minDamage := int32(e.L.ToNumber(-2))
-					maxDamage := int32(e.L.ToNumber(-1))
-					e.L.Pop(2)
-
-					e.log.Info("executed formula callback (skill)", "func", c.CallbackSkillValue, "min", minDamage, "max", maxDamage)
-
-					c2 := *c
-					c2.FormulaType = combat.CombatFormulaDamage
-					c2.MinA = float64(minDamage)
-					c2.MaxA = float64(maxDamage)
-					c = &c2
-				} else {
-					e.log.Error("combat callback error", "func", c.CallbackSkillValue, "err", err)
-				}
+		fn := e.L.GetGlobal(c.CallbackSkillValue)
+		if fn.Type() == lua.LTFunction {
+			ud := e.L.NewUserData()
+			ud.Value = caster
+			if _, isPlayer := caster.(*game.Player); isPlayer {
+				e.L.SetMetatable(ud, e.L.GetTypeMetatable("Player"))
+			} else if _, isMonster := caster.(*game.Monster); isMonster {
+				e.L.SetMetatable(ud, e.L.GetTypeMetatable("Monster"))
 			} else {
-				e.log.Error("combat callback is not a function", "func", c.CallbackSkillValue, "type", fn.Type().String())
+				e.L.SetMetatable(ud, e.L.GetTypeMetatable("Creature"))
 			}
+
+			skill := int32(0)
+			attack := int32(7)
+			factor := float32(1.0)
+
+			if p, ok := caster.(*game.Player); ok {
+				if e.world != nil {
+					catalog := e.world.Items
+					tool := p.GetWeapon(catalog, false)
+					if tool != nil {
+						attack = tool.Attack(catalog)
+						if tool.WeaponType(catalog) == "ammo" {
+							launcher := p.GetWeapon(catalog, true)
+							if launcher != nil {
+								attack += launcher.Attack(catalog)
+							}
+						}
+						skill = int32(p.GetWeaponSkillForItem(catalog, tool))
+					} else {
+						skill = int32(p.GetWeaponSkillForItem(catalog, nil))
+					}
+				} else {
+					skill = int32(p.GetWeaponSkillForItem(nil, nil))
+				}
+				factor = float32(p.GetAttackFactor())
+			}
+
+			if err := e.L.CallByParam(lua.P{
+				Fn:      fn,
+				NRet:    2,
+				Protect: true,
+			}, ud, lua.LNumber(skill), lua.LNumber(attack), lua.LNumber(factor)); err == nil {
+				minDamage := int32(e.L.ToNumber(-2))
+				maxDamage := int32(e.L.ToNumber(-1))
+				e.L.Pop(2)
+
+				e.log.Info("executed formula callback (skill)", "func", c.CallbackSkillValue, "min", minDamage, "max", maxDamage)
+
+				c2 := *c
+				c2.FormulaType = combat.CombatFormulaDamage
+				c2.MinA = float64(minDamage)
+				c2.MaxA = float64(maxDamage)
+				c = &c2
+			} else {
+				e.log.Error("combat callback error", "func", c.CallbackSkillValue, "err", err)
+			}
+		} else {
+			e.log.Error("combat callback is not a function", "func", c.CallbackSkillValue, "type", fn.Type().String())
+		}
 	}
 
 	if e.world == nil || e.world.Combat == nil {
@@ -467,4 +467,3 @@ func (e *Engine) luaDoAreaCombatMana(L *lua.LState) int {
 	L.Push(lua.LTrue)
 	return 1
 }
-
