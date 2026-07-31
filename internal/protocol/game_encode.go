@@ -168,7 +168,14 @@ func (g *GameProtocol) addCreature(w *netmsg.Writer, c game.Creature) {
 	}
 	w.AddByte(walkthrough) // walkthrough (can walk through: 0, solid: 1)
 
-	// OTCR extension: shader name + attached effects list.
+	// OTCR extension: shader name + attached effects list. Gated exactly like the
+	// tail of the C++ AddCreature (protocolgame.cpp:9659). Every game.Creature
+	// embeds BaseCreature and so satisfies this interface, which meant these bytes
+	// went to EVERY client — including stock Tibia ones, which do not read them and
+	// then parse the following fields three bytes out of alignment.
+	if !g.isOTCR() {
+		return
+	}
 	if bc, ok := c.(interface{ GetShader() string; GetAttachedEffects() []uint16 }); ok {
 		w.AddString(bc.GetShader())
 		effects := bc.GetAttachedEffects()

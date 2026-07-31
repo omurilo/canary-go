@@ -184,6 +184,11 @@ type GameProtocol struct {
 	challengeRand uint8
 	loggedIn      bool
 
+	// clientOS is the OperatingSystem_t the client announced in its login packet
+	// (protocolgame.cpp:1158). It is what tells an OTC client apart from a stock
+	// Tibia one, and therefore which protocol extensions may be written.
+	clientOS uint16
+
 	player  *game.Player
 	knownMu sync.RWMutex
 	known   map[uint32]bool
@@ -310,6 +315,42 @@ func (g *GameProtocol) isOldProtocol() bool {
 // isCipsoft860 returns true for the 8.60 protocol profile.
 func (g *GameProtocol) isCipsoft860() bool {
 	return g.profile != nil && g.profile.Version == VersionCipsoft860
+}
+
+// OperatingSystem_t (src/creatures/creatures_definitions.hpp:737). Only the
+// boundary that matters to the wire format is named: from CLIENTOS_OTCLIENT_LINUX
+// up, the client is an OTC derivative.
+const clientOSOTClientLinux = 10
+
+// isOTC reports whether the client announced itself as an OTC derivative, the
+// `isOTC = true` of sendClientLoginPreamble (protocolgame.cpp:12237).
+func (g *GameProtocol) isOTC() bool {
+	return g.clientOS >= clientOSOTClientLinux
+}
+
+// isOTCR reports whether this session may write the OTCR protocol extensions: the
+// shader name and attached-effect list appended to AddCreature
+// (protocolgame.cpp:9659), the shader appended to AddItem, and the custom outfit
+// blocks. It is false, and it is meant to be.
+//
+// In C++ isOTCR is not a property of the client — it is set inside
+// sendOTCRFeatures (protocolgame.cpp:10592), the function that also sends the 0x43
+// frame TELLING the client to enable those features. An OTC client leaves them off
+// by default (GameWingsAurasEffectsShader is commented out in its features.lua),
+// so the server's 0x43 is what makes them readable. Go does not implement
+// sendOTCRFeatures, so no client of this server has them enabled and none of those
+// bytes may be written.
+//
+// Writing them anyway shifts every field that follows. The client then reads ids
+// out of the middle of the previous description, which is exactly what "field has
+// more than one zero id appearance" reports: two appearance ids read as 0 on one
+// tile. A stock Tibia client dies on it during the enterWorld frame, before it can
+// draw the map; OTClient logs the damage and limps on.
+//
+// Whoever ports sendOTCRFeatures flips this to a field set by it — never to a test
+// on the operating system, which says what the client IS, not what it was told.
+func (g *GameProtocol) isOTCR() bool {
+	return false
 }
 
 func (g *GameProtocol) Player() *game.Player { return g.player }
@@ -440,8 +481,8 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	}
 	r := netmsg.NewReader(body[skip:])
 
-	_ = r.GetU16() // OS
-	_ = r.GetU16() // protocol version
+	g.clientOS = r.GetU16() // OperatingSystem_t (protocolgame.cpp:1158)
+	_ = r.GetU16()          // protocol version
 
 	var clientVersion uint32
 	var contentRevision uint16
