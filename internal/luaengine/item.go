@@ -2,6 +2,8 @@ package luaengine
 
 import (
 	"fmt"
+	"math"
+	"strconv"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
@@ -34,7 +36,7 @@ func (e *Engine) registerItem() {
 	e.L.SetField(mt, "__index", e.L.NewFunction(func(L *lua.LState) int {
 		it := checkItem(L)
 		key := L.CheckString(2)
-		
+
 		switch key {
 		case "itemid":
 			L.Push(lua.LNumber(it.item.ID))
@@ -57,7 +59,7 @@ func (e *Engine) registerItem() {
 			}
 			return 1
 		}
-		
+
 		// Fallback to method
 		val := methodTable.RawGetString(key)
 		L.Push(val)
@@ -152,10 +154,10 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			L.Push(lua.LBool(has))
 			return 1
 		},
-		"getId": func(L *lua.LState) int { 
+		"getId": func(L *lua.LState) int {
 			it := checkItem(L)
 			L.Push(lua.LNumber(it.item.ID))
-			return 1 
+			return 1
 		},
 		"getName": func(L *lua.LState) int {
 			it := checkItem(L)
@@ -270,11 +272,11 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			pushPosition(L, it.pos)
 			return 1
 		},
-		"getTile": stubItemMethod,
+		"getTile":      stubItemMethod,
 		"getContainer": stubItemMethod,
-		"getParent": stubItemMethod,
-		"clone": stubItemMethod,
-		"split": stubItemMethod,
+		"getParent":    stubItemMethod,
+		"clone":        stubItemMethod,
+		"split":        stubItemMethod,
 		"remove": func(L *lua.LState) int {
 			it := checkItem(L)
 			if it.item == nil {
@@ -330,6 +332,86 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			newItem := &game.Item{ID: itemID, Count: count, Parent: it.item}
 			it.item.Contents = append(it.item.Contents, newItem)
 			e.pushItem(L, newItem)
+			return 1
+		},
+		// item:setCustomAttribute(key, value) / getCustomAttribute(key) /
+		// removeCustomAttribute(key), ports of ItemFunctions::luaItemSetCustomAttribute
+		// and friends (src/lua/functions/items/item_functions.cpp). A numeric key is
+		// stringified, and the value may be a number, string or boolean — anything else
+		// yields nil, as upstream.
+		"setCustomAttribute": func(L *lua.LState) int {
+			it := checkItem(L)
+			key, ok := customAttributeKey(L, 2)
+			if !ok || it.item == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			switch v := L.Get(3); v.Type() {
+			case lua.LTNumber:
+				n := float64(lua.LVAsNumber(v))
+				// C++ keeps whole numbers as int64 and only falls back to double for a
+				// real fraction, so getCustomAttribute hands scripts an integer back.
+				if n == math.Trunc(n) {
+					it.item.SetCustomAttribute(key, int64(n))
+				} else {
+					it.item.SetCustomAttribute(key, n)
+				}
+			case lua.LTString:
+				it.item.SetCustomAttribute(key, v.String())
+			case lua.LTBool:
+				it.item.SetCustomAttribute(key, v == lua.LTrue)
+			default:
+				L.Push(lua.LNil)
+				return 1
+			}
+			L.Push(lua.LTrue)
+			return 1
+		},
+		"getCustomAttribute": func(L *lua.LState) int {
+			it := checkItem(L)
+			key, ok := customAttributeKey(L, 2)
+			if !ok || it.item == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			v, found := it.item.GetCustomAttribute(key)
+			if !found {
+				L.Push(lua.LNil)
+				return 1
+			}
+			switch tv := v.(type) {
+			case int64:
+				L.Push(lua.LNumber(tv))
+			case float64:
+				L.Push(lua.LNumber(tv))
+			case string:
+				L.Push(lua.LString(tv))
+			case bool:
+				L.Push(lua.LBool(tv))
+			default:
+				L.Push(lua.LNil)
+			}
+			return 1
+		},
+		"removeCustomAttribute": func(L *lua.LState) int {
+			it := checkItem(L)
+			key, ok := customAttributeKey(L, 2)
+			if !ok || it.item == nil {
+				L.Push(lua.LFalse)
+				return 1
+			}
+			L.Push(lua.LBool(it.item.RemoveCustomAttribute(key)))
+			return 1
+		},
+		// item:getFluidType returns the fluid subtype, which Item stores in Count for
+		// splashes and fluid containers (ItemFunctions::luaItemGetFluidType).
+		"getFluidType": func(L *lua.LState) int {
+			it := checkItem(L)
+			if it.item == nil {
+				L.Push(lua.LNumber(0))
+				return 1
+			}
+			L.Push(lua.LNumber(it.item.Count))
 			return 1
 		},
 		"getTier": func(L *lua.LState) int {
@@ -817,13 +899,13 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			L.Push(lua.LTrue)
 			return 1
 		},
-		"transform": e.itemTransform,
-		"decay": stubItemMethod,
-		"setDuration": stubItemMethod,
-		"stopDecay": stubItemMethod,
+		"transform":      e.itemTransform,
+		"decay":          stubItemMethod,
+		"setDuration":    stubItemMethod,
+		"stopDecay":      stubItemMethod,
 		"getDescription": e.itemGetDescription,
-		"isInsideDepot": stubItemMethod,
-		"isContainer": stubItemMethod,
+		"isInsideDepot":  stubItemMethod,
+		"isContainer":    stubItemMethod,
 		"actor": func(L *lua.LState) int {
 			it := checkItem(L)
 			if L.GetTop() == 1 {
@@ -843,7 +925,7 @@ func (e *Engine) itemGetDescription(L *lua.LState) int {
 		L.Push(lua.LString(""))
 		return 1
 	}
-	
+
 	it := e.world.Items.Get(li.item.ID)
 	if it == nil {
 		L.Push(lua.LString("an item of type " + fmt.Sprint(li.item.ID)))
@@ -904,4 +986,17 @@ func checkItemAt(L *lua.LState, index int) luaItem {
 	}
 	L.ArgError(index, "Item expected")
 	return luaItem{}
+}
+
+// customAttributeKey normalises the key argument of the custom-attribute methods.
+// C++ accepts a number or a string and stringifies the number, so 42 and "42" are
+// the same key; anything else is rejected (luaItemSetCustomAttribute).
+func customAttributeKey(L *lua.LState, n int) (string, bool) {
+	switch v := L.Get(n); v.Type() {
+	case lua.LTNumber:
+		return strconv.FormatInt(int64(lua.LVAsNumber(v)), 10), true
+	case lua.LTString:
+		return v.String(), true
+	}
+	return "", false
 }

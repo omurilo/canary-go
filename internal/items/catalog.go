@@ -125,6 +125,8 @@ type ItemType struct {
 	HitChance    int32
 	Range        int32
 	ShootRange   uint8
+	// IsCorpse comes from the appearance flags, not items.xml (items.cpp:233).
+	IsCorpse bool
 	// ShootType is the numeric ShootType_t, as C++ stores it. Weapon:shootType sets
 	// it from Lua, so it cannot be the items.xml name string it used to be.
 	ShootType ShootTypes
@@ -339,6 +341,8 @@ func Load(path string) (*Catalog, error) {
 			it.ClockExpire = f.GetClockexpire()
 			it.WearOut = f.GetWearout()
 			it.WrapKit = f.GetWrapkit()
+			// ItemType::isCorpse (items.cpp:233): either flag counts.
+			it.IsCorpse = f.GetCorpse() || f.GetPlayerCorpse()
 			it.BlockSolid = f.GetUnpass()
 			it.Pickupable = f.GetTake()
 			if h := f.GetHeight(); h != nil && h.GetElevation() > 0 {

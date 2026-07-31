@@ -27,7 +27,7 @@ func (e *Engine) registerMonsterType() {
 		"register": func(L *lua.LState) int {
 			m := checkMonsterType(L)
 			table := L.CheckTable(2)
-			
+
 			if val := table.RawGetString("health"); val.Type() == lua.LTNumber {
 				m.MaxHealth = uint32(lua.LVAsNumber(val))
 			}
@@ -115,7 +115,7 @@ func (e *Engine) registerMonsterType() {
 			if e != nil && e.world != nil && e.world.TypeRegistry != nil {
 				e.world.TypeRegistry.Monsters[strings.ToLower(m.Name)] = m
 			}
-			
+
 			L.Push(lua.LTrue)
 			return 1
 		},
@@ -140,6 +140,41 @@ func (e *Engine) registerMonsterType() {
 				return 1
 			}
 			L.Push(lootBlocksToLua(L, m.Loot))
+			return 1
+		},
+		// These four are get/set in C++: called with no argument they report, with a
+		// boolean they assign (monster_type_functions.cpp). The monster .lua files use
+		// the setter form while loading a type.
+		"isSummonable":   monsterTypeBoolFlag(func(m *creatures.MonsterType) *bool { return &m.Flags.Summonable }),
+		"isIllusionable": monsterTypeBoolFlag(func(m *creatures.MonsterType) *bool { return &m.Flags.Illusionable }),
+		"isConvinceable": monsterTypeBoolFlag(func(m *creatures.MonsterType) *bool { return &m.Flags.Convinceable }),
+		// BestiaryStars / Bestiaryrace keep the upstream capitalisation.
+		"BestiaryStars": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			if m == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			if L.GetTop() >= 2 {
+				m.BestiaryStars = uint8(L.CheckInt(2))
+				L.Push(lua.LTrue)
+				return 1
+			}
+			L.Push(lua.LNumber(m.BestiaryStars))
+			return 1
+		},
+		"Bestiaryrace": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			if m == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			if L.GetTop() >= 2 {
+				m.BestiaryRace = uint8(L.CheckInt(2))
+				L.Push(lua.LTrue)
+				return 1
+			}
+			L.Push(lua.LNumber(m.BestiaryRace))
 			return 1
 		},
 		"isRewardBoss": func(L *lua.LState) int {
@@ -191,90 +226,132 @@ func (e *Engine) registerMonsterType() {
 
 		"isPreyExclusive": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LFalse)
 			return 1
 		},
 		"isForgeCreature": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LFalse)
 			return 1
 		},
 		"canSpawn": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LFalse)
 			return 1
 		},
 		"critChance": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LNumber(0))
 			return 1
 		},
 		"nameDescription": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LString(""))
 			return 1
 		},
 		"runHealth": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LNumber(0))
 			return 1
 		},
 		"faction": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LNumber(0))
 			return 1
 		},
 		"enemyFactions": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(L.NewTable())
 			return 1
 		},
 		"targetPreferPlayer": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LFalse)
 			return 1
 		},
 		"targetPreferMaster": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LFalse)
 			return 1
 		},
 		"combatImmunities": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(L.NewTable())
 			return 1
 		},
 		"conditionImmunities": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(L.NewTable())
 			return 1
 		},
 		"familiar": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LFalse)
 			return 1
 		},
 		"getCorpseId": func(L *lua.LState) int {
 			mt := checkMonsterType(L)
-			if mt == nil { L.Push(lua.LNil); return 1 }
+			if mt == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
 			L.Push(lua.LNumber(0))
 			return 1
 		},
 	}
-	
+
 	// Resilient __index fallback: if a method on MonsterType doesn't exist,
 	// return a safe no-op function that returns 'self' to support method chaining.
 	mtIndex := e.L.NewFunction(func(L *lua.LState) int {
@@ -431,16 +508,26 @@ func parseMonsterAttacks(m *creatures.MonsterType, table *lua.LTable) {
 			// Convert to internal CombatType string name to match logic
 			cType := luaToCombatType(int(lua.LVAsNumber(val)))
 			switch cType {
-			case 1: atk.CombatType = "physical"
-			case 8: atk.CombatType = "fire"
-			case 4: atk.CombatType = "earth"
-			case 2: atk.CombatType = "energy"
-			case 128: atk.CombatType = "ice"
-			case 64: atk.CombatType = "death"
-			case 256: atk.CombatType = "holy"
-			case 1024: atk.CombatType = "lifedrain"
-			case 512: atk.CombatType = "manadrain"
-			case 32: atk.CombatType = "healing"
+			case 1:
+				atk.CombatType = "physical"
+			case 8:
+				atk.CombatType = "fire"
+			case 4:
+				atk.CombatType = "earth"
+			case 2:
+				atk.CombatType = "energy"
+			case 128:
+				atk.CombatType = "ice"
+			case 64:
+				atk.CombatType = "death"
+			case 256:
+				atk.CombatType = "holy"
+			case 1024:
+				atk.CombatType = "lifedrain"
+			case 512:
+				atk.CombatType = "manadrain"
+			case 32:
+				atk.CombatType = "healing"
 			}
 		}
 		if val := at.RawGetString("condition"); val.Type() == lua.LTString {
@@ -602,7 +689,6 @@ func parseMonsterElements(m *creatures.MonsterType, table *lua.LTable) {
 // lootBlocksToLua converts Go loot blocks into the array of tables the datapack's
 // MonsterType:generateLootRoll iterates. Key names are the contract with
 // data/libs/functions/monstertype.lua — renaming one silently drops that field.
-//
 func lootBlocksToLua(L *lua.LState, blocks []creatures.LootBlock) *lua.LTable {
 	out := L.NewTable()
 	for i, lb := range blocks {
@@ -636,4 +722,25 @@ func max32(v, min uint32) uint32 {
 		return min
 	}
 	return v
+}
+
+// monsterTypeBoolFlag builds a get/set accessor over a bool field of MonsterType,
+// the shape C++ uses for isSummonable/isIllusionable/isConvinceable: no argument
+// reads, a boolean argument assigns and returns true.
+func monsterTypeBoolFlag(field func(*creatures.MonsterType) *bool) lua.LGFunction {
+	return func(L *lua.LState) int {
+		m := checkMonsterType(L)
+		if m == nil {
+			L.Push(lua.LNil)
+			return 1
+		}
+		p := field(m)
+		if L.GetTop() >= 2 {
+			*p = L.ToBool(2)
+			L.Push(lua.LTrue)
+			return 1
+		}
+		L.Push(lua.LBool(*p))
+		return 1
+	}
 }

@@ -61,6 +61,13 @@ func (e *Engine) registerItemType() {
 			}
 			return 1
 		},
+		// ItemType::isCorpse comes from the appearance flags (corpse or player_corpse),
+		// not from items.xml (items.cpp:233).
+		"isCorpse": func(L *lua.LState) int {
+			it := checkItemType(L, 1)
+			L.Push(lua.LBool(it.item != nil && it.item.IsCorpse))
+			return 1
+		},
 		"isContainer": func(L *lua.LState) int {
 			it := checkItemType(L, 1)
 			if it.item != nil {

@@ -442,6 +442,46 @@ type ItemAttributes struct {
 	// the quick-loot assignment per container instance, like C++.
 	QuickLootContainer *uint32
 	ObtainContainer    *uint32
+
+	// Custom holds ATTR_CUSTOM: arbitrary script-defined values keyed by name, the
+	// Go side of Item::setCustomAttribute. C++ stores int64, double, string or bool
+	// in a variant; the datapack uses it for podium looks, unwrap ids, hireling
+	// state and quest bookkeeping. Keys are always strings — a numeric key is
+	// stringified, as luaItemSetCustomAttribute does.
+	Custom map[string]any
+}
+
+// SetCustomAttribute stores a script-defined value. Mirrors
+// Item::setCustomAttribute; the caller is responsible for having normalised the key.
+func (i *Item) SetCustomAttribute(key string, value any) {
+	if i.Attr == nil {
+		i.Attr = &ItemAttributes{}
+	}
+	if i.Attr.Custom == nil {
+		i.Attr.Custom = map[string]any{}
+	}
+	i.Attr.Custom[key] = value
+}
+
+// GetCustomAttribute returns a script-defined value and whether it was set.
+func (i *Item) GetCustomAttribute(key string) (any, bool) {
+	if i.Attr == nil || i.Attr.Custom == nil {
+		return nil, false
+	}
+	v, ok := i.Attr.Custom[key]
+	return v, ok
+}
+
+// RemoveCustomAttribute drops a script-defined value, reporting whether it existed.
+func (i *Item) RemoveCustomAttribute(key string) bool {
+	if i.Attr == nil || i.Attr.Custom == nil {
+		return false
+	}
+	if _, ok := i.Attr.Custom[key]; !ok {
+		return false
+	}
+	delete(i.Attr.Custom, key)
+	return true
 }
 
 // Outfit describes a creature's appearance.
