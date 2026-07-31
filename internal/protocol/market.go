@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"context"
+
+	"github.com/opentibiabr/canary-go/internal/db"
 	"log/slog"
 	"time"
 
@@ -52,7 +54,7 @@ func (g *GameProtocol) SendOpenMarket() {
 	w.AddByte(uint8(offerCount))
 
 	entries := g.collectDepotItems()
-	
+
 	entriesCount := uint16(len(entries))
 	if g.player.CoinTransferable > 0 {
 		entriesCount++
@@ -83,7 +85,7 @@ func (g *GameProtocol) SendOpenMarket() {
 
 	// C++ sends sendResourcesBalance immediately.
 	g.sendResourcesBalance()
-	
+
 	// We no longer need the 50ms delay because splitting 0xF2 and 0xDF into two blocks
 	// naturally solves the UI update race condition in the client.
 	g.sendCoinBalance()
@@ -219,9 +221,11 @@ func (g *GameProtocol) SendMarketAccept(timestamp uint32, counter uint16, amount
 
 // SendMarketBrowseOwnOffers sends the player's own active offers (opcode 0xF9).
 // Mirrors C++ ProtocolGame::sendMarketBrowseOwnOffers:
-//   [0xF9][u8 MARKETREQUEST_OWN_OFFERS=2]
-//   [u32 buyCount] per-offer: [u32 timestamp][u16 counter][u16 itemId][u8 tier][u16 amount][u64 price]
-//   [u32 sellCount] per-offer: [u32 timestamp][u16 counter][u16 itemId][u8 tier][u16 amount][u64 price]
+//
+//	[0xF9][u8 MARKETREQUEST_OWN_OFFERS=2]
+//	[u32 buyCount] per-offer: [u32 timestamp][u16 counter][u16 itemId][u8 tier][u16 amount][u64 price]
+//	[u32 sellCount] per-offer: [u32 timestamp][u16 counter][u16 itemId][u8 tier][u16 amount][u64 price]
+//
 // Tier byte is only sent when the item has forge tier > 0.
 func (g *GameProtocol) SendMarketBrowseOwnOffers() {
 	if g.player == nil || g.player.World == nil || g.player.World.Market == nil {
@@ -276,13 +280,56 @@ func (g *GameProtocol) SendMarketBrowseOwnHistory() {
 	if g.player == nil || g.player.World == nil || g.player.World.Market == nil {
 		return
 	}
-	// TODO: implement history tracking (market_history table); send empty lists.
+	ctx := context.Background()
+	buys, err := g.deps.DB.GetOwnMarketHistory(ctx, g.player.DBID, 0)
+	if err != nil {
+		g.deps.Log.Warn("load buy market history", "player", g.player.Name, "err", err)
+	}
+	sells, err := g.deps.DB.GetOwnMarketHistory(ctx, g.player.DBID, 1)
+	if err != nil {
+		g.deps.Log.Warn("load sell market history", "player", g.player.Name, "err", err)
+	}
+
 	w := netmsg.NewWriter()
 	w.AddByte(0xF9)
 	w.AddByte(marketRequestOwnHistory)
-	w.AddU32(0) // buy history count
-	w.AddU32(0) // sell history count
+	g.addMarketHistoryList(w, buys)
+	g.addMarketHistoryList(w, sells)
 	g.SendToClient(w)
+}
+
+// addMarketHistoryList writes one history list, mirroring the loops in
+// ProtocolGame::sendMarketBrowseOwnHistory (protocolgame.cpp:6930).
+//
+// The per-entry counter is a sequence WITHIN a timestamp — several offers that left
+// the market in the same second get 0, 1, 2 — and the counter map is reset between
+// the buy and sell lists, which is why this is a method rather than a shared
+// running total.
+func (g *GameProtocol) addMarketHistoryList(w *netmsg.Writer, offers []db.HistoryOffer) {
+	// C++ caps each list so the two together cannot overflow the client's buffer.
+	const perListCap = 810
+	count := len(offers)
+	if count > perListCap {
+		count = perListCap
+	}
+	w.AddU32(uint32(count))
+
+	counter := map[uint32]uint16{}
+	for i := 0; i < count; i++ {
+		o := offers[i]
+		w.AddU32(o.Timestamp)
+		w.AddU16(counter[o.Timestamp])
+		counter[o.Timestamp]++
+		w.AddU16(o.ItemID)
+		// The tier byte is only present for classified items; writing it
+		// unconditionally shifts everything after it.
+		if t := g.deps.Items.Get(o.ItemID); t != nil && t.UpgradeClassification > 0 {
+			w.AddByte(o.Tier)
+		}
+		w.AddU16(o.Amount)
+		w.AddU64(o.Price)
+		w.AddByte(o.State)
+	}
 }
 
 // SendMarketCancel confirms an offer was cancelled, porting
@@ -338,7 +385,9 @@ func (g *GameProtocol) parseMarketLeave() {
 
 // parseMarketBrowse handles item browsing / own offers / own history (0xF5).
 // Mirrors C++ ProtocolGame::parseMarketBrowse:
-//   [u8 browseId] — 1=own offers, 2=own history, 3+=browse item by itemId
+//
+//	[u8 browseId] — 1=own offers, 2=own history, 3+=browse item by itemId
+//
 // If the player is not yet in the market, SendOpenMarket is sent first (mirrors
 // C++ Game::playerBrowseMarket calling sendMarketEnter when !player->isInMarket()).
 func (g *GameProtocol) parseMarketBrowse(r *netmsg.Reader) {
@@ -457,7 +506,7 @@ func (g *GameProtocol) parseMarketCreateOffer(r *netmsg.Reader) {
 		totalCost := price * uint64(amount)
 		fee := totalCost * marketFeePercent / 100
 		g.player.BankBalance -= totalCost + fee
-		
+
 		// Note: SavePlayer will save BankBalance on logout, but ideally we'd update immediately here.
 	} else {
 		if itemId == game.ItemStoreCoin {
@@ -503,9 +552,12 @@ func (g *GameProtocol) parseMarketCancelOffer(r *netmsg.Reader) {
 	}
 
 	market.RemoveOffer(offer.ID)
-		if _, err := g.deps.DB.RemoveMarketOffer(context.Background(), offer.ID); err != nil {
-			slog.Default().Info("failed to remove market offer from DB", "err", err)
-		}
+	// MoveOfferToHistory deletes the row AND records why it ended, in one
+	// transaction (IOMarket::moveOfferToHistory). It replaces the bare delete, which
+	// left the player with no record that the offer ever existed.
+	if _, err := g.deps.DB.MoveOfferToHistory(context.Background(), offer.ID, db.OfferStateCancelled); err != nil {
+		slog.Default().Info("failed to move cancelled market offer to history", "err", err)
+	}
 	g.SendOpenMarket()
 	g.SendMarketCancel(offer)
 	g.SendMarketBrowse(offer.ItemID, offer.Tier)
@@ -575,6 +627,29 @@ func (g *GameProtocol) parseMarketAcceptOffer(r *netmsg.Reader) {
 		if _, err := g.deps.DB.RemoveMarketOffer(context.Background(), offer.ID); err != nil {
 			slog.Default().Info("failed to remove market offer from DB", "err", err)
 		}
+	}
+
+	// An accepted trade writes TWO history rows, one per side (game.cpp:11059-11061).
+	// The acceptor's row carries the OPPOSITE action — accepting a sell offer is a
+	// buy — and the extended ACCEPTEDEX state, which marks it as the counterparty's
+	// row and is collapsed back to ACCEPTED when read.
+	ctx := context.Background()
+	now := time.Now().Unix()
+	acceptorSale := uint8(1)
+	if offer.Action == game.MarketActionSell {
+		acceptorSale = 0
+	}
+	if err := g.deps.DB.AppendMarketHistory(ctx, g.player.DBID, acceptorSale,
+		offer.ItemID, amount, offer.Price, now, offer.Tier, db.OfferStateAcceptedEx); err != nil {
+		slog.Default().Info("failed to record buyer market history", "err", err)
+	}
+	ownerSale := uint8(0)
+	if offer.Action == game.MarketActionSell {
+		ownerSale = 1
+	}
+	if err := g.deps.DB.AppendMarketHistory(ctx, offer.PlayerID, ownerSale,
+		offer.ItemID, amount, offer.Price, now, offer.Tier, db.OfferStateAccepted); err != nil {
+		slog.Default().Info("failed to record seller market history", "err", err)
 	}
 
 	g.SendMarketAccept(timestamp, counter, amount)
