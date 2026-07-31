@@ -97,7 +97,17 @@ func run(o runOpts, log *slog.Logger) error {
 		log.Warn("using default config", "err", err)
 	}
 
-	if lv := cfg.String("logLevel", ""); lv != "" {
+	// config.lua's logLevel used to be applied unconditionally, so it silently beat
+	// an explicit -logLevel on the command line: asking for debug produced no debug
+	// output, which made a silently-closed connection impossible to diagnose. An
+	// explicitly passed flag now wins; config only fills in the default.
+	logLevelFromFlag := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "logLevel" {
+			logLevelFromFlag = true
+		}
+	})
+	if lv := cfg.String("logLevel", ""); lv != "" && !logLevelFromFlag {
 		var lvl slog.Level
 		switch strings.ToLower(lv) {
 		case "debug":

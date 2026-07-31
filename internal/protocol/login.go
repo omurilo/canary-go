@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+// tibiaHeaderLength is the 2-byte little-endian body length every Tibia packet
+// starts with (network.headerLength).
+const tibiaHeaderLength = 2
+
 // Login opcodes (outbound).
 const (
 	opLoginError      = 0x0B
@@ -274,6 +278,21 @@ func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 		}
 		c.Close()
 		return
+	}
+	// The login service reads in RawFirstPacket mode so it can recognise HTTP and
+	// MyAAC status probes, which means body still carries the 2-byte Tibia length
+	// header — the MyAAC checks above match on it directly. The binary Tibia login
+	// never skipped it, so every field landed two bytes early and the RSA block was
+	// cut short: it decrypted to garbage and bailed at "rsa leading byte non-zero",
+	// silently, with the connection closed and the client seeing EOF.
+	//
+	// Only the modern client's HTTP login path was exercised, which is why this went
+	// unnoticed while real logins worked.
+	if len(body) >= tibiaHeaderLength {
+		declared := int(body[0]) | int(body[1])<<8
+		if declared == len(body)-tibiaHeaderLength {
+			body = body[tibiaHeaderLength:]
+		}
 	}
 	body = transport.StripFirstPacketChecksum(body)
 	r := netmsg.NewReader(body)

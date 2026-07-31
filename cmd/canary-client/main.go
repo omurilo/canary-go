@@ -178,6 +178,10 @@ func doGame(host string, port int, account, password, charName string, key tibcr
 	}
 	defer conn.Close()
 	codec := transport.New()
+	// GameProtocol.OnConnect applies this before it writes the challenge, so the
+	// outer length is a block count, not a byte count. Without the same profile here
+	// DecodeBodySize read the challenge's 12-byte body as 1 byte.
+	codec.ApplyProfile(transport.ProfileCurrentModern)
 
 	// 1. Read the challenge (plaintext).
 	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -196,23 +200,40 @@ func doGame(host string, port int, account, password, charName string, key tibcr
 	challengeRand := r.GetByte()
 	log.Printf("   challenge ts=%d rand=%d", challengeTS, challengeRand)
 
-	// 2. Send game login.
+	// 2. Send game login. The layout has to match ProtocolGame.OnFirstPacket
+	// exactly: it skips firstHeaderBytes() (4-byte checksum + 2 marker bytes on the
+	// modern profile) and then reads OS, versions and the RSA block — with the
+	// challenge echo INSIDE that block, after the character name.
 	sessionKey := account + "\n" + password
-	w := netmsg.NewWriter()
-	w.AddU16(6)             // OS
-	w.AddU16(clientVersion) // protocol version
-	w.AddU32(clientVersion) // client version
-	w.AddString("1525")     // client version string
-	w.AddString("")         // asset hash
-	w.AddByte(0)            // preview state
-	w.AddBytes(buildRSABlock(keyBytes, func(b *netmsg.Writer) {
+
+	payload := netmsg.NewWriter()
+	payload.AddByte(0x0A)         // protocol id
+	payload.AddByte(0x00)         // second marker byte; the server skips both
+	payload.AddU16(6)             // OS
+	payload.AddU16(clientVersion) // protocol version
+	payload.AddU32(clientVersion) // client version
+	payload.AddString("1525")     // client version string
+	payload.AddString("")         // asset hash
+	payload.AddByte(0)            // preview state
+	payload.AddBytes(buildRSABlock(keyBytes, func(b *netmsg.Writer) {
 		b.AddByte(0) // gamemaster
 		b.AddString(sessionKey)
 		b.AddString(charName)
+		b.AddU32(challengeTS)    // echo, read from inside the block
+		b.AddByte(challengeRand) // echo
 	}, rsa))
-	w.AddU32(challengeTS)    // echo
-	w.AddByte(challengeRand) // echo
-	w.AddU16(0)              // otcv8 probe length
+	// The game codec is on the modern profile, so the outer length is a block count.
+	// Wrap sends (total-4)/8 and DecodeBodySize inverts it as header*8+4, so the
+	// division is only exact when the payload after the checksum is a multiple of 8.
+	// Otherwise the truncated block count makes the server read a short body and
+	// bail with "short packet, no RSA block".
+	for payload.Len()%8 != 0 {
+		payload.AddByte(0x00)
+	}
+
+	w := netmsg.NewWriter()
+	w.AddU32(tibcrypto.Adler32(payload.Bytes()))
+	w.AddBytes(payload.Bytes())
 	if err := send(conn, codec, w); err != nil {
 		return err
 	}
@@ -229,13 +250,25 @@ func doGame(host string, port int, account, password, charName string, key tibcr
 	}
 	log.Printf("   entered world")
 
-	// 4. Play: walk north, say hello, ping, then logout.
-	walk := netmsg.NewWriter()
-	walk.AddByte(0x65) // walk north
-	if err := send(conn, codec, walk); err != nil {
-		return err
+	// 4. Play: walk, say hello, ping, then logout.
+	//
+	// Try all four directions rather than just north. Whether a given step is legal
+	// depends on where the character happens to stand, and the sample characters
+	// spawn against a wall — a blocked step answers 0xB5 (walk cancel), which is a
+	// correct server response but proves nothing about movement.
+	for _, d := range []struct {
+		op   byte
+		name string
+	}{
+		{0x65, "north"}, {0x66, "east"}, {0x67, "south"}, {0x68, "west"},
+	} {
+		walk := netmsg.NewWriter()
+		walk.AddByte(d.op)
+		if err := send(conn, codec, walk); err != nil {
+			return err
+		}
+		log.Printf("   → sent walk %s", d.name)
 	}
-	log.Printf("   → sent walk north")
 
 	say := netmsg.NewWriter()
 	say.AddByte(0x96)
@@ -246,8 +279,12 @@ func doGame(host string, port int, account, password, charName string, key tibcr
 	}
 	log.Printf("   → sent say")
 
+	// 0x1D is the client keep-alive the server answers with opPingBack 0x1E
+	// (game.go: inPing / inPong). Sending 0x1E instead announced OUR pong, which the
+	// server only uses to refresh liveness — it never replies, so this always timed
+	// out waiting for one.
 	ping := netmsg.NewWriter()
-	ping.AddByte(0x1E) // ping
+	ping.AddByte(0x1D)
 	if err := send(conn, codec, ping); err != nil {
 		return err
 	}
@@ -269,16 +306,19 @@ func doGame(host string, port int, account, password, charName string, key tibcr
 			log.Printf("   ← map/move update 0x%02X", op)
 		case 0xAA:
 			gotSay = true
-			_ = r.GetU32()
+			_ = r.GetU32()    // statement id
 			name := r.GetString()
-			_ = r.GetU16()
-			_ = r.GetByte()
+			_ = r.GetByte()   // show (traded) — this byte was missing here, so every
+			_ = r.GetU16()    // field below read one byte early and the text came out empty
+			_ = r.GetByte()   // talk type
 			_ = r.GetPosition()
 			text := r.GetString()
 			log.Printf("   ← %s says: %q", name, text)
-		case 0x1D:
+		case 0x1E: // opPingBack
 			gotPong = true
 			log.Printf("   ← pong")
+		case 0xB5:
+			log.Printf("   ← walk cancelled (that direction is blocked)")
 		default:
 			log.Printf("   ← opcode 0x%02X", op)
 		}
