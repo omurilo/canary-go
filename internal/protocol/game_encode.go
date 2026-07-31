@@ -207,6 +207,55 @@ func (g *GameProtocol) canWalkthroughEx(observer *game.Player, target game.Creat
 	return false
 }
 
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+// Client viewport limits (src/map/map_const.hpp:12-19).
+const (
+	mapMaxClientViewPortX = 8
+	mapMaxClientViewPortY = 6
+	mapInitSurfaceLayer   = 7
+	mapLayerViewLimit     = 2
+)
+
+// canSee ports ProtocolGame::canSee (protocolgame.cpp) — whether pos is inside the
+// window this client actually holds tiles for. The window is NOT symmetric: the
+// player sits 8 tiles from the left edge and 9 from the right, 6 from the top and
+// 7 from the bottom, because the description is 18x14 with the player off-centre.
+//
+// game.Position.InRangeOf was standing in for this and is symmetric (±9, ±7), so
+// it claimed the column at myX-9 and the row at myY-7 were visible when the client
+// has neither. Moving a creature onto one of those emitted a 0x6D naming a tile the
+// client does not hold, which it reports as "target field not existing" and the
+// stock client dies on. InRangeOf is left alone: it approximates the wider
+// MAP_MAX_VIEW_PORT spectator range, which is a different question.
+func (g *GameProtocol) canSee(pos game.Position) bool {
+	if g.player == nil {
+		return false
+	}
+	my := g.player.Pos
+	if my.Z <= mapInitSurfaceLayer {
+		// On or above ground level the view spans 7 -> 0.
+		if pos.Z > mapInitSurfaceLayer {
+			return false
+		}
+	} else if absInt(int(my.Z)-int(pos.Z)) > mapLayerViewLimit {
+		// Underground the view is +/- 2 floors from the one we stand on.
+		return false
+	}
+	// A negative offset means the tile is on a floor below us; the client shifts the
+	// window diagonally per floor, so the bounds move with it.
+	offsetz := int(my.Z) - int(pos.Z)
+	x, y := int(pos.X), int(pos.Y)
+	mx, myY := int(my.X), int(my.Y)
+	return x >= mx-mapMaxClientViewPortX+offsetz && x <= mx+(mapMaxClientViewPortX+1)+offsetz &&
+		y >= myY-mapMaxClientViewPortY+offsetz && y <= myY+(mapMaxClientViewPortY+1)+offsetz
+}
+
 func (g *GameProtocol) canSeeCreature(c game.Creature) bool {
 	if c == nil {
 		return false

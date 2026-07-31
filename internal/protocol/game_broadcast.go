@@ -67,6 +67,7 @@ const (
 	moveActionShift                // 0x6D, the cheap same-floor step
 	moveActionRemoveAdd            // 0x6C + 0x6A, when a shift cannot express the move
 	moveActionRemove               // 0x6C only, the creature left this client's view
+	moveActionAdd                  // 0x6A only, it walked into this client's view
 )
 
 // creatureMoveAction is the branch table of ProtocolGame::sendMoveCreature
@@ -75,8 +76,15 @@ const (
 // had a stack position snapshotted at all; oldStack < 0 means they could not see
 // the creature. Either way they get nothing: a remove at a guessed stackpos
 // deletes whatever else the client has on that tile.
-func creatureMoveAction(oldStack int, captured, seesNew, teleport, known bool) moveAction {
+func creatureMoveAction(oldStack int, captured, seesOld, seesNew, teleport, known bool) moveAction {
 	if !captured || oldStack < 0 {
+		return moveActionNone
+	}
+	// The four canSee branches of sendMoveCreature, in its order.
+	if !seesOld {
+		if seesNew {
+			return moveActionAdd
+		}
 		return moveActionNone
 	}
 	if !seesNew {
@@ -127,7 +135,9 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 		visited[s.ID] = true
 
 		oldStack, captured := oldStackPos[s.ID]
-		switch creatureMoveAction(oldStack, captured, s.Pos.InRangeOf(newPos), teleport, gp.isKnown(c.GetID())) {
+		// gp.canSee, not s.Pos.InRangeOf: the client's window is asymmetric, and one
+		// column of over-reporting is enough to emit a 0x6D for a tile it does not hold.
+		switch creatureMoveAction(oldStack, captured, gp.canSee(oldPos), gp.canSee(newPos), teleport, gp.isKnown(c.GetID())) {
 		case moveActionShift:
 			gp.SendCreatureMove(oldPos, uint8(oldStack), newPos)
 		case moveActionRemoveAdd:
@@ -135,6 +145,8 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 			gp.SendAppendCreature(c, newPos)
 		case moveActionRemove:
 			gp.SendRemoveCreatureAt(oldPos, uint8(oldStack))
+		case moveActionAdd:
+			gp.SendAppendCreature(c, newPos)
 		}
 	}
 	for _, s := range w.Spectators(newPos, c.GetID()) {
@@ -143,6 +155,11 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 			continue
 		}
 		visited[s.ID] = true
+		// Spectators() is the wider MAP_MAX_VIEW_PORT-ish net; only clients whose
+		// description actually covers newPos may be told to add a creature there.
+		if !gp.canSee(newPos) {
+			continue
+		}
 		gp.SendAppendCreature(c, newPos)
 	}
 }

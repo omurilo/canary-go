@@ -165,26 +165,86 @@ func TestCaptureStackPositionsSnapshotsBeforeRemoval(t *testing.T) {
 // removed the wrong thing from their tile and logged "no thing at pos".
 func TestCreatureMoveAction(t *testing.T) {
 	tests := []struct {
-		name                         string
-		oldStack                     int
-		captured, seesNew, tp, known bool
-		want                         moveAction
+		name                                  string
+		oldStack                              int
+		captured, seesOld, seesNew, tp, known bool
+		want                                  moveAction
 	}{
-		{"never captured", 0, false, true, false, true, moveActionNone},
-		{"captured as unseen", -1, true, true, false, true, moveActionNone},
-		{"plain adjacent step", 2, true, true, false, true, moveActionShift},
-		{"walks out of view", 2, true, false, false, true, moveActionRemove},
-		{"teleport", 2, true, true, true, true, moveActionRemoveAdd},
-		{"past the 10-thing window", 10, true, true, false, true, moveActionRemoveAdd},
-		{"unknown to this client", 2, true, true, false, false, moveActionRemoveAdd},
-		// Leaving view wins over everything else: there is no new position to add to.
-		{"unseen new pos while teleporting", 2, true, false, true, true, moveActionRemove},
+		{"never captured", 0, false, true, true, false, true, moveActionNone},
+		{"captured as unseen", -1, true, true, true, false, true, moveActionNone},
+		{"plain adjacent step", 2, true, true, true, false, true, moveActionShift},
+		{"walks out of view", 2, true, true, false, false, true, moveActionRemove},
+		{"walks into view", 2, true, false, true, false, true, moveActionAdd},
+		{"passes by outside the view entirely", 2, true, false, false, false, true, moveActionNone},
+		{"teleport", 2, true, true, true, true, true, moveActionRemoveAdd},
+		{"past the 10-thing window", 10, true, true, true, false, true, moveActionRemoveAdd},
+		{"unknown to this client", 2, true, true, true, false, false, moveActionRemoveAdd},
+		// Leaving view wins over teleport: there is no new position to add to.
+		{"unseen new pos while teleporting", 2, true, true, false, true, true, moveActionRemove},
 	}
 	for _, tc := range tests {
-		got := creatureMoveAction(tc.oldStack, tc.captured, tc.seesNew, tc.tp, tc.known)
+		got := creatureMoveAction(tc.oldStack, tc.captured, tc.seesOld, tc.seesNew, tc.tp, tc.known)
 		if got != tc.want {
 			t.Errorf("%s: got %d, want %d", tc.name, got, tc.want)
 		}
+	}
+}
+
+// The exact packet from crashes/36493cfa-b63f-4ac0-8cc2-6c6d51d566c7.dmp.json,
+// which the stock client rejected with "target field not existing":
+//
+//	6D 5E 7E DC 7D 07 01 5D 7E DC 7D 07
+//	0x6D  oldPos (32350,32220,7)  stackpos 1  newPos (32349,32220,7)
+//
+// The player stood at (32358,32224,7), so newPos.x is myX-9 — one column left of
+// the description the client holds, which starts at myX-8. Position.InRangeOf is
+// symmetric (±9) and called it visible; ProtocolGame::canSee does not.
+func TestCanSeeMatchesTheAsymmetricClientWindow(t *testing.T) {
+	viewer := &game.Player{Name: "Gm Test", GroupID: 1}
+	g, world := stackposSetup(t, viewer)
+	_ = world
+	viewer.Pos = game.Position{X: 32358, Y: 32224, Z: 7}
+
+	crashPos := game.Position{X: 32349, Y: 32220, Z: 7}
+	if g.canSee(crashPos) {
+		t.Errorf("canSee(%v) = true; the client's window starts at x=%d", crashPos, 32358-mapMaxClientViewPortX)
+	}
+	if !viewer.Pos.InRangeOf(crashPos) {
+		t.Errorf("InRangeOf(%v) = false; the test no longer reproduces the divergence it guards", crashPos)
+	}
+
+	// The bounds themselves: 8 left, 9 right, 6 up, 7 down.
+	for _, tc := range []struct {
+		name string
+		x, y int
+		want bool
+	}{
+		{"left edge", 32358 - 8, 32224, true},
+		{"one past the left edge", 32358 - 9, 32224, false},
+		{"right edge", 32358 + 9, 32224, true},
+		{"one past the right edge", 32358 + 10, 32224, false},
+		{"top edge", 32358, 32224 - 6, true},
+		{"one past the top edge", 32358, 32224 - 7, false},
+		{"bottom edge", 32358, 32224 + 7, true},
+		{"one past the bottom edge", 32358, 32224 + 8, false},
+	} {
+		pos := game.Position{X: uint16(tc.x), Y: uint16(tc.y), Z: 7}
+		if got := g.canSee(pos); got != tc.want {
+			t.Errorf("%s: canSee(%d,%d) = %v, want %v", tc.name, tc.x, tc.y, got, tc.want)
+		}
+	}
+
+	// Above ground the view spans 7 -> 0 and never reaches underground.
+	if g.canSee(game.Position{X: 32358, Y: 32224, Z: 8}) {
+		t.Errorf("a surface player must not see z=8")
+	}
+	// Underground it is +/- 2 floors, and the window shifts diagonally per floor.
+	viewer.Pos = game.Position{X: 32358, Y: 32224, Z: 10}
+	if g.canSee(game.Position{X: 32358, Y: 32224, Z: 13}) {
+		t.Errorf("z=13 is 3 floors below z=10, past MAP_LAYER_VIEW_LIMIT")
+	}
+	if !g.canSee(game.Position{X: 32358, Y: 32224, Z: 12}) {
+		t.Errorf("z=12 is 2 floors below z=10 and must be visible")
 	}
 }
 
