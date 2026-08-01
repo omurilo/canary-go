@@ -211,3 +211,39 @@ func TestStaffCountAsHouseOwner(t *testing.T) {
 		t.Errorf("nil arguments must not grant access")
 	}
 }
+
+// stackPosOfItem must count creatures the way the client does: only the ones this
+// viewer can see, between the top items and the down items. It counted
+// len(tile.Creatures), so the value drifted as anything walked over the tile — a
+// session log shows the same door reported at stackpos 2, then 3, then 9, while the
+// client had it at 7 throughout, so every door transform updated the wrong slot.
+func TestStackPosOfItemCountsOnlyVisibleCreatures(t *testing.T) {
+	g, w, viewer, pos := wrapSetup(t)
+	tile := w.Map.GetTile(pos)
+
+	// A down item (not always-on-top) sits after the creatures.
+	door := &game.Item{ID: 1650}
+	tile.Items = append(tile.Items, door)
+
+	// ground(1) + the viewer, who stands on this tile and counts as a creature = 2.
+	if got := g.stackPosOfItem(pos, door); got != 2 {
+		t.Fatalf("with only the viewer present the door is at %d, want 2", got)
+	}
+
+	// A visible creature pushes it down by one.
+	rat := game.NewMonster(10, "Rat", nil)
+	rat.SetPosition(pos)
+	tile.Creatures = append(tile.Creatures, rat)
+	if got := g.stackPosOfItem(pos, door); got != 3 {
+		t.Errorf("with a second visible creature the door is at %d, want 3", got)
+	}
+
+	// A ghost the viewer cannot see occupies no slot in this client's stack.
+	ghost := &game.Player{Name: "Ghost", DBID: 999, GroupID: 1, Ghost: true}
+	ghost.SetPosition(pos)
+	tile.Creatures = append(tile.Creatures, ghost)
+	if got := g.stackPosOfItem(pos, door); got != 3 {
+		t.Errorf("an unseen ghost must not shift the stack: got %d, want 3", got)
+	}
+	_ = viewer
+}

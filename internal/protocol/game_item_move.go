@@ -633,8 +633,17 @@ func (g *GameProtocol) stackPosOfItem(pos game.Position, item *game.Item) uint8 
 			}
 		}
 	}
+	// Creatures sit between the top and the down items, and only the ones THIS
+	// client can see occupy a slot — an invisible creature or a ghost is not in the
+	// stack the client holds. Counting len(Creatures) made the value drift as
+	// anything walked over the tile: a door reported stackpos 2, then 3, then 9 for
+	// the same door, while the client had it at 7 the whole time.
 	if tile != nil {
-		stack += len(tile.Creatures)
+		for _, c := range tile.Creatures {
+			if g.canSeeCreature(c) {
+				stack++
+			}
+		}
 	}
 	if tile != nil {
 		for _, it := range tile.Items {
