@@ -1,7 +1,11 @@
 package game
 
 import (
+	"strings"
 	"sync"
+	"time"
+
+	"github.com/opentibiabr/canary-go/internal/config"
 )
 
 // House represents a player house or guild hall. Houses are loaded from
@@ -25,6 +29,20 @@ type House struct {
 	DoorList     []HouseDoor
 	AccessList   AccessList
 	HouseTiles   []Position // all tiles that belong to this house
+
+	// Ownership bookkeeping that House::setOwner maintains alongside `owner`.
+	// Without OwnerName the door description cannot name the owner, and without
+	// PaidUntil the rent cycle has no start date.
+	OwnerName      string
+	OwnerAccountID uint32
+	PaidUntil      int64
+	RentWarnings   uint32
+	State          uint8
+
+	// isLoaded gates the early return in setOwner: re-setting the SAME owner is a
+	// no-op only after the house has been loaded once, so that loading a house
+	// from the DB still runs the full initialisation.
+	isLoaded bool
 
 	// Auction/bid fields
 	BidderName     string
@@ -62,11 +80,159 @@ func (h *House) IsOwner(playerID uint32) bool {
 	return h.OwnerID == playerID
 }
 
-// SetOwner assigns ownership to a player. Pass 0 to unown.
-func (h *House) SetOwner(playerID uint32) {
+// CyclopediaHouseState values (src/enums/player_cyclopedia.hpp:64-69). setOwner
+// writes Rented when a guid is given and Available when the house is unowned.
+const (
+	HouseStateAvailable uint8 = 0
+	HouseStateRented    uint8 = 2
+	HouseStateTransfer  uint8 = 3
+	HouseStateMoveOut   uint8 = 4
+)
+
+// SetOwner assigns ownership to a player; pass 0 to unown. Port of
+// House::setOwner (src/map/house/house.cpp:94-154).
+//
+// This used to assign h.OwnerID and nothing else, so `/owner` appeared to do
+// nothing: the change lived only in memory, vanished on restart, and left the
+// owner name, the rent clock and the bid columns describing the previous owner.
+//
+// w may be nil (tests, and the load path that has no world yet); the DB write and
+// the owner lookup are World hooks, so a nil world simply means "in memory only",
+// which is what updateDatabase=false expresses in C++.
+func (h *House) SetOwner(w *World, guid uint32, updateDatabase bool, player *Player) {
+	h.mu.Lock()
+	current := h.OwnerID
+	loaded := h.isLoaded
+	h.mu.Unlock()
+
+	// The row is written BEFORE the early return below, exactly as in C++: the
+	// guard is on the in-memory state, not on the persistence.
+	if updateDatabase && current != guid && w != nil && w.OnHouseOwnerChange != nil {
+		w.OnHouseOwnerChange(h, guid)
+	}
+
+	if loaded && current == guid {
+		return
+	}
+
+	h.mu.Lock()
+	h.isLoaded = true
+	h.mu.Unlock()
+
+	if current != 0 {
+		h.tryTransferOwnership(w, player, false)
+	}
+
+	h.mu.Lock()
+	h.PaidUntil = housePaidUntil(guid)
+	h.RentWarnings = 0
+	h.mu.Unlock()
+
+	if guid == 0 {
+		return
+	}
+
+	// SELECT `name`, `account_id` FROM `players` WHERE `id` = guid. C++ abandons
+	// the assignment entirely when the row is missing or the name is empty, so a
+	// bad guid leaves the house unowned rather than owned by a ghost id.
+	if w == nil || w.LookupPlayerAccount == nil {
+		// No lookup available (tests, offline tools): take the guid on faith so the
+		// in-memory ownership is still usable, but leave the name blank.
+		h.mu.Lock()
+		h.OwnerID = guid
+		h.State = HouseStateRented
+		h.mu.Unlock()
+		return
+	}
+	name, accountID, ok := w.LookupPlayerAccount(guid)
+	if !ok || name == "" {
+		return
+	}
+	h.mu.Lock()
+	h.OwnerID = guid
+	h.OwnerName = name
+	h.OwnerAccountID = accountID
+	h.State = HouseStateRented
+	h.mu.Unlock()
+}
+
+// housePaidUntil is the rent clock C++ starts in setOwner from the configured
+// period; anything other than the four known periods means no rent at all.
+func housePaidUntil(guid uint32) int64 {
+	if guid == 0 {
+		return 0
+	}
+	now := time.Now().Unix()
+	switch strings.ToLower(config.Str("houseRentPeriod", "never")) {
+	case "yearly":
+		return now + 24*60*60*365
+	case "monthly":
+		return now + 24*60*60*30
+	case "weekly":
+		return now + 24*60*60*7
+	case "daily":
+		return now + 24*60*60
+	default:
+		return 0
+	}
+}
+
+// tryTransferOwnership mirrors House::tryTransferOwnership (house.cpp:72-92) for
+// the parts that exist here: kick everyone standing in the house and clear the
+// access lists. The depot transfer of the furniture (transferToDepot) has no Go
+// counterpart yet, so items are left where they are — see clearHouseInfo.
+func (h *House) tryTransferOwnership(w *World, player *Player, serverStartup bool) {
+	if w != nil {
+		for _, pos := range h.HouseTilesSnapshot() {
+			tile := w.Map.GetTile(pos)
+			if tile == nil {
+				continue
+			}
+			for _, c := range append([]Creature(nil), tile.Creatures...) {
+				if p, ok := c.(*Player); ok && p != nil {
+					h.kickPlayer(w, p)
+				}
+			}
+		}
+	}
+	h.clearHouseInfo(serverStartup)
+}
+
+// clearHouseInfo is House::clearHouseInfo (house.cpp:50-70). preventOwnerDeletion
+// keeps the owner while still wiping the access lists, which is what the
+// server-startup path relies on.
+func (h *House) clearHouseInfo(preventOwnerDeletion bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.OwnerID = playerID
+	if !preventOwnerDeletion {
+		h.OwnerID = 0
+		h.OwnerAccountID = 0
+		h.OwnerName = ""
+		h.State = HouseStateAvailable
+	}
+	h.SubOwnerList = nil
+	h.GuestList = nil
+	h.AccessList = AccessList{}
+}
+
+// kickPlayer sends a player standing in the house back to their town temple, the
+// effect of House::kickPlayer once the access check has already been made.
+func (h *House) kickPlayer(w *World, p *Player) {
+	if w == nil || p == nil {
+		return
+	}
+	dest, ok := w.TownsByID[p.TownID]
+	if !ok {
+		dest = w.DefaultSpawn
+	}
+	w.TeleportCreature(p, dest)
+}
+
+// HouseTilesSnapshot copies the tile list for iteration outside the lock.
+func (h *House) HouseTilesSnapshot() []Position {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return append([]Position(nil), h.HouseTiles...)
 }
 
 // GetHouseByDoorID finds the house that contains a door with the given door ID.

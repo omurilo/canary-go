@@ -43,14 +43,28 @@ func houseGetOwnerGuid(L *lua.LState) int {
 	return 1
 }
 
-func houseSetOwner(L *lua.LState) int {
+// houseSetOwner is house:setOwner(guid[, updateDatabase = true]). The second
+// argument defaults to TRUE in C++ (house_functions.cpp:159), which is what makes
+// `/owner` survive a restart; passing it as false was the old behaviour and lost
+// the change on shutdown.
+func (e *Engine) houseSetOwner(L *lua.LState) int {
 	h := checkHouseArg(L, 1)
 	if h == nil {
 		return 0
 	}
 	ownerID := uint32(lua.LVAsNumber(L.Get(2)))
-	h.SetOwner(ownerID)
+	h.SetOwner(e.world, ownerID, optBool(L, 3, true), nil)
 	return 0
+}
+
+// optBool reads an optional boolean argument, mirroring Lua::getBoolean(L, n, def):
+// absent or nil means the default, anything else follows Lua truthiness.
+func optBool(L *lua.LState, n int, def bool) bool {
+	v := L.Get(n)
+	if v == lua.LNil || v == nil {
+		return def
+	}
+	return lua.LVAsBool(v)
 }
 
 func houseGetPrice(L *lua.LState) int {
@@ -142,7 +156,7 @@ func (e *Engine) registerHouseMetatable() {
 	// Methods that need the engine closure.
 	methods := map[string]lua.LGFunction{
 		"getOwnerGuid":    houseGetOwnerGuid,
-		"setOwner":        houseSetOwner,
+		"setOwner":        e.houseSetOwner,
 		"getPrice":        houseGetPrice,
 		"getExitPosition": houseGetExitPosition,
 		"getBeds":         houseGetBeds,
@@ -159,7 +173,7 @@ func (e *Engine) registerHouseMetatable() {
 				L.Push(lua.LFalse)
 				return 1
 			}
-			h.SetOwner(uint32(lua.LVAsNumber(L.Get(2))))
+			h.SetOwner(e.world, uint32(lua.LVAsNumber(L.Get(2))), optBool(L, 3, true), nil)
 			L.Push(lua.LTrue)
 			return 1
 		},

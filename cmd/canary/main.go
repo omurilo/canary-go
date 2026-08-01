@@ -488,6 +488,18 @@ func run(o runOpts, log *slog.Logger) error {
 
 	var lengine *luaengine.Engine
 
+	// House::setOwner writes its row inline; here the write is a hook so that
+	// internal/game stays free of the database. Without these two, `/owner` and
+	// buy_house.lua changed memory only and the house reverted on restart.
+	world.OnHouseOwnerChange = func(h *game.House, ownerID uint32) {
+		if err := database.SaveHouseOwner(context.Background(), h.ID, ownerID); err != nil {
+			log.Error("persist house owner", "house", h.ID, "owner", ownerID, "err", err)
+		}
+	}
+	world.LookupPlayerAccount = func(guid uint32) (string, uint32, bool) {
+		return database.LookupPlayerAccount(context.Background(), guid)
+	}
+
 	// Runs inside the world lock, before the creature leaves its tile: the client
 	// stack index is only knowable while it is still there.
 	world.CaptureStackPositions = func(pos game.Position, c game.Creature) map[uint32]int {

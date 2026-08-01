@@ -94,6 +94,17 @@ type World struct {
 	OnCreatureDied   func(c Creature) // monster/NPC death, fires before RemoveCreature
 	OnGainExperience func(p *Player, source Creature, exp uint64, rawExp uint64) uint64
 
+	// OnHouseOwnerChange persists a house ownership change, the UPDATE `houses`
+	// that House::setOwner runs inline (src/map/house/house.cpp:95-101). Populated
+	// by the persistence layer. Without it `/owner` only ever changed memory.
+	OnHouseOwnerChange func(h *House, ownerID uint32)
+
+	// LookupPlayerAccount resolves a player guid to their name and account id —
+	// the `SELECT name, account_id FROM players WHERE id = guid` in setOwner
+	// (house.cpp:138). ok is false when no such player exists, which makes the
+	// ownership assignment abort rather than record an unknown id.
+	LookupPlayerAccount func(guid uint32) (name string, accountID uint32, ok bool)
+
 	// OnShieldUpdate asks the protocol layer to send `viewer` a party-shield
 	// packet (0x91) for `target`, using viewer.PartyShield(target).
 	OnShieldUpdate func(viewer *Player, target *Player)

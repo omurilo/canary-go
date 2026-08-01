@@ -49,10 +49,37 @@ func (d *DB) SaveHouse(ctx context.Context, h *game.House) error {
 	return err
 }
 
-// SaveHouseOwner persists the owner of a house.
+// SaveHouseOwner persists the owner of a house, and with it every column the
+// previous owner left behind. This wrote only `owner`, so a transferred house
+// kept the old bid, the old bidder name and a stale state, and the cyclopedia
+// went on advertising it as up for auction.
+//
+// Byte for byte the query in House::setOwner (src/map/house/house.cpp:99).
 func (d *DB) SaveHouseOwner(ctx context.Context, houseID uint32, ownerID uint32) error {
-	_, err := d.SQL.ExecContext(ctx, `UPDATE houses SET owner = ? WHERE id = ?`, ownerID, houseID)
+	state := 0
+	if ownerID > 0 {
+		state = 2 // CyclopediaHouseState::Rented
+	}
+	const q = `UPDATE houses SET owner = ?, new_owner = -1, paid = 0, bidder = 0,
+	           bidder_name = '', highest_bid = 0, internal_bid = 0, bid_end_date = 0,
+	           state = ? WHERE id = ?`
+	_, err := d.SQL.ExecContext(ctx, q, ownerID, state, houseID)
 	return err
+}
+
+// LookupPlayerAccount resolves a player guid to their name and account id, the
+// `SELECT name, account_id FROM players WHERE id = ?` that House::setOwner runs
+// before it accepts an owner (house.cpp:138). ok is false when there is no such
+// player, which is how a bad guid is rejected instead of silently recorded.
+func (d *DB) LookupPlayerAccount(ctx context.Context, guid uint32) (string, uint32, bool) {
+	var name string
+	var accountID uint32
+	err := d.SQL.QueryRowContext(ctx,
+		`SELECT name, account_id FROM players WHERE id = ?`, guid).Scan(&name, &accountID)
+	if err != nil {
+		return "", 0, false
+	}
+	return name, accountID, true
 }
 
 // SaveHouseBid persists the bid information for a house.
