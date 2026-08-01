@@ -47,8 +47,20 @@ func (e *Engine) registerAPI() {
 	dataDirResolved := resolveDir(dataDir)
 	coreDirResolved := resolveDir(coreDir)
 
-	L.SetGlobal("DATA_DIRECTORY", lua.LString(dataDirResolved))
-	L.SetGlobal("CORE_DIRECTORY", lua.LString(coreDirResolved))
+	// These two are used BOTH for dofile(DIR .. "/libs/...") and as a require prefix
+	// (quests.lua:1 does require(DATA_DIRECTORY .. ".lib.core.quests")). Lua's require
+	// turns every dot into a path separator, so an absolute path breaks the moment the
+	// machine's home directory contains one: "/Users/murilo.alves/..." became
+	// "/Users/murilo/alves/...", the require failed, and because dofile raises, the
+	// REST of load.lua never ran — tile.lua is line 32, so Tile:isWalkable and nine
+	// other files silently did not exist.
+	//
+	// C++ keeps these relative ("data-otservbr-global"), which is dotless and works
+	// for both uses. Prefer the same, falling back to the absolute path only when the
+	// directory is not under the working directory — where dofile still works and
+	// require was already broken.
+	L.SetGlobal("DATA_DIRECTORY", lua.LString(preferRelativeDir(dataDirResolved)))
+	L.SetGlobal("CORE_DIRECTORY", lua.LString(preferRelativeDir(coreDirResolved)))
 
 	registerBitLib(L)
 
@@ -717,4 +729,19 @@ func (e *Engine) setClassConstructor(name string, constructor lua.LGFunction, me
 	L.SetMetatable(classTable, mt)
 	L.SetGlobal(name, classTable)
 	return classTable
+}
+
+// preferRelativeDir returns dir relative to the working directory when that is a
+// plain, dotless path. A require prefix cannot contain a dot, and an absolute path
+// usually does — see the DATA_DIRECTORY comment above.
+func preferRelativeDir(dir string) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return dir
+	}
+	rel, err := filepath.Rel(cwd, dir)
+	if err != nil || strings.Contains(rel, "..") || strings.Contains(rel, ".") {
+		return dir
+	}
+	return rel
 }
