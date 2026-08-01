@@ -163,4 +163,90 @@ cmp_pair "spawn" "creatures/monsters/spawns/spawn_monster.cpp" -- "internal/game
 cmp_pair "decay" "items/decay/decay.cpp" -- "internal/game/decay.go"
 cmp_pair "map serialize" "io/iomapserialize.cpp" -- "internal/db/tile_store.go"
 
+# ---- behaviour coverage -----------------------------------------------------
+# Size ratios say nothing about whether a behaviour exists. This walks the C++
+# methods of one class and asks whether each has a Go counterpart by name, which
+# is the thing that actually has to reach 1:1.
+#
+# Matching is by name, so it can be fooled by a same-named function that does
+# something else. It cannot be fooled by absence, which is the failure mode that
+# matters here.
+head_ "Behaviour coverage (methods with a Go counterpart)"
+
+# Names that will never have a Go counterpart. Anything not listed here and not
+# found counts as missing.
+#
+# The compute/* group is this fork's asynchronous scheduling machinery (target
+# search, combat intention, follow path). Porting it literally into Go would be
+# wrong — the concurrency model is different — and the behaviour it computes is
+# covered by the synchronous path.
+SKIP_METHODS='
+createMonster getMonster setID addList removeList
+getName setName getTypeName getNameDescription setNameDescription getDescription
+getType getMasterPos setMasterPos getRaceId getRace getMonsterType
+isDead setDead getIdleStatus isTargetNearby israndomStepping
+getIgnoreFieldDamage setIgnoreFieldDamage setFatalHoldDuration
+getCriticalDamage setCriticalDamage getCriticalChance setCriticalChance
+getRespawnType setSpawnMonster getForgeStack setForgeStack isForgeCreature
+setForgeMonster getMonsterForgeClassification setMonsterForgeClassification
+getTimeToChangeFiendish setTimeToChangeFiendish
+getHazard setHazard getHazardSystemCrit setHazardSystemCrit
+getHazardSystemDodge setHazardSystemDodge getHazardSystemDamageBoost
+setHazardSystemDamageBoost getHazardSystemDefenseBoost setHazardSystemDefenseBoost
+getSoulPit setSoulPit setImmune
+requestTargetSearchCompute prepareTargetSearchCompute completeTargetSearchCompute
+retryTargetSearchCompute clearTargetSearchCompute nextTargetSearchComputeGeneration
+markTargetStateChanged markTargetDecisionChanged deferTargetSelection
+searchTargetImmediate requestCombatIntention startPendingCombatIntention
+prepareCombatIntention completeCombatIntention deferPendingCombatIntention
+clearCombatIntention commitCombatIntention nextCombatIntentionGeneration
+requestFollowPathCompute supersedeFollowPathCompute prepareFollowPathCompute
+completeFollowPathCompute rejectFollowPathCompute discardFollowPathCompute
+nextFollowPathComputeGeneration capturePathTraits captureComputeRelevance
+isComputeRelevant onExecuteAsyncTasks trySchedulePostThink
+cancelScheduledPostThink executePostThink queuePostThinkAfterAsync
+promotePostThinkToPlayerVisibleQueue onThink_async queueMovementAiRefresh
+executeMovementAiRefresh processMovementAiRefresh isPlayerVisibleForScheduling
+observeVisiblePlayerForScheduling addVisiblePlayerSpectator
+removeVisiblePlayerSpectator forgetTargetReference onFollowCreatureComplete
+countsAsPlayerOnScreenTarget
+'
+
+behaviour_coverage() { # cpp-file  go-dir  class
+	local cpp="$SRC/$1" godir="$GO_ROOT/$2" class="$3"
+	[[ -f "$cpp" ]] || return
+	local total=0 have=0 skipped=0 name upper flat
+	local missing=""
+	# Collapse the newline-separated skip list to single spaces so the
+	# word-boundary test below works.
+	flat=" $(echo $SKIP_METHODS) "
+
+	while read -r name; do
+		if [[ "$flat" == *" $name "* ]]; then
+			skipped=$((skipped + 1))
+			continue
+		fi
+		total=$((total + 1))
+		# Go convention is the same name, exported. Accept either capitalisation:
+		# an unexported helper is still a counterpart.
+		upper="$(printf '%s' "${name:0:1}" | tr '[:lower:]' '[:upper:]')${name:1}"
+		if grep -rqE "func \([a-z]+ \*$class\) ($name|$upper)\(" "$godir" 2>/dev/null ||
+			grep -rqE "func ($name|$upper)\(" "$godir" 2>/dev/null; then
+			have=$((have + 1))
+		else
+			missing="$missing $name"
+		fi
+	done < <(grep -oE "$class::[a-zA-Z_]+\(" "$cpp" | sed "s/$class:://;s/(//" | sort -u)
+
+	((total == 0)) && return
+	row "$class" "$total" "$have" "$((have * 100 / total))% ($skipped skipped)"
+	if [[ -n "$missing" ]]; then
+		if ((MD)); then printf '\nMissing:%s\n' "$missing"; else
+			printf '  missing:%s\n' "$missing" | fold -sw 96 | sed '2,$s/^/    /'
+		fi
+	fi
+}
+
+behaviour_coverage "creatures/monsters/monster.cpp" "internal/game" "Monster"
+
 echo
