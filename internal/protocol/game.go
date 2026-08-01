@@ -647,19 +647,37 @@ func (g *GameProtocol) sendCoinBalance() {
 		return
 	}
 
-	// 0xF2: Coin Balance Updating (show spinner)
+	// Total must be >= Transferable, otherwise the client disables the Sell UI.
+	total := g.player.CoinBalance + g.player.CoinTransferable
+
+	// 0xF2: Coin Balance Updating (show spinner).
+	//
+	// The official client reads ONE byte here, which is all upstream sends
+	// (protocolgame.cpp:6705-6707). OTCR does not: from client version 1291 its
+	// parseCoinBalanceUpdating reads action, two more bytes and then the three coin
+	// u32s (otclient/src/client/protocolgameparse.cpp:977-995), so the two-byte
+	// frame left it reading past the end. That is the login-time
+	//
+	//   parse message exception ... last opcode: 0xF2 (242) ... eof reached
+	//
+	// and an exception thrown mid-parse takes the rest of that message with it,
+	// which is why the cyclopedia town list never arrived on OTCR.
 	w1 := netmsg.NewWriter()
 	w1.AddByte(0xF2)
-	w1.AddByte(0x01)
+	w1.AddByte(0x01) // action: updating
+	if g.isOTCR() {
+		w1.AddByte(0)
+		w1.AddByte(0)
+		w1.AddU32(total)
+		w1.AddU32(g.player.CoinTransferable)
+		w1.AddU32(total) // reserved auction coins
+	}
 	g.SendToClient(w1)
 
 	// 0xDF: Coin Balance (hide spinner and update UI)
 	w2 := netmsg.NewWriter()
 	w2.AddByte(0xDF)
 	w2.AddByte(0x01)
-
-	// Total must be >= Transferable, otherwise the client disables the Sell UI.
-	total := g.player.CoinBalance + g.player.CoinTransferable
 	w2.AddU32(total)
 	w2.AddU32(g.player.CoinTransferable)
 	w2.AddU32(total) // reserved auction coins
