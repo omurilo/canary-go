@@ -1442,3 +1442,59 @@ func (g *GameProtocol) parseNpcGreet(r *netmsg.Reader) {
 		}
 	}
 }
+
+// walkToThenRetry is queuePlayerAutoWalk plus setNextWalkActionTask, the pattern
+// C++ uses whenever an action targets something out of arm's reach: walk to within
+// one tile, then run the action again (src/game/game.cpp:5401-5419 for the wrap
+// case; the same shape appears in playerUseItem, playerMoveThing and others).
+//
+// Without it every out-of-reach action was simply refused, so unwrapping a kit
+// across the room answered "You are too far away" where upstream walks over and
+// does it.
+//
+// Returns false when there is no path, which is the caller's cue to send
+// RETURNVALUE_THEREISNOWAY. A true return means the retry has been scheduled, not
+// that the action succeeded.
+func (g *GameProtocol) walkToThenRetry(target game.Position, retry func()) bool {
+	if g.player == nil {
+		return false
+	}
+	from := g.player.Pos
+	path := game.FindPath(g.deps.World.Map, g.deps.Items, from, target, 1000)
+	if len(path) == 0 {
+		return false
+	}
+	// getPathTo(..., minTargetDist 0, maxTargetDist 1): stop ADJACENT to the target,
+	// never on top of it — the tile itself may well be blocked by what we are
+	// reaching for.
+	if path[len(path)-1] == target {
+		path = path[:len(path)-1]
+	}
+	if len(path) == 0 {
+		return false
+	}
+
+	dirs := make([]game.Direction, 0, len(path))
+	prev := from
+	for _, step := range path {
+		dirs = append(dirs, game.StepDirection(prev, step))
+		prev = step
+	}
+
+	gen := g.walkGen.Add(1)
+	go func() {
+		g.walkPath(dirs, gen)
+		// A cancelled or blocked path must not fire the action: walkPath returns
+		// early in both cases, and the generation check catches the first.
+		if g.walkGen.Load() != gen {
+			return
+		}
+		if chebyshev(g.player.Pos, target) > 1 {
+			return
+		}
+		g.actionMu.Lock()
+		defer g.actionMu.Unlock()
+		retry()
+	}()
+	return true
+}

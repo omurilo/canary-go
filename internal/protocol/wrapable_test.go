@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"testing"
+	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/items"
@@ -324,4 +325,42 @@ func TestResolveStowItemFallsBackToTheTopDownItem(t *testing.T) {
 	if got != kit {
 		t.Errorf("an out-of-range index must fall back to the top down item, got %v", got)
 	}
+}
+
+// The kit was five and six tiles away in the session log, and every one of the six
+// requests was refused outright. C++ walks the player over and runs the action
+// again; refusing was a documented shortcut that turned out to be the last thing
+// standing between a bought decoration and unwrapping it.
+func TestWrapableWalksToAnOutOfReachKit(t *testing.T) {
+	g, w, p, pos := wrapSetup(t)
+
+	// A short corridor of walkable tiles leading away from the player.
+	far := pos
+	for i := 1; i <= 4; i++ {
+		step := game.Position{X: pos.X + uint16(i), Y: pos.Y, Z: pos.Z}
+		w.Map.SetTile(step, &game.Tile{Ground: &game.Item{ID: 1}, Flags: game.TileFlagProtectionZone, HouseID: 5})
+		far = step
+	}
+	kit := &game.Item{ID: game.ItemDecorationKit}
+	kit.SetCustomAttribute("unWrapId", int64(1650))
+	w.Map.GetTile(far).Items = append(w.Map.GetTile(far).Items, kit)
+
+	if chebyshev(far, p.Pos) <= 1 {
+		t.Fatalf("the test needs the kit out of reach")
+	}
+	idx := g.stackPosOfItem(far, kit)
+	if idx == -1 {
+		t.Fatalf("the kit needs a stack index")
+	}
+
+	g.wrapableAt(netmsg.Position{X: far.X, Y: far.Y, Z: far.Z}, game.ItemDecorationKit, uint8(idx))
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if kit.ID == 1650 {
+			return // walked over and unwrapped
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Errorf("the kit is still %d: the player never walked to it (at %v, kit at %v)", kit.ID, p.Pos, far)
 }

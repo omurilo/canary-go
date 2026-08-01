@@ -319,7 +319,15 @@ func (g *GameProtocol) parseWrapableItem(r *netmsg.Reader) {
 	pos := r.GetPosition()
 	itemID := r.GetU16()
 	stackpos := r.GetByte()
+	g.wrapableAt(pos, itemID, stackpos)
+}
 
+// wrapableAt is the body of the wrap/unwrap request, split out so the auto-walk
+// retry can run it again once the player has arrived.
+func (g *GameProtocol) wrapableAt(pos netmsg.Position, itemID uint16, stackpos uint8) {
+	if g.player == nil {
+		return
+	}
 	item := g.resolveStowItem(pos, int(stackpos), itemID)
 	if item == nil || item.ID != itemID {
 		g.sendCancelMessage("Sorry, not possible.")
@@ -373,11 +381,14 @@ func (g *GameProtocol) parseWrapableItem(r *netmsg.Reader) {
 		return
 	}
 
-	// C++ walks the player to the item when it is out of reach and retries. Here the
-	// action is refused instead — the auto-walk retry needs a queued player task,
-	// which this port does not have, and silently doing nothing would be worse.
+	// Out of reach: walk there and run this again, which is what C++ does
+	// (src/game/game.cpp:5401-5419). Refusing outright was the old behaviour and is
+	// why unwrapping a kit across the room never worked — a session log shows six
+	// requests for the right kit from five and six tiles away, every one rejected.
 	if pos.X != 0xFFFF && chebyshev(gamePos, g.player.Pos) > 1 {
-		g.sendCancelMessage("You are too far away.")
+		if !g.walkToThenRetry(gamePos, func() { g.wrapableAt(pos, itemID, stackpos) }) {
+			g.sendCancelMessage("There is no way.")
+		}
 		return
 	}
 

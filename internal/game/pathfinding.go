@@ -159,3 +159,9 @@ func FindPath(m *Map, catalog *items.Catalog, start, end Position, maxNodes int)
 	}
 	return nil
 }
+
+// StepDirection returns the single step that moves from `from` towards the
+// adjacent tile `to`. Exported form of the helper the AI engine uses, so the
+// protocol layer can turn a path from FindPath into the direction list the walk
+// machinery consumes.
+func StepDirection(from, to Position) Direction { return getDirectionTo(from, to) }
