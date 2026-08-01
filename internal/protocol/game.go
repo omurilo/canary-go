@@ -1281,7 +1281,7 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 	case inBugReport:
 		g.parseBugReport(r)
 	case inSendResourceBalance:
-		g.parseRequestRuleChannels(r)
+		g.parseSendResourceBalance(r)
 	case inQuestLog:
 		g.parseQuestLog(r)
 	case inQuestLine:

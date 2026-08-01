@@ -44,18 +44,23 @@ func (g *GameProtocol) parseReportViolation(r *netmsg.Reader) {
 	}
 }
 
-// parseRequestRuleChannels handles the client requesting the violation channel list
-// (opcode 0xEC).
-func (g *GameProtocol) parseRequestRuleChannels(r *netmsg.Reader) {
-	g.sendRuleChannels()
-}
-
-// sendRuleChannels sends the list of rule violation channels to the client
-// (opcode 0xED). Currently returns an empty list; a full implementation would
-// populate the list with open violation reports that this player can review.
-func (g *GameProtocol) sendRuleChannels() {
-	w := netmsg.NewWriter()
-	w.AddByte(0xED) // opcode
-	w.AddByte(0x00) // count (none available for now)
-	g.SendToClient(w)
+// parseSendResourceBalance handles 0xED, the client asking for a resource refresh.
+// Ports ProtocolGame::parseSendResourceBalance (protocolgame.cpp): it is a REQUEST
+// with no reply of its own — the answer is the ordinary resource balance packets.
+//
+// This opcode used to be routed to a "rule violation channels" handler that replied
+// with 0xED and a single zero byte. Outbound 0xED is sendMessageDialog, which is
+// opcode + type + STRING, so the client read the type and then looked for a string
+// that was not there: "not enough bytes (2) available at position 2", and it died.
+// The inbound and outbound opcode spaces are separate, and 0xED means different
+// things in each.
+func (g *GameProtocol) parseSendResourceBalance(r *netmsg.Reader) {
+	if g.player == nil {
+		return
+	}
+	// The modern profile prefixes a byte the handler discards.
+	if r.Remaining() > 0 {
+		_ = r.GetByte()
+	}
+	g.sendResourceBalances()
 }
