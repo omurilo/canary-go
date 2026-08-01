@@ -545,7 +545,7 @@ func run(o runOpts, log *slog.Logger) error {
 						if dist < 0 || dist > 3 {
 							targetNpc, targetPlayer := npc, player
 							game.GlobalDispatcher.AddEvent(0, func() {
-								lengine.CallNpcCloseChannel(targetNpc, targetPlayer)
+								deferLua(func() { lengine.CallNpcCloseChannel(targetNpc, targetPlayer) })
 							})
 							npc.RemovePlayerInteraction(player.ID)
 						}
@@ -558,7 +558,7 @@ func run(o runOpts, log *slog.Logger) error {
 						if dist < 0 || dist > 3 {
 							targetNpc, targetPlayer := npc, player
 							game.GlobalDispatcher.AddEvent(0, func() {
-								lengine.CallNpcCloseChannel(targetNpc, targetPlayer)
+								deferLua(func() { lengine.CallNpcCloseChannel(targetNpc, targetPlayer) })
 							})
 							npc.RemovePlayerInteraction(player.ID)
 						}
@@ -658,7 +658,9 @@ func run(o runOpts, log *slog.Logger) error {
 			} else {
 				mostDamageUnjustified = lastHitUnjustified
 			}
-			lengine.ExecuteCreatureOnDeath(p, nil, lastHit, mostDamage, lastHitUnjustified, mostDamageUnjustified)
+			deferLua(func() {
+				lengine.ExecuteCreatureOnDeath(p, nil, lastHit, mostDamage, lastHitUnjustified, mostDamageUnjustified)
+			})
 		}
 		protocol.HandlePlayerDeath(world, p, killer)
 		// Persist the penalty immediately so a crash/relog can't revert it.
@@ -759,7 +761,7 @@ func run(o runOpts, log *slog.Logger) error {
 				if npc, ok := spec.(*game.Npc); ok {
 					targetNpc, targetPlayer, tType, txt := npc, player, talkType, text
 					game.GlobalDispatcher.AddEvent(0, func() {
-						lengine.CallNpcOnCreatureSay(targetNpc, targetPlayer, tType, txt)
+						deferLua(func() { lengine.CallNpcOnCreatureSay(targetNpc, targetPlayer, tType, txt) })
 					})
 				}
 			}
@@ -1186,3 +1188,22 @@ func notifyNpcsAround(world *game.World, lengine *luaengine.Engine, c game.Creat
 		}
 	}
 }
+
+// deferLua runs fn on the dispatcher instead of inline.
+//
+// The world hooks that call into the Lua engine can fire from inside a Lua
+// binding: creature:teleportTo reaches OnCreatureMove through
+// World.TeleportCreature, creature:say reaches OnCreatureSay, and any script
+// that damages a player to death reaches OnPlayerDeath. Each of those handlers
+// then calls the engine, which locks the Lua state — the same state the binding
+// already holds. Go mutexes are not reentrant, so that is a hang, not a
+// slowdown.
+//
+// It is the same trap that stopped the server booting when the NPC
+// appear/disappear callback ran inline: world.OnCreatureAppear fires from
+// AddCreature, and Game.createNpc calls AddCreature from Lua. Dispatching keeps
+// the callback off the goroutine that holds the lock.
+//
+// C++ does not need this because these callbacks already run on the game
+// thread rather than inside whoever triggered them.
+func deferLua(fn func()) { game.GlobalDispatcher.AddEvent(0, fn) }
