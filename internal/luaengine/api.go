@@ -347,6 +347,10 @@ func (e *Engine) registerAPI() {
 	// populated from data/scripts/systems/item_tiers.lua.
 	e.registerItemClassificationType()
 
+	// Last, once every metatable above exists: __eq on the classes C++ gives one.
+	// Without it two handles on the same object compare unequal.
+	e.registerUserdataEquality()
+
 	L.SetGlobal("WEBHOOK_COLOR_GREEN", lua.LNumber(0x00FF00))
 	L.SetGlobal("WEBHOOK_COLOR_RED", lua.LNumber(0xFF0000))
 	L.SetGlobal("WEBHOOK_COLOR_YELLOW", lua.LNumber(0xFFFF00))

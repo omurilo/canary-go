@@ -4336,12 +4336,27 @@ func playerWheelunlockscroll(L *lua.LState) int {
 	return 1
 }
 
-func mapLuaSkillToGo(luaSkill int) (game.Skill, bool, bool) {
-	if luaSkill == 14 { // SKILL_MAGLEVEL
+// mapLuaSkillToGo turns a Lua skills_t value into a game.Skill. game.Skill is
+// declared 1:1 with skills_t (SKILL_FIST = SkillFist = 0 through
+// SKILL_MANA_LEECH_AMOUNT), so this is the identity — SKILL_MAGLEVEL is the only
+// one that goes somewhere else, because magic level advances on mana spent
+// rather than on skill tries.
+//
+// It used to shift every value down by one and gate on 1..7, left over from when
+// the enum table itself was off by one. The enums were fixed and this was not,
+// so the two errors stopped cancelling and started corrupting:
+//
+//	SKILL_DISTANCE (4) -> SkillAxe (3)     training a bow raised axe
+//	SKILL_FIST (0)     -> rejected          fist training did nothing
+//	SKILL_MAGLEVEL (13)-> rejected          the magic branch tested 14, SKILL_LEVEL
+//
+// Nothing logged, in any of the three cases.
+func mapLuaSkillToGo(luaSkill int) (skill game.Skill, isMagic bool, ok bool) {
+	if luaSkill == 13 { // SKILL_MAGLEVEL
 		return 0, true, true
 	}
-	if luaSkill >= 1 && luaSkill <= 7 {
-		return game.Skill(luaSkill - 1), false, true
+	if luaSkill >= int(game.SkillFist) && luaSkill < int(game.SkillCount) {
+		return game.Skill(luaSkill), false, true
 	}
 	return 0, false, false
 }
