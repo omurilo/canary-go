@@ -140,6 +140,16 @@ func (a combatAdapter) GetResistance(combatType combat.CombatType) int16 {
 	return 0
 }
 
+// IsImmune reads the monster type's immunity list. Players have no combat-type
+// immunities of their own; theirs come from equipment absorption, which is
+// applied separately.
+func (a combatAdapter) IsImmune(combatType combat.CombatType) bool {
+	if m, ok := a.c.(*Monster); ok {
+		return m.IsImmune(combatType)
+	}
+	return false
+}
+
 func (a combatAdapter) IsInProtectionZone() bool {
 	var world *World
 	if p, ok := a.c.(*Player); ok {

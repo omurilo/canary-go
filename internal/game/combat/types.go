@@ -125,6 +125,10 @@ type Creature interface {
 	GetArmor() int32
 	GetDefense() int32
 	GetResistance(combatType CombatType) int16
+	// IsImmune is Creature::isImmune(CombatType_t). Distinct from 100%
+	// resistance: an immune creature takes no damage AND is not given the
+	// condition the hit carries.
+	IsImmune(combatType CombatType) bool
 	IsInProtectionZone() bool
 	IsPlayer() bool
 }

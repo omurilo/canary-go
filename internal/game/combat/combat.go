@@ -102,6 +102,13 @@ func (c *Combat) DoCombatHealth(caster Creature, target Creature, damage CombatD
 		return false
 	}
 
+	// Immunity short-circuits everything, including the condition the hit would
+	// have applied. A fire elemental hit by fire takes nothing and does not burn.
+	// Monster immunities were parsed off the datapack and never consulted.
+	if isAggressive && target != nil && target.IsImmune(damage.PrimaryType) {
+		return false
+	}
+
 	// Apply dispel if configured
 	if c.Params.DispelType != ConditionNone {
 		target.RemoveCondition(c.Params.DispelType)
