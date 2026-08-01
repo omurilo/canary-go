@@ -93,7 +93,7 @@ func (e *CombatEngine) regenTick() {
 			p.RegenTicks = 0
 		}
 		// Heal once every 3 seconds to preserve standard regeneration rate
-		if (p.RegenTicks / 1000) % 3 == 0 {
+		if (p.RegenTicks/1000)%3 == 0 {
 			if p.Health < p.GetMaxHealth() {
 				p.AddHealth(1)
 				if e.world.OnCreatureHealthChange != nil {
@@ -714,7 +714,6 @@ func (e *CombatEngine) meleeDamage(attacker Creature) int {
 	}
 }
 
-
 // absDamageRange converts a monster attack's raw min/max combat values (which
 // are negative for damage) into a positive [lo, hi] damage span. Mirrors
 // Monsters::deserializeSpell taking min/max of the two values
@@ -726,7 +725,6 @@ func absDamageRange(minDamage, maxDamage int) (lo, hi int) {
 	}
 	return a, b
 }
-
 
 // handleDeath mirrors, at a basic level, Creature::onDeath -> dropCorpse ->
 // g_game().removeCreature (src/creatures/creature.cpp): drop a corpse on the
@@ -748,7 +746,7 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	// the temple respawn + client refresh.
 	if p, ok := victim.(*Player); ok {
 		p.ApplyDeathPenaltyWith(e.blessDeathReduction(p, killer))
-		
+
 		// Drop loot
 		var hasAoL bool
 		necklace := p.Inventory[ConstSlotNecklace]
@@ -756,18 +754,20 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 			hasAoL = true
 			p.Inventory[ConstSlotNecklace] = nil // consume Amulet of Loss
 		}
-		
+
 		blessCount := 0
 		for _, b := range p.Blessings {
-			if b > 0 { blessCount++ }
+			if b > 0 {
+				blessCount++
+			}
 		}
 
 		if !hasAoL && blessCount < 5 {
 			corpse := &Item{ID: 3058} // Dead human male
-			if p.Sex == 0 { // Female
+			if p.Sex == 0 {           // Female
 				corpse.ID = 3065
 			}
-			
+
 			// Backpack always drops in Tibia (if no AoL/Bless)
 			if bp := p.Inventory[ConstSlotBackpack]; bp != nil {
 				corpse.Contents = append(corpse.Contents, bp)
@@ -908,6 +908,14 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	// creature is still on the tile), then remove the creature. The corpse is a
 	// container whose Contents are the rolled loot table.
 	corpse := &Item{ID: corpseID, Count: 1}
+	// Monster::death and Monster::getCorpse: the monster tears down its own
+	// state (summons, target and friend lists) and stamps the corpse with the
+	// owner, so the top damage dealer gets the loot protection window.
+	if m, ok := victim.(*Monster); ok {
+		m.Death(e.world, killer)
+		m.GetCorpse(corpse, killer)
+		m.DropLoot(e.world, corpse)
+	}
 	// Loot generation belongs to the monsterOnDropLoot event, not to the core.
 	// Monster::dropLoot (monster.cpp:3414) only handles the fiendish sliver itself
 	// and then delegates both callbacks; the datapack's base script does the roll
@@ -1058,4 +1066,3 @@ func (e *CombatEngine) executeMonsterSpell(m *Monster, target Creature, s creatu
 		e.applyDefensiveCharmRune(m, tp, int32(dmg))
 	}
 }
-

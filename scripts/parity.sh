@@ -181,7 +181,7 @@ head_ "Behaviour coverage (methods with a Go counterpart)"
 # wrong — the concurrency model is different — and the behaviour it computes is
 # covered by the synchronous path.
 SKIP_METHODS='
-createMonster getMonster setID addList removeList
+Monster createMonster getMonster setID addList removeList
 getName setName getTypeName getNameDescription setNameDescription getDescription
 getType getMasterPos setMasterPos getRaceId getRace getMonsterType
 isDead setDead getIdleStatus isTargetNearby israndomStepping
@@ -236,7 +236,7 @@ behaviour_coverage() { # cpp-file  go-dir  class
 		else
 			missing="$missing $name"
 		fi
-	done < <(grep -oE "$class::[a-zA-Z_]+\(" "$cpp" | sed "s/$class:://;s/(//" | sort -u)
+	done < <(grep -oE "(^|[^A-Za-z_])$class::[a-zA-Z_]+\(" "$cpp" | sed "s/.*$class:://;s/(//" | sort -u)
 
 	((total == 0)) && return
 	row "$class" "$total" "$have" "$((have * 100 / total))% ($skipped skipped)"

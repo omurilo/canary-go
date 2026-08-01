@@ -117,6 +117,14 @@ type World struct {
 	OnMagicEffect    func(pos Position, effect uint16)
 	OnDistanceEffect func(from, to Position, effect uint16)
 	OnCreatureSay    func(speaker Creature, talkType byte, text string)
+	// OnSoundEffect is Game::sendSingleSoundEffect.
+	OnSoundEffect func(pos Position, sound uint16)
+	// The Monster:: script callbacks the datapack attaches through
+	// monsterType:eventType. Each is the send half of one Monster::on* handler.
+	OnMonsterCreatureSay      func(m *Monster, speaker Creature, talkType byte, text string)
+	OnMonsterAttackedByPlayer func(m *Monster, attacker *Player)
+	OnMonsterSpawn            func(m *Monster, pos Position)
+	OnMonsterCastSpell        func(m *Monster, target Creature, block creatures.MonsterAttack)
 	// OnCreatureTurn notifies spectators that a creature changed facing, the
 	// send half of Game::internalCreatureTurn. Monster::updateLookDirection
 	// fires it on every think, so a monster visibly faces its target.

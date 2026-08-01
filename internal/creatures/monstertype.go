@@ -99,6 +99,11 @@ type MonsterType struct {
 	YellInterval int
 	YellChance   int
 
+	// Ambient sounds, the audio counterpart of Voices (Monster::onThinkSound).
+	Sounds        []uint16
+	SoundChance   int
+	SoundInterval int
+
 	// Summons the monster calls while fighting, capped by MaxSummons.
 	// Monster::onThinkDefense (monster.cpp:2223-2270).
 	Summons       []MonsterSummon
@@ -746,4 +751,13 @@ func (r *TypeRegistry) LoadNpcs(dataDir string) error {
 
 		return nil
 	})
+}
+
+// MonsterSoundConfig is the ambient-sound half of monster.sounds, the audio
+// counterpart of Voices. No datapack monster ships one today; the fields exist
+// so onThinkSound has something to read rather than being dead code.
+type MonsterSoundConfig struct {
+	Sounds        []uint16
+	SoundChance   int
+	SoundInterval int
 }

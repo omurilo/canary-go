@@ -62,6 +62,23 @@ type Monster struct {
 	// challengeFocusDuration's melee sibling: while it runs, targetDistance is
 	// forced to melee range by a challenge, and getIcons shows the icon.
 	challengeMeleeDuration int
+	// soundTicks is onThinkSound.s counter, the audio sibling of yellTicks.
+	soundTicks int
+	// lastMoveMs backs getTimeSinceLastMove for the wander gate.
+	lastMoveMs int64
+	// attackTicks is the single counter every attack block is gated against;
+	// lastMeleeAttack is the separate 1500ms floor between melee swings, and
+	// extraMeleeAttack a one-shot flag that bypasses both.
+	attackTicks      int
+	lastMeleeAttack  int64
+	extraMeleeAttack bool
+	// minCombatValue/maxCombatValue hold the damage range of the block currently
+	// being cast, which is what Monster::getCombatValues reports.
+	minCombatValue int32
+	maxCombatValue int32
+	// SoulPitBoss and SkillLoss are set by setSoulPitStack.
+	SoulPitBoss bool
+	SkillLoss   bool
 
 	// Type is the shared, immutable monster definition (attacks, loot,
 	// experience, flags). May be nil for synthetic/test monsters.

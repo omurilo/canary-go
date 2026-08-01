@@ -2,6 +2,7 @@ package game
 
 import (
 	"math/rand"
+	"time"
 
 	"github.com/opentibiabr/canary-go/internal/game/combat"
 	"github.com/opentibiabr/canary-go/internal/items"
@@ -557,7 +558,7 @@ func (m *Monster) GetNextStep(w *World) (Direction, bool) {
 	case m.walkingBack:
 		dir, ok = m.doWalkBack(w)
 	default:
-		dir, ok = m.GetRandomStep(w, m.GetPosition())
+		dir, ok = m.doRandomStep(w)
 	}
 	if !ok {
 		return dir, false
@@ -645,3 +646,20 @@ const (
 	constMePoff     uint16 = 2
 	constMeBlockHit uint16 = 4
 )
+
+// doRandomStep is Monster::doRandomStep (monster.cpp:2493). The one-second floor
+// is what separates wandering from following: a monster with a target steps at
+// its own speed, but an idle one ambles, and without the gate it would jitter
+// once per think tick.
+func (m *Monster) doRandomStep(w *World) (Direction, bool) {
+	now := time.Now().UnixMilli()
+	if now-m.lastMoveMs < randomStepFloorMs {
+		return DirNorth, false
+	}
+	m.lastMoveMs = now
+	m.randomStepping = true
+	return m.GetRandomStep(w, m.GetPosition())
+}
+
+// randomStepFloorMs is getTimeSinceLastMove() >= 1000 in doRandomStep.
+const randomStepFloorMs = 1000
