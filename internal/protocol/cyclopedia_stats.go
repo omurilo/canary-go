@@ -326,24 +326,36 @@ func (g *GameProtocol) buildDefenceStats() *netmsg.Writer {
 	w.AddByte(0x06)
 	w.AddU16(uint16(shieldSkill))
 	w.AddU16(0) // defenseWheel from mastery (TBD)
-	// A spare u16 the client reads and discards
-	// (otclient/src/client/protocolgameparse.cpp:6135). It was missing, and
-	// everything after it landed two bytes early.
-	w.AddU16(0)
+	// The two clients disagree about this frame, and there is no C++ sender to
+	// arbitrate — this Canary revision has no DEFENCESTATS sender at all, so each
+	// client's own parser is the specification.
+	//
+	// OTC reads two fields here that the official client does not: a spare u16
+	// (otclient/src/client/protocolgameparse.cpp:6135) and mitigationCombatTactics
+	// (:6142), neither behind a version or feature gate on its side. Without them
+	// OTC ran off the end —
+	//
+	//	129 bytes, 0 unread at pos 129, last opcode 0xDA (218)
+	//
+	// 129 being exactly what this produced for a player with seven absorption
+	// entries. Sending them to the official client crashed it instead, so they are
+	// gated on the OTC signal, the same discriminator the long 0xF2 uses.
+	//
+	// If a future official client turns out to read them too, the gate is a
+	// version test rather than a fork test and this is where to change it.
+	otc := g.isOTC()
+	if otc {
+		w.AddU16(0)
+	}
 
 	w.AddDouble(p.GetMitigation()/100.0, 4)                  // mitigation
 	w.AddDouble(0.0, 4)                                      // mitigationBase
 	w.AddDouble(float64(p.GetDefenseEquipment())/10000.0, 4) // mitigationEquipment
 	w.AddDouble(p.ShieldSkillMitigationFactor(), 4)          // mitigationShield
 	w.AddDouble(0.0, 4)                                      // mitigationWheel (TBD)
-	// mitigationCombatTactics (parse:6142). Also missing — between this and the
-	// spare u16 the frame ended 7 bytes short, and the client read off the end:
-	//
-	//	129 bytes, 0 unread at pos 129, last opcode 0xDA (218)
-	//
-	// 129 is exactly what this function used to produce for a player with seven
-	// absorption entries.
-	w.AddDouble(0.0, 4)
+	if otc {
+		w.AddDouble(0.0, 4) // mitigationCombatTactics
+	}
 
 	absorbs := p.GetCombatAbsorbs()
 	w.AddByte(uint8(len(absorbs)))

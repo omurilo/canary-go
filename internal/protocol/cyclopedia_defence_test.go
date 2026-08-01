@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
 // otcReader replays the client's read sequence over a frame we produced. The
@@ -59,18 +60,46 @@ func (r *otcReader) done() {
 // This walks the frame with the client's own sequence
 // (protocolgameparse.cpp:6110-6152) and fails if either side drifts again.
 func TestDefenceStatsFrameMatchesClientReads(t *testing.T) {
+	// clientOS 11 is CLIENTOS_OTCLIENT_WINDOWS. The official client reads a
+	// shorter frame; see TestDefenceStatsOfficialClientFrameIsShorter.
+	for _, os := range []uint16{10, 11, 12} {
+		t.Run("otc", func(t *testing.T) { readDefenceFrame(t, os, true) })
+	}
+}
+
+// The official client does not read the spare u16 or mitigationCombatTactics.
+// Sending them crashed it — the first version of this fix did exactly that.
+func TestDefenceStatsOfficialClientFrameIsShorter(t *testing.T) {
+	otcLen := len(buildDefenceFrame(t, 11).Bytes())
+	officialLen := len(buildDefenceFrame(t, 2).Bytes())
+
+	// A wire double is 5 bytes (precision + u32), so the two fields are 2 + 5.
+	if want := otcLen - 7; officialLen != want {
+		t.Errorf("official frame is %d bytes, want %d (OTC %d minus the spare u16 and mitigationCombatTactics)",
+			officialLen, want, otcLen)
+	}
+	readDefenceFrame(t, 2, false)
+}
+
+func buildDefenceFrame(t *testing.T, clientOS uint16) *netmsg.Writer {
+	t.Helper()
 	w := game.NewWorld()
 	w.Items = items.NewCatalog(&items.ItemType{ID: 1, Name: "ground"})
 	p := &game.Player{Name: "Tester", Level: 100}
 	p.Skills[game.SkillShielding] = 80
 
-	g := &GameProtocol{player: p, deps: &Deps{World: w, Items: w.Items}}
+	g := &GameProtocol{player: p, clientOS: clientOS, clientVersion: 1525,
+		deps: &Deps{World: w, Items: w.Items}}
 	frame := g.buildDefenceStats()
 	if frame == nil {
 		t.Fatal("no frame built")
 	}
+	return frame
+}
 
-	r := &otcReader{t: t, buf: frame.Bytes()}
+func readDefenceFrame(t *testing.T, clientOS uint16, otc bool) {
+	t.Helper()
+	r := &otcReader{t: t, buf: buildDefenceFrame(t, clientOS).Bytes()}
 	if op := r.u8("opcode"); op != 0xDA {
 		t.Fatalf("opcode = 0x%02X, want 0xDA", op)
 	}
@@ -100,14 +129,18 @@ func TestDefenceStatsFrameMatchesClientReads(t *testing.T) {
 	r.u8("defenseSkillType")
 	r.u16("shieldingSkill")
 	r.u16("defenseWheel")
-	r.u16("spare") // parse:6135 — this is one of the two that were missing
+	if otc {
+		r.u16("spare") // parse:6135 — OTC only
+	}
 
 	r.double("mitigation")
 	r.double("mitigationBase")
 	r.double("mitigationEquipment")
 	r.double("mitigationShield")
 	r.double("mitigationWheel")
-	r.double("mitigationCombatTactics") // parse:6142 — the other one
+	if otc {
+		r.double("mitigationCombatTactics") // parse:6142 — OTC only
+	}
 
 	n := r.u8("combatsCount")
 	for i := 0; i < int(n); i++ {
