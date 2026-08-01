@@ -479,7 +479,6 @@ func run(o runOpts, log *slog.Logger) error {
 		spawn = generateSyntheticField()
 	}
 	world.DefaultSpawn = spawn
-	world.StartDecayingMap()
 
 	// Load houses from DB and register their map tiles.
 	if err := database.LoadHouses(ctx, world); err != nil {

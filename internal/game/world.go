@@ -280,7 +280,6 @@ func (w *World) BrowseFieldRemove(pos Position) {
 	delete(w.BrowseFields, pos)
 }
 
-// StartDecayingMap scans the entire map and starts decay for all applicable items.
 // InternalRemoveItem removes count from an item on a tile and broadcasts the update.
 // Mirrors C++ Game::internalRemoveItem for tile items.
 func (w *World) InternalRemoveItem(pos Position, item *Item, count uint16) {
@@ -303,20 +302,25 @@ func (w *World) InternalRemoveItem(pos Position, item *Item, count uint16) {
 	}
 }
 
-func (w *World) StartDecayingMap() {
-	if w.Items == nil || w.Decay == nil {
-		return
-	}
-	w.Map.mu.RLock()
-	defer w.Map.mu.RUnlock()
-	for pos, tile := range w.Map.tiles {
-		for _, it := range tile.Items {
-			if itemType := w.Items.Get(it.ID); itemType != nil && itemType.Duration > 0 && itemType.DecayTo > 0 {
-				w.Decay.StartDecaying(pos, it, itemType.Duration, itemType.DecayTo)
-			}
-		}
-	}
-}
+// StartDecayingMap is deliberately gone. It walked the entire map at boot and
+// started decay on every item whose TYPE declared a duration, which upstream
+// never does.
+//
+// C++ calls Item::startDecaying from a short list of places — house items
+// restored from the DB (iomapserialize.cpp:175), a player's own items
+// (iologindata_load_player.cpp), and an item the game moves (game.cpp:2595) —
+// and never from the OTBM loader. Decay::startDecay then reads the DURATION
+// attribute off the ITEM, not the default off its type, so a map item that was
+// never explicitly started has no duration and is never scheduled.
+//
+// The old scan decayed the map out from under the startup scripts. Every slain
+// skeleton (5972, duration 10, decayTo 4024) had already become a 4024 by the
+// time the map-attribute loaders ran ~18 seconds after load, which is what
+// produced 49 of these:
+//
+//	[loadLuaMapAction] - Wrong item id 5972 found
+//
+// and, worse, silently rewrote the map itself — grounds included.
 
 // Players returns a snapshot of all online players.
 func (w *World) Players() []*Player {
