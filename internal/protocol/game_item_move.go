@@ -330,11 +330,17 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		}
 
 		if !merged {
+			// World.AddItem already tells the spectators through OnItemAppear, which is
+			// how C++ notifies too (postAddNotification -> onAddTileItem). Broadcasting
+			// again here sent a SECOND identical 0x6A for every move, and the client
+			// drew the item twice — the "unusable copies left on the floor".
+			//
+			// The fallback path creates the tile directly and so notifies nobody; that
+			// is the only branch that still has to broadcast.
 			if !g.deps.World.AddItem(pos, moveItem) {
-				// Create a new tile if none exists
 				g.deps.World.Map.SetTile(pos, &game.Tile{Items: []*game.Item{moveItem}})
+				g.broadcastAddTileItem(pos, moveItem)
 			}
-			g.broadcastAddTileItem(pos, moveItem)
 		}
 		if fromContainer != nil {
 			g.RefreshContainer(fromContainer)
@@ -418,10 +424,12 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		if fromPos.X != 0xFFFF {
 			swapItem.Parent = nil
 			pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+			// Same as above: only the tile-creating fallback needs an explicit
+			// broadcast, because AddItem's OnItemAppear covers the normal path.
 			if !g.deps.World.AddItem(pos, swapItem) {
 				g.deps.World.Map.SetTile(pos, &game.Tile{Items: []*game.Item{swapItem}})
+				g.broadcastAddTileItem(pos, swapItem)
 			}
-			g.broadcastAddTileItem(pos, swapItem)
 		} else {
 			if fromPos.Y >= 0x40 {
 				cid := uint8(fromPos.Y - 0x40)

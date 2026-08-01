@@ -219,10 +219,22 @@ func BroadcastRemoveTileThing(w *game.World, pos game.Position, stackPos uint8) 
 	}
 }
 
+// BroadcastItemDecay tells spectators an item on a tile turned into another one —
+// decay, and every datapack item:transform, which is how a house door opens.
+//
+// The stackPos argument is IGNORED. World.TransformItem computes it as
+// "1 + index in the Items slice", which is not what the client counts: its stack is
+// ground, then always-on-top items, then creatures, then down items. The two agree
+// only on a bare tile, so a door with anything else on its square was updated at the
+// wrong slot and never appeared to open — until a relog resent the whole tile and it
+// was suddenly open.
+//
+// It is also per-viewer, for the same reason creature stackpos is: what each client
+// counts depends on which creatures it can see.
 func BroadcastItemDecay(w *game.World, pos game.Position, stackPos uint8, oldItem, newItem *game.Item) {
 	for _, s := range w.Spectators(pos, 0) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
-			gp.sendUpdateTileThing(pos, stackPos, newItem)
+			gp.sendUpdateTileThing(pos, gp.stackPosOfItem(pos, newItem), newItem)
 		}
 	}
 }
