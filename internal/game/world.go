@@ -537,6 +537,13 @@ func (w *World) captureStackPositions(pos Position, c Creature) map[uint32]int {
 	return w.CaptureStackPositions(pos, c)
 }
 
+// SpectatorCreatures returns every creature that can see pos — the equivalent of
+// Map::getSpectators with onlyPlayers off.
+//
+// Players and monsters are kept in two separate maps here, and this walked only
+// w.creatures, so despite the name it never returned a player. The one caller
+// filtered to NPCs and could not tell; the monster target list could, and saw an
+// empty world.
 func (w *World) SpectatorCreatures(pos Position) []Creature {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
@@ -544,6 +551,11 @@ func (w *World) SpectatorCreatures(pos Position) []Creature {
 	for _, c := range w.creatures {
 		if c.GetPosition().InRangeOf(pos) {
 			out = append(out, c)
+		}
+	}
+	for _, p := range w.players {
+		if p.Pos.InRangeOf(pos) {
+			out = append(out, p)
 		}
 	}
 	return out

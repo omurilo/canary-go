@@ -2,6 +2,7 @@ package game
 
 import (
 	"math/rand"
+	"sort"
 )
 
 // Monster AI behaviour ported from src/creatures/monsters/monster.cpp.
@@ -113,9 +114,17 @@ func (m *Monster) SearchTarget(w *World, t TargetSearchType) bool {
 	myPos := m.GetPosition()
 	melee := m.TargetDistanceOf() == 1
 
+	// Upstream draws from targetList, not from raw spectators. Scanning
+	// spectators here meant only players were ever candidates, so a monster with
+	// an enemy faction had nothing to pick from even once factions were read.
+	m.UpdateTargetList(w)
+
 	var candidates []Creature
-	for _, s := range w.Spectators(myPos, m.GetID()) {
-		if s == nil || s.CannotBeAttacked() || s.Ghost {
+	for _, s := range m.Targets {
+		if s == nil || s.GetHealth() == 0 {
+			continue
+		}
+		if p, ok := s.(*Player); ok && (p.CannotBeAttacked() || p.Ghost) {
 			continue
 		}
 		if !melee && !m.CanUseAttack(myPos, s, w) {
@@ -126,6 +135,13 @@ func (m *Monster) SearchTarget(w *World, t TargetSearchType) bool {
 	if len(candidates) == 0 {
 		return false
 	}
+	// Map iteration order is random in Go and would make the random pick and the
+	// nearest tie-break irreproducible run to run. C++ walks targetList in
+	// insertion order; a rebuild cannot recover that, so order by creature id —
+	// stable, and the closest proxy for "oldest first".
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].GetID() < candidates[j].GetID()
+	})
 
 	var chosen Creature
 	switch searchType {
@@ -202,11 +218,12 @@ func (m *Monster) DanceStep(w *World, keepAttack, keepDistance bool) (Direction,
 		if d != centerToDist {
 			return
 		}
-		dest := Position{X: uint16(nx), Y: uint16(ny), Z: pos.Z}
-		tile := w.Map.GetTile(dest)
-		if tile == nil || !tile.WalkableFor(m, w.Items, w.WorldType) {
+		// canWalkTo, not a bare tile check: the dance step must respect the spawn
+		// range and must not step onto another creature (monster.cpp:2593).
+		if !m.CanWalkTo(w, pos, dir) {
 			return
 		}
+		dest := Position{X: uint16(nx), Y: uint16(ny), Z: pos.Z}
 		if keepAttack && canAttackNow && !m.CanUseAttack(dest, target, w) {
 			return
 		}

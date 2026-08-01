@@ -1,7 +1,6 @@
 package game
 
 import (
-	"math/rand"
 	"time"
 )
 
@@ -45,30 +44,41 @@ func (e *AIEngine) updateAI() {
 		monster.OnThinkDefense(e.world, interval)
 		monster.OnThinkTarget(e.world, interval)
 
-		// Passive AI: If the monster is not hostile (e.g. Cat, Rabbit, Deer),
-		// it should never seek targets or keep any existing target.
+		// Passive AI: a non-hostile monster (Cat, Rabbit, Deer) never seeks a
+		// target, but it still keeps a target list — that list is what tells it
+		// whether anyone is around, and upstream only lets a monster wander while
+		// it is not idle. A rabbit alone in a field stands on its spawn; one with
+		// a player nearby hops about.
 		if monster.Type != nil && !monster.Type.Flags.Hostile {
 			if monster.GetTarget() != nil {
 				monster.SetTarget(nil)
 			}
-			// Just wander
-			if rand.Intn(3) == 0 { // 33% chance to move randomly
-				dirs := []Direction{DirNorth, DirEast, DirSouth, DirWest}
-				dir := dirs[rand.Intn(len(dirs))]
+			monster.UpdateTargetList(e.world)
+			monster.UpdateIdleStatus()
+			if dir, ok := monster.GetNextStep(e.world); ok {
 				e.world.TryMoveCreature(monster, dir)
 			}
 			continue
 		}
 
 		// --- target upkeep -------------------------------------------------
-		// A target that walked out of range, went ghost or became unattackable is
-		// dropped; C++ does the same in onThink before considering a new one.
+		// A target that died, walked out of range, went ghost or became
+		// unattackable is dropped; C++ does the same in onThink before considering
+		// a new one.
+		//
+		// This used to require the target to be a *Player and dropped anything
+		// else outright. Now that factions let a monster fight another monster,
+		// that would have released every non-player target on the tick after it
+		// was chosen.
 		if t := monster.GetTarget(); t != nil {
-			p, isPlayer := t.(*Player)
-			gone := !isPlayer ||
-				e.world.PlayerByID(p.GetID()) == nil ||
-				p.CannotBeAttacked() || p.Ghost ||
-				!monster.GetPosition().InRangeOf(p.GetPosition())
+			gone := t.GetHealth() == 0 ||
+				!monster.GetPosition().InRangeOf(t.GetPosition()) ||
+				!monster.IsOpponent(t)
+			if p, isPlayer := t.(*Player); isPlayer {
+				gone = gone || e.world.PlayerByID(p.GetID()) == nil || p.CannotBeAttacked() || p.Ghost
+			} else if e.world.CreatureByID(t.GetID()) == nil {
+				gone = true
+			}
 			if gone {
 				monster.SetTarget(nil)
 			}
@@ -81,97 +91,37 @@ func (e *AIEngine) updateAI() {
 			monster.SearchTarget(e.world, TargetSearchDefault)
 		}
 
-		target := monster.GetTarget()
-		if target == nil {
-			// Monster::updateIdleStatus (monster.cpp:1520): with nothing to fight,
-			// a monster away from its spawn walks back instead of wandering off.
-			//
-			// Idle is computed but not used to skip the monster. Upstream drops an
-			// idle monster from the creature check list and wakes it from
-			// onCreatureEnter; there is no target-list upkeep on creature movement
-			// here yet, so skipping would freeze it for good.
-			monster.UpdateIdleStatus()
-			if monster.IsWalkingBack() {
-				e.walkBackToSpawn(monster)
-			} else if rand.Intn(3) == 0 {
-				dirs := []Direction{DirNorth, DirEast, DirSouth, DirWest}
-				e.world.TryMoveCreature(monster, dirs[rand.Intn(len(dirs))])
-			}
-			continue
-		}
-
 		// Face what it is fighting, before moving. Monster::updateLookDirection
 		// (monster.cpp:3355) — without it a monster attacks sideways, and on the
 		// client it never turns at all.
-		if dir := monster.UpdateLookDirection(); dir != monster.GetDirection() {
-			monster.SetDirection(dir)
-			if e.world.OnCreatureTurn != nil {
-				e.world.OnCreatureTurn(monster)
+		if monster.GetTarget() != nil {
+			if dir := monster.UpdateLookDirection(); dir != monster.GetDirection() {
+				monster.SetDirection(dir)
+				if e.world.OnCreatureTurn != nil {
+					e.world.OnCreatureTurn(monster)
+				}
+			}
+		} else {
+			// Monster::updateIdleStatus (monster.cpp:1520): with nothing to fight,
+			// a monster away from its spawn heads back rather than wandering off.
+			monster.UpdateIdleStatus()
+			if !monster.IsInSpawnRange(monster.GetPosition()) {
+				// Past the despawn radius, upstream teleports rather than walking.
+				e.world.TeleportCreature(monster, monster.SpawnPosition)
+				monster.Idle = true
+				continue
 			}
 		}
 
 		// --- movement --------------------------------------------------------
-		// Monster::doFollowCreature (monster.cpp:2529-2549): a fleeing monster
-		// backs away, and one already at its fighting distance dances around the
-		// target instead of standing still — but only when staticAttackChance says
-		// so, which is what keeps a static caster planted.
-		if monster.IsFleeing() {
-			if dir, ok := monster.FleeStep(e.world); ok {
-				e.world.TryMoveCreature(monster, dir)
-			}
-			continue
-		}
-
-		pos := monster.GetPosition()
-		dist := chebyshevDistance(pos, target.GetPosition())
-		want := monster.TargetDistanceOf()
-
-		if dist > want {
-			// Close the gap. A distance monster stops at its targetDistance rather
-			// than walking into melee, which the old engine always did.
-			path := FindPath(e.world.Map, e.world.Items, pos, target.GetPosition(), 100)
-			for _, step := range path {
-				if chebyshevDistance(step, target.GetPosition()) < want {
-					break
-				}
-				e.world.TryMoveCreature(monster, StepDirection(pos, step))
-				break
-			}
-			continue
-		}
-
-		static := 0
-		if monster.Type != nil {
-			static = monster.Type.Flags.StaticAttackChance
-		}
-		if static < rand.Intn(100)+1 {
-			if dir, ok := monster.DanceStep(e.world, true, true); ok {
-				e.world.TryMoveCreature(monster, dir)
-			}
+		// One entry point, Monster::getNextStep (monster.cpp:2442): follow, walk
+		// back, or wander, then push whatever is in the way of the chosen tile.
+		if dir, ok := monster.GetNextStep(e.world); ok {
+			e.world.TryMoveCreature(monster, dir)
 		}
 	}
 
-	GlobalDispatcher.AddEvent(1*time.Second, e.updateAI)
-}
-
-// walkBackToSpawn is Monster::doWalkBack (monster.cpp:2500): one step along the
-// path home. A monster that cannot find a path is teleported back, which is what
-// upstream does once it leaves the despawn radius entirely.
-func (e *AIEngine) walkBackToSpawn(m *Monster) {
-	pos := m.GetPosition()
-	if pos == m.SpawnPosition {
-		return
-	}
-	if !m.IsInSpawnRange(pos) {
-		e.world.TeleportCreature(m, m.SpawnPosition)
-		m.Idle = true
-		return
-	}
-	path := FindPath(e.world.Map, e.world.Items, pos, m.SpawnPosition, 100)
-	if len(path) == 0 {
-		return
-	}
-	e.world.TryMoveCreature(m, StepDirection(pos, path[0]))
+	GlobalDispatcher.AddEvent(creatureThinkInterval, e.updateAI)
 }
 
 func chebyshevDistance(p1, p2 Position) int {

@@ -48,6 +48,13 @@ type Monster struct {
 	challengeFocusDuration int
 	// walkingBack is set when the monster is outside its spawn and heading home.
 	walkingBack bool
+	// stepDuration counts up while the target is adjacent and down while it is
+	// not, saturating at 2. Monster::isTargetNearby reads it; getDistanceStep is
+	// the only writer.
+	stepDuration int
+	// randomStepping distinguishes a monster wandering from one following, so a
+	// wandering monster is not treated as having a path.
+	randomStepping bool
 
 	// Type is the shared, immutable monster definition (attacks, loot,
 	// experience, flags). May be nil for synthetic/test monsters.
