@@ -53,37 +53,40 @@ const (
 
 // Inbound game opcodes.
 const (
-	inLogout         = 0x14
-	inPing           = 0x1D // client keep-alive ping → reply with opPingBack
-	inPong           = 0x1E // client reply to our opPing → refresh liveness
-	inAutoWalk       = 0x64
-	inStopAutoWalk   = 0x69
-	inWalkNorth      = 0x65
-	inWalkEast       = 0x66
-	inWalkSouth      = 0x67
-	inWalkWest       = 0x68
-	inWalkNE         = 0x6A
-	inWalkSE         = 0x6B
-	inWalkSW         = 0x6C
-	inWalkNW         = 0x6D
-	inTurnNorth      = 0x6F
-	inTurnEast       = 0x70
-	inTurnSouth      = 0x71
-	inTurnWest       = 0x72
-	inSay            = 0x96
-	inExtendedOpcode = 0x32
-	inUseItem          = 0x82
-	inUseItemWith      = 0x83
-	inUseWithCreature  = 0x84
-	inCloseContainer = 0x87
-	inContainerUp    = 0x88
-	inLookAt         = 0x8C
-	inThrowItem      = 0x78
-	inAttack         = 0xA1
-	inFightModes     = 0xA0
-	inBuyItem        = 0x7A
-	inSellItem       = 0x7B
-	inCloseShop      = 0x7C
+	// inEnterGame is OTC's ClientEnterGame. A live player's session never handles
+	// it; see the note in OnPacket.
+	inEnterGame       = 0x0F
+	inLogout          = 0x14
+	inPing            = 0x1D // client keep-alive ping → reply with opPingBack
+	inPong            = 0x1E // client reply to our opPing → refresh liveness
+	inAutoWalk        = 0x64
+	inStopAutoWalk    = 0x69
+	inWalkNorth       = 0x65
+	inWalkEast        = 0x66
+	inWalkSouth       = 0x67
+	inWalkWest        = 0x68
+	inWalkNE          = 0x6A
+	inWalkSE          = 0x6B
+	inWalkSW          = 0x6C
+	inWalkNW          = 0x6D
+	inTurnNorth       = 0x6F
+	inTurnEast        = 0x70
+	inTurnSouth       = 0x71
+	inTurnWest        = 0x72
+	inSay             = 0x96
+	inExtendedOpcode  = 0x32
+	inUseItem         = 0x82
+	inUseItemWith     = 0x83
+	inUseWithCreature = 0x84
+	inCloseContainer  = 0x87
+	inContainerUp     = 0x88
+	inLookAt          = 0x8C
+	inThrowItem       = 0x78
+	inAttack          = 0xA1
+	inFightModes      = 0xA0
+	inBuyItem         = 0x7A
+	inSellItem        = 0x7B
+	inCloseShop       = 0x7C
 	// 0x97 is playerRequestChannels in C++ (protocolgame.cpp:1842), NOT close
 	// channel. Closing a channel is 0x99.
 	inRequestChannels = 0x97
@@ -99,11 +102,11 @@ const (
 	inLeaveParty           = 0xA7
 	inEnableSharedPartyExp = 0xA8
 	// Inbound market opcodes (0xF3..0xF8).
-	inMarketLeave    = 0xF3
-	inMarketBrowse   = 0xF5
-	inMarketCreate   = 0xF6
-	inMarketCancel   = 0xF7
-	inMarketAccept   = 0xF8
+	inMarketLeave  = 0xF3
+	inMarketBrowse = 0xF5
+	inMarketCreate = 0xF6
+	inMarketCancel = 0xF7
+	inMarketAccept = 0xF8
 
 	// Batch 1: additional inbound opcodes.
 	inRetrieveDepotSearch      = 0x29
@@ -265,7 +268,7 @@ func NewGameFactory(deps *Deps, profile *Profile) network.ProtocolFactory {
 		return &GameProtocol{
 			deps:     deps,
 			profile:  p,
-			known:   make(map[uint32]bool),
+			known:    make(map[uint32]bool),
 			pingStop: make(chan struct{}),
 		}
 	}
@@ -505,9 +508,9 @@ func (g *GameProtocol) OnDisconnect(c *network.Connection) {
 		c.Logger().Warn("save on disconnect failed", "err", err)
 	}
 	g.deps.World.RemovePlayer(g.player.ID)
-		if err := g.deps.DB.RemovePlayerOnline(ctx, g.player.DBID); err != nil {
-			c.Logger().Debug("remove player_online", "err", err)
-		}
+	if err := g.deps.DB.RemovePlayerOnline(ctx, g.player.DBID); err != nil {
+		c.Logger().Debug("remove player_online", "err", err)
+	}
 	g.broadcastRemove(g.player)
 	c.Logger().Info("player logged out", "name", g.player.Name, "online", g.deps.World.OnlineCount())
 	g.player = nil
@@ -742,7 +745,6 @@ func (g *GameProtocol) sendResourceBalances() {
 	g.SendToClient(w)
 }
 
-
 // dispatchStore forwards a store packet's payload (bytes after the opcode) to
 // the gamestore Lua module.
 func (g *GameProtocol) dispatchDailyReward(op byte, r *netmsg.Reader) {
@@ -766,7 +768,7 @@ func (g *GameProtocol) dispatchStore(op byte, r *netmsg.Reader) {
 // enterWorld sends the full login sequence as a single message.
 func (g *GameProtocol) enterWorld() {
 	p := g.player
-	
+
 	w := netmsg.NewWriter()
 
 	// 0x17 self appear.
@@ -904,14 +906,14 @@ func (g *GameProtocol) addStats(w *netmsg.Writer) {
 		freeCap = totalCap - usedCap
 	}
 	w.AddU32(freeCap)
-	
+
 	w.AddU64(p.Experience)
 	w.AddU16(p.Level)
 	w.AddU16(p.GetLevelPercent()) // level percent (0-10000)
-	w.AddU16(100) // base xp gain
-	w.AddU16(0)   // grinding xp boost
-	w.AddU16(0)   // xp boost percent
-	w.AddU16(0)   // stamina multiplier
+	w.AddU16(100)                 // base xp gain
+	w.AddU16(0)                   // grinding xp boost
+	w.AddU16(0)                   // xp boost percent
+	w.AddU16(0)                   // stamina multiplier
 	w.AddU32(p.Mana)
 	w.AddU32(p.GetMaxMana())
 	w.AddByte(p.Soul)
@@ -934,27 +936,27 @@ func (g *GameProtocol) addStats(w *netmsg.Writer) {
 	}
 	w.AddU16(offlineTrainingMinutes) // offline training minutes
 	w.AddU16(0)                      // xp boost time
-	w.AddByte(1) // can buy xp boost
-	w.AddU32(0)  // mana shield
-	w.AddU32(0)  // max mana shield
+	w.AddByte(1)                     // can buy xp boost
+	w.AddU32(0)                      // mana shield
+	w.AddU32(0)                      // max mana shield
 }
 
 func (g *GameProtocol) addSkills(w *netmsg.Writer) {
 	p := g.player
 	w.AddByte(opPlayerSkills)
 	// magic level.
-	w.AddU16(p.MagLevel) // magic level
-	w.AddU16(p.MagLevel) // base magic level
-	w.AddU16(0)          // loyalty magic level
+	w.AddU16(p.MagLevel)             // magic level
+	w.AddU16(p.MagLevel)             // base magic level
+	w.AddU16(0)                      // loyalty magic level
 	w.AddU16(p.GetMagLevelPercent()) // magic level percent * 100
 	// Combat skills fist..fishing only. AddPlayerSkills iterates
 	// SKILL_FIRST..SKILL_FISHING here (protocolgame.cpp:9806); the crit and leech
 	// skills are NOT part of this block, so the bound must stay at SkillFishing
 	// rather than SkillCount, which now covers all 13 skills.
 	for i := game.SkillFist; i <= game.SkillFishing; i++ {
-		w.AddU16(p.Skills[i]) // level
-		w.AddU16(p.Skills[i]) // base
-		w.AddU16(0)           // loyalty
+		w.AddU16(p.Skills[i])          // level
+		w.AddU16(p.Skills[i])          // base
+		w.AddU16(0)                    // loyalty
 		w.AddU16(p.GetSkillPercent(i)) // percent * 100
 	}
 
@@ -1016,7 +1018,7 @@ func getVocationClientID(vocation uint16) byte {
 func (g *GameProtocol) addBasicData(w *netmsg.Writer) {
 	p := g.player
 	w.AddByte(opBasicData)
-	w.AddByte(1) // is premium
+	w.AddByte(1)                                    // is premium
 	w.AddU32(uint32(time.Now().Unix() + 86400*365)) // premium expire timestamp
 	w.AddByte(getVocationClientID(p.Vocation))
 	w.AddByte(1) // has reached main (1 = allow main features like Wheel & Prey)
@@ -1037,10 +1039,23 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 				"opcode", fmt.Sprintf("0x%02X", op), "panic", rec, "stack", string(debug.Stack()))
 		}
 	}()
-	if g.player == nil {
+	// The byte is read before the player check because 0x0F still means something
+	// without one (protocolgame.cpp:1516-1521):
+	//
+	//	if (!player || player->isRemoved()) {
+	//	    if (recvbyte == 0x0F) { disconnect(); }
+	//	    return;
+	//	}
+	if r.Remaining() < 1 {
 		return
 	}
 	op = r.GetByte()
+	if g.player == nil {
+		if op == inEnterGame {
+			c.Close()
+		}
+		return
+	}
 	g.logInboundOpcode(op, r.Buffer()[r.Pos():])
 	switch op {
 	case inLogout:
@@ -1134,10 +1149,18 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		g.deps.World.PlayerLeaveParty(g.player.ID)
 	case inEnableSharedPartyExp:
 		g.deps.World.PlayerEnableSharedPartyExperience(g.player.ID, r.GetByte() == 1)
-	case 0x0F: // Ping back
-		w := netmsg.NewWriter()
-		w.AddByte(0x1D)
-		g.SendToClient(w)
+	// No case for 0x0F. It is ClientEnterGame, and for a LIVE player C++ has no
+	// handler at all — it falls through to the default and is logged and dropped.
+	// This used to answer it with 0x1D, calling it "ping back", which it is not:
+	// 0x0F is the byte upstream disconnects on when there is no player, and the
+	// death screen's resurrect request when the player is dead. Answering a ping
+	// to it was a fourth meaning that exists nowhere.
+	//
+	// The dead-player branch (parsePacketDead, protocolgame.cpp:1550-1587: respawn
+	// in place, sendAddCreature, addBless) has no equivalent here because Go's
+	// HandlePlayerDeath removes the player from the world outright and the client
+	// reconnects, so no packet ever arrives from a dead-but-connected session.
+	// Porting the death screen is what would make that branch reachable.
 	case 0x61:
 		g.parseOpenWheel(r)
 	case 0x62:
