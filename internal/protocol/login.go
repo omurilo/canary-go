@@ -465,6 +465,7 @@ func stripLoginFraming(body []byte, c *network.Connection) (out []byte, modernPa
 	if len(body) < tibiaHeaderLength {
 		return body, false
 	}
+	body = stripWorldNameLine(body, c)
 	declared := int(body[0]) | int(body[1])<<8
 	rest := len(body) - tibiaHeaderLength
 
@@ -541,4 +542,66 @@ func loginBytesToSkipBeforeRSA(version ProtocolVersion) int {
 		return 12
 	}
 	return 17
+}
+
+// stripWorldNameLine removes the proxy-identification line an OTC client sends
+// before its first real packet.
+//
+// Protocol::onConnect (otclient/src/framework/net/protocol.cpp:408-418) writes
+// `getWorldName() + "\n"` RAW — no header, no checksum — for every client at
+// version 1200 or above, and then calls enabledSequencedPackets(). A client
+// reached by IP and port rather than through a server list has no world name,
+// so it sends a bare "\n": the stray 0x0A at the head of
+//
+//	declared=12298 rest=389 total=391
+//	hex="0A 30 00 00 00 00 00 06 01 0A 00 F5 05 F5 05 ..."
+//
+// where 30 00 is the real block count of 48, and the four zeros are
+// writeSequence(0) rather than an Adler-32, which is never zero.
+//
+// Upstream fares no better: Connection::parseProxyIdentification
+// (connection.cpp:150-158) compares the first two bytes against its own
+// configured SERVER_NAME and, on a mismatch, hands the bytes to parseHeader
+// unchanged. With an empty world name it reads the same garbage. Setting the
+// world name in the client is the parity-correct fix and makes this dead code.
+//
+// This is therefore a deliberate divergence, and a narrow one: the line is only
+// removed when doing so turns a frame that parses as nothing into one that
+// parses exactly. That is a verified improvement, not a guess about what the
+// leading bytes mean.
+func stripWorldNameLine(body []byte, c *network.Connection) []byte {
+	if framesCleanly(body) {
+		return body // nothing to strip; do not touch a frame that already works
+	}
+	// Bounded scan: a world name is short, and anything longer is not one.
+	limit := 64
+	if len(body) < limit {
+		limit = len(body)
+	}
+	for i := 0; i < limit; i++ {
+		if body[i] != '\n' {
+			continue
+		}
+		rest := body[i+1:]
+		if !framesCleanly(rest) {
+			continue
+		}
+		if c != nil {
+			c.Logger().Info("login: consumed the client's proxy-identification line",
+				"worldName", string(body[:i]), "bytes", i+1)
+		}
+		return rest
+	}
+	return body
+}
+
+// framesCleanly reports whether body is exactly one Tibia frame, in either the
+// modern block-count form or the legacy byte-length one.
+func framesCleanly(body []byte) bool {
+	if len(body) < tibiaHeaderLength {
+		return false
+	}
+	declared := int(body[0]) | int(body[1])<<8
+	rest := len(body) - tibiaHeaderLength
+	return declared*8+4 == rest || declared == rest
 }

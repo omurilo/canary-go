@@ -135,3 +135,43 @@ func TestModernPaddingBoundsAreChecked(t *testing.T) {
 		t.Errorf("got %q ok=%v, want \"hi\" true", got, ok)
 	}
 }
+
+// An OTC client at version 1200+ writes `getWorldName() + "\n"` raw before its
+// first real packet (otclient/src/framework/net/protocol.cpp:408-418), then
+// enables sequenced packets. Reached by IP and port rather than through a
+// server list it has no world name, so it sends a bare "\n" — the stray 0x0A
+// that made the login frame unparseable.
+func TestBareWorldNameLineIsConsumed(t *testing.T) {
+	payload := make([]byte, 377)
+	frame := buildClientLoginPacket(payload, true)
+
+	got := unwrap(t, append([]byte{'\n'}, frame...))
+	if len(got) != len(payload) {
+		t.Fatalf("unwrapped %d bytes, want %d", len(got), len(payload))
+	}
+}
+
+// A named world sends the name too, and the whole line has to go.
+func TestNamedWorldLineIsConsumed(t *testing.T) {
+	payload := []byte("some login payload")
+	frame := buildClientLoginPacket(payload, false)
+
+	got := unwrap(t, append([]byte("Canary-Go\n"), frame...))
+	if string(got) != string(payload) {
+		t.Errorf("got %q, want %q", got, payload)
+	}
+}
+
+// The line is only removed when doing so turns a frame that parses as nothing
+// into one that parses exactly — so a frame that already works is never
+// touched, whatever its first byte happens to be.
+func TestValidFrameIsNeverStripped(t *testing.T) {
+	payload := make([]byte, 64)
+	for _, modern := range []bool{true, false} {
+		frame := buildClientLoginPacket(payload, modern)
+		got := unwrap(t, frame)
+		if len(got) != len(payload) {
+			t.Errorf("modern=%v: unwrapped %d bytes, want %d", modern, len(got), len(payload))
+		}
+	}
+}
