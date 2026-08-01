@@ -261,3 +261,53 @@ func TestCustomAttributeEncodingIsDeterministic(t *testing.T) {
 		}
 	}
 }
+
+// item:remove on something held in a container or an inventory slot only zeroed
+// the count and left the object in place. A mystic bag survived its own
+// mysticBag.onUse — still in the backpack, still usable — so it handed out a
+// prize on every click, forever.
+func TestRemoveItemFromHolder(t *testing.T) {
+	p := &Player{Name: "Holder"}
+	bag := &Item{ID: 1987, Count: 1}
+	mystic := &Item{ID: 6571, Count: 1, Parent: bag}
+	bag.Contents = []*Item{mystic}
+	p.Inventory[3] = bag
+
+	if !(&World{}).RemoveItemFromHolder(p, mystic, 1) {
+		t.Fatalf("an item inside a backpack must be removable")
+	}
+	if len(bag.Contents) != 0 {
+		t.Errorf("the bag still holds %d items", len(bag.Contents))
+	}
+	if mystic.Parent != nil {
+		t.Errorf("the removed item must not keep pointing at its old container")
+	}
+
+	// A stack loses only the requested amount and stays put.
+	gold := &Item{ID: 3031, Count: 100, Parent: bag}
+	bag.Contents = []*Item{gold}
+	if !(&World{}).RemoveItemFromHolder(p, gold, 40) {
+		t.Fatalf("a partial removal must report success")
+	}
+	if gold.Count != 60 {
+		t.Errorf("gold count = %d, want 60", gold.Count)
+	}
+	if len(bag.Contents) != 1 {
+		t.Errorf("a partially removed stack must stay in the container")
+	}
+
+	// Directly in an inventory slot, with no container in between.
+	loose := &Item{ID: 6571, Count: 1}
+	p.Inventory[5] = loose
+	if !(&World{}).RemoveItemFromHolder(p, loose, 1) {
+		t.Fatalf("an item in an inventory slot must be removable")
+	}
+	if p.Inventory[5] != nil {
+		t.Errorf("the inventory slot must be cleared")
+	}
+
+	// Nothing holds it.
+	if (&World{}).RemoveItemFromHolder(p, &Item{ID: 1}, 1) {
+		t.Errorf("an unheld item has no holder to remove it from")
+	}
+}

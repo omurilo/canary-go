@@ -311,7 +311,29 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 					}
 				}
 			}
+			// Not on a tile: it is in a container or an inventory slot, and it has to
+			// come OUT of that holder. Setting Count to 0 and leaving the object in
+			// place made a mystic bag survive item:remove(1) — still in the backpack,
+			// still usable, handing out a prize on every click.
+			if !removed && e.world != nil {
+				holder := e.playerHoldingItem(it.item)
+				removed = e.world.RemoveItemFromHolder(holder, it.item, uint16(count))
+				if removed && holder != nil && holder.Session != nil {
+					holder.Session.SendInventoryIds()
+					if parent := it.item.Parent; parent != nil {
+						holder.Session.RefreshContainer(parent)
+					} else {
+						for _, oc := range holder.OpenContainersSnapshot() {
+							if oc.Container != nil {
+								holder.Session.RefreshContainer(oc.Container)
+							}
+						}
+					}
+				}
+			}
 			if !removed {
+				// Nothing owns it — decrement so a caller that holds a bare Item still
+				// sees the count fall.
 				if int(it.item.Count) > count {
 					it.item.Count -= uint16(count)
 				} else {
@@ -1002,4 +1024,27 @@ func customAttributeKey(L *lua.LState, n int) (string, bool) {
 		return v.String(), true
 	}
 	return "", false
+}
+
+// playerHoldingItem finds the online player whose inventory ultimately holds the
+// item. luaItem carries only the item and a map position, so when the item is not
+// on a tile the holder has to be located — Item::getHoldingPlayer walks the parent
+// chain in C++, which is the same idea from the other end.
+func (e *Engine) playerHoldingItem(item *game.Item) *game.Player {
+	if item == nil || e.world == nil {
+		return nil
+	}
+	// Climb to the outermost container; that is what sits in an inventory slot.
+	root := item
+	for root.Parent != nil {
+		root = root.Parent
+	}
+	for _, p := range e.world.Players() {
+		for _, inv := range p.Inventory {
+			if inv == root {
+				return p
+			}
+		}
+	}
+	return nil
 }

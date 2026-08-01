@@ -893,3 +893,51 @@ func (w *World) PlayerRequestTrade(playerID, targetID uint32, pos Position, item
 func (w *World) PlayerAcceptTrade(playerID uint32)      {}
 func (w *World) PlayerCloseTrade(playerID uint32)       {}
 func (w *World) PlayerFollow(playerID, targetID uint32) {}
+
+// RemoveItemFromHolder removes count from an item wherever it actually lives —
+// a container, a player's inventory slot, or nowhere at all — and reports whether
+// it found a holder.
+//
+// Item::remove goes through Game::internalRemoveItem, which asks the item for its
+// parent cylinder and removes it from THAT. The Lua binding only knew how to
+// remove from a tile and, for anything else, set Count to 0 and left the object
+// in place: a mystic bag in a backpack stayed there after item:remove(1), fully
+// usable, so it handed out a prize on every click.
+func (w *World) RemoveItemFromHolder(p *Player, item *Item, count uint16) bool {
+	if item == nil {
+		return false
+	}
+	partial := int(item.Count) > int(count) && count > 0
+
+	// A container the item sits in, which the item itself points at.
+	if parent := item.Parent; parent != nil {
+		for i, c := range parent.Contents {
+			if c != item {
+				continue
+			}
+			if partial {
+				item.Count -= count
+			} else {
+				parent.Contents = append(parent.Contents[:i], parent.Contents[i+1:]...)
+				item.Parent = nil
+			}
+			return true
+		}
+	}
+
+	// An inventory slot holds the item directly, with no parent container.
+	if p != nil {
+		for slot, inv := range p.Inventory {
+			if inv != item {
+				continue
+			}
+			if partial {
+				item.Count -= count
+			} else {
+				p.Inventory[slot] = nil
+			}
+			return true
+		}
+	}
+	return false
+}
