@@ -44,13 +44,16 @@ func (d *DB) LoadHouses(ctx context.Context, w *game.World) error {
 		// (0,0,0), so /gotohouse teleported the player into the void and the screen
 		// went black.
 		if existing := w.GetHouse(h.ID); existing != nil {
-			existing.Name = h.Name
+			// ONLY the ownership and auction columns. IOMapSerialize::loadHouseInfo
+			// selects exactly these (iomapserialize.cpp:299) and nothing else: the
+			// name, rent, size, town and client id belong to the map, and houses.xml
+			// has already supplied them.
+			//
+			// Copying them from the row overwrote the XML with whatever the table
+			// happened to hold — clientid above all, which came back 0 and left the
+			// cyclopedia unable to identify any house. Same mistake as the entry
+			// position, one field over.
 			existing.OwnerID = h.OwnerID
-			existing.Rent = h.Rent
-			existing.Size = h.Size
-			existing.Beds = h.Beds
-			existing.TownID = h.TownID
-			existing.ClientID = h.ClientID
 			existing.BidderName = h.BidderName
 			existing.HighestBid = h.HighestBid
 			existing.InternalBid = h.InternalBid
