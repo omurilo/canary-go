@@ -42,10 +42,13 @@ const (
 	ItemInbox      = 12902
 	ItemMarket     = 12903
 	ItemStoreInbox = 23396
-	ItemStash      = 28750
-	ItemStoreCoin  = 22118
-	ItemGoldPouch    = 23721
-	ItemBrowseField  = 470
+	// ItemDecorationKit is ITEM_DECORATION_KIT (utils_definitions.hpp:547): the
+	// wrapped form of house furniture, carrying the original id in a custom attribute.
+	ItemDecorationKit = 23398
+	ItemStash         = 28750
+	ItemStoreCoin     = 22118
+	ItemGoldPouch     = 23721
+	ItemBrowseField   = 470
 
 	// Mail item IDs.
 	ItemParcel        = 3503
