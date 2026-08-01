@@ -248,9 +248,13 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	if moveItem == item {
 		if fromPos.X != 0xFFFF {
 			pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+			// Captured before the removal, because the index is only knowable while
+			// the item is still on the tile. -1 means no client holds it there.
 			actualStack := g.stackPosOfItem(pos, item)
 			g.deps.World.Map.RemoveItemPtr(pos, item)
-			g.onRemoveTileItem(pos, actualStack, item)
+			if actualStack != -1 {
+				g.onRemoveTileItem(pos, uint8(actualStack), item)
+			}
 		} else {
 			if fromPos.Y >= 0x40 {
 				fromContainer.Contents = append(fromContainer.Contents[:fromSlot], fromContainer.Contents[fromSlot+1:]...)
@@ -261,7 +265,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 						if bf == fromContainer {
 							tileStack := g.stackPosOfItem(bfPos, item)
 							g.deps.World.Map.RemoveItemPtr(bfPos, item)
-							g.broadcastRemoveTileThing(bfPos, tileStack)
+							if tileStack != -1 {
+								g.broadcastRemoveTileThing(bfPos, uint8(tileStack))
+							}
 							break
 						}
 					}
@@ -275,8 +281,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		// Just update the source count
 		if fromPos.X != 0xFFFF {
 			pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
-			actualStack := g.stackPosOfItem(pos, item)
-			g.broadcastUpdateTileThing(pos, actualStack, item)
+			if actualStack := g.stackPosOfItem(pos, item); actualStack != -1 {
+				g.broadcastUpdateTileThing(pos, uint8(actualStack), item)
+			}
 		} else {
 			if fromPos.Y >= 0x40 {
 				g.sendUpdateContainerItem(uint8(fromPos.Y-0x40), fromSlot, item)
@@ -593,8 +600,10 @@ func (g *GameProtocol) broadcastAddTileItem(pos game.Position, item *game.Item) 
 	for _, s := range g.deps.World.Spectators(pos, 0) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
 
-			stack := gp.stackPosOfItem(pos, item)
-			gp.sendAddTileItem(pos, stack, item)
+			// Per viewer, and skipped entirely for a viewer with no slot for it.
+			if stack := gp.stackPosOfItem(pos, item); stack != -1 {
+				gp.sendAddTileItem(pos, uint8(stack), item)
+			}
 		}
 	}
 }
@@ -612,50 +621,93 @@ func (g *GameProtocol) sendAddTileItem(pos game.Position, stack uint8, item *gam
 	g.SendToClient(w)
 }
 
-func (g *GameProtocol) stackPosOfItem(pos game.Position, item *game.Item) uint8 {
+// stackPosOfItem is Tile::getStackposOfItem (src/items/tile.cpp:1496-1543): the
+// index `item` occupies in THIS client's view of the tile, or -1 when the client
+// does not hold it at that index.
+//
+// -1 is not an error code to paper over — it is the answer for two real cases the
+// old version got wrong by returning a count instead:
+//
+//   - the item is not on the tile at all, where the count was a plausible-looking
+//     index pointing at whatever else was there;
+//   - the tile holds ten or more things, where the client simply stopped storing
+//     and has no index to update.
+//
+// Callers must skip the packet on -1, exactly as C++ does. Sending an update for
+// an index the client does not have is how the same door ended up reported at 2,
+// then 3, then 9 while the client held it at 7 — and why opening it did nothing
+// until a relog rebuilt the tile.
+func (g *GameProtocol) stackPosOfItem(pos game.Position, item *game.Item) int {
 	g.deps.World.RLock()
 	defer g.deps.World.RUnlock()
-	stack := 0
+
 	tile := g.deps.World.Map.GetTile(pos)
-	if tile != nil {
-		if tile.Ground != nil {
-			if tile.Ground == item {
-				return uint8(stack)
-			}
-			stack++
-		}
-		for _, it := range tile.Items {
-			if g.isTopItem(it) {
-				if it == item {
-					return uint8(stack)
-				}
-				stack++
-			}
-		}
+	if tile == nil || item == nil {
+		return -1
 	}
-	// Creatures sit between the top and the down items, and only the ones THIS
-	// client can see occupy a slot — an invisible creature or a ghost is not in the
-	// stack the client holds. Counting len(Creatures) made the value drift as
-	// anything walked over the tile: a door reported stackpos 2, then 3, then 9 for
-	// the same door, while the client had it at 7 the whole time.
-	if tile != nil {
-		for _, c := range tile.Creatures {
-			if g.canSeeCreature(c) {
-				stack++
-			}
+
+	n := 0
+	if tile.Ground != nil {
+		if tile.Ground == item {
+			return n
 		}
+		n++
 	}
-	if tile != nil {
+
+	// The always-on-top items are searched one by one only when the item we are
+	// looking for is itself always-on-top; otherwise C++ skips the whole group by
+	// count, because a down item can never be found among them.
+	if g.isTopItem(item) {
 		for _, it := range tile.Items {
 			if !g.isTopItem(it) {
-				if it == item {
-					return uint8(stack)
-				}
-				stack++
+				continue
+			}
+			if it == item {
+				return n
+			}
+			n++
+			if n == 10 {
+				return -1
+			}
+		}
+	} else {
+		for _, it := range tile.Items {
+			if g.isTopItem(it) {
+				n++
+			}
+		}
+		if n >= 10 {
+			return -1
+		}
+	}
+
+	// Creatures sit between the top and the down items, and only the ones THIS
+	// client can see occupy a slot — an invisible creature or a ghost is not in the
+	// stack the client holds.
+	for _, c := range tile.Creatures {
+		if g.canSeeCreature(c) {
+			n++
+			if n >= 10 {
+				return -1
 			}
 		}
 	}
-	return uint8(stack)
+
+	if !g.isTopItem(item) {
+		for _, it := range tile.Items {
+			if g.isTopItem(it) {
+				continue
+			}
+			if it == item {
+				return n
+			}
+			n++
+			if n >= 10 {
+				return -1
+			}
+		}
+	}
+	return -1
 }
 
 func (g *GameProtocol) getItemWeight(item *game.Item) uint32 {

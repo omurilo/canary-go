@@ -27,7 +27,7 @@ func wrapSetup(t *testing.T) (*GameProtocol, *game.World, *game.Player, game.Pos
 	pos := game.Position{X: 100, Y: 100, Z: 7}
 	w.Map.SetTile(pos, &game.Tile{Ground: &game.Item{ID: 1}, Flags: game.TileFlagProtectionZone, HouseID: 5})
 	w.Houses = map[uint32]*game.House{5: {ID: 5}}
-	w.Houses[5].SetOwner(77)
+	w.Houses[5].SetOwner(nil, 77, false, nil)
 
 	p := &game.Player{Name: "Owner", DBID: 77, GroupID: 1}
 	p.SetPosition(pos)
@@ -192,7 +192,7 @@ func TestAddItemSendsTheRealUnwrapID(t *testing.T) {
 // a gamemaster from decorating in someone else's building, which upstream allows.
 func TestStaffCountAsHouseOwner(t *testing.T) {
 	house := &game.House{ID: 5}
-	house.SetOwner(77)
+	house.SetOwner(nil, 77, false, nil)
 
 	owner := &game.Player{Name: "Owner", DBID: 77, GroupID: 1}
 	stranger := &game.Player{Name: "Stranger", DBID: 78, GroupID: 1}
@@ -246,4 +246,46 @@ func TestStackPosOfItemCountsOnlyVisibleCreatures(t *testing.T) {
 		t.Errorf("an unseen ghost must not shift the stack: got %d, want 3", got)
 	}
 	_ = viewer
+}
+
+// An item that is not on the tile has no index. This returned the running count —
+// a number that looks like a valid stackpos and points at whatever else is there,
+// so the update landed on the wrong thing instead of being dropped.
+func TestStackPosOfItemAbsentIsMinusOne(t *testing.T) {
+	g, w, _, pos := wrapSetup(t)
+	tile := w.Map.GetTile(pos)
+	tile.Items = append(tile.Items, &game.Item{ID: 1650})
+
+	stranger := &game.Item{ID: 1650}
+	if got := g.stackPosOfItem(pos, stranger); got != -1 {
+		t.Errorf("an item not on the tile is at %d, want -1", got)
+	}
+	if got := g.stackPosOfItem(game.Position{X: 500, Y: 500, Z: 7}, stranger); got != -1 {
+		t.Errorf("an empty tile must answer -1, got %d", got)
+	}
+}
+
+// Tile::getStackposOfItem gives up at ten: the client stores no more than that, so
+// there is no index to update past it. Without the cap the server kept sending
+// updates for slots the client does not have — the door at a crowded house
+// entrance transformed server-side and never redrew.
+func TestStackPosOfItemCapsAtTen(t *testing.T) {
+	g, w, _, pos := wrapSetup(t)
+	tile := w.Map.GetTile(pos)
+
+	// ground(1) + viewer(1) = 2 slots used. Fill past ten with down items.
+	for i := 0; i < 12; i++ {
+		tile.Items = append(tile.Items, &game.Item{ID: 1650})
+	}
+	buried := &game.Item{ID: 1650}
+	tile.Items = append(tile.Items, buried)
+
+	if got := g.stackPosOfItem(pos, buried); got != -1 {
+		t.Errorf("past the tenth slot the answer must be -1, got %d", got)
+	}
+
+	// The first few are still addressable.
+	if got := g.stackPosOfItem(pos, tile.Items[0]); got != 2 {
+		t.Errorf("the first down item is at %d, want 2", got)
+	}
 }

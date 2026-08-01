@@ -85,7 +85,12 @@ func SendExpMessage(p *game.Player, exp uint64, text string) {
 }
 
 func (g *GameProtocol) sendTileAddItem(pos game.Position, item *game.Item) {
-	g.sendAddTileItem(pos, g.stackPosOfItem(pos, item), item)
+	// -1 means this client has no slot for the item; Player::sendAddTileItem drops
+	// the packet rather than send an index the client cannot resolve
+	// (src/creatures/players/player.cpp:6951).
+	if stack := g.stackPosOfItem(pos, item); stack != -1 {
+		g.sendAddTileItem(pos, uint8(stack), item)
+	}
 }
 
 
@@ -234,7 +239,10 @@ func BroadcastRemoveTileThing(w *game.World, pos game.Position, stackPos uint8) 
 func BroadcastItemDecay(w *game.World, pos game.Position, stackPos uint8, oldItem, newItem *game.Item) {
 	for _, s := range w.Spectators(pos, 0) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
-			gp.sendUpdateTileThing(pos, gp.stackPosOfItem(pos, newItem), newItem)
+			// player.cpp:6960 — no packet at all when the viewer has no such slot.
+			if stack := gp.stackPosOfItem(pos, newItem); stack != -1 {
+				gp.sendUpdateTileThing(pos, uint8(stack), newItem)
+			}
 		}
 	}
 }
