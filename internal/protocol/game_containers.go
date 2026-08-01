@@ -175,8 +175,16 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 					}
 				}
 			}
-			g.player.OpenContainerAtWithPos(index, item, containerPos, isOnMap)
-			g.sendContainer(index, item, item.Parent != nil)
+			// Using a container that is ALREADY open closes it, rather than opening a
+			// second window onto the same thing (Actions::useItem, actions.cpp:371).
+			// Without the toggle the pouch ended up registered under two cids, and
+			// every refresh then sent two identical 0x6E windows for one bag.
+			if oldCid := g.player.GetContainerID(item); oldCid != -1 {
+				g.CloseClientContainer(uint8(oldCid))
+			} else {
+				g.player.OpenContainerAtWithPos(index, item, containerPos, isOnMap)
+				g.sendContainer(index, item, item.Parent != nil)
+			}
 		} else {
 			g.openContainerWithPos(item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, true)
 		}
