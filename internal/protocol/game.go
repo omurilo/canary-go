@@ -379,6 +379,7 @@ func (g *GameProtocol) SendToClient(w *netmsg.Writer) {
 			g.deps.Log.Warn("empty packet discarded")
 			return
 		}
+		g.logOutboundPacket(b)
 		_ = g.conn.Send(w)
 	}
 }
