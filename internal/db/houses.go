@@ -33,6 +33,37 @@ func (d *DB) LoadHouses(ctx context.Context, w *game.World) error {
 		if ownerID.Valid {
 			h.OwnerID = uint32(ownerID.Int64)
 		}
+
+		// Update the house the map already gave us; do NOT register a new one.
+		// IOMapSerialize::loadHouseInfo does exactly this — getHouse(id), then assign
+		// the columns (src/io/iomapserialize.cpp:304-320).
+		//
+		// Registering a fresh House replaced the one built from houses.xml and threw
+		// away everything the DB does not store, above all the entry position: the
+		// houses table has no entryx/entryy/entryz. getExitPosition then answered
+		// (0,0,0), so /gotohouse teleported the player into the void and the screen
+		// went black.
+		if existing := w.GetHouse(h.ID); existing != nil {
+			existing.Name = h.Name
+			existing.OwnerID = h.OwnerID
+			existing.Rent = h.Rent
+			existing.Size = h.Size
+			existing.Beds = h.Beds
+			existing.TownID = h.TownID
+			existing.ClientID = h.ClientID
+			existing.BidderName = h.BidderName
+			existing.HighestBid = h.HighestBid
+			existing.InternalBid = h.InternalBid
+			existing.BidHolderLimit = h.BidHolderLimit
+			existing.BidEndDate = h.BidEndDate
+			existing.Bidder = h.Bidder
+			existing.TransferToName = h.TransferToName
+			existing.TransferPrice = h.TransferPrice
+			existing.TransferAccept = h.TransferAccept
+			continue
+		}
+		// A row for a house the map does not define — keep it, as before, so nothing
+		// silently disappears.
 		w.RegisterHouse(&h)
 	}
 	return nil
