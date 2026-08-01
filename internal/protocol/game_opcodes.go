@@ -322,6 +322,22 @@ func (g *GameProtocol) parseWrapableItem(r *netmsg.Reader) {
 	g.wrapableAt(pos, itemID, stackpos)
 }
 
+// wrapRefuse sends the cancel message AND records why, because the cancel packet
+// is not in the opcode dump: three sessions were spent guessing which of a dozen
+// refusals had fired. The reason is the whole diagnostic value here.
+func (g *GameProtocol) wrapRefuse(reason, msg string, pos netmsg.Position, itemID uint16, stackpos uint8) {
+	if g.deps != nil && g.deps.Log != nil {
+		player := ""
+		if g.player != nil {
+			player = g.player.Name
+		}
+		g.deps.Log.Warn("wrap refused", "reason", reason, "player", player,
+			"pos", fmt.Sprintf("%d,%d,%d", pos.X, pos.Y, pos.Z),
+			"itemId", itemID, "stackpos", stackpos)
+	}
+	g.sendCancelMessage(msg)
+}
+
 // wrapableAt is the body of the wrap/unwrap request, split out so the auto-walk
 // retry can run it again once the player has arrived.
 func (g *GameProtocol) wrapableAt(pos netmsg.Position, itemID uint16, stackpos uint8) {
@@ -330,30 +346,30 @@ func (g *GameProtocol) wrapableAt(pos netmsg.Position, itemID uint16, stackpos u
 	}
 	item := g.resolveStowItem(pos, int(stackpos), itemID)
 	if item == nil || item.ID != itemID {
-		g.sendCancelMessage("Sorry, not possible.")
+		g.wrapRefuse("itemNotFound", "Sorry, not possible.", pos, itemID, stackpos)
 		return
 	}
 
 	gamePos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
 	tile := g.deps.World.Map.GetTile(gamePos)
 	if tile == nil {
-		g.sendCancelMessage("Sorry, not possible.")
+		g.wrapRefuse("noTile", "Sorry, not possible.", pos, itemID, stackpos)
 		return
 	}
 
 	// Only inside a house, and only on a protection-zone tile.
 	house := g.deps.World.GetHouseByPosition(gamePos)
 	if house == nil || !tile.IsProtectionZone() {
-		g.sendCancelMessage("You may construct this only inside a house.")
+		g.wrapRefuse("notInsideHouse", "You may construct this only inside a house.", pos, itemID, stackpos)
 		return
 	}
 	if !houseAccessIsOwner(house, g.player) {
-		g.sendCancelMessage("You are not allowed to construct this here.")
+		g.wrapRefuse("notOwner", "You are not allowed to construct this here.", pos, itemID, stackpos)
 		return
 	}
 	// A unique id marks a map-placed fixture, which must not be pocketed.
 	if item.Attr != nil && item.Attr.UniqueID != nil {
-		g.sendCancelMessage("Sorry, not possible.")
+		g.wrapRefuse("hasUniqueId", "Sorry, not possible.", pos, itemID, stackpos)
 		return
 	}
 
@@ -363,21 +379,21 @@ func (g *GameProtocol) wrapableAt(pos netmsg.Position, itemID uint16, stackpos u
 	// the decoration kit for every wrappable type.
 	wrapable := t != nil && t.WrapableTo != 0
 	if !wrapable && !isKit {
-		g.sendCancelMessage("Sorry, not possible.")
+		g.wrapRefuse("notWrapable", "Sorry, not possible.", pos, itemID, stackpos)
 		return
 	}
 
 	// An owned item belongs to whoever bought it, even inside someone else's house.
 	if item.Attr != nil && item.Attr.Owner != nil && *item.Attr.Owner != 0 &&
 		*item.Attr.Owner != g.player.DBID {
-		g.sendCancelMessage("This item is not yours.")
+		g.wrapRefuse("notYours", "This item is not yours.", pos, itemID, stackpos)
 		return
 	}
 
 	// onlyInvitedCanMoveHouseItems: a guest may not rearrange the furniture.
 	if config.Bool("onlyInvitedCanMoveHouseItems", true) &&
 		!houseAccessIsOwner(house, g.player) && !house.IsSubOwner(g.player.Name) {
-		g.sendCancelMessage("You cannot use this object.")
+		g.wrapRefuse("onlyInvitedCanMove", "You cannot use this object.", pos, itemID, stackpos)
 		return
 	}
 
@@ -387,14 +403,14 @@ func (g *GameProtocol) wrapableAt(pos netmsg.Position, itemID uint16, stackpos u
 	// requests for the right kit from five and six tiles away, every one rejected.
 	if pos.X != 0xFFFF && chebyshev(gamePos, g.player.Pos) > 1 {
 		if !g.walkToThenRetry(gamePos, func() { g.wrapableAt(pos, itemID, stackpos) }) {
-			g.sendCancelMessage("There is no way.")
+			g.wrapRefuse("noPath", "There is no way.", pos, itemID, stackpos)
 		}
 		return
 	}
 
 	// A container has to be emptied first, or its contents vanish with it.
 	if len(item.Contents) > 0 {
-		g.sendCancelMessage("Sorry, not possible.")
+		g.wrapRefuse("hasContents", "Sorry, not possible.", pos, itemID, stackpos)
 		return
 	}
 
@@ -404,13 +420,13 @@ func (g *GameProtocol) wrapableAt(pos netmsg.Position, itemID uint16, stackpos u
 	blockedUnwrap := topItem != nil && canReceiveAutoCarpet(topItem, g.deps.Items) &&
 		!(t != nil && t.HasProperty(items.PropImmovableBlockSolid))
 	if blockedUnwrap {
-		g.sendCancelMessage("You can only wrap/unwrap on the floor.")
+		g.wrapRefuse("notOnFloor", "You can only wrap/unwrap on the floor.", pos, itemID, stackpos)
 		return
 	}
 
 	// A filled bath tub would lose its contents.
 	if item.ID == itemFilledBathTube {
-		g.sendCancelMessage("Sorry, not possible.")
+		g.wrapRefuse("filledBathTub", "Sorry, not possible.", pos, itemID, stackpos)
 		return
 	}
 
