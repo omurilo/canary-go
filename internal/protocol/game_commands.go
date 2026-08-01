@@ -239,42 +239,21 @@ func (g *GameProtocol) cmdCreateItem(args []string) {
 	}
 	pos := g.player.Pos
 	item := &game.Item{ID: uint16(id), Count: uint16(count)}
+	// World.AddItem already tells the spectators through OnItemAppear. A second
+	// broadcastAddItem here announced the SAME item twice, and the two paths compute
+	// the stack index differently, so the client was told it sat at two places at
+	// once and drew it twice. Moving one copy left the other on screen — the
+	// "phantom item" that could not be picked up.
+	//
+	// A session log has the pair a millisecond apart, same item id, stackpos 2 then
+	// 1, straight after `/create 6571`.
 	if !g.deps.World.AddItem(pos, item) {
 		g.sendStatusText("No tile to place the item on.")
 		return
 	}
-	g.broadcastAddItem(pos, item)
 	g.sendStatusText(fmt.Sprintf("Created item %d (x%d).", id, count))
 }
 
-// broadcastAddItem tells the player and nearby spectators an item appeared on top
-// of a tile (0x6A TileAddThing with the item's stack index).
-func (g *GameProtocol) broadcastAddItem(pos game.Position, item *game.Item) {
-	send := func(gp *GameProtocol) {
-		// The new item sits on top of everything currently on the tile.
-
-		stack := 0
-		if t := gp.deps.World.Map.GetTile(pos); t != nil {
-			if t.Ground != nil {
-				stack++
-			}
-			stack += len(t.Items) - 1 // the item is already in the stack; index is the rest
-			stack += len(t.Creatures)
-		}
-		w := netmsg.NewWriter()
-		w.AddByte(0x6A) // TileAddThing
-		w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
-		w.AddByte(byte(stack - 1))
-		gp.addItem(w, item)
-		gp.SendToClient(w)
-	}
-	send(g)
-	for _, s := range g.deps.World.Spectators(pos, g.player.ID) {
-		if gp, ok := s.Session.(*GameProtocol); ok && gp.isKnown(g.player.ID) {
-			gp.SendRemoveCreatureAt(pos, 0)
-		}
-	}
-}
 
 // cmdAddSkill raises a skill: /addskill <fist|club|sword|axe|dist|shield|fish|ml> [n].
 func (g *GameProtocol) cmdAddSkill(args []string) {
