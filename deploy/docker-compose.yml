@@ -45,6 +45,7 @@ services:
       CANARY_DB_HOST: db
       CANARY_LEGACY_1100_GAME_PORT: "7174"
       CANARY_LEGACY_860_GAME_PORT: "7175"
+      CANARY_DUMP_ITEM_OPCODES: 1
     ports:
       - "7171:7171"
       - "7172:7172"
