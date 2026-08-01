@@ -298,15 +298,17 @@ func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 		}
 	}
 	r := netmsg.NewReader(body)
-	_ = r.GetByte()       // protocol id (0x01)
-	_ = r.GetU16()        // operating system
-	version := r.GetU16() // protocol version
+	protoID := r.GetByte() // protocol id (0x01)
+	clientOS := r.GetU16() // operating system
+	version := r.GetU16()  // protocol version
 	clientVersion := r.GetU32()
 	r.Skip(13) // 12 asset signatures + 1 preview byte
 	if r.Remaining() < tibcrypto.BlockSize {
 		c.Logger().Debug("login: short packet, no RSA block")
 		return
 	}
+	c.Logger().Info("login: parsed prelude", "protoId", protoID, "clientOS", clientOS,
+		"version", version, "clientVersion", clientVersion, "payloadLen", len(body))
 	block := r.GetBytes(tibcrypto.BlockSize)
 	if err := p.deps.RSA.Decrypt(block); err != nil {
 		c.Logger().Debug("login: rsa decrypt failed", "err", err)
@@ -340,9 +342,18 @@ func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	}
 	chars, err := p.deps.DB.ListCharacters(ctx, acc.ID)
 	if err != nil {
+		c.Logger().Warn("login: listing characters failed", "account", account, "err", err)
 		p.disconnect(c, "Unable to load your characters.")
 		return
 	}
+	names := make([]string, 0, len(chars))
+	for _, ch := range chars {
+		names = append(names, ch.Name)
+	}
+	c.Logger().Info("login: character list", "account", account, "accountId", acc.ID,
+		"count", len(chars), "names", strings.Join(names, ","),
+		"worldName", p.deps.Cfg.ServerName, "worldIP", p.deps.Cfg.IP,
+		"gamePort", p.deps.Cfg.GamePort)
 	// ONE message carrying all three parts, as getCharacterList does
 	// (protocollogin.cpp:60-148: a single OutputMessage, one send() at the end).
 	//
@@ -455,12 +466,34 @@ func stripLoginFraming(body []byte, c *network.Connection) (out []byte, modernPa
 	if declared == rest {
 		return body[tibiaHeaderLength:], false
 	}
-	// Neither: leave it alone rather than guess.
+	// Neither: leave it alone rather than guess. Dump the head so the actual
+	// shape is identifiable instead of being inferred from two numbers — a
+	// mismatch here is either a framing form nobody has ported or a truncated
+	// read, and the bytes say which.
 	if c != nil {
-		c.Logger().Debug("login: unrecognised outer header",
-			"declared", declared, "rest", rest)
+		head := body
+		if len(head) > 48 {
+			head = head[:48]
+		}
+		c.Logger().Warn("login: unrecognised outer header",
+			"declared", declared, "rest", rest, "total", len(body),
+			"hex", fmt.Sprintf("% X", head), "ascii", printableASCII(head))
 	}
 	return body, false
+}
+
+// printableASCII renders a byte slice with non-printable bytes as dots, so a
+// text protocol arriving on the binary path is obvious at a glance.
+func printableASCII(b []byte) string {
+	out := make([]byte, len(b))
+	for i, ch := range b {
+		if ch >= 0x20 && ch < 0x7F {
+			out[i] = ch
+		} else {
+			out[i] = '.'
+		}
+	}
+	return string(out)
 }
 
 // stripModernPadding removes OutputMessage::writePaddingAmount's leading count
