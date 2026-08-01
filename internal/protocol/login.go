@@ -298,14 +298,31 @@ func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 		}
 	}
 	r := netmsg.NewReader(body)
-	protoID := r.GetByte() // protocol id (0x01)
-	clientOS := r.GetU16() // operating system
-	version := r.GetU16()  // protocol version
-	clientVersion := r.GetU32()
-	r.Skip(13) // 12 asset signatures + 1 preview byte
-	if r.Remaining() < tibcrypto.BlockSize {
-		c.Logger().Debug("login: short packet, no RSA block")
+	protoID := r.GetByte() // protocol id (0x01), consumed by the service dispatch in C++
+	clientOS := r.GetU16() // msg.skipBytes(2)      protocollogin.cpp:209
+	version := r.GetU16()  // msg.get<uint16_t>()   protocollogin.cpp:211
+
+	// resolveLoginLayout, reduced to the one thing it decides here: how much
+	// pre-RSA metadata to skip (AccountLoginLayout::bytesToSkipBeforeRsa,
+	// protocol_profile.cpp:287-325). 17 for the modern and 11.00 profiles — a u32
+	// client version, three u32 asset signatures and a preview byte — and 12 for
+	// 8.60, which reads the signatures itself rather than skipping them.
+	//
+	// This was a bare Skip(13) after an inline GetU32, which is the same 17 bytes
+	// for the modern profile only. Naming it means an 8.60 login on this port is a
+	// visible gap rather than a silent misread.
+	skip := loginBytesToSkipBeforeRSA(ProtocolVersion(version))
+	if r.Remaining() < skip+tibcrypto.BlockSize {
+		c.Logger().Warn("login: packet too short for the RSA block",
+			"version", version, "remaining", r.Remaining(), "need", skip+tibcrypto.BlockSize)
 		return
+	}
+	clientVersion := uint32(0)
+	if skip >= 4 {
+		clientVersion = r.GetU32()
+		r.Skip(skip - 4)
+	} else {
+		r.Skip(skip)
 	}
 	c.Logger().Info("login: parsed prelude", "protoId", protoID, "clientOS", clientOS,
 		"version", version, "clientVersion", clientVersion, "payloadLen", len(body))
@@ -510,4 +527,22 @@ func stripModernPadding(body []byte) ([]byte, bool) {
 		return body, false
 	}
 	return body[1:end], true
+}
+
+// loginBytesToSkipBeforeRSA is AccountLoginLayout::bytesToSkipBeforeRsa
+// (src/server/network/protocol/protocol_profile.cpp:287-325), the pre-RSA
+// metadata each profile carries after the protocol version:
+//
+//	modern / 11.00   17   u32 client version + 3 u32 asset signatures + preview byte
+//	8.60             12   the three signatures, which that profile reads rather
+//	                      than skips so the asset contract can pick the profile
+//
+// The 8.60 case is listed for completeness. Nothing resolves a profile from the
+// signatures here yet, so an 8.60 login on this port gets the right byte count
+// and no profile switch — a gap, but a visible one.
+func loginBytesToSkipBeforeRSA(version ProtocolVersion) int {
+	if version <= VersionCipsoft860 {
+		return 12
+	}
+	return 17
 }
