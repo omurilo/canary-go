@@ -742,8 +742,5 @@ func houseAccessIsOwner(house *game.House, p *game.Player) bool {
 	if house == nil || p == nil {
 		return false
 	}
-	if p.CannotGainInFight() { // the same staff threshold used for the frag rules
-		return true
-	}
-	return house.IsOwner(p.DBID)
+	return house.GetHouseAccessLevel(p) == game.HouseOwner
 }

@@ -346,22 +346,84 @@ func (w *World) GetHouseByDoorID(doorID uint8) *House {
 	return nil
 }
 
-// CanPlayerUseDoor checks if a player can open a house door.
-// The player must be the owner, a sub-owner, or on the guest list.
-func (h *House) CanPlayerUseDoor(p *Player) bool {
+// AccessHouseLevel_t (src/map/map_definitions.hpp:19-22).
+type AccessHouseLevel uint8
+
+const (
+	HouseNotInvited AccessHouseLevel = 0
+	HouseGuest      AccessHouseLevel = 1
+	HouseSubOwner   AccessHouseLevel = 2
+	HouseOwner      AccessHouseLevel = 3
+)
+
+// GetHouseAccessLevel is House::getHouseAccessLevel (src/map/house/house.cpp:
+// 183-211). A nil player is HOUSE_OWNER, as in C++, because the callers that pass
+// nil are the server acting on its own behalf.
+func (h *House) GetHouseAccessLevel(p *Player) AccessHouseLevel {
 	if p == nil {
-		return false
+		return HouseOwner
 	}
-	if h.IsOwner(p.DBID) {
-		return true
+	h.mu.RLock()
+	owner, ownerAccount := h.OwnerID, h.OwnerAccountID
+	h.mu.RUnlock()
+
+	if config.Bool("houseOwnedByAccount", false) && ownerAccount != 0 && ownerAccount == p.AccountID {
+		return HouseOwner
+	}
+	if p.CanEditHouses() {
+		return HouseOwner
+	}
+	if p.DBID == owner {
+		return HouseOwner
 	}
 	if h.IsSubOwner(p.Name) {
-		return true
+		return HouseSubOwner
 	}
 	if h.IsGuest(p.Name) {
-		return true
+		return HouseGuest
 	}
-	return false
+	return HouseNotInvited
+}
+
+// IsInvited is House::isInvited (house.hpp:118).
+func (h *House) IsInvited(p *Player) bool {
+	return h.GetHouseAccessLevel(p) != HouseNotInvited
+}
+
+// CanPlayerUseDoor is Door::canUse (src/map/house/house.cpp:819-829): sub-owner
+// and above always, otherwise the door's OWN access list.
+//
+// That last list is per door, not per house — House::setAccessList routes any
+// list id that is neither GUEST_LIST nor SUBOWNER_LIST to the door with that
+// number. So a plain house guest does not open a door unless that specific door
+// names them, which is upstream behaviour and not an oversight here.
+//
+// game.HouseDoor carries an id, a lock flag and a level, with no list, so the
+// fallback is always empty — the same answer C++ gives for a door nobody has
+// called setAccessList on. Modelling per-door lists would change only the case
+// where a datapack sets one.
+func (h *House) CanPlayerUseDoor(p *Player) bool {
+	if h == nil {
+		return true // Door::canUse returns true for a door with no house.
+	}
+	return h.GetHouseAccessLevel(p) >= HouseSubOwner
+}
+
+// GetDoorHouse returns the house a door at pos belongs to. C++ keeps a back
+// pointer on the Door because House::addDoor sets it from the house's own tiles;
+// here the tile is the association.
+//
+// This replaces a lookup by door id, which could not work: house door ids are
+// numbered per house, so scanning every house for id 1 answered with whichever of
+// the 1086 houses Go's randomised map iteration reached first.
+func (w *World) GetDoorHouse(pos Position) *House {
+	tile := w.Map.GetTile(pos)
+	if tile == nil || tile.HouseID == 0 {
+		return nil
+	}
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.Houses[uint32(tile.HouseID)]
 }
 
 // IsSubOwner checks if a player name is on the sub-owner list.

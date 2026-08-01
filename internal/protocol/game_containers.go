@@ -44,6 +44,19 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		return
 	}
 
+	// Door access comes FIRST, before any action runs — Actions::internalUseItem
+	// opens with it (src/lua/creature/actions.cpp:260-264). The check used to sit
+	// far below, after the Lua-action branch had already returned, so it never ran
+	// for a door: every door in the datapack has an action registered by
+	// custom_door.lua, and locked house doors admitted anyone.
+	if t.IsDoor && pos.X != 0xFFFF {
+		house := g.deps.World.GetDoorHouse(gamePos)
+		if house != nil && !house.CanPlayerUseDoor(g.player) {
+			g.sendCancelMessage("You cannot use this object.")
+			return
+		}
+	}
+
 	// Execute Lua action first
 	action := actions.FindAction(item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
 	if action != nil {
@@ -136,15 +149,10 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 		return
 	}
 
-	// House door access check.
-	if item.Attr != nil && item.Attr.HouseDoorID != nil {
-		doorID := *item.Attr.HouseDoorID
-		house := g.deps.World.GetHouseByDoorID(doorID)
-		if house != nil && !house.CanPlayerUseDoor(g.player) {
-			g.sendStatusText("That is locked.")
-			return
-		}
-	}
+	// (The door access check that used to sit here was unreachable — the Lua-action
+	// branch above returns for every door — and resolved the house by scanning all
+	// of them for a per-house door id. It now runs before the action, keyed on the
+	// tile.)
 
 	// Market (B11) — item ID 12903 in the depot locker.
 	if item.ID == game.ItemMarket {

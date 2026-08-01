@@ -2359,7 +2359,21 @@ func (p *Player) OnReceiveMail() {
 func (p *Player) GetMaxDepotItems() uint32 { return 2000 }
 
 // HasFlag checks if the player has a specific group flag.
+//
+// STUB: always false. groups.xml is not loaded, so no group flag is readable.
+// Anything needing a specific flag has to approximate it from GroupID until the
+// group table exists — see CanEditHouses.
 func (p *Player) HasFlag(flag uint64) bool { return false }
+
+// CanEditHouses stands in for hasFlag(PlayerFlags_t::CanEditHouses), which
+// House::getHouseAccessLevel uses to give staff owner access to any house
+// (src/map/house/house.cpp:194).
+//
+// data/XML/groups.xml grants canedithouses to groups 5 and 6 only — group 4,
+// gamemaster, has it set to 0 (lines 38, 82, 126). Reading GroupID is a stand-in
+// for the flag itself and will be wrong for a server that edits those values;
+// loading groups.xml is the real fix.
+func (p *Player) CanEditHouses() bool { return p != nil && p.GroupID >= 5 }
 
 // SendCancelMessage sends a cancel/error message.
 func (p *Player) SendCancelMessage(msg string) {

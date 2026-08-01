@@ -157,3 +157,67 @@ func TestFormatNumber(t *testing.T) {
 		}
 	}
 }
+
+// Locked house doors admitted anyone. The access check lived after the Lua-action
+// branch in parseUseItem, which returns for every door (custom_door.lua registers
+// an action for all of them), so it never ran — and it resolved the house by
+// scanning all 1086 for a door id that is numbered PER HOUSE, so even when reached
+// it answered with whichever house Go's randomised map iteration hit first.
+func TestDoorAccess(t *testing.T) {
+	w := NewWorld()
+	pos := Position{X: 100, Y: 100, Z: 7}
+	w.Map.SetTile(pos, &Tile{Ground: &Item{ID: 1}, HouseID: 5})
+	h := &House{ID: 5, Name: "Harbour Place 7", HouseTiles: []Position{pos}}
+	w.RegisterHouse(h)
+	w.LookupPlayerAccount = func(uint32) (string, uint32, bool) { return "Owner", 42, true }
+	h.SetOwner(w, 77, false, nil)
+
+	if got := w.GetDoorHouse(pos); got != h {
+		t.Fatalf("the door's house comes from its tile, got %v", got)
+	}
+	if w.GetDoorHouse(Position{X: 500, Y: 500, Z: 7}) != nil {
+		t.Errorf("a tile outside any house must resolve to no house")
+	}
+
+	owner := &Player{Name: "Owner", DBID: 77, GroupID: 1}
+	stranger := &Player{Name: "Stranger", DBID: 78, GroupID: 1}
+	guest := &Player{Name: "Guest", DBID: 79, GroupID: 1}
+	deputy := &Player{Name: "Deputy", DBID: 80, GroupID: 1}
+	gamemaster := &Player{Name: "Gm", DBID: 81, GroupID: 4}
+	god := &Player{Name: "God", DBID: 82, GroupID: 6}
+	h.AddGuest("Guest")
+	h.AddSubOwner("Deputy")
+
+	for _, tc := range []struct {
+		p    *Player
+		want AccessHouseLevel
+	}{
+		{owner, HouseOwner},
+		{stranger, HouseNotInvited},
+		{guest, HouseGuest},
+		{deputy, HouseSubOwner},
+		// groups.xml gives canedithouses to 5 and 6 only; a gamemaster is group 4.
+		{gamemaster, HouseNotInvited},
+		{god, HouseOwner},
+	} {
+		if got := h.GetHouseAccessLevel(tc.p); got != tc.want {
+			t.Errorf("%s has access level %d, want %d", tc.p.Name, got, tc.want)
+		}
+	}
+
+	// Door::canUse: sub-owner and above pass, a plain guest does not.
+	for _, tc := range []struct {
+		p    *Player
+		want bool
+	}{{owner, true}, {deputy, true}, {god, true}, {guest, false}, {stranger, false}} {
+		if got := h.CanPlayerUseDoor(tc.p); got != tc.want {
+			t.Errorf("CanPlayerUseDoor(%s) = %v, want %v", tc.p.Name, got, tc.want)
+		}
+	}
+
+	// A door with no house is usable by anyone (house.cpp:820-822).
+	var noHouse *House
+	if !noHouse.CanPlayerUseDoor(stranger) {
+		t.Errorf("a door outside any house must open for anyone")
+	}
+}
