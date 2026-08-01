@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,13 +23,13 @@ const (
 
 // BidErrorMessage codes for house auction.
 const (
-	BidErrNoError        = 0
-	BidErrRookgaard      = 3
-	BidErrPremium        = 5
-	BidErrGuildhall      = 6
-	BidErrOnlyOneBid     = 7
-	BidErrNotEnoughMoney = 17
-	BidErrInternal       = 24
+	BidErrNoError           = 0
+	BidErrRookgaard         = 3
+	BidErrPremium           = 5
+	BidErrGuildhall         = 6
+	BidErrOnlyOneBid        = 7
+	BidErrNotEnoughMoney    = 17
+	BidErrInternal          = 24
 	BidErrCharacterNotFound = 4
 )
 
@@ -382,15 +383,42 @@ func (g *GameProtocol) sendCyclopediaHouseList(townName string) {
 
 	slog.Default().Info("house: filtered by town", "matched", len(townHouses), "total", len(world.Houses))
 
+	// C++ collects these into a std::map<clientId, house>
+	// (game.cpp:12743), which does three things this loop has to reproduce:
+	// key by clientId, DE-DUPLICATE on it, and emit in ascending order.
+	//
+	// Go was ranging a Go map, so the order was different on every request, and
+	// houses sharing a clientId were all sent. otservbr-house.xml gives 102 of its
+	// 1029 houses clientid="0" — 69 of them in Thais alone — so that town went out
+	// with 69 entries the client cannot tell apart instead of the one upstream
+	// sends.
+	byClientID := make(map[uint32]*game.House, len(townHouses))
+	for _, h := range townHouses {
+		if _, seen := byClientID[h.ClientID]; !seen {
+			byClientID[h.ClientID] = h
+		}
+	}
+	clientIDs := make([]uint32, 0, len(byClientID))
+	for id := range byClientID {
+		clientIDs = append(clientIDs, id)
+	}
+	sort.Slice(clientIDs, func(i, j int) bool { return clientIDs[i] < clientIDs[j] })
+
 	w := netmsg.NewWriter()
 	w.AddByte(0xC7)
-	w.AddU16(uint16(len(townHouses)))
+	w.AddU16(uint16(len(clientIDs)))
 
-	for _, h := range townHouses {
-		clientID := h.ClientID
-		if clientID == 0 {
-			clientID = h.ID
-		}
+	for _, clientID := range clientIDs {
+		h := byClientID[clientID]
+		// No fallback to the house id. 0xC6 advertises getClientId() with no
+		// fallback (protocolgame.cpp:12026), so substituting the house id here sent
+		// the client a number it was never told about — it cannot resolve a name,
+		// a town or an owner for it, because the client resolves all of those from
+		// the clientId against its own house data. The server never sends a house
+		// name at all.
+		//
+		// A clientId of 0 therefore renders as nothing. That is a hole in the
+		// datapack, not something the protocol can paper over.
 		w.AddU32(clientID)
 		w.AddByte(0x01) // Category: Available for rent
 
@@ -508,9 +536,9 @@ func (g *GameProtocol) sendHousesInfo() {
 	w.AddU32(houseClientID)
 	w.AddByte(0x00) // padding
 	w.AddByte(accountHouseCount)
-	w.AddByte(0)  // accountHighscoreCount
-	w.AddByte(3)  // premiumForHouseHighscore
-	w.AddByte(3)  // maxHouseHighscore
+	w.AddByte(0)    // accountHighscoreCount
+	w.AddByte(3)    // premiumForHouseHighscore
+	w.AddByte(3)    // maxHouseHighscore
 	w.AddByte(0x01) // ownedHouseCountSameAccount
 	w.AddByte(0x01) // ownedHouseCount
 	w.AddU32(houseClientID)

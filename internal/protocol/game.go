@@ -331,6 +331,34 @@ func (g *GameProtocol) isOTC() bool {
 	return g.clientOS >= clientOSOTClientLinux
 }
 
+// otcCoinBalanceMinVersion is the version at which OTC changed the shape it reads
+// for 0xF2 (otclient/src/client/protocolgameparse.cpp:979).
+const otcCoinBalanceMinVersion = 1291
+
+// isOTCCoinBalanceExtended reports whether this client reads the long form of
+// 0xF2: action, two spare bytes, then the coin totals.
+//
+// This is a DELIBERATE DIVERGENCE from upstream, which sends two bytes and
+// nothing else (protocolgame.cpp:6704-6707). OTC's parseCoinBalanceUpdating
+// switches on its OWN version — `g_game.getClientVersion() >= 1291` — and is not
+// gated on any negotiated feature, so against upstream Canary an OTC client at
+// 1291 or later reads off the end of the frame at login:
+//
+//	parse message exception (9 bytes, 0 unread at pos 9, last opcode: 0xF2 (242)):
+//	InputMessage eof reached
+//
+// The exception aborts the rest of that message, which is why the cyclopedia
+// town list never arrived. Upstream is simply wrong for this client; matching it
+// byte for byte would mean shipping a login that breaks.
+//
+// The OS test narrows it to OTC derivatives so an official client at the same
+// protocol version, which reads the short form, is untouched. It deliberately
+// does not use isOTCR: the long 0xF2 needs no 0x43 negotiation, and the creature
+// shader bytes do.
+func (g *GameProtocol) isOTCCoinBalanceExtended() bool {
+	return g.isOTC() && g.ClientVersion() >= otcCoinBalanceMinVersion
+}
+
 // isOTCR reports whether this session may write the OTCR protocol extensions: the
 // shader name and attached-effect list appended to AddCreature
 // (protocolgame.cpp:9659), the shader appended to AddItem, and the custom outfit
@@ -350,8 +378,19 @@ func (g *GameProtocol) isOTC() bool {
 // tile. A stock Tibia client dies on it during the enterWorld frame, before it can
 // draw the map; OTClient logs the damage and limps on.
 //
-// Whoever ports sendOTCRFeatures flips this to a field set by it — never to a test
-// on the operating system, which says what the client IS, not what it was told.
+// Whoever ports sendOTCRFeatures flips this to a field set by it.
+//
+// An earlier version of this comment claimed upstream does not derive the flag
+// from the operating system. It does: sendClientLoginPreamble
+// (protocolgame.cpp:12236-12239) calls sendOTCRFeatures for every client at
+// CLIENTOS_OTCLIENT_LINUX or above. The distinction that matters is narrower —
+// sendOTCRFeatures sets the flag AND sends the 0x43 that enables the features
+// client-side, so the two are inseparable. Go may not set the flag while it
+// still does not send 0x43, because the client would not read the extra bytes.
+// That is a reason to port 0x43, not a reason the OS is the wrong signal.
+//
+// Anything gated purely on the client's own version rather than on 0x43 must
+// therefore NOT use this predicate — see isOTCCoinBalanceExtended.
 // ClientOS is the OperatingSystem_t the client announced. Player:getClient()
 // reports it to Lua, which is how the datapack branches on client family — C++
 // returns player->getOperatingSystem() from the same binding.
@@ -662,10 +701,16 @@ func (g *GameProtocol) sendCoinBalance() {
 	//
 	// and an exception thrown mid-parse takes the rest of that message with it,
 	// which is why the cyclopedia town list never arrived on OTCR.
+	extended := g.isOTCCoinBalanceExtended()
+	if g.deps != nil && g.deps.Log != nil {
+		g.deps.Log.Info("coin balance 0xF2", "player", g.player.Name,
+			"clientOS", g.clientOS, "clientVersion", g.ClientVersion(), "extended", extended)
+	}
+
 	w1 := netmsg.NewWriter()
 	w1.AddByte(0xF2)
 	w1.AddByte(0x01) // action: updating
-	if g.isOTCR() {
+	if extended {
 		w1.AddByte(0)
 		w1.AddByte(0)
 		w1.AddU32(total)
