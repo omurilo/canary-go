@@ -343,9 +343,20 @@ func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 		p.disconnect(c, "Unable to load your characters.")
 		return
 	}
-	p.sendMOTD(c)
-	p.sendSessionKey(c, account, password)
-	p.sendCharacterList(c, acc, chars)
+	// ONE message carrying all three parts, as getCharacterList does
+	// (protocollogin.cpp:60-148: a single OutputMessage, one send() at the end).
+	//
+	// These used to be three separate sends, and the client only ever saw the
+	// first: ProtocolLogin:onRecv drains the opcodes of one message and then
+	// calls self:disconnect() unconditionally
+	// (otclient/modules/gamelib/protocollogin.lua:156-186). With a MOTD
+	// configured the client read the MOTD, hung up, and never received the
+	// character list — login "worked" and the list was empty.
+	w := netmsg.NewWriter()
+	p.writeMOTD(w)
+	p.writeSessionKey(w, account, password)
+	p.writeCharacterList(w, acc, chars)
+	_ = c.Send(w)
 	c.Close()
 }
 func (p *LoginProtocol) disconnect(c *network.Connection, msg string) {
@@ -355,23 +366,18 @@ func (p *LoginProtocol) disconnect(c *network.Connection, msg string) {
 	_ = c.Send(w)
 	c.Close()
 }
-func (p *LoginProtocol) sendMOTD(c *network.Connection) {
+func (p *LoginProtocol) writeMOTD(w *netmsg.Writer) {
 	if p.deps.Cfg.MOTD == "" {
 		return
 	}
-	w := netmsg.NewWriter()
 	w.AddByte(opLoginMOTD)
 	w.AddString(fmt.Sprintf("1\n%s", p.deps.Cfg.MOTD))
-	_ = c.Send(w)
 }
-func (p *LoginProtocol) sendSessionKey(c *network.Connection, account, password string) {
-	w := netmsg.NewWriter()
+func (p *LoginProtocol) writeSessionKey(w *netmsg.Writer, account, password string) {
 	w.AddByte(opLoginSessionKey)
 	w.AddString(account + "\n" + password)
-	_ = c.Send(w)
 }
-func (p *LoginProtocol) sendCharacterList(c *network.Connection, acc *db.Account, chars []db.Character) {
-	w := netmsg.NewWriter()
+func (p *LoginProtocol) writeCharacterList(w *netmsg.Writer, acc *db.Account, chars []db.Character) {
 	w.AddByte(opLoginCharList)
 	// Worlds list (single world).
 	w.AddByte(1) // number of worlds
@@ -408,7 +414,6 @@ func (p *LoginProtocol) sendCharacterList(c *network.Connection, acc *db.Account
 	w.AddByte(byte(premTrunc))
 	w.AddByte(isPremium)
 	w.AddU32(premLastDay)
-	_ = c.Send(w)
 }
 
 // stripLoginFraming removes the outer 2-byte header from a first login packet
