@@ -132,10 +132,42 @@ for lua_name, sym in regs:
         resolved[lua_name] = val
 
 # ---- 4. diff against Go ----------------------------------------------------
-go = open("/Users/murilo.alves/projects/personal/canary/canary-go/internal/luaengine/enums.go").read()
-have = set(re.findall(r'"([A-Za-z][\w]*)"\s*:', go))
+# All three registration files, not just enums.go: enums_generated.go alone holds
+# ~918 of them, so reading one file reported ~900 phantom "missing" enums and sent
+# at least one session off to re-add globals that were already there.
+GO_DIR = "/Users/murilo.alves/projects/personal/canary/canary-go/internal/luaengine/"
+have = {}
+for fname in ("enums.go", "enums_generated.go", "enums_spells.go"):
+    try:
+        src = open(GO_DIR + fname).read()
+    except FileNotFoundError:
+        continue
+    # The value may be an expression (`1 << 3`), so capture to the comma and
+    # evaluate; a name already seen with a real value is not overwritten.
+    for m in re.finditer(r'"([A-Za-z]\w*)"\s*:\s*([^,\n]+),', src):
+        name, raw = m.group(1), m.group(2).strip()
+        try:
+            v = eval(raw, {"__builtins__": {}}, {})
+            v = int(v)
+        except Exception:
+            v = None
+        if have.get(name) is None:
+            have[name] = v
 
 missing = {k: v for k, v in resolved.items() if k not in have}
+
+# A wrong value is worse than a missing one: a missing global is nil and tends to
+# blow up, a wrong one is silently obeyed.
+mismatched = {}
+for k, v in resolved.items():
+    if have.get(k) is None:
+        continue
+    try:
+        cv = int(v)
+    except (TypeError, ValueError):
+        continue
+    if have[k] != cv:
+        mismatched[k] = {"go": have[k], "cpp": cv}
 
 print(f"registered in C++      : {len(regs)}")
 print(f"distinct lua names     : {len(set(n for n, _ in regs))}")
@@ -143,7 +175,11 @@ print(f"values resolved        : {len(resolved)}")
 print(f"unresolved             : {len(unresolved)}")
 print(f"already in Go          : {len(have)}")
 print(f"missing from Go        : {len(missing)}")
-json.dump({"missing": missing, "unresolved": unresolved, "resolved": resolved},
+print(f"VALUE MISMATCHES       : {len(mismatched)}")
+json.dump({"missing": missing, "mismatched": mismatched,
+           "unresolved": unresolved, "resolved": resolved},
           open(sys.argv[1] if len(sys.argv) > 1 else "/tmp/enums.json", "w"), indent=1)
+for k, d in sorted(mismatched.items())[:20]:
+    print(f"  MISMATCH: {k:<40} Go={d['go']:<12} C++={d['cpp']}")
 for n, s in unresolved[:15]:
     print("  unresolved:", n, "<-", s)
