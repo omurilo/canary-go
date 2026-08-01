@@ -359,10 +359,20 @@ func (g *GameProtocol) sendCyclopediaHouseList(townName string) {
 	slog.Default().Info("house: sendCyclopediaHouseList start",
 		"worldHouses", len(world.Houses), "townName", townName)
 
-	// Filter houses by the requested town name (case-insensitive).
+	// An EMPTY town name is not "match no town" — it is the request for the
+	// player's OWN houses (Game::playerCyclopediaHousesByTown, game.cpp:12732-12752
+	// branches on townName.empty() and calls getAllHousesByPlayerId). Filtering by
+	// "" matched nothing, which is why the cyclopedia never listed a single house
+	// of yours.
 	var townHouses []*game.House
 	for _, h := range world.Houses {
-		if h == nil || townName == "" {
+		if h == nil {
+			continue
+		}
+		if townName == "" {
+			if h.OwnerID == g.player.DBID {
+				townHouses = append(townHouses, h)
+			}
 			continue
 		}
 		if name, ok := world.TownNames[h.TownID]; ok && strings.EqualFold(name, townName) {
@@ -409,8 +419,8 @@ func (g *GameProtocol) sendCyclopediaHouseList(townName string) {
 		} else if h.TransferToName != "" {
 			// Transfer state
 			w.AddByte(HouseStateTransfer)
-			w.AddString("") // ownerName (optional)
-			w.AddU32(0)     // paidUntil
+			w.AddString(g.houseOwnerName(h))
+			w.AddU32(uint32(h.PaidUntil))
 			isOwner := byte(0)
 			if h.OwnerID == g.player.DBID {
 				isOwner = 1
@@ -437,15 +447,23 @@ func (g *GameProtocol) sendCyclopediaHouseList(townName string) {
 				w.AddByte(0) // cancelAvailable
 			}
 		} else {
-			// Rented state
+			// Rented state (protocolgame.cpp:11923-11933).
 			w.AddByte(HouseStateRented)
-			w.AddString("") // ownerName
-			w.AddU32(0)     // paidUntil
+			w.AddString(g.houseOwnerName(h))
+			w.AddU32(uint32(h.PaidUntil))
 			isOwner := byte(0)
 			if h.OwnerID == g.player.DBID {
 				isOwner = 1
 			}
 			w.AddByte(isOwner)
+			// C++ writes two more bytes when the house is the reader's own. They were
+			// missing, so every frame containing a house you rent ended two bytes
+			// short and the client ran off the end of it — opening the Thais list,
+			// 201 houses including one of mine, dropped the connection.
+			if isOwner == 1 {
+				w.AddByte(0)
+				w.AddByte(0)
+			}
 		}
 	}
 
@@ -519,4 +537,25 @@ func (g *GameProtocol) sendHousesInfo() {
 		"totalHouses", len(world.Houses))
 	g.SendToClient(w)
 	g.sendResourceBalances()
+}
+
+// houseOwnerName is IOLoginData::getNameByGuid for a house's owner
+// (protocolgame.cpp:11924). The list used to send an empty string here, so no
+// house ever showed who rented it — including the reader's own.
+//
+// House.OwnerName is filled at load and by setOwner; the world lookup is the
+// fallback for a house whose row was written by something else.
+func (g *GameProtocol) houseOwnerName(h *game.House) string {
+	if h == nil || h.OwnerID == 0 {
+		return ""
+	}
+	if h.OwnerName != "" {
+		return h.OwnerName
+	}
+	if g.deps.World != nil && g.deps.World.LookupPlayerAccount != nil {
+		if name, _, ok := g.deps.World.LookupPlayerAccount(h.OwnerID); ok {
+			return name
+		}
+	}
+	return ""
 }
