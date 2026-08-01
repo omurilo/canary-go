@@ -1,9 +1,9 @@
 package luaengine
 
 import (
-	lua "github.com/yuin/gopher-lua"
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
+	lua "github.com/yuin/gopher-lua"
 )
 
 func checkMonster(L *lua.LState) *game.Monster {
@@ -54,56 +54,56 @@ func (e *Engine) registerMonster() {
 }
 
 var monsterMethods = map[string]lua.LGFunction{
-	"isMonster": monsterIsmonster,
-	"getType": monsterGettype,
-	"setType": monsterSettype,
-	"getSpawnPosition": monsterGetspawnposition,
-	"isInSpawnRange": monsterIsinspawnrange,
-	"isIdle": monsterIsidle,
-	"setIdle": monsterSetidle,
-	"isTarget": monsterIstarget,
-	"isOpponent": monsterIsopponent,
-	"isFriend": monsterIsfriend,
-	"addFriend": monsterAddfriend,
-	"removeFriend": monsterRemovefriend,
-	"getFriendList": monsterGetfriendlist,
-	"getFriendCount": monsterGetfriendcount,
-	"addTarget": monsterAddtarget,
-	"removeTarget": monsterRemovetarget,
-	"getTargetList": monsterGettargetlist,
-	"getTargetCount": monsterGettargetcount,
-	"changeTargetDistance": monsterChangetargetdistance,
-	"isChallenged": monsterIschallenged,
-	"selectTarget": monsterSelecttarget,
-	"searchTarget": monsterSearchtarget,
-	"setSpawnPosition": monsterSetspawnposition,
-	"getRespawnType": monsterGetrespawntype,
-	"getTimeToChangeFiendish": monsterGettimetochangefiendish,
-	"setTimeToChangeFiendish": monsterSettimetochangefiendish,
+	"isMonster":                     monsterIsmonster,
+	"getType":                       monsterGettype,
+	"setType":                       monsterSettype,
+	"getSpawnPosition":              monsterGetspawnposition,
+	"isInSpawnRange":                monsterIsinspawnrange,
+	"isIdle":                        monsterIsidle,
+	"setIdle":                       monsterSetidle,
+	"isTarget":                      monsterIstarget,
+	"isOpponent":                    monsterIsopponent,
+	"isFriend":                      monsterIsfriend,
+	"addFriend":                     monsterAddfriend,
+	"removeFriend":                  monsterRemovefriend,
+	"getFriendList":                 monsterGetfriendlist,
+	"getFriendCount":                monsterGetfriendcount,
+	"addTarget":                     monsterAddtarget,
+	"removeTarget":                  monsterRemovetarget,
+	"getTargetList":                 monsterGettargetlist,
+	"getTargetCount":                monsterGettargetcount,
+	"changeTargetDistance":          monsterChangetargetdistance,
+	"isChallenged":                  monsterIschallenged,
+	"selectTarget":                  monsterSelecttarget,
+	"searchTarget":                  monsterSearchtarget,
+	"setSpawnPosition":              monsterSetspawnposition,
+	"getRespawnType":                monsterGetrespawntype,
+	"getTimeToChangeFiendish":       monsterGettimetochangefiendish,
+	"setTimeToChangeFiendish":       monsterSettimetochangefiendish,
 	"getMonsterForgeClassification": monsterGetmonsterforgeclassification,
 	"setMonsterForgeClassification": monsterSetmonsterforgeclassification,
-	"getForgeStack": monsterGetforgestack,
-	"setForgeStack": monsterSetforgestack,
-	"configureForgeSystem": monsterConfigureforgesystem,
-	"clearFiendishStatus": monsterClearfiendishstatus,
-	"isForgeable": monsterIsforgeable,
-	"getName": monsterGetname,
-	"setName": monsterSetname,
-	"hazard": monsterHazard,
-	"hazardCrit": monsterHazardcrit,
-	"hazardDodge": monsterHazarddodge,
-	"hazardDamageBoost": monsterHazarddamageboost,
-	"hazardDefenseBoost": monsterHazarddefenseboost,
-	"soulPit": monsterSoulpit,
-	"addReflectElement": monsterAddreflectelement,
-	"addDefense": monsterAdddefense,
-	"getDefense": monsterGetdefense,
-	"isDead": monsterIsdead,
-	"immune": monsterImmune,
-	"criticalChance": monsterCriticalchance,
-	"criticalDamage": monsterCriticaldamage,
-	"addAttackSpell": monsterAddattackspell,
-	"addDefenseSpell": monsterAdddefensespell,
+	"getForgeStack":                 monsterGetforgestack,
+	"setForgeStack":                 monsterSetforgestack,
+	"configureForgeSystem":          monsterConfigureforgesystem,
+	"clearFiendishStatus":           monsterClearfiendishstatus,
+	"isForgeable":                   monsterIsforgeable,
+	"getName":                       monsterGetname,
+	"setName":                       monsterSetname,
+	"hazard":                        monsterHazard,
+	"hazardCrit":                    monsterHazardcrit,
+	"hazardDodge":                   monsterHazarddodge,
+	"hazardDamageBoost":             monsterHazarddamageboost,
+	"hazardDefenseBoost":            monsterHazarddefenseboost,
+	"soulPit":                       monsterSoulpit,
+	"addReflectElement":             monsterAddreflectelement,
+	"addDefense":                    monsterAdddefense,
+	"getDefense":                    monsterGetdefense,
+	"isDead":                        monsterIsdead,
+	"immune":                        monsterImmune,
+	"criticalChance":                monsterCriticalchance,
+	"criticalDamage":                monsterCriticaldamage,
+	"addAttackSpell":                monsterAddattackspell,
+	"addDefenseSpell":               monsterAdddefensespell,
 }
 
 func monsterAddattackspell(L *lua.LState) int {
@@ -193,8 +193,13 @@ func monsterChangetargetdistance(L *lua.LState) int {
 		return 0
 	}
 	distance := int32(L.CheckNumber(2))
+	// monster:changeTargetDistance(distance[, duration = 12000])
+	duration := 0
+	if L.GetTop() >= 3 {
+		duration = int(L.CheckNumber(3))
+	}
 	game.GlobalDispatcher.AddEvent(0, func() {
-		m.ChangeTargetDistance(distance)
+		m.ChangeTargetDistance(distance, duration)
 	})
 	return 0
 }
@@ -717,4 +722,3 @@ func monsterSoulpit(L *lua.LState) int {
 	}
 	return 1
 }
-

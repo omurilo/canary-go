@@ -183,7 +183,7 @@ func TestPushItemLocationOptionsAreSideways(t *testing.T) {
 		DirSW:    {{0, 1}, {-1, 0}},
 	}
 	for dir, want := range cases {
-		got := pushItemLocationOptions(dir)
+		got := getPushItemLocationOptions(dir)
 		if len(got) != len(want) {
 			t.Errorf("%v: got %v, want %v", dir, got, want)
 			continue

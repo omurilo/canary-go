@@ -392,7 +392,7 @@ func (m *Monster) IsTargetNearby() bool { return m.stepDuration >= 1 }
 // (monster.cpp:3948): where a blocking item may be shoved, given the direction
 // the monster is walking. Always sideways relative to the movement, never into
 // the monster's own path.
-func pushItemLocationOptions(dir Direction) [][2]int {
+func getPushItemLocationOptions(dir Direction) [][2]int {
 	switch dir {
 	case DirWest, DirEast:
 		return [][2]int{{0, -1}, {0, 1}}
@@ -420,7 +420,7 @@ func (m *Monster) pushItem(w *World, from Position, item *Item, dir Direction) b
 	if fromTile == nil || fromTile.HouseID != 0 {
 		return false
 	}
-	for _, off := range pushItemLocationOptions(dir) {
+	for _, off := range getPushItemLocationOptions(dir) {
 		to := Position{X: uint16(int(from.X) + off[0]), Y: uint16(int(from.Y) + off[1]), Z: from.Z}
 		toTile := w.Map.GetTile(to)
 		if toTile == nil || !w.CanThrowObjectTo(from, to, true, true, MaxClientViewportX, MaxClientViewportY) {
@@ -553,9 +553,9 @@ func (m *Monster) GetNextStep(w *World) (Direction, bool) {
 	var ok bool
 	switch {
 	case m.GetTarget() != nil:
-		dir, ok = m.followStep(w)
+		dir, ok = m.doFollowCreature(w)
 	case m.walkingBack:
-		dir, ok = m.walkBackStep(w)
+		dir, ok = m.doWalkBack(w)
 	default:
 		dir, ok = m.GetRandomStep(w, m.GetPosition())
 	}
@@ -588,7 +588,7 @@ func (m *Monster) GetNextStep(w *World) (Direction, bool) {
 //
 // staticAttackChance is what keeps a caster planted: rolled against 1..100, a
 // chance of 100 never dances.
-func (m *Monster) followStep(w *World) (Direction, bool) {
+func (m *Monster) doFollowCreature(w *World) (Direction, bool) {
 	target := m.GetTarget()
 	if target == nil {
 		return DirNorth, false
@@ -612,14 +612,14 @@ func (m *Monster) followStep(w *World) (Direction, bool) {
 	}
 
 	if m.IsFleeing() {
-		return m.DanceStep(w, false, false)
+		return m.GetDanceStep(w, false, false)
 	}
 	static := 0
 	if m.Type != nil {
 		static = m.Type.Flags.StaticAttackChance
 	}
 	if static < rand.Intn(100)+1 {
-		return m.DanceStep(w, true, true)
+		return m.GetDanceStep(w, true, true)
 	}
 	return DirNorth, false
 }
@@ -627,7 +627,7 @@ func (m *Monster) followStep(w *World) (Direction, bool) {
 // walkBackStep is Monster::doWalkBack (monster.cpp:2500). Reaching the spawn
 // clears the flag; failing to find a path clears it too, so the monster stops
 // trying rather than standing still forever.
-func (m *Monster) walkBackStep(w *World) (Direction, bool) {
+func (m *Monster) doWalkBack(w *World) (Direction, bool) {
 	pos := m.GetPosition()
 	if pos == m.SpawnPosition {
 		m.walkingBack = false

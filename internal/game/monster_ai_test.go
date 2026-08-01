@@ -177,7 +177,7 @@ func TestDanceStep(t *testing.T) {
 	w.AddPlayer(victim, nil)
 	m.SetTarget(victim)
 
-	dir, ok := m.DanceStep(w, true, true)
+	dir, ok := m.GetDanceStep(w, true, true)
 	if !ok {
 		t.Fatalf("at its fighting distance the monster should have somewhere to dance")
 	}
@@ -188,7 +188,7 @@ func TestDanceStep(t *testing.T) {
 
 	// Standing closer than targetDistance: no dancing.
 	m.SetPosition(Position{X: 101, Y: 100, Z: 7})
-	if _, ok := m.DanceStep(w, true, true); ok {
+	if _, ok := m.GetDanceStep(w, true, true); ok {
 		t.Errorf("a monster inside its fighting distance must not dance, it must back off")
 	}
 }

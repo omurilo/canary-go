@@ -36,6 +36,11 @@ func (e *AIEngine) updateAI() {
 			continue
 		}
 
+		// Monster::onThink runs the challenge timer first, so a monster dragged
+		// into melee is back at its own fighting distance on the tick the
+		// challenge lapses rather than one tick later (monster.cpp:1608-1615).
+		monster.tickChallenge(e.world, interval)
+
 		// The Monster::onThink timers (monster.cpp:2140-2310). They run before
 		// anything else and regardless of whether the monster has a target — a
 		// monster yells at an empty room and a summoner keeps its summons up

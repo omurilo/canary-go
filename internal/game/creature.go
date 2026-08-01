@@ -11,7 +11,6 @@ type Creature interface {
 	AddHealth(amount int32)
 	GetTarget() Creature
 	SetTarget(target Creature)
-	ChangeTargetDistance(distance int32)
 	GetPosition() Position
 	SetPosition(pos Position)
 	GetDirection() Direction
@@ -31,13 +30,13 @@ type BaseCreature struct {
 	conditionStore
 	damageTracker
 
-	World     *World
-	ID        uint32
-	Name      string
-	Health    uint32
-	MaxHealth uint32
-	Mana      uint32
-	MaxMana   uint32
+	World      *World
+	ID         uint32
+	Name       string
+	Health     uint32
+	MaxHealth  uint32
+	Mana       uint32
+	MaxMana    uint32
 	Target     Creature
 	Pos        Position
 	Direction  Direction
@@ -52,9 +51,9 @@ type BaseCreature struct {
 
 func (c *BaseCreature) GetShader() string            { return c.Shader }
 func (c *BaseCreature) GetAttachedEffects() []uint16 { return c.AttachedEffects }
-func (c *BaseCreature) GetID() uint32 { return c.ID }
-func (c *BaseCreature) GetName() string { return c.Name }
-func (c *BaseCreature) GetHealth() uint32 { return c.Health }
+func (c *BaseCreature) GetID() uint32                { return c.ID }
+func (c *BaseCreature) GetName() string              { return c.Name }
+func (c *BaseCreature) GetHealth() uint32            { return c.Health }
 func (c *BaseCreature) SetHealth(health uint32) {
 	c.Health = health
 	if c.Health > c.MaxHealth {
@@ -77,30 +76,31 @@ func (c *BaseCreature) AddHealth(amount int32) {
 		}
 	}
 }
-func (c *BaseCreature) GetTarget() Creature { return c.Target }
-func (c *BaseCreature) SetTarget(target Creature) { c.Target = target }
-func (c *BaseCreature) ChangeTargetDistance(distance int32) {
-	// Logic to change target distance
-}
-func (c *BaseCreature) GetPosition() Position { return c.Pos }
-func (c *BaseCreature) SetPosition(pos Position) { c.Pos = pos }
-func (c *BaseCreature) GetDirection() Direction { return c.Direction }
+func (c *BaseCreature) GetTarget() Creature        { return c.Target }
+func (c *BaseCreature) SetTarget(target Creature)  { c.Target = target }
+func (c *BaseCreature) GetPosition() Position      { return c.Pos }
+func (c *BaseCreature) SetPosition(pos Position)   { c.Pos = pos }
+func (c *BaseCreature) GetDirection() Direction    { return c.Direction }
 func (c *BaseCreature) SetDirection(dir Direction) { c.Direction = dir }
-func (c *BaseCreature) GetOutfit() Outfit { return c.Outfit }
-func (c *BaseCreature) GetLightLevel() uint8 { return c.LightLevel }
-func (c *BaseCreature) GetLightColor() uint8 { return c.LightColor }
-func (c *BaseCreature) GetSpeed() uint16 { return c.Speed }
-func (c *BaseCreature) GetBaseSpeed() uint16 { return c.Speed }
+func (c *BaseCreature) GetOutfit() Outfit          { return c.Outfit }
+func (c *BaseCreature) GetLightLevel() uint8       { return c.LightLevel }
+func (c *BaseCreature) GetLightColor() uint8       { return c.LightColor }
+func (c *BaseCreature) GetSpeed() uint16           { return c.Speed }
+func (c *BaseCreature) GetBaseSpeed() uint16       { return c.Speed }
 func (c *BaseCreature) ChangeSpeed(delta int32) {
 	// Base creatures don't have SpeedBonus logic yet, just adjust Speed directly
 	speed := int32(c.Speed) + delta
-	if speed < 0 { speed = 0 }
-	if speed > 0xFFFF { speed = 0xFFFF }
+	if speed < 0 {
+		speed = 0
+	}
+	if speed > 0xFFFF {
+		speed = 0xFFFF
+	}
 	c.Speed = uint16(speed)
 }
 func (c *BaseCreature) GetCreatureType() uint8 { return 0 } // Player by default
 
-func (c *BaseCreature) GetArmor() int32 { return 0 }
+func (c *BaseCreature) GetArmor() int32   { return 0 }
 func (c *BaseCreature) GetDefense() int32 { return 0 }
 
 // GetMana/GetMaxMana/AddMana provide the mana accessors the combat adapter
@@ -133,4 +133,3 @@ func (c *BaseCreature) AddCondition(cond combat.Condition) {
 func (c *BaseCreature) TickConditions(interval int32) {
 	c.conditionStore.ExecuteConditions(adaptCreature(c), interval)
 }
-

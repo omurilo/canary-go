@@ -55,6 +55,13 @@ type Monster struct {
 	// randomStepping distinguishes a monster wandering from one following, so a
 	// wandering monster is not treated as having a path.
 	randomStepping bool
+	// ignoreFieldDamage is set while a monster is walking a path that crosses a
+	// magic field, and cleared the moment the path runs out. It is what lets a
+	// monster follow a player through its own fire wall.
+	ignoreFieldDamage bool
+	// challengeFocusDuration's melee sibling: while it runs, targetDistance is
+	// forced to melee range by a challenge, and getIcons shows the icon.
+	challengeMeleeDuration int
 
 	// Type is the shared, immutable monster definition (attacks, loot,
 	// experience, flags). May be nil for synthetic/test monsters.
@@ -143,10 +150,6 @@ func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {
 		Type:           mType,
 		spellCooldowns: make(map[string]int64),
 	}
-}
-
-func (m *Monster) ChangeTargetDistance(distance int32) {
-	m.TargetDistance = distance
 }
 
 func (m *Monster) GetCreatureType() uint8 { return 1 } // CREATURETYPE_MONSTER

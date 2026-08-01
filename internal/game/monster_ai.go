@@ -190,7 +190,7 @@ func (m *Monster) SearchTarget(w *World, t TargetSearchType) bool {
 // closing in, which is how a fleeing monster backs away instead of circling.
 // A monster nearer than its targetDistance does not dance at all — it needs to
 // back off first.
-func (m *Monster) DanceStep(w *World, keepAttack, keepDistance bool) (Direction, bool) {
+func (m *Monster) GetDanceStep(w *World, keepAttack, keepDistance bool) (Direction, bool) {
 	target := m.GetTarget()
 	if target == nil || w == nil {
 		return DirNorth, false
@@ -269,7 +269,7 @@ func (m *Monster) FleeStep(w *World) (Direction, bool) {
 			return StepDirection(pos, away), true
 		}
 	}
-	return m.DanceStep(w, false, false)
+	return m.GetDanceStep(w, false, false)
 }
 
 func sign(v int) int {
