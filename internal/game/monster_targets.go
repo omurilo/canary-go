@@ -105,32 +105,214 @@ func playerBehind(c Creature) *Player {
 	return nil
 }
 
-// UpdateTargetList rebuilds both lists from who is currently on screen. It is
-// Monster::updateTargetList (monster.cpp:734) plus the onCreatureEnter path that
-// fills them, collapsed into one pass.
+// AddTarget is Monster::addTarget (monster.cpp:676). Adding the monster to its
+// own target list is a bug upstream logs rather than tolerates.
+func (m *Monster) AddTarget(c Creature) bool {
+	if c == nil || c.GetID() == m.GetID() {
+		return false
+	}
+	if m.Targets == nil {
+		m.Targets = make(map[uint32]Creature)
+	}
+	if _, exists := m.Targets[c.GetID()]; exists {
+		return false
+	}
+	m.Targets[c.GetID()] = c
+	return true
+}
+
+// RemoveTarget is Monster::removeTarget (monster.cpp:709).
+func (m *Monster) RemoveTarget(c Creature) bool {
+	if c == nil || m.Targets == nil {
+		return false
+	}
+	if _, exists := m.Targets[c.GetID()]; !exists {
+		return false
+	}
+	delete(m.Targets, c.GetID())
+	return true
+}
+
+// AddFriend is Monster::addFriend (monster.cpp:651).
+func (m *Monster) AddFriend(c Creature) bool {
+	if c == nil || c.GetID() == m.GetID() {
+		return false
+	}
+	if m.Friends == nil {
+		m.Friends = make(map[uint32]Creature)
+	}
+	if _, exists := m.Friends[c.GetID()]; exists {
+		return false
+	}
+	m.Friends[c.GetID()] = c
+	return true
+}
+
+// RemoveFriend is Monster::removeFriend (monster.cpp:661).
+func (m *Monster) RemoveFriend(c Creature) bool {
+	if c == nil || m.Friends == nil {
+		return false
+	}
+	if _, exists := m.Friends[c.GetID()]; !exists {
+		return false
+	}
+	delete(m.Friends, c.GetID())
+	return true
+}
+
+// ClearTargetList is Monster::clearTargetList (monster.cpp:771).
+func (m *Monster) ClearTargetList() { m.Targets = nil }
+
+// ClearFriendList is Monster::clearFriendList (monster.cpp:779).
+func (m *Monster) ClearFriendList() { m.Friends = nil }
+
+// IsTarget is Monster::isTarget (monster.cpp:1433): whether this creature is a
+// legal thing to point an attack at, as opposed to isOpponent's "is this an
+// enemy". The two differ — a protected or out-of-floor enemy is still an
+// opponent but not a target.
+func (m *Monster) IsTarget(w *World, c Creature) bool {
+	if c == nil || c.GetHealth() == 0 {
+		return false
+	}
+	if c.GetPosition().Z != m.GetPosition().Z {
+		return false
+	}
+	if p, ok := c.(*Player); ok && (p.CannotBeAttacked() || p.Ghost) {
+		return false
+	}
+	if other, ok := c.(*Monster); ok && !other.IsAttackable() {
+		return false
+	}
+	if w != nil && w.Map != nil {
+		if tile := w.Map.GetTile(c.GetPosition()); tile != nil && tile.IsProtectionZone() {
+			return false
+		}
+	}
+	if m.Master == nil && m.GetFaction() != FactionDefault {
+		return m.IsEnemyFaction(CreatureFaction(c))
+	}
+	return true
+}
+
+// OnCreatureFound is Monster::onCreatureFound (monster.cpp:787): sort one
+// creature into whichever list it belongs in, and re-evaluate idleness if
+// either changed.
+func (m *Monster) OnCreatureFound(c Creature) {
+	listChanged := false
+	if m.IsFriend(c) {
+		listChanged = m.AddFriend(c) || listChanged
+	}
+	if m.IsOpponent(c) {
+		listChanged = m.AddTarget(c) || listChanged
+	}
+	if listChanged || m.Idle {
+		m.UpdateIdleStatus()
+	}
+}
+
+// OnCreatureEnter is Monster::onCreatureEnter (monster.cpp:802): someone came
+// into view. This is the wake-up path for an idle monster.
+func (m *Monster) OnCreatureEnter(c Creature) { m.OnCreatureFound(c) }
+
+// OnCreatureLeave is Monster::onCreatureLeave (monster.cpp:881): someone left
+// view. Idleness is only re-evaluated when the target list actually empties,
+// which is what stops a monster idling while it still has other enemies around.
+func (m *Monster) OnCreatureLeave(c Creature) {
+	if m.IsFriend(c) {
+		m.RemoveFriend(c)
+	}
+	if m.IsOpponent(c) {
+		if m.RemoveTarget(c) && len(m.Targets) == 0 {
+			m.UpdateIdleStatus()
+		}
+	}
+}
+
+// SetIdle is Monster::setIdle (monster.cpp:1498). Going idle drops both lists;
+// coming out of idle does not rebuild them, because whoever woke the monster is
+// about to add itself through onCreatureFound.
 //
-// Upstream maintains the lists incrementally from spectator events; rebuilding
-// them once per think reaches the same state and is what the port can do
-// without creature-movement hooks. The cost is one spectator scan per monster
-// per second, which is the scan searchTarget was already doing.
+// A removed or dead monster is never re-idled, so a corpse does not clear the
+// damage map the loot roll still needs.
+func (m *Monster) SetIdle(idle bool) {
+	if m.GetHealth() == 0 {
+		return
+	}
+	m.Idle = idle
+	if idle {
+		m.ClearTargetList()
+		m.ClearFriendList()
+	}
+}
+
+// SetAttackedCreature is Monster::setAttackedCreature (monster.cpp:1367).
+func (m *Monster) SetAttackedCreature(c Creature) bool {
+	m.SetTarget(c)
+	if c == nil {
+		return false
+	}
+	m.Idle = false
+	return true
+}
+
+// SetFollowCreature is Monster::setFollowCreature (monster.cpp:1376). The port
+// has no separate follow target — movement follows the attacked creature — so
+// this is the same assignment, kept under its own name because callers and the
+// parity audit both look for it.
+func (m *Monster) SetFollowCreature(c Creature) bool { return m.SetAttackedCreature(c) }
+
+// UpdateSummonTarget is Monster::updateSummonTarget (monster.cpp:1331): a summon
+// fights whatever its master is fighting, and follows its master otherwise.
+func (m *Monster) UpdateSummonTarget(w *World) {
+	master, ok := m.Master.(*Monster)
+	if !ok {
+		if p, isPlayer := m.Master.(*Player); isPlayer {
+			if t := p.GetTarget(); t != nil && t != Creature(m) {
+				m.SelectTarget(w, t)
+				return
+			}
+			m.SetFollowCreature(p)
+		}
+		return
+	}
+	if t := master.GetTarget(); t != nil && t != Creature(m) {
+		m.SelectTarget(w, t)
+		return
+	}
+	m.SetFollowCreature(master)
+}
+
+// UpdateTargetList is Monster::updateTargetList (monster.cpp:734): drop whoever
+// died or went out of view, then take in whoever is newly in view.
+//
+// Upstream maintains the lists purely from spectator events and only prunes
+// here. This port has no creature-movement hook to add from, so the sweep does
+// both — the resulting state is the same, at the cost of one spectator scan per
+// monster per think, which is the scan searchTarget was already doing.
 func (m *Monster) UpdateTargetList(w *World) {
 	if w == nil {
 		return
 	}
-	targets := make(map[uint32]Creature)
-	friends := make(map[uint32]Creature)
+	for id, c := range m.Friends {
+		if c == nil || c.GetHealth() == 0 || !m.GetPosition().InRangeOf(c.GetPosition()) {
+			delete(m.Friends, id)
+		}
+	}
+	emptiedTargets := false
+	for id, c := range m.Targets {
+		if c == nil || c.GetHealth() == 0 || !m.GetPosition().InRangeOf(c.GetPosition()) {
+			delete(m.Targets, id)
+			emptiedTargets = true
+		}
+	}
 
 	for _, c := range w.SpectatorCreatures(m.GetPosition()) {
 		if c == nil || c.GetID() == m.GetID() || c.GetHealth() == 0 {
 			continue
 		}
-		switch {
-		case m.IsFriend(c):
-			friends[c.GetID()] = c
-		case m.IsOpponent(c):
-			targets[c.GetID()] = c
-		}
+		m.OnCreatureFound(c)
 	}
-	m.Targets = targets
-	m.Friends = friends
+	if emptiedTargets && len(m.Targets) == 0 {
+		m.UpdateIdleStatus()
+	}
 }

@@ -374,7 +374,7 @@ func (m *Monster) UpdateIdleStatus() {
 			m.walkingBack = true
 		}
 	}
-	m.Idle = idle
+	m.SetIdle(idle)
 	if !idle {
 		m.walkingBack = m.walkingBack && m.GetPosition() != m.SpawnPosition
 	}

@@ -113,7 +113,7 @@ func (e *AIEngine) updateAI() {
 			if !monster.IsInSpawnRange(monster.GetPosition()) {
 				// Past the despawn radius, upstream teleports rather than walking.
 				e.world.TeleportCreature(monster, monster.SpawnPosition)
-				monster.Idle = true
+				monster.SetIdle(true)
 				continue
 			}
 		}

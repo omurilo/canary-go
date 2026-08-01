@@ -255,7 +255,10 @@ func TestSpawnRangeUsesRadiusAndFloor(t *testing.T) {
 func TestIdleStatusMarksWalkBackAwayFromSpawn(t *testing.T) {
 	home := Position{X: 100, Y: 100, Z: 7}
 
+	// Health matters: Monster::setIdle refuses outright on a dead monster, so a
+	// zero-health fixture never goes idle.
 	atHome := &Monster{SpawnPosition: home}
+	atHome.MaxHealth, atHome.Health = 100, 100
 	atHome.Pos = home
 	atHome.UpdateIdleStatus()
 	if !atHome.Idle || atHome.IsWalkingBack() {
@@ -263,6 +266,7 @@ func TestIdleStatusMarksWalkBackAwayFromSpawn(t *testing.T) {
 	}
 
 	away := &Monster{SpawnPosition: home}
+	away.MaxHealth, away.Health = 100, 100
 	away.Pos = Position{X: 110, Y: 100, Z: 7}
 	away.UpdateIdleStatus()
 	if away.Idle || !away.IsWalkingBack() {
