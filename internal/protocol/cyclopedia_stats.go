@@ -286,9 +286,19 @@ func writeOffenceWeapon(g *GameProtocol, w *netmsg.Writer, p *game.Player, weapo
 	}
 }
 
+// sendCyclopediaCharacterDefenceStats sends the frame; buildDefenceStats builds it.
+// They are split so a test can walk the bytes with the client's own read
+// sequence — SendToClient needs a live connection, which the protocol tests do
+// not have.
 func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
+	if w := g.buildDefenceStats(); w != nil {
+		g.SendToClient(w)
+	}
+}
+
+func (g *GameProtocol) buildDefenceStats() *netmsg.Writer {
 	if g.player == nil {
-		return
+		return nil
 	}
 	p := g.player
 	w := netmsg.NewWriter()
@@ -316,12 +326,24 @@ func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
 	w.AddByte(0x06)
 	w.AddU16(uint16(shieldSkill))
 	w.AddU16(0) // defenseWheel from mastery (TBD)
+	// A spare u16 the client reads and discards
+	// (otclient/src/client/protocolgameparse.cpp:6135). It was missing, and
+	// everything after it landed two bytes early.
+	w.AddU16(0)
 
-	w.AddDouble(p.GetMitigation()/100.0, 4)        // mitigation
-	w.AddDouble(0.0, 4)                              // (unused)
-	w.AddDouble(float64(p.GetDefenseEquipment())/10000.0, 4) // shield def from equipment
-	w.AddDouble(p.ShieldSkillMitigationFactor(), 4)  // shield skill * mitigationFactor / 10000
-	w.AddDouble(0.0, 4)                              // wheel mitigation multiplier (TBD)
+	w.AddDouble(p.GetMitigation()/100.0, 4)                  // mitigation
+	w.AddDouble(0.0, 4)                                      // mitigationBase
+	w.AddDouble(float64(p.GetDefenseEquipment())/10000.0, 4) // mitigationEquipment
+	w.AddDouble(p.ShieldSkillMitigationFactor(), 4)          // mitigationShield
+	w.AddDouble(0.0, 4)                                      // mitigationWheel (TBD)
+	// mitigationCombatTactics (parse:6142). Also missing — between this and the
+	// spare u16 the frame ended 7 bytes short, and the client read off the end:
+	//
+	//	129 bytes, 0 unread at pos 129, last opcode 0xDA (218)
+	//
+	// 129 is exactly what this function used to produce for a player with seven
+	// absorption entries.
+	w.AddDouble(0.0, 4)
 
 	absorbs := p.GetCombatAbsorbs()
 	w.AddByte(uint8(len(absorbs)))
@@ -331,7 +353,7 @@ func (g *GameProtocol) sendCyclopediaCharacterDefenceStats() {
 		w.AddDouble(a.Absorb, 4)
 	}
 
-	g.SendToClient(w)
+	return w
 }
 
 func (g *GameProtocol) sendCyclopediaCharacterMiscStats() {
