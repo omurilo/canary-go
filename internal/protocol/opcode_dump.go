@@ -96,3 +96,26 @@ func (g *GameProtocol) logOutboundPacket(b []byte) {
 	fields = append(fields, "hex", fmt.Sprintf("% X", head))
 	g.deps.Log.Info("SEND", fields...)
 }
+
+// logInboundOpcode records what the client asked for. The outbound half alone was
+// not enough: a player clicked "unwrap" in the context menu and nothing happened,
+// and with only the server's side of the wire there was no way to tell whether the
+// request never arrived or arrived and was dropped.
+//
+// Every inbound opcode is logged, not a filtered set — the whole question is which
+// one the client actually sends for an action, and filtering assumes the answer.
+func (g *GameProtocol) logInboundOpcode(op byte, rest []byte) {
+	if dumpItemOpcodes == "" || g.deps == nil || g.deps.Log == nil {
+		return
+	}
+	player := ""
+	if g.player != nil {
+		player = g.player.Name
+	}
+	head := rest
+	if len(head) > 16 {
+		head = head[:16]
+	}
+	g.deps.Log.Info("RECV", "op", fmt.Sprintf("0x%02X", op), "player", player,
+		"payloadLen", len(rest), "hex", fmt.Sprintf("% X", head))
+}

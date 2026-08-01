@@ -5,13 +5,14 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/game"
 	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/opentibiabr/canary-go/internal/netmsg"
 )
 
 func wrapCatalog() *items.Catalog {
 	return items.NewCatalog(
 		&items.ItemType{ID: 1, Name: "ground"},
 		&items.ItemType{ID: 1650, Name: "table", WrapableTo: game.ItemDecorationKit, Movable: true},
-		&items.ItemType{ID: game.ItemDecorationKit, Name: "decoration kit"},
+		&items.ItemType{ID: game.ItemDecorationKit, Name: "decoration kit", WrapKit: true},
 		&items.ItemType{ID: 25879, Name: "health cask", WrapableTo: game.ItemDecorationKit},
 		&items.ItemType{ID: itemFilledBathTube, Name: "filled bath tub", WrapableTo: game.ItemDecorationKit},
 		// Blocking, always-on-top, no height: the shape that takes an auto carpet.
@@ -146,5 +147,42 @@ func TestCanReceiveAutoCarpet(t *testing.T) {
 	}
 	if canReceiveAutoCarpet(&game.Item{ID: 1650}, cat) {
 		t.Errorf("a plain table must not qualify")
+	}
+}
+
+// C++ sends the kit's unWrapId in the wrap-kit field; this sent a constant 0, so
+// the client was told every kit unwraps into nothing. It is NOT why the unwrap did
+// not work — the option did appear in the menu — but a field that lies about an
+// item is worth correcting on its own.
+func TestAddItemSendsTheRealUnwrapID(t *testing.T) {
+	g, _, _, _ := wrapSetup(t)
+
+	kit := &game.Item{ID: game.ItemDecorationKit}
+	kit.SetCustomAttribute("unWrapId", int64(1650))
+
+	w := netmsg.NewWriter()
+	g.addItem(w, kit)
+	b := w.Bytes()
+
+	// id u16 then the wrap-kit u16.
+	if len(b) < 4 {
+		t.Fatalf("packet too short: % X", b)
+	}
+	gotID := uint16(b[0]) | uint16(b[1])<<8
+	gotUnwrap := uint16(b[2]) | uint16(b[3])<<8
+	if gotID != game.ItemDecorationKit {
+		t.Fatalf("item id = %d, want the kit", gotID)
+	}
+	if gotUnwrap != 1650 {
+		t.Errorf("unwrap id = %d, want 1650 — with 0 the client hides the unwrap option", gotUnwrap)
+	}
+
+	// A kit with no attribute still writes the field, as zero, so the frame keeps
+	// its length.
+	bare := &game.Item{ID: game.ItemDecorationKit}
+	w2 := netmsg.NewWriter()
+	g.addItem(w2, bare)
+	if len(w2.Bytes()) != len(b) {
+		t.Errorf("the wrap-kit field must always be present: %d vs %d bytes", len(w2.Bytes()), len(b))
 	}
 }

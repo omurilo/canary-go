@@ -107,7 +107,15 @@ func (g *GameProtocol) addItem(w *netmsg.Writer, it *game.Item) {
 		w.AddByte(0)
 	}
 	if t.WrapKit {
-		w.AddU16(0)
+		// The unwrap id the item is carrying, not a constant zero. C++ reads it from
+		// the "unWrapId" custom attribute (AddItem, protocolgame.cpp), and the client
+		// uses it to decide whether the item can be unwrapped at all — with 0 it never
+		// offers the option, so the request never reaches the server.
+		unwrapID := uint16(0)
+		if v, ok := it.GetCustomAttribute("unWrapId"); ok {
+			unwrapID = customAttrUint16(v)
+		}
+		w.AddU16(unwrapID)
 	}
 }
 

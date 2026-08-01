@@ -978,6 +978,7 @@ func (g *GameProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {
 		return
 	}
 	op = r.GetByte()
+	g.logInboundOpcode(op, r.Buffer()[r.Pos():])
 	switch op {
 	case inLogout:
 		c.Close()
