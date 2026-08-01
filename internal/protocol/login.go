@@ -145,9 +145,6 @@ func (p *LoginProtocol) OnPacket(c *network.Connection, r *netmsg.Reader) {}
 
 // handleHTTPRequest parses an HTTP request body and returns the appropriate JSON response.
 func (p *LoginProtocol) handleHTTPRequest(c *network.Connection, body []byte) {
-	var req struct {
-		Type string `json:"type"`
-	}
 	// Try to extract JSON body from HTTP request (find the JSON after headers)
 	raw := string(body)
 	jsonStart := strings.Index(raw, "{")
@@ -155,12 +152,15 @@ func (p *LoginProtocol) handleHTTPRequest(c *network.Connection, body []byte) {
 		jsonError(c, "Invalid request")
 		return
 	}
+	var req loginRequest
 	if err := json.Unmarshal([]byte(raw[jsonStart:]), &req); err != nil {
 		jsonError(c, "Invalid JSON")
 		return
 	}
 	c.Logger().Info("login: http request", "type", req.Type, "bytes", len(body))
 	switch req.Type {
+	case "login":
+		p.handleJSONLogin(c, req)
 	case "cacheinfo":
 		jsonCacheInfo(c, p)
 	case "boostedcreature":
@@ -170,12 +170,7 @@ func (p *LoginProtocol) handleHTTPRequest(c *network.Connection, body []byte) {
 	case "showoff":
 		jsonEmpty(c) // not implemented
 	default:
-		// The official 13.x client logs in over HTTP JSON, not the binary port,
-		// and its request type lands here. Upstream Canary has no JSON login
-		// either — in a real deployment MyAAC serves it — so this is a genuine
-		// gap rather than a divergence, and it must be loud instead of a 400 the
-		// client renders as an empty character list.
-		c.Logger().Warn("login: unhandled http login type", "type", req.Type)
+		c.Logger().Warn("login: unhandled http request type", "type", req.Type)
 		jsonError(c, "Unknown type: "+req.Type)
 	}
 }

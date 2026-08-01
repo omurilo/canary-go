@@ -25,6 +25,18 @@ type Account struct {
 type Character struct {
 	Name    string
 	Deleted bool
+
+	// The rest is only needed by the HTTP/JSON login the modern client uses; the
+	// binary character list sends nothing but the name.
+	Level      uint32
+	Vocation   uint16
+	Sex        uint16
+	LookType   uint16
+	LookHead   uint16
+	LookBody   uint16
+	LookLegs   uint16
+	LookFeet   uint16
+	LookAddons uint16
 }
 
 // LoadAccount fetches an account by email (modern) or name (old protocol).
@@ -45,7 +57,9 @@ func (d *DB) LoadAccount(ctx context.Context, identifier string) (*Account, erro
 
 // ListCharacters returns non-deleted characters for an account, ordered by name.
 func (d *DB) ListCharacters(ctx context.Context, accountID uint32) ([]Character, error) {
-	const q = `SELECT name, deletion FROM players WHERE account_id = ? ORDER BY name ASC`
+	const q = `SELECT name, deletion, level, vocation, sex,
+	                  looktype, lookhead, lookbody, looklegs, lookfeet, lookaddons
+	           FROM players WHERE account_id = ? ORDER BY name ASC`
 	rows, err := d.SQL.QueryContext(ctx, q, accountID)
 	if err != nil {
 		return nil, err
@@ -53,15 +67,17 @@ func (d *DB) ListCharacters(ctx context.Context, accountID uint32) ([]Character,
 	defer rows.Close()
 	var out []Character
 	for rows.Next() {
-		var name string
+		var ch Character
 		var deletion int64
-		if err := rows.Scan(&name, &deletion); err != nil {
+		if err := rows.Scan(&ch.Name, &deletion, &ch.Level, &ch.Vocation, &ch.Sex,
+			&ch.LookType, &ch.LookHead, &ch.LookBody, &ch.LookLegs, &ch.LookFeet,
+			&ch.LookAddons); err != nil {
 			return nil, err
 		}
 		if deletion != 0 {
 			continue
 		}
-		out = append(out, Character{Name: name})
+		out = append(out, ch)
 	}
 	return out, rows.Err()
 }
