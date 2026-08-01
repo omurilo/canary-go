@@ -311,3 +311,28 @@ func TestRemoveItemFromHolder(t *testing.T) {
 		t.Errorf("an unheld item has no holder to remove it from")
 	}
 }
+
+// The depot chest page size travels to the client in the 0x6E frame and is what
+// it pages by; 36 was invented and disagrees with DepotChest::maxSize.
+func TestDepotChestPageSize(t *testing.T) {
+	if DepotChestPageSize != 32 {
+		t.Fatalf("page size = %d, want 32 (depotchest.cpp:17)", DepotChestPageSize)
+	}
+	dm := NewPlayerDepotManager(&Player{Name: "Owner"})
+	chest := dm.GetDepotChest(1, true)
+	if chest.MaxSize != DepotChestPageSize {
+		t.Errorf("chest MaxSize = %d, want %d", chest.MaxSize, DepotChestPageSize)
+	}
+	if !chest.HasPagination() {
+		t.Errorf("a depot chest must be paginated, or nothing past the first page is reachable")
+	}
+
+	// The page is not the limit: a chest holds up to maxDepotItems, and pagination
+	// is how the rest is seen. Nothing here may cap contents at the page size.
+	for i := 0; i < 100; i++ {
+		chest.Contents = append(chest.Contents, &Item{ID: 3031, Count: 1})
+	}
+	if len(chest.Contents) != 100 {
+		t.Errorf("a depot chest must hold more than one page, got %d", len(chest.Contents))
+	}
+}

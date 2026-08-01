@@ -16,6 +16,10 @@ const (
 	ItemDepotXX    = 39724
 )
 
+// DepotChestPageSize is DepotChest::maxSize (depotchest.cpp:17): how many slots
+// one page of a depot box shows.
+const DepotChestPageSize = 32
+
 // defaultDepotBoxes mirrors `depotBoxes = 20` in config.lua.dist.
 const defaultDepotBoxes = 20
 
@@ -95,7 +99,15 @@ func (dm *PlayerDepotManager) GetDepotChest(depotId uint16, autoCreate bool) *It
 		chestID = ItemDepotXX
 	}
 
-	chest := &Item{ID: chestID, Contents: make([]*Item, 0), Pagination: true, MaxSize: 36}
+	// DepotChest::DepotChest sets maxSize = 32, not 36
+	// (src/items/containers/depot/depotchest.cpp:14-18). The capacity travels to the
+	// client in the 0x6E frame and is what it pages by, so an invented number makes
+	// the server and the client disagree about where page two starts.
+	//
+	// maxSize is the PAGE, not the limit: queryAdd caps a depot chest at
+	// maxDepotItems (2000), so holding far more than 32 is correct and pagination is
+	// the only way to see the rest.
+	chest := &Item{ID: chestID, Contents: make([]*Item, 0), Pagination: true, MaxSize: DepotChestPageSize}
 	dm.Chests[depotId] = chest
 	return chest
 }
