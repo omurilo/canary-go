@@ -469,9 +469,6 @@ func (g *GameProtocol) sendHousesInfo() {
 	for _, h := range world.Houses {
 		if h != nil && h.OwnerID == g.player.DBID {
 			houseClientID = h.ClientID
-			if houseClientID == 0 {
-				houseClientID = h.ID
-			}
 			slog.Default().Info("house: player owns house", "clientId", houseClientID, "houseName", h.Name)
 			break
 		}
@@ -499,16 +496,22 @@ func (g *GameProtocol) sendHousesInfo() {
 	w.AddByte(0x01) // ownedHouseCountSameAccount
 	w.AddByte(0x01) // ownedHouseCount
 	w.AddU32(houseClientID)
-	w.AddU16(uint16(len(world.Houses)))
+	// The count and the entries must be built from the SAME list. This wrote
+	// len(world.Houses) and then skipped nils while writing, so a single nil left
+	// the client reading one entry too many and running off the end of the frame.
+	ids := make([]uint32, 0, len(world.Houses))
 	for _, h := range world.Houses {
 		if h == nil {
 			continue
 		}
-		clientID := h.ClientID
-		if clientID == 0 {
-			clientID = h.ID
-		}
-		w.AddU32(clientID)
+		// getClientId(), with no fallback to the house id (protocolgame.cpp:12026).
+		// Substituting the id sent the client a number it then quotes back when
+		// asking for that house's details — and no house answers to it.
+		ids = append(ids, h.ClientID)
+	}
+	w.AddU16(uint16(len(ids)))
+	for _, id := range ids {
+		w.AddU32(id)
 	}
 
 	slog.Default().Info("house: sent 0xC6", "player", g.player.Name,
