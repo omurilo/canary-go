@@ -212,3 +212,52 @@ func itemAttrsEqual(a, b *ItemAttributes) bool {
 		eqU16(a.Amount, b.Amount) &&
 		eqU32(a.Owner, b.Owner)
 }
+
+// The unwrap bug, at its root: ATTR_CUSTOM was read and thrown away, so every
+// script-set attribute died on the first save/load round trip. The store stamps a
+// decoration kit with "unWrapId" to record what it becomes
+// (data/libs/gamestore/purchases.lua:140); after a restart the kit came back
+// without it and unwrapping refused with nothing to go on.
+func TestCustomAttributesSurviveTheRoundTrip(t *testing.T) {
+	in := &ItemAttributes{Custom: map[string]any{
+		"unWrapId": int64(20718),
+		"label":    "a parquet floor",
+		"ratio":    2.5,
+		"bound":    true,
+	}}
+
+	blob := in.Encode(0)
+	out, _, err := DecodeItemAttributes(blob, 0)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out == nil || out.Custom == nil {
+		t.Fatalf("custom attributes were dropped entirely")
+	}
+	if got := out.Custom["unWrapId"]; got != int64(20718) {
+		t.Errorf("unWrapId = %v (%T), want int64(20718)", got, got)
+	}
+	if got := out.Custom["label"]; got != "a parquet floor" {
+		t.Errorf("label = %v", got)
+	}
+	if got := out.Custom["ratio"]; got != 2.5 {
+		t.Errorf("ratio = %v", got)
+	}
+	if got := out.Custom["bound"]; got != true {
+		t.Errorf("bound = %v", got)
+	}
+}
+
+// Encoding must be stable: a map iterated in random order would rewrite the blob
+// on every save and churn the tile_store rows.
+func TestCustomAttributeEncodingIsDeterministic(t *testing.T) {
+	a := &ItemAttributes{Custom: map[string]any{
+		"z": int64(1), "a": int64(2), "m": "x", "b": true,
+	}}
+	first := a.Encode(0)
+	for i := 0; i < 20; i++ {
+		if got := a.Encode(0); string(got) != string(first) {
+			t.Fatalf("encoding differs between runs")
+		}
+	}
+}

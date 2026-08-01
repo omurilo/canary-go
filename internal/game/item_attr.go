@@ -1,6 +1,8 @@
 package game
 
 import (
+	"math"
+	"sort"
 	"fmt"
 
 	"github.com/opentibiabr/canary-go/internal/io/propstream"
@@ -364,33 +366,62 @@ func DecodeItemAttributesFrom(ps *propstream.PropStream, subType uint16) (*ItemA
 		case attrCustomAttributes:
 			return nil, subType, children, fmt.Errorf("item attr %d not supported for decode", attrType)
 
-		// ATTR_CUSTOM carries key-value pairs (e.g. imbuement data). We skip
-		// over it so DecodeItemAttributes succeeds and Attr stays non-nil,
-		// avoiding blob duplication on every save.
+		// ATTR_CUSTOM carries the script-defined key/value pairs (item.cpp:1300-1325).
+		// These were READ AND DISCARDED, so every custom attribute died on the first
+		// save/load round trip. The store stamps a decoration kit with "unWrapId" to
+		// record what it unwraps into (data/libs/gamestore/purchases.lua:140); after a
+		// restart the kit came back without it and unwrapping answered "Sorry, not
+		// possible" with nothing to go on.
+		//
+		// u64 count, then per pair: string key, u8 type, value.
+		// Types are CustomAttribute::serialize's (custom_attribute.cpp:88-103):
+		// 1 = string, 2 = int64, 3 = double, 4 = bool.
 		case attrCustom:
 			count, err := ps.ReadUint64()
 			if err != nil {
 				return nil, subType, children, err
 			}
 			for i := uint64(0); i < count; i++ {
-				if _, err := ps.ReadString(); err != nil {
+				key, err := ps.ReadString()
+				if err != nil {
 					return nil, subType, children, err
 				}
 				valType, err := ps.ReadUint8()
 				if err != nil {
 					return nil, subType, children, err
 				}
+				if a.Custom == nil {
+					a.Custom = map[string]any{}
+				}
 				switch valType {
-				case 1: // string
-					if _, err := ps.ReadString(); err != nil {
+				case 1:
+					v, err := ps.ReadString()
+					if err != nil {
 						return nil, subType, children, err
 					}
-				case 2: // int64
-					if _, err := ps.ReadInt64(); err != nil {
+					a.Custom[key] = v
+				case 2:
+					v, err := ps.ReadInt64()
+					if err != nil {
 						return nil, subType, children, err
 					}
+					a.Custom[key] = v
+				case 3:
+					bits, err := ps.ReadUint64()
+					if err != nil {
+						return nil, subType, children, err
+					}
+					a.Custom[key] = math.Float64frombits(bits)
+				case 4:
+					v, err := ps.ReadUint8()
+					if err != nil {
+						return nil, subType, children, err
+					}
+					a.Custom[key] = v != 0
 				default:
-					ps.Skip(8)
+					// An unknown type has no length, so the rest of the blob cannot be
+					// trusted; stopping beats silently misreading the following items.
+					return nil, subType, children, fmt.Errorf("unknown custom attribute type %d for key %q", valType, key)
 				}
 			}
 
@@ -531,6 +562,48 @@ func (a *ItemAttributes) Encode(subType uint16) []byte {
 	if a.ObtainContainer != nil {
 		w.WriteUint8(attrObtainContainer)
 		w.WriteUint32(*a.ObtainContainer)
+	}
+
+	// ATTR_CUSTOM (item.cpp:1537-1544). Decoding these without writing them back
+	// would still lose them on the next save, so the pair has to land together.
+	// Keys are sorted so the same attributes always produce the same bytes — Go map
+	// order is randomised, and an item whose blob changes on every save churns the
+	// tile_store rows for no reason.
+	if len(a.Custom) > 0 {
+		keys := make([]string, 0, len(a.Custom))
+		for k := range a.Custom {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		w.WriteUint8(attrCustom)
+		w.WriteUint64(uint64(len(keys)))
+		for _, k := range keys {
+			w.WriteString(k)
+			switch v := a.Custom[k].(type) {
+			case string:
+				w.WriteUint8(1)
+				w.WriteString(v)
+			case int64:
+				w.WriteUint8(2)
+				w.WriteInt64(v)
+			case float64:
+				w.WriteUint8(3)
+				w.WriteUint64(math.Float64bits(v))
+			case bool:
+				w.WriteUint8(4)
+				if v {
+					w.WriteUint8(1)
+				} else {
+					w.WriteUint8(0)
+				}
+			default:
+				// CustomAttribute holds exactly these four; anything else came from a
+				// binding that should be storing one of them instead.
+				w.WriteUint8(2)
+				w.WriteInt64(0)
+			}
+		}
 	}
 
 	return w.GetStream()
