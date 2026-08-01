@@ -285,13 +285,17 @@ func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	// addition and match on the still-attached length header, which is why the
 	// framing is only stripped here.
 	body, modernPad := stripLoginFraming(body, c)
-	body = transport.StripFirstPacketChecksum(body)
 	if modernPad {
+		// The checksum/sequence slot is already gone; only the padding is left.
 		var ok bool
 		if body, ok = stripModernPadding(body); !ok {
 			c.Logger().Debug("login: invalid modern padding")
 			return
 		}
+	} else {
+		// Legacy frames carry an Adler-32 that may or may not be present, so it
+		// is detected rather than assumed.
+		body = transport.StripFirstPacketChecksum(body)
 	}
 	r := netmsg.NewReader(body)
 	protoID := r.GetByte() // protocol id (0x01), consumed by the service dispatch in C++
@@ -475,7 +479,23 @@ func stripLoginFraming(body []byte, c *network.Connection) (out []byte, modernPa
 		if c != nil {
 			c.Logger().Debug("login: modern framing", "blocks", declared, "bytes", rest)
 		}
-		return body[tibiaHeaderLength:], true
+		// Strip the header AND the four bytes after it. That slot holds a
+		// checksum or a sequence number depending on what the client enabled —
+		// Protocol::send picks one or the other (protocol.cpp:144-149) — and
+		// writeHeaderSize subtracts a flat 4 for it either way, so its presence is
+		// certain even when its meaning is not.
+		//
+		// Leaving it to StripFirstPacketChecksum did not work: that only strips
+		// when the bytes verify as an Adler-32, and an OTC client that called
+		// enabledSequencedPackets sends writeSequence(0) instead — four zeros,
+		// which Adler-32 can never be. The four bytes then stayed in front of the
+		// payload and everything read four bytes early:
+		//
+		//	protoId=0 clientOS=0 version=262 clientVersion=99942410
+		//
+		// 262 is 0x0106, the padding-count byte and the protocol id read as a
+		// u16; 99942410 is 0x05F5000A, the OS and version read as a u32.
+		return body[tibiaHeaderLength+4:], true
 	}
 	if declared == rest {
 		return body[tibiaHeaderLength:], false

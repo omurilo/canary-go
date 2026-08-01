@@ -47,12 +47,13 @@ func buildClientLoginPacket(payload []byte, modern bool) []byte {
 func unwrap(t *testing.T, wire []byte) []byte {
 	t.Helper()
 	body, modernPad := stripLoginFraming(wire, nil)
-	body = transport.StripFirstPacketChecksum(body)
 	if modernPad {
 		var ok bool
 		if body, ok = stripModernPadding(body); !ok {
 			t.Fatal("modern padding rejected")
 		}
+	} else {
+		body = transport.StripFirstPacketChecksum(body)
 	}
 	return body
 }
@@ -173,5 +174,46 @@ func TestValidFrameIsNeverStripped(t *testing.T) {
 		if len(got) != len(payload) {
 			t.Errorf("modern=%v: unwrapped %d bytes, want %d", modern, len(got), len(payload))
 		}
+	}
+}
+
+// Protocol::send writes EITHER a checksum or a sequence number into the four
+// bytes after the header (protocol.cpp:144-149), and writeHeaderSize subtracts
+// a flat 4 for that slot either way. An OTC client that called
+// enabledSequencedPackets — which Protocol::onConnect does, right after sending
+// the world-name line — sends writeSequence(0): four zeros, which Adler-32 can
+// never be, since its sum starts at 1.
+//
+// Detecting the slot by verifying it as a checksum therefore left it in place,
+// and the payload read four bytes early:
+//
+//	protoId=0 clientOS=0 version=262 clientVersion=99942410
+func TestModernFrameWithSequenceInsteadOfChecksum(t *testing.T) {
+	payload := []byte{0x01, 0x0A, 0x00, 0xF5, 0x05, 0xF5, 0x05, 0x00, 0x00}
+
+	pad := 8 - (len(payload) % 8) - 1
+	if pad < 0 {
+		pad += 8
+	}
+	body := append([]byte{byte(pad)}, payload...)
+	body = append(body, make([]byte, pad)...)
+
+	// Four zeros where a checksum would go: writeSequence(0).
+	wire := append([]byte{0, 0, 0, 0}, body...)
+	blocks := uint16(len(body) / 8)
+	wire = append([]byte{byte(blocks), byte(blocks >> 8)}, wire...)
+
+	got := unwrap(t, wire)
+	if len(got) != len(payload) {
+		t.Fatalf("unwrapped %d bytes, want %d", len(got), len(payload))
+	}
+	if got[0] != 0x01 {
+		t.Errorf("protocol id = %d, want 1 — the sequence slot was not stripped", got[0])
+	}
+	if os := uint16(got[1]) | uint16(got[2])<<8; os != 10 {
+		t.Errorf("clientOS = %d, want 10", os)
+	}
+	if v := uint16(got[3]) | uint16(got[4])<<8; v != 1525 {
+		t.Errorf("version = %d, want 1525", v)
 	}
 }
