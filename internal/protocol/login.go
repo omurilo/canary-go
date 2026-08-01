@@ -279,15 +279,10 @@ func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 		c.Close()
 		return
 	}
-	// The login service reads in RawFirstPacket mode so it can recognise HTTP and
-	// MyAAC status probes, which means body still carries the 2-byte Tibia length
-	// header — the MyAAC checks above match on it directly. The binary Tibia login
-	// never skipped it, so every field landed two bytes early and the RSA block was
-	// cut short: it decrypted to garbage and bailed at "rsa leading byte non-zero",
-	// silently, with the connection closed and the client seeing EOF.
-	//
-	// Only the modern client's HTTP login path was exercised, which is why this went
-	// unnoticed while real logins worked.
+	// Everything below is the binary Tibia login, ProtocolLogin::onRecvFirstMessage
+	// (protocollogin.cpp:203-240). The MyAAC and HTTP probes above are a Go-only
+	// addition and match on the still-attached length header, which is why the
+	// framing is only stripped here.
 	body, modernPad := stripLoginFraming(body, c)
 	body = transport.StripFirstPacketChecksum(body)
 	if modernPad {

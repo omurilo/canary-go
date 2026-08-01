@@ -164,17 +164,17 @@ func (c *Connection) serve() {
 	c.consumeProxyIdentification(r)
 	c.proto.OnConnect(c)
 
-	// Raw first-packet: skip the 2-byte Tibia header for HTTP/status
+	// Raw first-packet: the login service needs the bytes unframed so it can tell
+	// an HTTP request or a MyAAC status probe from a binary Tibia login.
 	if c.RawFirstPacket {
 		c.RawFirstPacket = false
-		raw := make([]byte, 4096)
-		n, _ := r.Read(raw)
-		if n > 0 {
+		if raw := c.readFirstPacketRaw(r); len(raw) > 0 {
 			c.gotFirst = true
-			c.proto.OnFirstPacket(c, raw[:n])
+			c.proto.OnFirstPacket(c, raw)
 			// After raw first packet, return to avoid re-entering the framed loop.
 			return
 		}
+		return
 	}
 
 	header := make([]byte, headerLength)
@@ -204,4 +204,65 @@ func (c *Connection) serve() {
 		}
 		c.proto.OnPacket(c, r)
 	}
+}
+
+// firstPacketQuietPeriod bounds how long readFirstPacketRaw waits for more bytes
+// once it has some. A client sends its login packet in one burst, so anything
+// still in flight arrives within a round trip.
+const firstPacketQuietPeriod = 250 * time.Millisecond
+
+// readFirstPacketRaw reads the whole first packet, not just whatever one Read
+// call happened to return.
+//
+// TCP does not preserve write boundaries: a client's ~500-byte login packet
+// (metadata, a 128-byte RSA block, the OGL strings, and a second RSA block for
+// the authenticator token) can arrive in several segments. A single Read then
+// returns a prefix, and the login parser sees a frame whose outer header does
+// not describe the bytes it has —
+//
+//	login: unrecognised outer header declared=... rest=...
+//
+// Worse, the remainder is left unread in the socket. Closing a TCP connection
+// with unread data in the receive queue sends RST rather than FIN, and an RST
+// discards whatever is still in the send buffer — so the reply we just wrote
+// can be thrown away before the client reads it.
+//
+// The framed loop below never had this problem: it reads a header and then
+// exactly that many bytes. Only this raw path, which exists for the HTTP and
+// MyAAC probes, read opportunistically.
+//
+// The length is not known up front here — that is the whole point of the raw
+// path — so it keeps reading until the peer goes quiet, capped at the same
+// buffer size as before.
+func (c *Connection) readFirstPacketRaw(r *bufio.Reader) []byte {
+	buf := make([]byte, 0, 4096)
+	chunk := make([]byte, 4096)
+
+	// The first read blocks: the client may not have sent anything yet.
+	n, err := r.Read(chunk)
+	if n > 0 {
+		buf = append(buf, chunk[:n]...)
+	}
+	if err != nil {
+		return buf
+	}
+
+	for len(buf) < cap(buf) {
+		if r.Buffered() == 0 {
+			// Nothing already buffered: give the network one short window to
+			// deliver the rest of the burst before deciding the packet is whole.
+			_ = c.conn.SetReadDeadline(time.Now().Add(firstPacketQuietPeriod))
+			n, err = r.Read(chunk)
+			_ = c.conn.SetReadDeadline(time.Time{})
+		} else {
+			n, err = r.Read(chunk)
+		}
+		if n > 0 {
+			buf = append(buf, chunk[:n]...)
+		}
+		if err != nil {
+			break // timeout (the packet is complete) or a real read error
+		}
+	}
+	return buf
 }
