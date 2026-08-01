@@ -132,6 +132,25 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 					count++
 				}
 			}
+			// The startup map-attribute loaders report ~49 positions where the item
+			// they expect is not on the tile — yet loading the same OTBM in a test
+			// and reading those exact coordinates finds every one of them, ground
+			// items included. Something between the two differs and static reading
+			// has not found it, so say what the tile actually holds at the moment
+			// the script asks.
+			if count == 0 && e.log != nil {
+				ground := uint16(0)
+				if t.tile.Ground != nil {
+					ground = t.tile.Ground.ID
+				}
+				ids := make([]uint16, 0, len(t.tile.Items))
+				for _, it := range t.tile.Items {
+					ids = append(ids, it.ID)
+				}
+				e.log.Debug("tile:getItemCountById found nothing",
+					"want", itemID, "pos", t.pos, "ground", ground, "items", ids,
+					"creatures", len(t.tile.Creatures))
+			}
 			L.Push(lua.LNumber(count))
 			return 1
 		},
