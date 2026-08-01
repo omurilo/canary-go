@@ -75,11 +75,84 @@ func (d *DB) LoadHouseItems(ctx context.Context, world *game.World) (int, error)
 				// stop on this tile instead of appending garbage.
 				break
 			}
-			tile.Items = append(tile.Items, it)
-			restored++
+			if placeHouseItem(world.Items, tile, it) {
+				restored++
+			}
 		}
 	}
 	return restored, rows.Err()
+}
+
+// placeHouseItem puts one restored item on the tile, the two-branch placement of
+// IOMapSerialize::loadItem (src/io/iomapserialize.cpp:158-225).
+//
+// The branch is the whole point, and it was missing: every row was appended.
+// A door is saved to tile_store on purpose — isSavedToHouses includes getDoor()
+// (item.cpp:2348) — because the row records whether it is open or shut. But the
+// door itself already exists on the tile, from the map. Appending it added a
+// SECOND door on every start:
+//
+//   - the tile kept a closed door however many times the server had booted, so it
+//     stayed blocking and walking into it answered "Sorry, not possible";
+//   - clicking transformed one of them, so the open state was real but invisible
+//     behind the others, and only a relog appeared to fix it;
+//   - the client's stack held all of the phantom copies, which is why it reported
+//     the door at index 6 while the server computed 2.
+//
+// Only house tiles pass through tile_store, which is exactly why only house doors
+// misbehaved.
+//
+// Returns false when the row describes something the map no longer has; C++ reads
+// those attributes into a dummy and drops them.
+func placeHouseItem(cat *items.Catalog, tile *game.Tile, it *game.Item) bool {
+	if tile == nil || it == nil {
+		return false
+	}
+	t := cat.Get(it.ID)
+
+	// Things a player genuinely put there are new objects. Beds, carpets and trash
+	// holders join them because C++ treats them as created rather than matched.
+	if t == nil || t.Movable ||
+		t.Type == items.ItemTypeBed ||
+		t.Type == items.ItemTypeCarpet ||
+		t.Type == items.ItemTypeTrashHolder {
+		tile.Items = append(tile.Items, it)
+		return true
+	}
+
+	// Stationary map furniture — doors, blackboards, bookcases. Find the one that
+	// is already there and restore its state onto it.
+	for _, existing := range tile.Items {
+		if existing == nil {
+			continue
+		}
+		et := cat.Get(existing.ID)
+		match := existing.ID == it.ID ||
+			(t.IsDoor && et != nil && et.IsDoor) ||
+			// C++ keeps a bed arm here too, though the branch above already claimed
+			// every bed; mirrored so the two read the same.
+			(t.Type == items.ItemTypeBed && et != nil && et.Type == items.ItemTypeBed)
+		if !match {
+			continue
+		}
+		// g_game().transformItem(item, id) — the saved id wins, so a door saved open
+		// comes back open.
+		existing.ID = it.ID
+		if it.Attr != nil {
+			existing.Attr = it.Attr
+		}
+		existing.Count = it.Count
+		if len(it.Contents) > 0 {
+			existing.Contents = it.Contents
+			for _, c := range existing.Contents {
+				c.Parent = existing
+			}
+		}
+		return true
+	}
+
+	// The map changed since the last save.
+	return false
 }
 
 // readItem reads one item record, recursing into container contents.

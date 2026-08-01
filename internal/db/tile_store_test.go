@@ -152,3 +152,76 @@ func TestSavedToHouses(t *testing.T) {
 		t.Errorf("with no catalog savedToHouses must be false")
 	}
 }
+
+// The house-door bug: a door is saved to tile_store on purpose, because the row
+// records whether it is open or shut, but the door already exists on the tile from
+// the map. The loader appended every row, so each server start left another closed
+// door on the tile — the tile went on blocking, walking into it answered "Sorry,
+// not possible", and only house doors were affected because only house tiles pass
+// through tile_store.
+func TestPlaceHouseItemDoesNotDuplicateDoors(t *testing.T) {
+	cat := items.NewCatalog(
+		&items.ItemType{ID: 1, Name: "ground"},
+		&items.ItemType{ID: 20446, Name: "closed door", IsDoor: true, Type: items.ItemTypeDoor},
+		&items.ItemType{ID: 20447, Name: "open door", IsDoor: true, Type: items.ItemTypeDoor},
+		&items.ItemType{ID: 1650, Name: "table", Movable: true},
+	)
+	mapDoor := &game.Item{ID: 20446}
+	tile := &game.Tile{Ground: &game.Item{ID: 1}, Items: []*game.Item{mapDoor}}
+
+	// The save says the door was left open.
+	if !placeHouseItem(cat, tile, &game.Item{ID: 20447}) {
+		t.Fatalf("a door present on the map must be matched, not dropped")
+	}
+	if len(tile.Items) != 1 {
+		t.Fatalf("the tile has %d items, want 1 — the door must be transformed, never appended", len(tile.Items))
+	}
+	if tile.Items[0] != mapDoor {
+		t.Errorf("the map's own door object must be the one kept")
+	}
+	if mapDoor.ID != 20447 {
+		t.Errorf("the door is %d, want the saved open state 20447", mapDoor.ID)
+	}
+
+	// Booting again must not grow the tile.
+	placeHouseItem(cat, tile, &game.Item{ID: 20447})
+	placeHouseItem(cat, tile, &game.Item{ID: 20447})
+	if len(tile.Items) != 1 {
+		t.Errorf("after three loads the tile has %d items, want 1", len(tile.Items))
+	}
+}
+
+// Furniture a player carried in is a genuinely new object and must still be added,
+// or the fix above would silently delete everyone's belongings.
+func TestPlaceHouseItemAddsMovables(t *testing.T) {
+	cat := items.NewCatalog(
+		&items.ItemType{ID: 1, Name: "ground"},
+		&items.ItemType{ID: 1650, Name: "table", Movable: true},
+	)
+	tile := &game.Tile{Ground: &game.Item{ID: 1}}
+
+	for i := 0; i < 3; i++ {
+		if !placeHouseItem(cat, tile, &game.Item{ID: 1650}) {
+			t.Fatalf("a movable must be added")
+		}
+	}
+	if len(tile.Items) != 3 {
+		t.Errorf("three tables were saved, the tile has %d", len(tile.Items))
+	}
+}
+
+// A stationary item the map no longer has is dropped, not resurrected.
+func TestPlaceHouseItemDropsVanishedFurniture(t *testing.T) {
+	cat := items.NewCatalog(
+		&items.ItemType{ID: 1, Name: "ground"},
+		&items.ItemType{ID: 2000, Name: "bookcase"},
+	)
+	tile := &game.Tile{Ground: &game.Item{ID: 1}}
+
+	if placeHouseItem(cat, tile, &game.Item{ID: 2000}) {
+		t.Errorf("a stationary item with nothing to match must be dropped")
+	}
+	if len(tile.Items) != 0 {
+		t.Errorf("nothing must be added, got %d items", len(tile.Items))
+	}
+}
