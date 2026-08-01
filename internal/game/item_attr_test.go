@@ -3,6 +3,8 @@ package game
 import (
 	"testing"
 
+	"github.com/opentibiabr/canary-go/internal/items"
+
 	"github.com/opentibiabr/canary-go/internal/io/propstream"
 )
 
@@ -334,5 +336,31 @@ func TestDepotChestPageSize(t *testing.T) {
 	}
 	if len(chest.Contents) != 100 {
 		t.Errorf("a depot chest must hold more than one page, got %d", len(chest.Contents))
+	}
+}
+
+// A depot box holds up to maxDepotItems (2000), not one page. MaxItems was left
+// at 0, so AddItemToContainer fell back to the page size and refused everything
+// past the 32nd item — and the move path had already taken the item off the
+// floor, so it was destroyed rather than rejected.
+func TestDepotChestHoldsMoreThanOnePage(t *testing.T) {
+	dm := NewPlayerDepotManager(&Player{Name: "Owner"})
+	chest := dm.GetDepotChest(1, true)
+
+	if chest.MaxItems != MaxDepotItems {
+		t.Fatalf("chest MaxItems = %d, want %d (depotchest.cpp:16)", chest.MaxItems, MaxDepotItems)
+	}
+	if chest.MaxSize != DepotChestPageSize {
+		t.Errorf("the page size must stay %d", DepotChestPageSize)
+	}
+
+	cat := items.NewCatalog(&items.ItemType{ID: 1650, Name: "table"})
+	for i := 0; i < DepotChestPageSize+10; i++ {
+		if !AddItemToContainer(cat, chest, &Item{ID: 1650, Count: 1}) {
+			t.Fatalf("the depot refused item %d, well short of its %d limit", i+1, MaxDepotItems)
+		}
+	}
+	if len(chest.Contents) != DepotChestPageSize+10 {
+		t.Errorf("chest holds %d, want %d", len(chest.Contents), DepotChestPageSize+10)
 	}
 }

@@ -296,6 +296,15 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	// 4. Add to destination
 	if destContainer != nil {
 		if !game.AddItemToContainer(g.deps.Items, destContainer, moveItem) {
+			// Step 3 already took the item off its source. revertMove only re-sends
+			// packets describing the CURRENT state — it restores nothing — so bailing
+			// out here used to destroy the item outright. Dropping things into a full
+			// depot box made them vanish.
+			//
+			// C++ never gets here: internalMoveItem runs queryAdd on the destination
+			// BEFORE removing from the source. Putting it back is the containable fix;
+			// reordering playerMoveThing is the real one.
+			g.restoreToSource(fromPos, fromContainer, fromSlot, moveItem)
 			g.sendStatusText("There is not enough room.")
 			g.revertMove(fromPos, toPos, spriteID)
 			return
@@ -761,5 +770,42 @@ func (g *GameProtocol) onRemoveTileItem(pos game.Position, stackPos uint8, item 
 		if gp, ok := s.Session.(*GameProtocol); ok {
 			gp.sendRemoveTileThing(pos, stackPos)
 		}
+	}
+}
+
+// restoreToSource puts an item back where a failed move took it from, so a
+// rejected destination costs the player nothing.
+//
+// This exists because playerMoveThing removes before it knows the destination
+// will accept. C++ asks first (Game::internalMoveItem runs queryAdd on the
+// destination cylinder ahead of removeThing), which is the ordering this port
+// should eventually adopt; until then, undoing the removal is what keeps a full
+// container from eating items.
+func (g *GameProtocol) restoreToSource(fromPos netmsg.Position, fromContainer *game.Item, fromSlot uint8, item *game.Item) {
+	if item == nil {
+		return
+	}
+	if fromPos.X != 0xFFFF {
+		pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
+		g.deps.World.AddItem(pos, item)
+		return
+	}
+	if fromPos.Y >= 0x40 {
+		if fromContainer != nil {
+			item.Parent = fromContainer
+			at := int(fromSlot)
+			if at > len(fromContainer.Contents) {
+				at = len(fromContainer.Contents)
+			}
+			fromContainer.Contents = append(fromContainer.Contents, nil)
+			copy(fromContainer.Contents[at+1:], fromContainer.Contents[at:])
+			fromContainer.Contents[at] = item
+			g.RefreshContainer(fromContainer)
+		}
+		return
+	}
+	if int(fromSlot) < len(g.player.Inventory) && g.player.Inventory[fromSlot] == nil {
+		g.player.Inventory[fromSlot] = item
+		g.sendInventoryItem(fromSlot, item)
 	}
 }

@@ -107,7 +107,16 @@ func (dm *PlayerDepotManager) GetDepotChest(depotId uint16, autoCreate bool) *It
 	// maxSize is the PAGE, not the limit: queryAdd caps a depot chest at
 	// maxDepotItems (2000), so holding far more than 32 is correct and pagination is
 	// the only way to see the rest.
-	chest := &Item{ID: chestID, Contents: make([]*Item, 0), Pagination: true, MaxSize: DepotChestPageSize}
+	// MaxItems is the real limit, MaxSize is only the page. Leaving MaxItems at 0
+	// made AddItemToContainer fall back to the page size, so a depot box refused
+	// everything past its 32nd item — and the move path had already taken the item
+	// off the floor by then, so it was simply gone.
+	//
+	// DepotChest::maxDepotItems = 2000 (depotchest.cpp:16).
+	chest := &Item{
+		ID: chestID, Contents: make([]*Item, 0), Pagination: true,
+		MaxSize: DepotChestPageSize, MaxItems: MaxDepotItems,
+	}
 	dm.Chests[depotId] = chest
 	return chest
 }
