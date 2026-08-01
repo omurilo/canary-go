@@ -72,9 +72,66 @@ type MonsterType struct {
 	// MonsterType::info.lootItems (src/creatures/monsters/monsters.hpp).
 	Loot []LootBlock
 
+	// Defenses are the monster's defensive spell blocks — self-healing, haste,
+	// invisibility — cast from Monster::onThinkDefense (monster.cpp:2201) rather
+	// than at a target. 1655 of the 1655 datapack monsters set monster.defenses
+	// and every one of them was dropped by register() before this field existed,
+	// which is why no monster in the port ever healed itself.
+	Defenses []MonsterAttack
+
+	// Defense and Armor are the `defense` and `armor` keys of monster.defenses,
+	// read by Monster::getDefense and Monster::getArmor. Mitigation scales the
+	// damage reduction a shield-carrying monster gets (Monster::getMitigation).
+	Defense    int
+	Armor      int
+	Mitigation float64
+
+	// ChangeTargetInterval and ChangeTargetChance are monster.changeTarget
+	// {interval, chance}, driving Monster::onThinkTarget (monster.cpp:2140). An
+	// interval of 0 means the monster never re-picks a target on its own, which
+	// is what every monster in the port did, because the block was never read.
+	ChangeTargetInterval int
+	ChangeTargetChance   int
+
+	// Idle chatter. monster.voices = {interval, chance, {text, yell}, ...} feeds
+	// Monster::onThinkYell (monster.cpp:2273).
+	Voices       []MonsterVoice
+	YellInterval int
+	YellChance   int
+
+	// Summons the monster calls while fighting, capped by MaxSummons.
+	// Monster::onThinkDefense (monster.cpp:2223-2270).
+	Summons       []MonsterSummon
+	MaxSummons    int
+	ManaCost      uint32 // mana a player spends to convince/summon this monster
+	BloodRace     string // monster.race: blood, venom, undead, fire, energy, ink
+	LightLevel    uint8
+	LightColor    uint8
+	Faction       uint8   // Faction_t; 0 is FACTION_DEFAULT
+	EnemyFactions []uint8 // factions this monster attacks on sight
+
 	Flags      MonsterFlags
 	Elements   map[uint32]int16
 	Immunities []uint32 // combat type immunities
+}
+
+// MonsterVoice is one entry of monster.voices, mirroring voiceBlock_t
+// (src/creatures/creatures_definitions.hpp). Yell selects TALKTYPE_MONSTER_YELL
+// over TALKTYPE_MONSTER_SAY.
+type MonsterVoice struct {
+	Text string
+	Yell bool
+}
+
+// MonsterSummon is one entry of monster.summon(s), mirroring summonBlock_t.
+// Interval is `speed` in the C++ struct: the tick count between attempts, not a
+// delay. Force places the summon even when the tile is occupied.
+type MonsterSummon struct {
+	Name     string
+	Chance   int
+	Interval int
+	Count    int
+	Force    bool
 }
 
 type MonsterAttack struct {
@@ -136,9 +193,13 @@ type MonsterFlags struct {
 	TargetDistance     int
 	// Weighted percentages for Monster::searchTargetImmediate
 	// (src/creatures/monsters/monster.cpp:906-924). One roll of 1..100 walks them
-	// in this order; whatever it overshoots becomes a random pick. All zero, the
-	// default, means always-nearest — which is what the engine did unconditionally
-	// before these existed.
+	// in this order; whatever it overshoots becomes a random pick.
+	//
+	// All zero therefore means always-RANDOM, not always-nearest. That matters:
+	// the datapack sets these under monster.strategiesTarget, a top-level table,
+	// and the reader only looked for strategiesTargetNearest inside monster.flags
+	// — a key no monster file has. So all 1633 monsters that declare a strategy
+	// were left at zero and picked their target at random.
 	StrategiesTargetNearest int
 	StrategiesTargetHealth  int
 	StrategiesTargetDamage  int

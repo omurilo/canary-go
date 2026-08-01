@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+// creatureThinkInterval is EVENT_CREATURE_THINK_INTERVAL (1000ms), the cadence
+// Game::checkCreatures calls Creature::onThink at. The onThink timers below
+// accumulate in these units, so changing it changes every monster's yell,
+// defense and target-change cadence with it.
+const creatureThinkInterval = 1 * time.Second
+
 // AIEngine handles AI logic for creatures.
 type AIEngine struct {
 	world *World
@@ -17,10 +23,12 @@ func NewAIEngine(w *World) *AIEngine {
 
 // Start begins the AI loop.
 func (e *AIEngine) Start() {
-	GlobalDispatcher.AddEvent(1*time.Second, e.updateAI)
+	GlobalDispatcher.AddEvent(creatureThinkInterval, e.updateAI)
 }
 
 func (e *AIEngine) updateAI() {
+	const interval = uint32(creatureThinkInterval / time.Millisecond)
+
 	creatures := e.world.Creatures()
 	for _, c := range creatures {
 		// Only monsters have AI for now
@@ -28,6 +36,14 @@ func (e *AIEngine) updateAI() {
 		if !isMonster {
 			continue
 		}
+
+		// The Monster::onThink timers (monster.cpp:2140-2310). They run before
+		// anything else and regardless of whether the monster has a target — a
+		// monster yells at an empty room and a summoner keeps its summons up
+		// while walking home.
+		monster.OnThinkYell(e.world, interval)
+		monster.OnThinkDefense(e.world, interval)
+		monster.OnThinkTarget(e.world, interval)
 
 		// Passive AI: If the monster is not hostile (e.g. Cat, Rabbit, Deer),
 		// it should never seek targets or keep any existing target.
@@ -67,11 +83,31 @@ func (e *AIEngine) updateAI() {
 
 		target := monster.GetTarget()
 		if target == nil {
-			if rand.Intn(3) == 0 {
+			// Monster::updateIdleStatus (monster.cpp:1520): with nothing to fight,
+			// a monster away from its spawn walks back instead of wandering off.
+			//
+			// Idle is computed but not used to skip the monster. Upstream drops an
+			// idle monster from the creature check list and wakes it from
+			// onCreatureEnter; there is no target-list upkeep on creature movement
+			// here yet, so skipping would freeze it for good.
+			monster.UpdateIdleStatus()
+			if monster.IsWalkingBack() {
+				e.walkBackToSpawn(monster)
+			} else if rand.Intn(3) == 0 {
 				dirs := []Direction{DirNorth, DirEast, DirSouth, DirWest}
 				e.world.TryMoveCreature(monster, dirs[rand.Intn(len(dirs))])
 			}
 			continue
+		}
+
+		// Face what it is fighting, before moving. Monster::updateLookDirection
+		// (monster.cpp:3355) — without it a monster attacks sideways, and on the
+		// client it never turns at all.
+		if dir := monster.UpdateLookDirection(); dir != monster.GetDirection() {
+			monster.SetDirection(dir)
+			if e.world.OnCreatureTurn != nil {
+				e.world.OnCreatureTurn(monster)
+			}
 		}
 
 		// --- movement --------------------------------------------------------
@@ -118,6 +154,26 @@ func (e *AIEngine) updateAI() {
 	GlobalDispatcher.AddEvent(1*time.Second, e.updateAI)
 }
 
+// walkBackToSpawn is Monster::doWalkBack (monster.cpp:2500): one step along the
+// path home. A monster that cannot find a path is teleported back, which is what
+// upstream does once it leaves the despawn radius entirely.
+func (e *AIEngine) walkBackToSpawn(m *Monster) {
+	pos := m.GetPosition()
+	if pos == m.SpawnPosition {
+		return
+	}
+	if !m.IsInSpawnRange(pos) {
+		e.world.TeleportCreature(m, m.SpawnPosition)
+		m.Idle = true
+		return
+	}
+	path := FindPath(e.world.Map, e.world.Items, pos, m.SpawnPosition, 100)
+	if len(path) == 0 {
+		return
+	}
+	e.world.TryMoveCreature(m, StepDirection(pos, path[0]))
+}
+
 func chebyshevDistance(p1, p2 Position) int {
 	dx := abs(int(p1.X) - int(p2.X))
 	dy := abs(int(p1.Y) - int(p2.Y))
@@ -128,14 +184,29 @@ func chebyshevDistance(p1, p2 Position) int {
 }
 
 func getDirectionTo(from, to Position) Direction {
-	if to.X > from.X && to.Y == from.Y { return DirEast }
-	if to.X < from.X && to.Y == from.Y { return DirWest }
-	if to.Y > from.Y && to.X == from.X { return DirSouth }
-	if to.Y < from.Y && to.X == from.X { return DirNorth }
-	if to.X > from.X && to.Y > from.Y { return DirSE }
-	if to.X > from.X && to.Y < from.Y { return DirNE }
-	if to.X < from.X && to.Y > from.Y { return DirSW }
-	if to.X < from.X && to.Y < from.Y { return DirNW }
+	if to.X > from.X && to.Y == from.Y {
+		return DirEast
+	}
+	if to.X < from.X && to.Y == from.Y {
+		return DirWest
+	}
+	if to.Y > from.Y && to.X == from.X {
+		return DirSouth
+	}
+	if to.Y < from.Y && to.X == from.X {
+		return DirNorth
+	}
+	if to.X > from.X && to.Y > from.Y {
+		return DirSE
+	}
+	if to.X > from.X && to.Y < from.Y {
+		return DirNE
+	}
+	if to.X < from.X && to.Y > from.Y {
+		return DirSW
+	}
+	if to.X < from.X && to.Y < from.Y {
+		return DirNW
+	}
 	return DirNorth
 }
-

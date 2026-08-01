@@ -32,12 +32,29 @@ type Monster struct {
 	// Idle indicates this monster has been idled (no AI processing).
 	Idle bool
 
+	// Summons this monster has out, capped by MonsterType.MaxSummons.
+	Summons []*Monster
+
+	// Per-timer tick accumulators for the Monster::onThink pipeline
+	// (monster.cpp:2140-2310). Each counter advances by the think interval and
+	// fires independently; they live on the monster because upstream keeps them
+	// there and they must survive a tick where the monster is skipped.
+	yellTicks            int
+	defenseTicks         int
+	targetChangeTicks    int
+	targetChangeCooldown int
+	// challengeFocusDuration pins the monster on a challenging player, blocking
+	// onThinkTarget from re-rolling until it expires.
+	challengeFocusDuration int
+	// walkingBack is set when the monster is outside its spawn and heading home.
+	walkingBack bool
+
 	// Type is the shared, immutable monster definition (attacks, loot,
 	// experience, flags). May be nil for synthetic/test monsters.
 	Type *creatures.MonsterType
 
-	ForgeClassification ForgeClassification
-	ForgeStack          uint16
+	ForgeClassification  ForgeClassification
+	ForgeStack           uint16
 	TimeToChangeFiendish int64
 
 	// spellCooldowns tracks per-spell cooldowns keyed by spell name. Each

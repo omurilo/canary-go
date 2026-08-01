@@ -117,6 +117,10 @@ type World struct {
 	OnMagicEffect    func(pos Position, effect uint16)
 	OnDistanceEffect func(from, to Position, effect uint16)
 	OnCreatureSay    func(speaker Creature, talkType byte, text string)
+	// OnCreatureTurn notifies spectators that a creature changed facing, the
+	// send half of Game::internalCreatureTurn. Monster::updateLookDirection
+	// fires it on every think, so a monster visibly faces its target.
+	OnCreatureTurn   func(c Creature)
 	OnCastSpell      func(name string, caster Creature, target Creature) bool
 	OnTargetTile     func(funcName string, caster Creature, pos Position)
 	OnTargetCreature func(funcName string, caster Creature, target Creature)

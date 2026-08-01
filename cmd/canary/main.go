@@ -752,6 +752,10 @@ func run(o runOpts, log *slog.Logger) error {
 	// Core engine data lives in the base `data/` tree (not the world datapack):
 	// data/lib + data/npclib define framework classes (e.g. KeywordHandler) that
 
+	world.OnCreatureTurn = func(c game.Creature) {
+		protocol.BroadcastCreatureTurn(world, c)
+	}
+
 	world.OnCreatureSay = func(speaker game.Creature, talkType byte, text string) {
 		protocol.BroadcastCreatureSay(world, speaker, talkType, text)
 

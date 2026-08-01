@@ -7,8 +7,8 @@ import (
 
 	"github.com/opentibiabr/canary-go/internal/creatures"
 	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/game/vocations"
 	"github.com/opentibiabr/canary-go/internal/game/imbuements"
+	"github.com/opentibiabr/canary-go/internal/game/vocations"
 	"github.com/opentibiabr/canary-go/internal/items"
 	"github.com/opentibiabr/canary-go/internal/moveevents"
 	"github.com/opentibiabr/canary-go/internal/netmsg"
@@ -461,7 +461,7 @@ func (g *GameProtocol) stepDuration(dir game.Direction) time.Duration {
 
 // sendMapShift sends the newly revealed strip after the player moved.
 func (g *GameProtocol) sendMapShift(dir game.Direction, pos game.Position) {
-	
+
 	w := netmsg.NewWriter()
 	switch dir {
 	case game.DirNorth:
@@ -487,35 +487,52 @@ func (g *GameProtocol) sendMapShift(dir game.Direction, pos game.Position) {
 
 // turn updates the player's facing and notifies spectators.
 func (g *GameProtocol) turn(dir game.Direction) {
-	p := g.player
-	p.Direction = dir
+	g.player.Direction = dir
+	BroadcastCreatureTurn(g.deps.World, g.player)
+}
 
-	// Per Player::sendCreatureTurn (src/creatures/players/player.cpp:8671) the
-	// stack position is resolved in EACH receiver's view — one value taken from the
-	// turning player's own view is wrong for anyone whose tile stack differs (an
-	// invisible creature between them, say). Out of range, C++ falls back to a full
-	// tile update rather than naming a stackpos the client cannot address.
+// BroadcastCreatureTurn tells everyone who can see a creature that it changed
+// facing. It is Game::internalCreatureTurn's send half, and monsters need it as
+// much as players do — Monster::updateLookDirection turns a monster towards
+// whatever it is attacking on every think.
+//
+// Per Player::sendCreatureTurn (src/creatures/players/player.cpp:8671) the stack
+// position is resolved in EACH receiver's view — one value taken from the
+// turning creature's own view is wrong for anyone whose tile stack differs (an
+// invisible creature between them, say). Out of range, C++ falls back to a full
+// tile update rather than naming a stackpos the client cannot address.
+func BroadcastCreatureTurn(world *game.World, c game.Creature) {
+	if world == nil || c == nil {
+		return
+	}
+	pos, id, dir := c.GetPosition(), c.GetID(), c.GetDirection()
+
 	notify := func(gp *GameProtocol) {
-		if !gp.canSeeCreature(p) {
+		if !gp.canSeeCreature(c) {
 			return
 		}
-		stack := gp.ClientIndexOfCreature(p.Pos, p.ID)
+		stack := gp.ClientIndexOfCreature(pos, id)
 		if stack < 0 || stack >= 10 {
-			gp.sendUpdateTile(p.Pos, gp.deps.World.Map.GetTile(p.Pos))
+			gp.sendUpdateTile(pos, world.Map.GetTile(pos))
 			return
 		}
 		w := netmsg.NewWriter()
 		w.AddByte(opTileTransform)
-		w.AddPosition(netmsg.Position{X: p.Pos.X, Y: p.Pos.Y, Z: p.Pos.Z})
+		w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})
 		w.AddByte(uint8(stack))
 		w.AddU16(creatureTurnMark)
-		w.AddU32(p.ID)
+		w.AddU32(id)
 		w.AddByte(byte(dir))
 		w.AddByte(0x01) // can-walk-through flag (0x01 = blocking, as ProtocolGame::sendCreatureTurn for version >= 953)
 		gp.SendToClient(w)
 	}
-	notify(g)
-	for _, s := range g.deps.World.Spectators(p.Pos, p.ID) {
+
+	if p, ok := c.(*game.Player); ok {
+		if gp, ok := p.Session.(*GameProtocol); ok {
+			notify(gp)
+		}
+	}
+	for _, s := range world.Spectators(pos, id) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
 			notify(gp)
 		}
@@ -609,7 +626,7 @@ func hasTalkActionPermission(p *game.Player, ta *talkactions.TalkAction) bool {
 			return false
 		}
 	}
-	
+
 	// Check explicitly set AccountType requirement
 	if ta.AccountType > 0 {
 		if p.AccountType < ta.AccountType {
@@ -623,7 +640,7 @@ func hasTalkActionPermission(p *game.Player, ta *talkactions.TalkAction) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -644,7 +661,7 @@ func (g *GameProtocol) tryTalkAction(talkType byte, text string) bool {
 	if ta == nil {
 		return false
 	}
-	
+
 	if !hasTalkActionPermission(g.player, ta) {
 		g.sendStatusText("You cannot execute this command.")
 		return true
@@ -738,7 +755,7 @@ func (g *GameProtocol) SendCreatureMove(oldPos game.Position, oldStack uint8, ne
 
 // SendAppendCreature adds a creature onto a tile in this client's view.
 func (g *GameProtocol) SendAppendCreature(p game.Creature, pos game.Position) {
-	
+
 	// sendAddCreature opens with `if (!canSee(pos)) return;` and then drops anything
 	// at stackpos >= 10 (protocolgame.cpp). Spectator range is wider than the client
 	// window, so without the first check every widened spectator is told to add a
@@ -833,7 +850,7 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 				return
 			}
 		}
-		
+
 		desc := fmt.Sprintf("You see %s.", targetCreature.GetName())
 		if targetPlayer, ok := targetCreature.(*game.Player); ok {
 			desc = BuildPlayerDescription(g.player, targetPlayer)
@@ -853,7 +870,7 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 				return
 			}
 		}
-		
+
 		desc := BuildItemDescription(g.player, item, g.deps.Items)
 
 		w := netmsg.NewWriter()
@@ -916,7 +933,7 @@ func BuildPlayerDescription(viewer *game.Player, target *game.Player) string {
 	if target.Party != nil {
 		memberCount := target.Party.MemberCount() + 1
 		invitationCount := len(target.Party.Invitees())
-		
+
 		var part1, part2 string
 		if memberCount == 1 {
 			part1 = "1 member"
@@ -971,7 +988,7 @@ func BuildItemDescription(viewer *game.Player, item *game.Item, catalog *items.C
 		if len(itemType.Name) > 0 {
 			c := itemType.Name[0]
 			if c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u' ||
-			   c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U' {
+				c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U' {
 				article = "an"
 			}
 		}
@@ -1195,6 +1212,7 @@ func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 
 	g.refreshAfterTrade()
 }
+
 // deliveredUnits sums the stack counts of the items actually placed by a buy.
 func deliveredUnits(placed []*game.Item) uint32 {
 	var n uint32
@@ -1406,7 +1424,6 @@ func (g *GameProtocol) parseCloseChannel(r *netmsg.Reader) {
 	}
 }
 
-
 func (g *GameProtocol) parseFightModes(r *netmsg.Reader) {
 	fightMode := r.GetByte()  // 1 = offensive, 2 = balanced, 3 = defensive
 	chaseMode := r.GetByte()  // 0 = stand, 1 = chase
@@ -1423,7 +1440,6 @@ func (g *GameProtocol) parseFightModes(r *netmsg.Reader) {
 
 	g.sendStats()
 }
-
 
 func (g *GameProtocol) parseNpcGreet(r *netmsg.Reader) {
 	npcId := r.GetU32()
