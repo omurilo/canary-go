@@ -338,10 +338,11 @@ func (e *Engine) registerAPI() {
 	mockClass("Hazard")
 	mockClass("ZoneEvent")
 	mockClass("HazardMonster")
-	// Teleport stays mocked: registerTeleportType exists but its method set still
-	// misses what the datapack calls. Zone no longer does — it is backed by the real
-	// registry now, with the nineteen methods C++ registers.
-	// Same caveat for Imbuement: registerImbuementType is intentionally left unwired.
+	// Teleport is NOT in that list, and the comment that used to say it was is
+	// gone with it: registerTeleportType now builds a real shared class, and
+	// mocking the name would destroy it. Zone is the same — backed by the real
+	// registry, with the nineteen methods C++ registers.
+	// Imbuement stays unwired: registerImbuementType exists but is not called.
 
 	// ItemClassification has a real binding (not a mock) so it can be
 	// populated from data/scripts/systems/item_tiers.lua.
