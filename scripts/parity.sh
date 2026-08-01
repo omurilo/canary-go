@@ -91,7 +91,7 @@ go_enums=$(grep -rhoE 'registerEnum' "$GO_ROOT/internal/luaengine/" 2>/dev/null 
 
 row "class methods" "$cpp_methods" "$go_methods" "names only, not behaviour"
 # O uso de ':-0' garante que, se o grep não encontrar nada e as variáveis ficarem vazias, o valor padrão seja 0.
-row "enum globals" "${cpp_enums:-0}" "${go_enums:-0}" "0 missing, 0 wrong (snapshot)"
+row "enum globals" "${cpp_enums:-0}" "${go_enums:-0}" "raw grep counts; the real diff is TestRegisteredEnumsMatchUpstream"
 
 # ---- database ---------------------------------------------------------------
 head_ "Database tables referenced from code"
@@ -123,25 +123,44 @@ head_ "Subsystem size ratios"
 # go-path may name several files. A subsystem split across more than one Go file
 # was counted from the first alone and reported far lower than it is — monster AI
 # read 3% while half of it sat in monster_ai.go.
-cmp_pair() { # label cpp-path go-path...
-	local label cpp c g f
+# Both sides may span several files, and BOTH lists have to cover the same scope
+# or the ratio is meaningless. Counting Go's Lua bindings against the C++ core
+# alone reported NPC at 131%, which is as wrong as the 9% it replaced.
+#
+#   cmp_pair <label> <cpp...> -- <go...>
+cmp_pair() {
+	local label c g f side
 	label="$1"
-	cpp="$2"
-	shift 2
-	c=$(cat "$SRC/$cpp" 2>/dev/null | wc -l | tr -d ' ')
-	[[ "$c" == "0" || -z "$c" ]] && return
+	shift
+	c=0
 	g=0
+	side=cpp
 	for f in "$@"; do
-		g=$((g + $(cat "$GO_ROOT/$f" 2>/dev/null | wc -l | tr -d ' ')))
+		if [[ "$f" == "--" ]]; then
+			side=go
+			continue
+		fi
+		if [[ "$side" == "cpp" ]]; then
+			c=$((c + $(cat "$SRC/$f" 2>/dev/null | wc -l | tr -d ' ')))
+		else
+			g=$((g + $(cat "$GO_ROOT/$f" 2>/dev/null | wc -l | tr -d ' ')))
+		fi
 	done
+	((c == 0)) && return
 	row "$label" "$c" "$g" "$((g * 100 / c))%"
 }
 cmp_pair "monster AI" "creatures/monsters/monster.cpp" \
-	"internal/game/ai_engine.go" "internal/game/monster_ai.go"
-cmp_pair "npc" "creatures/npcs/npc.cpp" "internal/game/npc.go"
-cmp_pair "house" "map/house/house.cpp" "internal/game/house.go"
-cmp_pair "spawn" "creatures/monsters/spawns/spawn_monster.cpp" "internal/game/spawn_engine.go"
-cmp_pair "decay" "items/decay/decay.cpp" "internal/game/decay.go"
-cmp_pair "map serialize" "io/iomapserialize.cpp" "internal/db/tile_store.go"
+	-- "internal/game/ai_engine.go" "internal/game/monster_ai.go"
+cmp_pair "npc (core)" "creatures/npcs/npc.cpp" \
+	-- "internal/game/npc.go" "internal/game/npc_engine.go" "internal/game/npc_shop.go"
+cmp_pair "npc (lua api)" \
+	"lua/functions/creatures/npc/npc_functions.cpp" \
+	"lua/functions/creatures/npc/npc_type_functions.cpp" \
+	"lua/functions/creatures/npc/shop_functions.cpp" \
+	-- "internal/luaengine/npc.go" "internal/luaengine/npctype.go"
+cmp_pair "house" "map/house/house.cpp" -- "internal/game/house.go"
+cmp_pair "spawn" "creatures/monsters/spawns/spawn_monster.cpp" -- "internal/game/spawn_engine.go"
+cmp_pair "decay" "items/decay/decay.cpp" -- "internal/game/decay.go"
+cmp_pair "map serialize" "io/iomapserialize.cpp" -- "internal/db/tile_store.go"
 
 echo

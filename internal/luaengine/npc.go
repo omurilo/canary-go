@@ -691,3 +691,56 @@ func (e *Engine) pushPlayerUserdata(p *game.Player) {
 	e.L.SetMetatable(ud, e.L.GetTypeMetatable("Player"))
 	e.L.Push(ud)
 }
+
+// ExecuteNpcCreatureAppear runs an NPC's onAppear callback, Npc::onCreatureAppear
+// (src/creatures/npcs/npc.cpp:577-594), which passes (self, creature).
+//
+// onAppear and onDisappear were being captured by NpcType's __newindex and then
+// never called — the assignment succeeded, the script loaded clean, and the
+// greeting simply never happened. Every NPC that hails a passer-by or says
+// goodbye when they walk off was silent.
+func (e *Engine) ExecuteNpcCreatureAppear(npc *game.Npc, c game.Creature) bool {
+	return e.execNpcCreatureCallback("onAppear", npc, c)
+}
+
+// ExecuteNpcCreatureDisappear runs onDisappear, the counterpart above.
+func (e *Engine) ExecuteNpcCreatureDisappear(npc *game.Npc, c game.Creature) bool {
+	return e.execNpcCreatureCallback("onDisappear", npc, c)
+}
+
+func (e *Engine) execNpcCreatureCallback(key string, npc *game.Npc, c game.Creature) bool {
+	if npc == nil || c == nil {
+		return false
+	}
+	e.npcCallbacksMu.Lock()
+	if e.npcCallbacks == nil {
+		e.npcCallbacksMu.Unlock()
+		return false
+	}
+	callbacks, ok := e.npcCallbacks[strings.ToLower(npc.Name)]
+	if !ok || callbacks[key] == nil {
+		e.npcCallbacksMu.Unlock()
+		return false
+	}
+	fn := callbacks[key]
+	e.npcCallbacksMu.Unlock()
+
+	L := e.L
+	L.Push(fn)
+
+	udNpc := L.NewUserData()
+	udNpc.Value = npc
+	L.SetMetatable(udNpc, L.GetTypeMetatable("Npc"))
+	L.Push(udNpc)
+
+	udCreature := L.NewUserData()
+	udCreature.Value = c
+	L.SetMetatable(udCreature, L.GetTypeMetatable(metatableForCreature(c)))
+	L.Push(udCreature)
+
+	if err := L.PCall(2, 0, nil); err != nil {
+		e.log.Error("lua npc callback", "callback", key, "npc", npc.Name, "err", err)
+		return false
+	}
+	return true
+}

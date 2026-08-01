@@ -570,9 +570,15 @@ func run(o runOpts, log *slog.Logger) error {
 	}
 	world.OnCreatureAppear = func(c game.Creature) {
 		protocol.BroadcastCreatureAppear(world, c)
+		// Npc::onCreatureAppear (src/creatures/npcs/npc.cpp:577-594). Every NPC that
+		// can see the new arrival gets its onAppear callback. These were captured by
+		// NpcType's __newindex and never called, so an NPC that greets a passer-by
+		// stayed silent and no script error said why.
+		notifyNpcsAround(world, lengine, c, true)
 	}
 	world.OnCreatureRemove = func(c game.Creature, oldStackPos map[uint32]int) {
 		protocol.BroadcastCreatureRemove(world, c, oldStackPos)
+		notifyNpcsAround(world, lengine, c, false)
 	}
 	world.OnGhostModeChange = func(p *game.Player) {
 		protocol.BroadcastGhostModeChange(world, p)
@@ -1153,5 +1159,31 @@ func jobHandler(_ *db.DB, log *slog.Logger) db.JobHandler {
 	return func(ctx context.Context, kind string, payload json.RawMessage) error {
 		log.Info("processing async job", "kind", kind, "payload", string(payload))
 		return nil
+	}
+}
+
+// notifyNpcsAround fires onAppear/onDisappear on every NPC that can see the
+// creature. C++ delivers these through the spectator list the same way
+// (Npc::onCreatureAppear / onCreatureDisappear); the NPC itself is skipped so it
+// does not greet its own arrival.
+func notifyNpcsAround(world *game.World, lengine *luaengine.Engine, c game.Creature, appearing bool) {
+	if lengine == nil || c == nil {
+		return
+	}
+	pos := c.GetPosition()
+	for _, other := range world.Creatures() {
+		npc, ok := other.(*game.Npc)
+		if !ok || game.Creature(npc) == c {
+			continue
+		}
+		// Spectator range, so a distant NPC is not woken for someone it cannot see.
+		if !npc.GetPosition().InRangeOf(pos) {
+			continue
+		}
+		if appearing {
+			lengine.ExecuteNpcCreatureAppear(npc, c)
+		} else {
+			lengine.ExecuteNpcCreatureDisappear(npc, c)
+		}
 	}
 }
