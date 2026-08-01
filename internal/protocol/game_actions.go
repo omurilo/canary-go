@@ -1482,19 +1482,44 @@ func (g *GameProtocol) walkToThenRetry(target game.Position, retry func()) bool 
 	}
 
 	gen := g.walkGen.Add(1)
+	g.logWalkRetry("start", from, target, len(dirs))
 	go func() {
 		g.walkPath(dirs, gen)
 		// A cancelled or blocked path must not fire the action: walkPath returns
 		// early in both cases, and the generation check catches the first.
+		//
+		// Both of these used to drop the action with no message and no log, which
+		// made an interrupted walk indistinguishable from a server that ignored the
+		// request — the exact hole that cost a round of diagnosis.
 		if g.walkGen.Load() != gen {
+			g.logWalkRetry("cancelled", g.player.Pos, target, len(dirs))
 			return
 		}
 		if chebyshev(g.player.Pos, target) > 1 {
+			g.logWalkRetry("blocked", g.player.Pos, target, len(dirs))
+			g.sendCancelMessage("There is no way.")
 			return
 		}
+		g.logWalkRetry("arrived", g.player.Pos, target, len(dirs))
 		g.actionMu.Lock()
 		defer g.actionMu.Unlock()
 		retry()
 	}()
 	return true
+}
+
+// logWalkRetry records each outcome of the walk-then-retry, at WARN so it shows
+// without the opcode dump.
+func (g *GameProtocol) logWalkRetry(stage string, from, target game.Position, steps int) {
+	if g.deps == nil || g.deps.Log == nil {
+		return
+	}
+	player := ""
+	if g.player != nil {
+		player = g.player.Name
+	}
+	g.deps.Log.Warn("walk-to-action", "stage", stage, "player", player,
+		"from", fmt.Sprintf("%d,%d,%d", from.X, from.Y, from.Z),
+		"target", fmt.Sprintf("%d,%d,%d", target.X, target.Y, target.Z),
+		"steps", steps)
 }

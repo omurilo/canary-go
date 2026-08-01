@@ -480,8 +480,16 @@ func (g *GameProtocol) unwrapItem(pos game.Position, item *game.Item) {
 	raw, ok := item.GetCustomAttribute("unWrapId")
 	unwrapID := customAttrUint16(raw)
 	if !ok || unwrapID == 0 {
-		g.sendCancelMessage("Sorry, not possible.")
+		// Outside wrapableAt, so this refusal carried no reason either: a kit whose
+		// unWrapId the store never wrote looks identical, from the log, to a request
+		// that was dropped.
+		g.wrapRefuse("noUnwrapId", "Sorry, not possible.",
+			netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, item.ID, 0)
 		return
+	}
+	if g.deps != nil && g.deps.Log != nil {
+		g.deps.Log.Warn("unwrap proceeding", "item", item.ID, "into", unwrapID,
+			"pos", fmt.Sprintf("%d,%d,%d", pos.X, pos.Y, pos.Z))
 	}
 
 	amount := uint16(1)
