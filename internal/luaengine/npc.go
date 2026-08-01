@@ -697,13 +697,33 @@ func (e *Engine) pushPlayerUserdata(p *game.Player) {
 // never called — the assignment succeeded, the script loaded clean, and the
 // greeting simply never happened. Every NPC that hails a passer-by or says
 // goodbye when they walk off was silent.
-func (e *Engine) ExecuteNpcCreatureAppear(npc *game.Npc, c game.Creature) bool {
-	return e.execNpcCreatureCallback("onAppear", npc, c)
+// It is dispatched rather than run inline, and that is load-bearing. The
+// trigger is world.OnCreatureAppear, which fires from AddCreature — and
+// AddCreature is called from inside Lua bindings (Game.createNpc,
+// Game.createMonster), which already hold e.mu. Locking it again there is a
+// self-deadlock: Go mutexes are not reentrant, and the server hung during
+// startup spawning with no log past the last spawned NPC.
+//
+// Running it on the dispatcher decouples the callback from whoever mutated the
+// world, so the lock is always taken from a goroutine that does not hold it.
+// C++ has the same separation for a different reason — onCreatureAppear runs on
+// the game thread, never inside the caller that placed the creature.
+func (e *Engine) ExecuteNpcCreatureAppear(npc *game.Npc, c game.Creature) {
+	e.dispatchNpcCreatureCallback("onAppear", npc, c)
 }
 
 // ExecuteNpcCreatureDisappear runs onDisappear, the counterpart above.
-func (e *Engine) ExecuteNpcCreatureDisappear(npc *game.Npc, c game.Creature) bool {
-	return e.execNpcCreatureCallback("onDisappear", npc, c)
+func (e *Engine) ExecuteNpcCreatureDisappear(npc *game.Npc, c game.Creature) {
+	e.dispatchNpcCreatureCallback("onDisappear", npc, c)
+}
+
+func (e *Engine) dispatchNpcCreatureCallback(key string, npc *game.Npc, c game.Creature) {
+	if npc == nil || c == nil {
+		return
+	}
+	game.GlobalDispatcher.AddEvent(0, func() {
+		e.execNpcCreatureCallback(key, npc, c)
+	})
 }
 
 func (e *Engine) execNpcCreatureCallback(key string, npc *game.Npc, c game.Creature) bool {
