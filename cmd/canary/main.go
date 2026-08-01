@@ -38,6 +38,13 @@ import (
 	"github.com/opentibiabr/canary-go/internal/tibcrypto"
 )
 
+// buildCommit and buildTime are stamped at link time; see the Makefile. They stay
+// "unknown" for a plain `go build`, which is itself worth knowing in a log.
+var (
+	buildCommit = "unknown"
+	buildTime   = "unknown"
+)
+
 func main() {
 	var (
 		configPath  = flag.String("config", "config.lua", "path to the Lua config file")
@@ -126,6 +133,13 @@ func run(o runOpts, log *slog.Logger) error {
 	if scriptsDir == "scripts" && cfg.DataPack != "" {
 		scriptsDir = filepath.Join(cfg.DataPack, "scripts")
 	}
+	// Which build is this? Every diagnosis this far has had to infer it by comparing
+	// a commit time on one machine against a log time on another, across an
+	// unverified sync — and that inference was wrong more than once, twice leading to
+	// real evidence being dismissed as "the code was not in that build". The binary
+	// states it instead.
+	log.Info("build", "commit", buildCommit, "builtAt", buildTime)
+
 	log.Info("configuration loaded", "server", cfg.ServerName, "loginPort", cfg.LoginPort,
 		"gamePort", cfg.GamePort, "db", cfg.DBName)
 

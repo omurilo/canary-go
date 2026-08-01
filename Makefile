@@ -2,8 +2,14 @@
 
 c ?=
 
+# Stamp the build so the running server can say which commit it is, instead of it
+# having to be inferred from timestamps across machines.
+COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+BUILT_AT := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -X main.buildCommit=$(COMMIT) -X main.buildTime=$(BUILT_AT)
+
 build:
-	go build -o bin/canary ./cmd/canary
+	go build -ldflags "$(LDFLAGS)" -o bin/canary ./cmd/canary
 	go build -o bin/canary-client ./cmd/canary-client
 
 test:

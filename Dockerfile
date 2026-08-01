@@ -25,9 +25,21 @@ RUN ./scripts/generate_appearances.sh
 # 5. Realiza o build utilizando cache mounts do Go.
 # Isso garante que recompilações (quando você muda apenas um arquivo .go)
 # sejam extremamente rápidas.
+# BUILD_COMMIT is stamped into the binary so the running server logs which build
+# it is. Without it, "is this fix in the container?" can only be inferred by
+# comparing a commit time on one machine against a log time on another — which has
+# been wrong twice, and each time led to real evidence being waved away.
+#
+# The build works without it; the field then reads "unknown", which is itself
+# worth seeing in a log. Pass it with:
+#   docker build --build-arg BUILD_COMMIT=$(git rev-parse --short HEAD) ...
+ARG BUILD_COMMIT=unknown
+ARG BUILD_TIME=unknown
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -o /out/canary ./cmd/canary
+    CGO_ENABLED=0 go build -trimpath \
+    -ldflags "-X main.buildCommit=${BUILD_COMMIT} -X main.buildTime=${BUILD_TIME}" \
+    -o /out/canary ./cmd/canary
 
 # --- Estágio Final ---
 FROM alpine:3.20

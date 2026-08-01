@@ -36,6 +36,12 @@ services:
     build:
       context: ..
       dockerfile: ./Dockerfile
+      # Stamps the running server's startup log with the commit it was built from,
+      # so it never has to be inferred from timestamps again. Falls back to
+      # "unknown" outside a git checkout, which the log will say plainly.
+      args:
+        BUILD_COMMIT: "${BUILD_COMMIT:-unknown}"
+        BUILD_TIME: "${BUILD_TIME:-unknown}"
     user: "1000:1000"
     container_name: canary-go-server
     restart: unless-stopped
