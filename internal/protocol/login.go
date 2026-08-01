@@ -288,13 +288,15 @@ func (p *LoginProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	//
 	// Only the modern client's HTTP login path was exercised, which is why this went
 	// unnoticed while real logins worked.
-	if len(body) >= tibiaHeaderLength {
-		declared := int(body[0]) | int(body[1])<<8
-		if declared == len(body)-tibiaHeaderLength {
-			body = body[tibiaHeaderLength:]
+	body, modernPad := stripLoginFraming(body, c)
+	body = transport.StripFirstPacketChecksum(body)
+	if modernPad {
+		var ok bool
+		if body, ok = stripModernPadding(body); !ok {
+			c.Logger().Debug("login: invalid modern padding")
+			return
 		}
 	}
-	body = transport.StripFirstPacketChecksum(body)
 	r := netmsg.NewReader(body)
 	_ = r.GetByte()       // protocol id (0x01)
 	_ = r.GetU16()        // operating system
@@ -407,4 +409,67 @@ func (p *LoginProtocol) sendCharacterList(c *network.Connection, acc *db.Account
 	w.AddByte(isPremium)
 	w.AddU32(premLastDay)
 	_ = c.Send(w)
+}
+
+// stripLoginFraming removes the outer 2-byte header from a first login packet
+// and reports whether the client used the modern (>= 1405) framing, which also
+// carries a padding byte the caller has to remove after the checksum.
+//
+// The login service reads in RawFirstPacket mode so it can recognise HTTP and
+// MyAAC status probes, so the header is still attached and has to be parsed by
+// hand. The two forms are:
+//
+//	legacy   u16 = body length         (OutputMessage::writeMessageSize)
+//	modern   u16 = XTEA block count    (OutputMessage::writeHeaderSize, >= 1405)
+//	              = (messageSize - 4) / 8, the -4 being the checksum
+//
+// Only the legacy form was recognised. A 13.x client's header is a block count,
+// which never equals the byte length, so the two bytes were left in front of the
+// payload; every field after that read two bytes early and the RSA block came
+// out as noise. The first decrypted byte then failed its "must be zero" check
+// and the connection was dropped in silence — the reported
+//
+//	rsa leading byte non-zero
+//
+// The two tests cannot both pass: declared == declared*8+4 has no solution.
+func stripLoginFraming(body []byte, c *network.Connection) (out []byte, modernPad bool) {
+	if len(body) < tibiaHeaderLength {
+		return body, false
+	}
+	declared := int(body[0]) | int(body[1])<<8
+	rest := len(body) - tibiaHeaderLength
+
+	// Modern: block count * 8 + the 4 checksum bytes, the same arithmetic
+	// Codec.DecodeBodySize does for the game port.
+	if declared*8+4 == rest {
+		if c != nil {
+			c.Logger().Debug("login: modern framing", "blocks", declared, "bytes", rest)
+		}
+		return body[tibiaHeaderLength:], true
+	}
+	if declared == rest {
+		return body[tibiaHeaderLength:], false
+	}
+	// Neither: leave it alone rather than guess.
+	if c != nil {
+		c.Logger().Debug("login: unrecognised outer header",
+			"declared", declared, "rest", rest)
+	}
+	return body, false
+}
+
+// stripModernPadding removes OutputMessage::writePaddingAmount's leading count
+// byte and the trailing filler it describes. The first login packet is not
+// XTEA-encrypted — encryption is only enabled after it is sent — but a 13.x
+// client pads it anyway, so the padding is sitting in the clear.
+func stripModernPadding(body []byte) ([]byte, bool) {
+	if len(body) < 1 {
+		return body, false
+	}
+	pad := int(body[0])
+	end := len(body) - pad
+	if end < 1 {
+		return body, false
+	}
+	return body[1:end], true
 }
