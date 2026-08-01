@@ -61,30 +61,30 @@ func (e *Engine) npcIsmerchant(L *lua.LState) int {
 }
 
 var npcMethods = map[string]lua.LGFunction{
-	"isNpc": npcIsnpc,
-	"setMasterPos": npcSetmasterpos,
-	"getCurrency": npcGetcurrency,
-	"setCurrency": npcSetcurrency,
+	"isNpc":           npcIsnpc,
+	"setMasterPos":    npcSetmasterpos,
+	"getCurrency":     npcGetcurrency,
+	"setCurrency":     npcSetcurrency,
 	"getSpeechBubble": npcGetspeechbubble,
 	"setSpeechBubble": npcSetspeechbubble,
 	// getId/getName/move are inherited from creatureMethods (which are now
 	// implemented); don't shadow them with stubs here.
-	"setName": npcSetname,
-	"place": npcPlace,
-	"say": npcSay,
-	"turnToCreature": npcTurntocreature,
-	"setPlayerInteraction": npcSetplayerinteraction,
-	"removePlayerInteraction": npcRemoveplayerinteraction,
-	"isInteractingWithPlayer": npcIsinteractingwithplayer,
-	"isInTalkRange": npcIsintalkrange,
+	"setName":                    npcSetname,
+	"place":                      npcPlace,
+	"say":                        npcSay,
+	"turnToCreature":             npcTurntocreature,
+	"setPlayerInteraction":       npcSetplayerinteraction,
+	"removePlayerInteraction":    npcRemoveplayerinteraction,
+	"isInteractingWithPlayer":    npcIsinteractingwithplayer,
+	"isInTalkRange":              npcIsintalkrange,
 	"isPlayerInteractingOnTopic": npcIsplayerinteractingontopic,
-	"openShopWindow": npcOpenshopwindow,
-	"openShopWindowTable": npcOpenshopwindowtable,
-	"closeShopWindow": npcCloseshopwindow,
-	"getShopItem": npcGetshopitem,
-	"turn": npcTurn,
-	"follow": npcFollow,
-	"getDistanceTo": npcGetdistanceto,
+	"openShopWindow":             npcOpenshopwindow,
+	"openShopWindowTable":        npcOpenshopwindowtable,
+	"closeShopWindow":            npcCloseshopwindow,
+	"getShopItem":                npcGetshopitem,
+	"turn":                       npcTurn,
+	"follow":                     npcFollow,
+	"getDistanceTo":              npcGetdistanceto,
 }
 
 func npcCloseshopwindow(L *lua.LState) int { return 0 }
@@ -210,7 +210,6 @@ func interactionPlayerID(L *lua.LState, n int) uint32 {
 	return 0
 }
 
-
 func npcIsnpc(L *lua.LState) int {
 	L.Push(lua.LTrue)
 	return 1
@@ -235,7 +234,7 @@ func (e *Engine) npcOpenshopwindow(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	
+
 	if e.world != nil {
 		nType := e.world.TypeRegistry.Npcs[strings.ToLower(n.Name)]
 		if nType != nil && len(nType.ShopItems) > 0 {
@@ -255,46 +254,46 @@ func npcOpenshopwindowtable(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
-	
+
 	tbl := L.CheckTable(3)
 	var shopItems []creatures.ShopItem
-	
+
 	tbl.ForEach(func(key lua.LValue, val lua.LValue) {
 		if innerTbl, ok := val.(*lua.LTable); ok {
 			var si creatures.ShopItem
-			
+
 			if idVal := innerTbl.RawGetString("id"); idVal.Type() == lua.LTNumber {
 				si.ID = uint16(lua.LVAsNumber(idVal))
 			} else if idVal := innerTbl.RawGetString("itemId"); idVal.Type() == lua.LTNumber {
 				si.ID = uint16(lua.LVAsNumber(idVal))
 			}
-			
+
 			if buyVal := innerTbl.RawGetString("buy"); buyVal.Type() == lua.LTNumber {
 				si.BuyPrice = uint32(lua.LVAsNumber(buyVal))
 			}
-			
+
 			if sellVal := innerTbl.RawGetString("sell"); sellVal.Type() == lua.LTNumber {
 				si.SellPrice = uint32(lua.LVAsNumber(sellVal))
 			}
-			
+
 			if nameVal := innerTbl.RawGetString("name"); nameVal.Type() == lua.LTString {
 				si.Name = lua.LVAsString(nameVal)
 			}
-			
+
 			// SubType check if we support it
 			if subTypeVal := innerTbl.RawGetString("subType"); subTypeVal.Type() == lua.LTNumber {
 				si.SubType = uint8(lua.LVAsNumber(subTypeVal))
 			}
-			
+
 			if si.ID != 0 {
 				shopItems = append(shopItems, si)
 			}
 		}
 	})
-	
+
 	p.ShopOwnerID = n.ID
 	p.SendOpenShop(n, shopItems)
-	
+
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -465,7 +464,6 @@ func npcTurntocreature(L *lua.LState) int {
 	}
 	return 0
 }
-
 
 // CallNpcCloseChannel fires the NPC's onCloseChannel callback (if defined) when
 // a player closes the shop/trade window, mirroring Npc::onPlayerCloseChannel so
@@ -724,6 +722,24 @@ func (e *Engine) execNpcCreatureCallback(key string, npc *game.Npc, c game.Creat
 	}
 	fn := callbacks[key]
 	e.npcCallbacksMu.Unlock()
+
+	// e.mu guards the Lua state itself. npcCallbacksMu only guards the callback
+	// MAP — releasing it and then touching e.L, as this did, left the VM open to
+	// concurrent use from the spectator goroutine that fires onAppear.
+	//
+	// gopher-lua's LState is not safe for concurrent use, and corrupting it does
+	// not surface as a lock warning: it surfaced as
+	//
+	//	lua npc callback callback=onAppear npc=Polly
+	//	err="runtime error: invalid memory address or nil pointer dereference
+	//	     ... actions_boss_timira_fight.lua:278: in main chunk"
+	//
+	// pointing at a file that has nothing to do with Polly, and at its "main
+	// chunk" long after that chunk finished loading. The nonsensical traceback is
+	// the symptom — it is whatever happened to be on the shared stack when the
+	// two goroutines collided.
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
 	L := e.L
 	L.Push(fn)
