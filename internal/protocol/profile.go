@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/opentibiabr/canary-go/internal/transport"
+	"github.com/omurilo/canary-go/internal/transport"
 )
 
 // ProtocolVersion identifies a supported client protocol version family.

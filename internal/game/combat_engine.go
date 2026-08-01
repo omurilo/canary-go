@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/bestiary"
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
-	"github.com/opentibiabr/canary-go/internal/game/vocations"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/bestiary"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/game/vocations"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 const (

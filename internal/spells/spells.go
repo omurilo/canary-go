@@ -4,7 +4,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/game/combat"
 	lua "github.com/yuin/gopher-lua"
 )
 

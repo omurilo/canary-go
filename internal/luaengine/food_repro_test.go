@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/actions"
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/actions"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 func TestFoodActionRepro(t *testing.T) {

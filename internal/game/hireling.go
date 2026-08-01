@@ -20,8 +20,8 @@ type Hireling struct {
 // HirelingManager holds global hireling data (skills and outfits).
 type HirelingManager struct {
 	mu      sync.Mutex
-	skills  map[uint16]string  // skillID -> skill name
-	outfits map[uint16]string  // outfitID -> outfit name
+	skills  map[uint16]string // skillID -> skill name
+	outfits map[uint16]string // outfitID -> outfit name
 }
 
 // NewHirelingManager creates a new hireling manager with default data.

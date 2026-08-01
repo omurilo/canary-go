@@ -3,7 +3,7 @@ package creatures
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/bosstiary"
+	"github.com/omurilo/canary-go/internal/bosstiary"
 )
 
 func TestBosstiaryRegistry(t *testing.T) {

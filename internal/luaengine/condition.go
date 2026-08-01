@@ -1,8 +1,8 @@
 package luaengine
 
 import (
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game/combat"
 	lua "github.com/yuin/gopher-lua"
 )
 

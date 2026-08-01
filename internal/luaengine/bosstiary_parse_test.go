@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/bosstiary"
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/bosstiary"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // TestMonsterBosstiaryParse verifies monster.bosstiary parses bossRace via the

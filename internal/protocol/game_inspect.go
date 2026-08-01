@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/game/vocations"
-	"github.com/opentibiabr/canary-go/internal/mounts"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game/vocations"
+	"github.com/omurilo/canary-go/internal/mounts"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 const (

@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // LoadPlayerDepot loads all depot items for a player from the player_depotitems

@@ -3,7 +3,7 @@ package game
 import (
 	"sync"
 
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // Tile holds the contents of a single map cell.

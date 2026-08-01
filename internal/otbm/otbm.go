@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // Node type bytes.

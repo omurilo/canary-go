@@ -7,11 +7,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/bosstiary"
-	"github.com/opentibiabr/canary-go/internal/charms"
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game/imbuements"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/bosstiary"
+	"github.com/omurilo/canary-go/internal/charms"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game/imbuements"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // World is the authoritative in-memory game state: the map plus all online

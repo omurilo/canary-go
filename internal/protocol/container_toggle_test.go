@@ -3,7 +3,7 @@ package protocol
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // Using a container that is already open closes it instead of opening a second

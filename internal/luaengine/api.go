@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/config"
-	"github.com/opentibiabr/canary-go/internal/mounts"
+	"github.com/omurilo/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/mounts"
 	lua "github.com/yuin/gopher-lua"
 )
 

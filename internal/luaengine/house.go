@@ -3,7 +3,7 @@ package luaengine
 import (
 	lua "github.com/yuin/gopher-lua"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 const houseTypeName = "House"

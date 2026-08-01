@@ -3,7 +3,7 @@ package protocol
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // TestBosstiaryDataPacket decodes the 0x61 Boss Cyclopedia rules packet exactly

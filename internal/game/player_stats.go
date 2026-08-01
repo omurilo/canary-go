@@ -7,9 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game/vocations"
+	"github.com/omurilo/canary-go/internal/game/vocations"
 )
-
 
 // ============================================================================
 // Base types
@@ -28,7 +27,6 @@ type SkillsEquipment struct {
 	Equipment float64
 	Imbuement float64
 }
-
 
 func (p *Player) GetForgeSkillStat(slot uint8) float64 {
 	// Map cyclopedia forge slot to inventory slot + forge type.
@@ -422,6 +420,7 @@ var combatTypeToCipbia = [14]uint8{
 	11, // 12: COMBAT_AGONY   → CIPBIA_AGONY
 	12, // 13: COMBAT_NEUTRAL → CIPBIA_UNDEFINED
 }
+
 // equipped items (matching C++ calculateAbsorbValues). It also applies the
 // player's base AbsorbPercent. Imbuement and wheel contributions are stubbed
 // (0) until those systems expose per-element absorb data.
@@ -688,7 +687,6 @@ type WeaponProficiencyAugment struct {
 	Id      uint8
 	Data    float64
 }
-
 
 func (p *Player) GetWheelAugments() []WeaponProfAugment {
 	if p.Wheel == nil {

@@ -6,9 +6,9 @@ import (
 
 	lua "github.com/yuin/gopher-lua"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 func checkNpc(L *lua.LState) *game.Npc {

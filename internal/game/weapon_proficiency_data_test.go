@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/kv"
+	"github.com/omurilo/canary-go/internal/kv"
 )
 
 // The key names are the contract with the C++ server: serialize/serializePerk in

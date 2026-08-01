@@ -1,23 +1,21 @@
 package combat
 
-import (
-	
-)
+import ()
 
 // CombatType represents the type of combat damage
 type CombatType uint32
 
 const (
-	CombatNone CombatType = 0
-	CombatPhysical CombatType = 1 << 0
-	CombatEnergy CombatType = 1 << 1
-	CombatEarth CombatType = 1 << 2
-	CombatFire CombatType = 1 << 3
+	CombatNone      CombatType = 0
+	CombatPhysical  CombatType = 1 << 0
+	CombatEnergy    CombatType = 1 << 1
+	CombatEarth     CombatType = 1 << 2
+	CombatFire      CombatType = 1 << 3
 	CombatUndefined CombatType = 1 << 4
-	CombatHealing CombatType = 1 << 5
-	CombatDeath CombatType = 1 << 6
-	CombatIce CombatType = 1 << 7
-	CombatHoly CombatType = 1 << 8
+	CombatHealing   CombatType = 1 << 5
+	CombatDeath     CombatType = 1 << 6
+	CombatIce       CombatType = 1 << 7
+	CombatHoly      CombatType = 1 << 8
 	CombatManaDrain CombatType = 1 << 9
 	CombatLifeDrain CombatType = 1 << 10
 )
@@ -26,33 +24,33 @@ const (
 type ConditionType uint32
 
 const (
-	ConditionNone ConditionType = 0
-	ConditionPoison ConditionType = 1 << 0
-	ConditionFire ConditionType = 1 << 1
-	ConditionEnergy ConditionType = 1 << 2
-	ConditionBleeding ConditionType = 1 << 3
-	ConditionHaste ConditionType = 1 << 4
-	ConditionParalyze ConditionType = 1 << 5
-	ConditionOutfit ConditionType = 1 << 6
-	ConditionInvisible ConditionType = 1 << 7
-	ConditionLight ConditionType = 1 << 8
-	ConditionManaShield ConditionType = 1 << 9
-	ConditionInFight ConditionType = 1 << 10
-	ConditionDrunk ConditionType = 1 << 11
-	ConditionExhaust ConditionType = 1 << 12
-	ConditionFood ConditionType = 1 << 13
-	ConditionRegeneration ConditionType = 1 << 14
-	ConditionSoul ConditionType = 1 << 15
-	ConditionMuted ConditionType = 1 << 16
+	ConditionNone                  ConditionType = 0
+	ConditionPoison                ConditionType = 1 << 0
+	ConditionFire                  ConditionType = 1 << 1
+	ConditionEnergy                ConditionType = 1 << 2
+	ConditionBleeding              ConditionType = 1 << 3
+	ConditionHaste                 ConditionType = 1 << 4
+	ConditionParalyze              ConditionType = 1 << 5
+	ConditionOutfit                ConditionType = 1 << 6
+	ConditionInvisible             ConditionType = 1 << 7
+	ConditionLight                 ConditionType = 1 << 8
+	ConditionManaShield            ConditionType = 1 << 9
+	ConditionInFight               ConditionType = 1 << 10
+	ConditionDrunk                 ConditionType = 1 << 11
+	ConditionExhaust               ConditionType = 1 << 12
+	ConditionFood                  ConditionType = 1 << 13
+	ConditionRegeneration          ConditionType = 1 << 14
+	ConditionSoul                  ConditionType = 1 << 15
+	ConditionMuted                 ConditionType = 1 << 16
 	ConditionChannelMutedCondition ConditionType = 1 << 17
-	ConditionYellTicks ConditionType = 1 << 18
-	ConditionAttributes ConditionType = 1 << 19
-	ConditionFreezing ConditionType = 1 << 20
-	ConditionDazzled ConditionType = 1 << 21
-	ConditionCursed ConditionType = 1 << 22
-	ConditionPacified ConditionType = 1 << 23
-	ConditionSpellCooldown ConditionType = 1 << 24
-	ConditionSpellGroupCooldown ConditionType = 1 << 25
+	ConditionYellTicks             ConditionType = 1 << 18
+	ConditionAttributes            ConditionType = 1 << 19
+	ConditionFreezing              ConditionType = 1 << 20
+	ConditionDazzled               ConditionType = 1 << 21
+	ConditionCursed                ConditionType = 1 << 22
+	ConditionPacified              ConditionType = 1 << 23
+	ConditionSpellCooldown         ConditionType = 1 << 24
+	ConditionSpellGroupCooldown    ConditionType = 1 << 25
 )
 
 type ConditionId uint32
@@ -155,16 +153,16 @@ type Tile interface {
 
 // CombatDamage represents the damage or healing amount
 type CombatDamage struct {
-	PrimaryType CombatType
-	PrimaryValue int32
-	SecondaryType CombatType
+	PrimaryType    CombatType
+	PrimaryValue   int32
+	SecondaryType  CombatType
 	SecondaryValue int32
-	Origin CombatOrigin
+	Origin         CombatOrigin
 }
 
 type IntervalInfo struct {
 	Damage int32
-	Ticks int32
+	Ticks  int32
 }
 
 // PlayerIcon represents the status icons shown in the client

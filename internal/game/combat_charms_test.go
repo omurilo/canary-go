@@ -3,9 +3,9 @@ package game
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/charms"
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/charms"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 func TestApplyCharmRune_OffensiveProc(t *testing.T) {

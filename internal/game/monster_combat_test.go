@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/creatures"
 )
 
 // ratType builds a rat-like MonsterType for combat/loot/xp tests.
@@ -200,4 +200,3 @@ func TestGetLevelPercent(t *testing.T) {
 		t.Errorf("GetLevelPercent() halfway = %d, want 5000", pct)
 	}
 }
-

@@ -3,8 +3,8 @@ package luaengine
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // The Zone class used to sit behind mockClass, so every one of these calls returned

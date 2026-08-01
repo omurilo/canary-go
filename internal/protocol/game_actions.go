@@ -5,14 +5,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/game/imbuements"
-	"github.com/opentibiabr/canary-go/internal/game/vocations"
-	"github.com/opentibiabr/canary-go/internal/items"
-	"github.com/opentibiabr/canary-go/internal/moveevents"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
-	"github.com/opentibiabr/canary-go/internal/talkactions"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game/imbuements"
+	"github.com/omurilo/canary-go/internal/game/vocations"
+	"github.com/omurilo/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/moveevents"
+	"github.com/omurilo/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/talkactions"
 )
 
 // walk handles a directional movement request.

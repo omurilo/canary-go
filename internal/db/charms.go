@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // charmsBlobSize is the fixed on-disk size of the per-charm state blob:

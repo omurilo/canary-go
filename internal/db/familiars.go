@@ -4,8 +4,8 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/kv"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/kv"
 )
 
 // Unlocked familiars move from the invented `player_familiars` table into the KV

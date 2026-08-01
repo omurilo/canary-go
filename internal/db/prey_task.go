@@ -6,8 +6,8 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/io/propstream"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/io/propstream"
 )
 
 // encodeRaceList serializes a monster grid (race ids) to the player_prey /

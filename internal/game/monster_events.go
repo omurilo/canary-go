@@ -3,7 +3,7 @@ package game
 import (
 	"math/rand"
 
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 // The Monster:: event handlers, ported from src/creatures/monsters/monster.cpp.

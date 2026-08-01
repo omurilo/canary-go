@@ -21,7 +21,7 @@ type MonsterAIResult struct {
 // but not yet used for actual monster AI (the AI engine still runs inline).
 // Phase 2+ will migrate AI to submit work here.
 type MonsterComputeService struct {
-	workers chan struct{}           // bounded semaphore
+	workers chan struct{} // bounded semaphore
 	tasks   chan MonsterComputeTask
 	world   *World
 }

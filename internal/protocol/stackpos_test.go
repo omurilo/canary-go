@@ -3,8 +3,8 @@ package protocol
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // stackposCatalog gives id 1 a plain ground/item type and id 2 an always-on-top

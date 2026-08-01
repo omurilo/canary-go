@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/bosstiary"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/bosstiary"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // SendBosstiaryCooldownTimer sends the per-boss fight cooldowns (0xBD): u16

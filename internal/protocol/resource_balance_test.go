@@ -3,7 +3,7 @@ package protocol
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // 0xED means different things inbound and outbound, and conflating them killed the

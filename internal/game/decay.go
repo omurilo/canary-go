@@ -27,7 +27,7 @@ func (d *DecayManager) StartDecaying(pos Position, item *Item, duration uint32, 
 
 		found := false
 		var stackPos uint8 = 0
-		
+
 		if tile.Ground == item {
 			found = true
 		} else {

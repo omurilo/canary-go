@@ -1,7 +1,7 @@
 package game
 
 import (
-	"github.com/opentibiabr/canary-go/internal/kv"
+	"github.com/omurilo/canary-go/internal/kv"
 )
 
 // ProficiencyPerk is one selected perk on a weapon, mirroring ProficiencyPerk

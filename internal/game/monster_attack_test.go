@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 func meleeBlock(interval int) creatures.MonsterAttack {

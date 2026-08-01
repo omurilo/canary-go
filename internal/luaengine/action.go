@@ -2,8 +2,8 @@ package luaengine
 
 import (
 	"log/slog"
-	"github.com/opentibiabr/canary-go/internal/actions"
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/actions"
+	"github.com/omurilo/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
 

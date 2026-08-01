@@ -3,7 +3,7 @@ package db
 import (
 	"context"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // LoadMarketOffers loads all active market offers from the market_offers table.

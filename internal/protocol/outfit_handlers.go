@@ -1,9 +1,9 @@
 package protocol
 
 import (
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/mounts"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/mounts"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // SendOutfitWindow sends the character customization dialog (Opcode 0xC8).

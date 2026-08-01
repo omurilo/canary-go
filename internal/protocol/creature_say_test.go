@@ -3,7 +3,7 @@ package protocol
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // TestCreatureSayFormat documents the 0xAA creature-say wire layout the client

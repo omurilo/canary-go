@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 func main() {

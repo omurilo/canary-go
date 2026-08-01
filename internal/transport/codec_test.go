@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/netmsg"
-	"github.com/opentibiabr/canary-go/internal/tibcrypto"
+	"github.com/omurilo/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/tibcrypto"
 )
 
 // wrapUnwrap simulates one side wrapping a message and the peer unwrapping it,

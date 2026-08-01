@@ -123,8 +123,8 @@ func (r *AchievementRegistry) Count() int {
 
 // PlayerAchievement tracks a single unlocked achievement with its unlock time.
 type PlayerAchievement struct {
-	Achievement   *Achievement
-	UnlockedAt    time.Time
+	Achievement *Achievement
+	UnlockedAt  time.Time
 }
 
 // --- Player achievement methods ---

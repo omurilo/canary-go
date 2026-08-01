@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/opentibiabr/canary-go/internal/io/propstream"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/io/propstream"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // Item is an item instance: a client item id, a stack count/subtype, and the
@@ -49,7 +49,7 @@ type Item struct {
 	// Imbuements maps slot index to the applied imbuement on this item instance.
 	// The map is nil when no imbuements have ever been set on this item.
 	Imbuements map[uint8]ImbuementInfo
-	imbueMu sync.Mutex
+	imbueMu    sync.Mutex
 }
 
 // ImbuementInfo holds an applied imbuement's identity and remaining duration.
@@ -185,7 +185,7 @@ func (i *Item) HasImbuements() bool {
 }
 
 const (
-	attrCustomTag        = 41 // ATTR_CUSTOM
+	attrCustomTag          = 41  // ATTR_CUSTOM
 	imbuementCustomKeyBase = 500 // ITEM_IMBUEMENT_SLOT
 )
 
@@ -409,30 +409,30 @@ func (i *Item) SetTier(tier uint8) {
 // The subtype (ATTR_COUNT / ATTR_RUNE_CHARGES) lives on Item.Count; HasCount
 // records that the blob carried it so it is re-emitted on save.
 type ItemAttributes struct {
-	StoreTimestamp *int64  // ATTR_STORE (1)      int64
-	HasCount       bool    // ATTR_COUNT (15) / ATTR_RUNE_CHARGES (12) -> Item.Count (u8)
-	Charges        *uint16 // ATTR_CHARGES (22)   uint16
-	ActionID       *uint16 // ATTR_ACTION_ID (4)  uint16
-	UniqueID       *uint16 // ATTR_UNIQUE_ID (5)  uint16
+	StoreTimestamp *int64    // ATTR_STORE (1)      int64
+	HasCount       bool      // ATTR_COUNT (15) / ATTR_RUNE_CHARGES (12) -> Item.Count (u8)
+	Charges        *uint16   // ATTR_CHARGES (22)   uint16
+	ActionID       *uint16   // ATTR_ACTION_ID (4)  uint16
+	UniqueID       *uint16   // ATTR_UNIQUE_ID (5)  uint16
 	TeleDest       *Position // ATTR_TELE_DEST (8)
-	Text           *string // ATTR_TEXT (6)
-	WrittenDate    *uint64 // ATTR_WRITTENDATE (18) uint64
-	WrittenBy      *string // ATTR_WRITTENBY (19)
-	Description    *string // ATTR_DESC (7)
-	Duration       *int32  // ATTR_DURATION (16)  int32
-	DecayState     *uint8  // ATTR_DECAYING_STATE (17) uint8
-	Name           *string // ATTR_NAME (24)
-	Article        *string // ATTR_ARTICLE (25)
-	PluralName     *string // ATTR_PLURALNAME (26)
-	Weight         *uint32 // ATTR_WEIGHT (27)    uint32
-	Attack         *int32  // ATTR_ATTACK (28)    int32
-	Defense        *int32  // ATTR_DEFENSE (29)   int32
-	ExtraDefense   *int32  // ATTR_EXTRADEFENSE (30) int32
-	Armor          *int32  // ATTR_ARMOR (31)     int32
-	HitChance      *int8   // ATTR_HITCHANCE (32) int8
-	ShootRange     *uint8  // ATTR_SHOOTRANGE (33) uint8
+	Text           *string   // ATTR_TEXT (6)
+	WrittenDate    *uint64   // ATTR_WRITTENDATE (18) uint64
+	WrittenBy      *string   // ATTR_WRITTENBY (19)
+	Description    *string   // ATTR_DESC (7)
+	Duration       *int32    // ATTR_DURATION (16)  int32
+	DecayState     *uint8    // ATTR_DECAYING_STATE (17) uint8
+	Name           *string   // ATTR_NAME (24)
+	Article        *string   // ATTR_ARTICLE (25)
+	PluralName     *string   // ATTR_PLURALNAME (26)
+	Weight         *uint32   // ATTR_WEIGHT (27)    uint32
+	Attack         *int32    // ATTR_ATTACK (28)    int32
+	Defense        *int32    // ATTR_DEFENSE (29)   int32
+	ExtraDefense   *int32    // ATTR_EXTRADEFENSE (30) int32
+	Armor          *int32    // ATTR_ARMOR (31)     int32
+	HitChance      *int8     // ATTR_HITCHANCE (32) int8
+	ShootRange     *uint8    // ATTR_SHOOTRANGE (33) uint8
 	Tier           *uint8
-		HouseDoorID    *uint8  // ATTR_TIER (40)      uint8
+	HouseDoorID    *uint8  // ATTR_TIER (40)      uint8
 	Amount         *uint16 // ATTR_AMOUNT (39)    uint16
 	Owner          *uint32 // ATTR_OWNER (43)     uint32
 	OpenContainer  *uint8  // ATTR_OPENCONTAINER (36) uint8
@@ -486,18 +486,18 @@ func (i *Item) RemoveCustomAttribute(key string) bool {
 
 // Outfit describes a creature's appearance.
 type Outfit struct {
-	LookType   uint16
-	Head       uint8
-	Body       uint8
-	Legs       uint8
-	Feet       uint8
-	Addons     uint8
-	LookTypeEx uint16
-	LookMount  uint16
-	MountHead  uint8
-	MountBody  uint8
-	MountLegs  uint8
-	MountFeet  uint8
+	LookType      uint16
+	Head          uint8
+	Body          uint8
+	Legs          uint8
+	Feet          uint8
+	Addons        uint8
+	LookTypeEx    uint16
+	LookMount     uint16
+	MountHead     uint8
+	MountBody     uint8
+	MountLegs     uint8
+	MountFeet     uint8
 	FamiliarsType uint16
 	// OTCR extension fields for wings, auras, effects, and shaders.
 	LookWing   uint16
@@ -511,18 +511,18 @@ type Outfit struct {
 func (i *Item) GetWeight(catalog *items.Catalog) uint32 {
 	weight := uint32(0)
 	stackable := false
-	
+
 	if catalog != nil {
 		if t := catalog.Get(i.ID); t != nil {
 			weight = t.Weight
 			stackable = t.Stackable
 		}
 	}
-	
+
 	if i.Attr != nil && i.Attr.Weight != nil {
 		weight = *i.Attr.Weight
 	}
-	
+
 	total := weight
 	if stackable {
 		count := uint32(i.Count)
@@ -769,4 +769,3 @@ func (i *Item) Worth() uint64 {
 	}
 	return 0
 }
-

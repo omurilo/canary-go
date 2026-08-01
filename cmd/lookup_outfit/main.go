@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/opentibiabr/canary-go/internal/appproto"
+	"github.com/omurilo/canary-go/internal/appproto"
 )
 
 func main() {

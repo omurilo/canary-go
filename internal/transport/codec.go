@@ -15,8 +15,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/opentibiabr/canary-go/internal/netmsg"
-	"github.com/opentibiabr/canary-go/internal/tibcrypto"
+	"github.com/omurilo/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/tibcrypto"
 )
 
 // ChecksumMethod selects how the 4-byte checksum field is produced/validated.

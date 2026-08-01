@@ -1,8 +1,8 @@
 package protocol
 
 import (
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // sendFullMapAt re-centres the client's map on pos with a full map description

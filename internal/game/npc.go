@@ -1,6 +1,6 @@
 package game
 
-import "github.com/opentibiabr/canary-go/internal/creatures"
+import "github.com/omurilo/canary-go/internal/creatures"
 
 type Npc struct {
 	BaseCreature

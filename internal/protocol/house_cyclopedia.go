@@ -8,8 +8,8 @@ import (
 
 	"context"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // CyclopediaHouseState mirrors C++ src/enums/player_cyclopedia.hpp

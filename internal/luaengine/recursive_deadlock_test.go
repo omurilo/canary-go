@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 func TestRecursiveDeadlockAvoidanceOnMoveAndSay(t *testing.T) {

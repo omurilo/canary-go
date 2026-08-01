@@ -14,12 +14,12 @@ type ModalChoice struct {
 
 // ModalWindow is a modal dialog window sent to the client.
 type ModalWindow struct {
-	ID                 uint32
-	Title              string
-	Message            string
-	Buttons            []ModalButton
-	Choices            []ModalChoice
+	ID                  uint32
+	Title               string
+	Message             string
+	Buttons             []ModalButton
+	Choices             []ModalChoice
 	DefaultEscapeButton uint8
 	DefaultEnterButton  uint8
-	Priority           bool
+	Priority            bool
 }

@@ -4,7 +4,7 @@ import (
 	"container/heap"
 	"math"
 
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 type pathNode struct {
@@ -98,25 +98,25 @@ func FindPath(m *Map, catalog *items.Catalog, start, end Position, maxNodes int)
 	if start == end {
 		return nil
 	}
-	
+
 	pq := make(priorityQueue, 0)
 	heap.Init(&pq)
-	
+
 	startNode := &pathNode{pos: start, g: 0, h: chebyshevDist(start, end)}
 	heap.Push(&pq, startNode)
-	
+
 	closedList := make(map[Position]bool)
 	openMap := make(map[Position]*pathNode)
 	openMap[start] = startNode
-	
+
 	nodesEvaluated := 0
-	
+
 	for pq.Len() > 0 && nodesEvaluated < maxNodes {
 		curr := heap.Pop(&pq).(*pathNode)
 		delete(openMap, curr.pos)
 		closedList[curr.pos] = true
 		nodesEvaluated++
-		
+
 		if curr.pos == end || chebyshevDist(curr.pos, end) == 1 {
 			var path []Position
 			for curr != nil && curr.pos != start {
@@ -125,14 +125,14 @@ func FindPath(m *Map, catalog *items.Catalog, start, end Position, maxNodes int)
 			}
 			return path
 		}
-		
+
 		dirs := []Direction{DirNorth, DirEast, DirSouth, DirWest, DirNE, DirNW, DirSE, DirSW}
 		for _, d := range dirs {
 			nextPos := curr.pos.Offset(d)
 			if closedList[nextPos] {
 				continue
 			}
-			
+
 			snap := m.GetSectorSnapshot(int(nextPos.X), int(nextPos.Y), int(nextPos.Z))
 			cell := snap.Cell(int(nextPos.X)%8, int(nextPos.Y)%8)
 			if !cell.HasGround || cell.BlockSolid {
@@ -140,10 +140,10 @@ func FindPath(m *Map, catalog *items.Catalog, start, end Position, maxNodes int)
 					continue
 				}
 			}
-			
+
 			g := curr.g + 1
 			h := chebyshevDist(nextPos, end)
-			
+
 			if inOpen, ok := openMap[nextPos]; ok {
 				if g < inOpen.g {
 					inOpen.g = g

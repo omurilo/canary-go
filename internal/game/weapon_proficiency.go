@@ -9,20 +9,20 @@ import (
 // WeaponProficiency stores per-weapon bonus data that feeds into cyclopedia
 // OffenceStats (bestiary damage, runes/auto critical, skill percentages, augments).
 type WeaponProficiency struct {
-	stats           map[WeaponProfBonus]float64
-	skillPcts       map[Skill]SkillPercentage
-	bestiaryDamage  map[string]float64
-	runesCritical   WeaponProfCritical
-	autoCrit        WeaponProfCritical
-	generalCritical WeaponProfCritical
-	elementCritical map[int]WeaponProfCritical
-	augments        map[uint16][]WeaponProfAugment
+	stats             map[WeaponProfBonus]float64
+	skillPcts         map[Skill]SkillPercentage
+	bestiaryDamage    map[string]float64
+	runesCritical     WeaponProfCritical
+	autoCrit          WeaponProfCritical
+	generalCritical   WeaponProfCritical
+	elementCritical   map[int]WeaponProfCritical
+	augments          map[uint16][]WeaponProfAugment
 	powerfulFoeDamage float64
 
 	// Derived sinks that applyPerks feeds and that had no Go counterpart before.
-	specializedMagic map[uint8]float64  // element → bonus magic level
-	skillBonus       map[Skill]float64  // skill → flat bonus
-	perfectShot      map[uint8]float64  // range → damage
+	specializedMagic map[uint8]float64 // element → bonus magic level
+	skillBonus       map[Skill]float64 // skill → flat bonus
+	perfectShot      map[uint8]float64 // range → damage
 }
 
 type WeaponProfBonus uint8
@@ -114,14 +114,14 @@ func NewWeaponProficiency() *WeaponProficiency {
 // --- JSON serialization for DB persistence ---
 
 type wpJSON struct {
-	Stats             map[string]float64              `json:"stats"`
-	SkillPcts         map[string]*SkillPercentage     `json:"skillPcts,omitempty"`
-	BestiaryDamage    map[string]float64              `json:"bestiaryDamage,omitempty"`
-	RunesCritical     *WeaponProfCritical             `json:"runesCritical,omitempty"`
-	AutoCrit          *WeaponProfCritical             `json:"autoCrit,omitempty"`
-	GeneralCritical   *WeaponProfCritical             `json:"generalCritical,omitempty"`
-	PowerfulFoeDamage float64                         `json:"powerfulFoeDamage"`
-	Augments          map[string][]WeaponProfAugment  `json:"augments,omitempty"`
+	Stats             map[string]float64             `json:"stats"`
+	SkillPcts         map[string]*SkillPercentage    `json:"skillPcts,omitempty"`
+	BestiaryDamage    map[string]float64             `json:"bestiaryDamage,omitempty"`
+	RunesCritical     *WeaponProfCritical            `json:"runesCritical,omitempty"`
+	AutoCrit          *WeaponProfCritical            `json:"autoCrit,omitempty"`
+	GeneralCritical   *WeaponProfCritical            `json:"generalCritical,omitempty"`
+	PowerfulFoeDamage float64                        `json:"powerfulFoeDamage"`
+	Augments          map[string][]WeaponProfAugment `json:"augments,omitempty"`
 }
 
 func bonusKey(b WeaponProfBonus) string { return fmt.Sprintf("%d", b) }

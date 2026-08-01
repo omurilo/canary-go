@@ -1,6 +1,6 @@
 package game
 
-import "github.com/opentibiabr/canary-go/internal/game/combat"
+import "github.com/omurilo/canary-go/internal/game/combat"
 
 // The combat package defines its own combat.Creature interface (int32 health,
 // mana, conditions, combat.Position) that does not match game.Creature. Rather
@@ -192,36 +192,51 @@ func (a combatAdapter) IsPlayer() bool {
 	return ok
 }
 
-
 func (a combatAdapter) GetCriticalChance() uint16 {
-	if p, ok := a.c.(*Player); ok { return p.GetCriticalChance() }
+	if p, ok := a.c.(*Player); ok {
+		return p.GetCriticalChance()
+	}
 	return 0
 }
 func (a combatAdapter) GetCriticalDamage() uint16 {
-	if p, ok := a.c.(*Player); ok { return p.GetCriticalDamage() }
+	if p, ok := a.c.(*Player); ok {
+		return p.GetCriticalDamage()
+	}
 	return 0
 }
 func (a combatAdapter) GetLifeLeechChance() uint16 {
-	if p, ok := a.c.(*Player); ok { return p.GetLifeLeechChance() }
+	if p, ok := a.c.(*Player); ok {
+		return p.GetLifeLeechChance()
+	}
 	return 0
 }
 func (a combatAdapter) GetLifeLeechAmount() uint16 {
-	if p, ok := a.c.(*Player); ok { return p.GetLifeLeechAmount() }
+	if p, ok := a.c.(*Player); ok {
+		return p.GetLifeLeechAmount()
+	}
 	return 0
 }
 func (a combatAdapter) GetManaLeechChance() uint16 {
-	if p, ok := a.c.(*Player); ok { return p.GetManaLeechChance() }
+	if p, ok := a.c.(*Player); ok {
+		return p.GetManaLeechChance()
+	}
 	return 0
 }
 func (a combatAdapter) GetManaLeechAmount() uint16 {
-	if p, ok := a.c.(*Player); ok { return p.GetManaLeechAmount() }
+	if p, ok := a.c.(*Player); ok {
+		return p.GetManaLeechAmount()
+	}
 	return 0
 }
 func (a combatAdapter) GetReflectPercent() uint16 {
-	if p, ok := a.c.(*Player); ok { return p.GetReflectPercent() }
+	if p, ok := a.c.(*Player); ok {
+		return p.GetReflectPercent()
+	}
 	return 0
 }
 func (a combatAdapter) GetAbsorbPercent() uint16 {
-	if p, ok := a.c.(*Player); ok { return p.GetAbsorbPercent() }
+	if p, ok := a.c.(*Player); ok {
+		return p.GetAbsorbPercent()
+	}
 	return 0
 }

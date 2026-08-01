@@ -1,6 +1,6 @@
 package game
 
-import "github.com/opentibiabr/canary-go/internal/game/combat"
+import "github.com/omurilo/canary-go/internal/game/combat"
 
 type Creature interface {
 	GetID() uint32

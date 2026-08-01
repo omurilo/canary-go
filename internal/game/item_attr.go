@@ -1,11 +1,11 @@
 package game
 
 import (
+	"fmt"
 	"math"
 	"sort"
-	"fmt"
 
-	"github.com/opentibiabr/canary-go/internal/io/propstream"
+	"github.com/omurilo/canary-go/internal/io/propstream"
 )
 
 // OTBR item attribute tags (AttrTypes_t). Values mirror

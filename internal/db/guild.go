@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 func (d *DB) LoadGuild(ctx context.Context, guildID uint32) (*game.Guild, error) {

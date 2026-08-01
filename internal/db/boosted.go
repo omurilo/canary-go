@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/bosstiary"
-	"github.com/opentibiabr/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/bosstiary"
+	"github.com/omurilo/canary-go/internal/creatures"
 )
 
 // dayStamp is the current day-of-year (1-366), stored in the boosted_* tables'

@@ -21,8 +21,8 @@ type ConnectBlock struct {
 
 // Ban provides IP-based connection rate limiting.
 type Ban struct {
-	mu       sync.Mutex
-	ipMap    map[string]*ConnectBlock
+	mu    sync.Mutex
+	ipMap map[string]*ConnectBlock
 }
 
 // NewBan creates a new Ban.

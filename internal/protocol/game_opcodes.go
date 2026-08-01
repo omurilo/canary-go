@@ -2,10 +2,10 @@ package protocol
 
 import (
 	"fmt"
-	"github.com/opentibiabr/canary-go/internal/config"
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/items"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // parseRetrieveDepotSearch handles 0x29 — depot search item request.

@@ -4,8 +4,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 // ---------------------------------------------------------------------------
@@ -17,8 +17,8 @@ type MonsterSpellTarget uint8
 
 const (
 	SpellTargetEnemy  MonsterSpellTarget = iota // damages/conditions an enemy
-	SpellTargetSelf                              // heals / buffs the caster
-	SpellTargetFriend                            // heals / buffs an ally (future use)
+	SpellTargetSelf                             // heals / buffs the caster
+	SpellTargetFriend                           // heals / buffs an ally (future use)
 )
 
 // ---------------------------------------------------------------------------
@@ -56,9 +56,9 @@ type MonsterSpell struct {
 	IsSpeech      bool // purely cosmetic speech (no combat effect)
 
 	// Combat parameters
-	CombatType combat.CombatType // physical, fire, energy, etc.
-	Length     uint8             // wave length (0 = single-target)
-	Spread     uint8             // wave spread (0 = single-target)
+	CombatType combat.CombatType  // physical, fire, energy, etc.
+	Length     uint8              // wave length (0 = single-target)
+	Spread     uint8              // wave spread (0 = single-target)
 	Target     MonsterSpellTarget // enemy / self / friend
 
 	// Optional condition to apply alongside the damage

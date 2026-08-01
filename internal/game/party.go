@@ -31,18 +31,18 @@ type Party struct {
 // Party shield values (Shields_t, utils_definitions.hpp). Exactly one byte is
 // written inside the AddCreature stream, so these must stay in range 0..11.
 const (
-	ShieldNone                    = 0
-	ShieldWhiteYellow             = 1 // a player invited by the viewer's-target? (target invited viewer)
-	ShieldWhiteBlue               = 2
-	ShieldBlue                    = 3
-	ShieldYellow                  = 4
-	ShieldBlueSharedExp           = 5
-	ShieldYellowSharedExp         = 6
-	ShieldBlueNoSharedExpBlink    = 7
-	ShieldYellowNoSharedExpBlink  = 8
-	ShieldBlueNoSharedExp         = 9
-	ShieldYellowNoSharedExp       = 10
-	ShieldGray                    = 11
+	ShieldNone                   = 0
+	ShieldWhiteYellow            = 1 // a player invited by the viewer's-target? (target invited viewer)
+	ShieldWhiteBlue              = 2
+	ShieldBlue                   = 3
+	ShieldYellow                 = 4
+	ShieldBlueSharedExp          = 5
+	ShieldYellowSharedExp        = 6
+	ShieldBlueNoSharedExpBlink   = 7
+	ShieldYellowNoSharedExpBlink = 8
+	ShieldBlueNoSharedExp        = 9
+	ShieldYellowNoSharedExp      = 10
+	ShieldGray                   = 11
 )
 
 // NewParty creates a party led by leader and links it back to the world for

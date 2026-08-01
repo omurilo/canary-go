@@ -12,19 +12,19 @@ type AttachedEffectType uint8
 
 const (
 	EffectNone         AttachedEffectType = 0
-	EffectBlood       AttachedEffectType = 1
-	EffectBlueBubble  AttachedEffectType = 2
+	EffectBlood        AttachedEffectType = 1
+	EffectBlueBubble   AttachedEffectType = 2
 	EffectPoisonBubble AttachedEffectType = 3
-	EffectFire        AttachedEffectType = 4
-	EffectEnergy      AttachedEffectType = 5
+	EffectFire         AttachedEffectType = 4
+	EffectEnergy       AttachedEffectType = 5
 	EffectPoison       AttachedEffectType = 6
 	EffectMagic        AttachedEffectType = 7
-	EffectMagicAlt    AttachedEffectType = 8
-	EffectDrown       AttachedEffectType = 9
+	EffectMagicAlt     AttachedEffectType = 8
+	EffectDrown        AttachedEffectType = 9
 	EffectFreeze       AttachedEffectType = 10
 	EffectDazzle       AttachedEffectType = 11
 	EffectCurse        AttachedEffectType = 12
-	EffectSparkling   AttachedEffectType = 13
+	EffectSparkling    AttachedEffectType = 13
 )
 
 // AttachedEffectSlot represents the OTCR effect slot type (aura, shader, effect, wing).
@@ -53,11 +53,11 @@ type AttachedEffectRegistry struct {
 
 // xmlAttachedEffects is the root XML structure.
 type xmlAttachedEffects struct {
-	XMLName xml.Name              `xml:"attachedeffects"`
-	Auras   []xmlEffectEntry      `xml:"aura"`
-	Shaders []xmlEffectEntry      `xml:"shader"`
-	Effects []xmlEffectEntry      `xml:"effect"`
-	Wings   []xmlEffectEntry      `xml:"wing"`
+	XMLName xml.Name         `xml:"attachedeffects"`
+	Auras   []xmlEffectEntry `xml:"aura"`
+	Shaders []xmlEffectEntry `xml:"shader"`
+	Effects []xmlEffectEntry `xml:"effect"`
+	Wings   []xmlEffectEntry `xml:"wing"`
 }
 
 type xmlEffectEntry struct {

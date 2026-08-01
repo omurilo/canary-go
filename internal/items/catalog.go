@@ -11,7 +11,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/opentibiabr/canary-go/internal/appproto"
+	"github.com/omurilo/canary-go/internal/appproto"
 )
 
 // AugmentType mirrors the C++ enum Augment_t (creatures_definitions.hpp).

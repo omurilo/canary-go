@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // Combat text-message classes and colors (src/utils/utils_definitions.hpp).

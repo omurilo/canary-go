@@ -11,36 +11,36 @@ import (
 type Lane int
 
 const (
-	LaneProtocolInput      Lane = iota // Raw protocol packet reads
-	LanePlayerWalk                     // Walk/auto-walk decisions
-	LanePlayerAction                   // Player actions (use, loot, equip)
-	LaneWorldCommit                    // World state commit / tile updates
-	LaneWorkerCompletion               // Async worker completion callbacks
-	LaneVisibleMonster                 // Visible monster tasks (near players)
-	LaneBackgroundMonster              // Background monster tasks (far from players)
-	LaneVisibleMonsterAI               // High-priority monster AI decisions
-	LaneMonsterAI                      // General monster AI
-	LaneDeferred                       // Deferred / best-effort work
-	LaneMaintenance                    // Server maintenance tasks (save, cleanup)
-	LaneGenericParallel                // General purpose (backward compat for AddEvent)
+	LaneProtocolInput     Lane = iota // Raw protocol packet reads
+	LanePlayerWalk                    // Walk/auto-walk decisions
+	LanePlayerAction                  // Player actions (use, loot, equip)
+	LaneWorldCommit                   // World state commit / tile updates
+	LaneWorkerCompletion              // Async worker completion callbacks
+	LaneVisibleMonster                // Visible monster tasks (near players)
+	LaneBackgroundMonster             // Background monster tasks (far from players)
+	LaneVisibleMonsterAI              // High-priority monster AI decisions
+	LaneMonsterAI                     // General monster AI
+	LaneDeferred                      // Deferred / best-effort work
+	LaneMaintenance                   // Server maintenance tasks (save, cleanup)
+	LaneGenericParallel               // General purpose (backward compat for AddEvent)
 
 	laneCount
 )
 
 // LaneNames maps each lane to its human-readable name for debugging/telemetry.
 var LaneNames = map[Lane]string{
-	LaneProtocolInput:      "ProtocolInput",
-	LanePlayerWalk:         "PlayerWalk",
-	LanePlayerAction:       "PlayerAction",
-	LaneWorldCommit:        "WorldCommit",
-	LaneWorkerCompletion:   "WorkerCompletion",
-	LaneVisibleMonster:     "VisibleMonster",
-	LaneBackgroundMonster:  "BackgroundMonster",
-	LaneVisibleMonsterAI:   "VisibleMonsterAI",
-	LaneMonsterAI:          "MonsterAI",
-	LaneDeferred:           "Deferred",
-	LaneMaintenance:        "Maintenance",
-	LaneGenericParallel:    "GenericParallel",
+	LaneProtocolInput:     "ProtocolInput",
+	LanePlayerWalk:        "PlayerWalk",
+	LanePlayerAction:      "PlayerAction",
+	LaneWorldCommit:       "WorldCommit",
+	LaneWorkerCompletion:  "WorkerCompletion",
+	LaneVisibleMonster:    "VisibleMonster",
+	LaneBackgroundMonster: "BackgroundMonster",
+	LaneVisibleMonsterAI:  "VisibleMonsterAI",
+	LaneMonsterAI:         "MonsterAI",
+	LaneDeferred:          "Deferred",
+	LaneMaintenance:       "Maintenance",
+	LaneGenericParallel:   "GenericParallel",
 }
 
 // TaskMeta describes a unit of work queued on a lane's priority heap.
@@ -119,18 +119,18 @@ func (h *taskHeap) Peek() *TaskMeta {
 // defaultQuanta maps each lane to its WDRR byte-weight quantum. Higher values
 // give the lane more work per scheduling cycle.
 var defaultQuanta = [laneCount]int32{
-	LaneProtocolInput:      80,
-	LanePlayerWalk:         60,
-	LanePlayerAction:       60,
-	LaneWorldCommit:        40,
-	LaneWorkerCompletion:   50,
-	LaneVisibleMonster:     30,
-	LaneBackgroundMonster:  15,
-	LaneVisibleMonsterAI:   25,
-	LaneMonsterAI:          20,
-	LaneDeferred:           10,
-	LaneMaintenance:        5,
-	LaneGenericParallel:    30,
+	LaneProtocolInput:     80,
+	LanePlayerWalk:        60,
+	LanePlayerAction:      60,
+	LaneWorldCommit:       40,
+	LaneWorkerCompletion:  50,
+	LaneVisibleMonster:    30,
+	LaneBackgroundMonster: 15,
+	LaneVisibleMonsterAI:  25,
+	LaneMonsterAI:         20,
+	LaneDeferred:          10,
+	LaneMaintenance:       5,
+	LaneGenericParallel:   30,
 }
 
 // Ensure taskHeap implements heap.Interface at compile time.

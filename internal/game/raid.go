@@ -12,15 +12,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // RaidState tracks a raid's lifecycle.
 type RaidState int
 
 const (
-	RaidStateInactive  RaidState = iota
+	RaidStateInactive RaidState = iota
 	RaidStateRunning
 	RaidStateCompleted
 )
@@ -46,7 +46,7 @@ func (e *AnnounceEvent) Execute(w *World) error {
 	for _, p := range w.Players() {
 		if p.Session != nil {
 			m := netmsg.NewWriter()
-			m.AddByte(0xB4) // opTextMessage
+			m.AddByte(0xB4)       // opTextMessage
 			m.AddByte(byte(0x10)) // MESSAGE_EVENT_ADVANCE
 			m.AddString(e.Message)
 			p.Session.SendToClient(m)

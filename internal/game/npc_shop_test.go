@@ -3,8 +3,8 @@ package game
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 func shopCatalog() *items.Catalog {

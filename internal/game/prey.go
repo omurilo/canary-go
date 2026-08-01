@@ -3,7 +3,7 @@ package game
 import (
 	"sync"
 
-	"github.com/opentibiabr/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/config"
 )
 
 type PreyBonusType byte
@@ -18,12 +18,12 @@ const (
 type PreyState byte
 
 const (
-	PreyDataState_Locked                PreyState = 0
-	PreyDataState_Inactive              PreyState = 1
-	PreyDataState_Active                PreyState = 2
-	PreyDataState_Selection             PreyState = 3
+	PreyDataState_Locked                 PreyState = 0
+	PreyDataState_Inactive               PreyState = 1
+	PreyDataState_Active                 PreyState = 2
+	PreyDataState_Selection              PreyState = 3
 	PreyDataState_SelectionChangeMonster PreyState = 4
-	PreyDataState_ListSelection         PreyState = 5
+	PreyDataState_ListSelection          PreyState = 5
 )
 
 type PreySlot struct {

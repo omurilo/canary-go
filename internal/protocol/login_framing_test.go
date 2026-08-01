@@ -3,8 +3,8 @@ package protocol
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/tibcrypto"
-	"github.com/opentibiabr/canary-go/internal/transport"
+	"github.com/omurilo/canary-go/internal/tibcrypto"
+	"github.com/omurilo/canary-go/internal/transport"
 )
 
 // buildClientLoginPacket assembles a first login packet the way OTC does in

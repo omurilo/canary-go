@@ -6,14 +6,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/opentibiabr/canary-go/internal/io/propstream"
+	"github.com/omurilo/canary-go/internal/io/propstream"
 )
 
 // AnimusMastery tracks which monster types the player has unlocked animus mastery for.
 // Provides an experience multiplier based on the number of unlocked masteries.
 type AnimusMastery struct {
 	mu       sync.RWMutex
-	monsters map[uint16]bool  // raceID -> unlocked
+	monsters map[uint16]bool   // raceID -> unlocked
 	names    map[uint16]string // raceID -> monster name
 }
 
@@ -80,7 +80,7 @@ func (am *AnimusMastery) GetExperienceMultiplier() float64 {
 	monstersXpMultiplier := 0.1
 	monstersToMultiply := 10.0
 
-	base := 1.0 + (monsterXpMultiplier + float64(count)/monstersToMultiply*monstersXpMultiplier)/100.0
+	base := 1.0 + (monsterXpMultiplier+float64(count)/monstersToMultiply*monstersXpMultiplier)/100.0
 	return math.Min(maxMultiplier, base)
 }
 

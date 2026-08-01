@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"sync"
 
-	"github.com/opentibiabr/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/config"
 )
 
 type TaskHuntingState byte

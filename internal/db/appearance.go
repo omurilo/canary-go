@@ -4,8 +4,8 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/kv"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/kv"
 )
 
 // Unlocked mounts and outfits move out of the invented `player_mounts` and

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/db"
-	"github.com/opentibiabr/canary-go/internal/network"
+	"github.com/omurilo/canary-go/internal/db"
+	"github.com/omurilo/canary-go/internal/network"
 )
 
 // The HTTP/JSON login the modern client uses.

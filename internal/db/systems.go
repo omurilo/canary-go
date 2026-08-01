@@ -3,8 +3,8 @@ package db
 import (
 	"context"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/kv"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/kv"
 )
 
 // Hazard points and concoctions used to be persisted by ALTERing the canonical

@@ -3,8 +3,8 @@ package protocol
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // The creature description must end at the walkthrough byte. C++ appends the OTCR

@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/netmsg"
-	"github.com/opentibiabr/canary-go/internal/transport"
+	"github.com/omurilo/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/transport"
 )
 
 const (

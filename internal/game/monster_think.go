@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/creatures"
 )
 
 // The Monster::onThink pipeline, ported from src/creatures/monsters/monster.cpp.

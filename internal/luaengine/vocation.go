@@ -3,7 +3,7 @@ package luaengine
 import (
 	"math"
 
-	"github.com/opentibiabr/canary-go/internal/game/vocations"
+	"github.com/omurilo/canary-go/internal/game/vocations"
 	lua "github.com/yuin/gopher-lua"
 )
 

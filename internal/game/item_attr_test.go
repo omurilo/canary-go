@@ -3,9 +3,9 @@ package game
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/items"
 
-	"github.com/opentibiabr/canary-go/internal/io/propstream"
+	"github.com/omurilo/canary-go/internal/io/propstream"
 )
 
 func u16p(v uint16) *uint16 { return &v }

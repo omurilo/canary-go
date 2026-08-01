@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // houseEntry is one <house> element in the houses XML.

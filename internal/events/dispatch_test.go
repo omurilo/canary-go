@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
 

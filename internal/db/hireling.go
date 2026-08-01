@@ -3,7 +3,7 @@ package db
 import (
 	"context"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // LoadPlayerHirelings loads all hirelings for a player from the DB.

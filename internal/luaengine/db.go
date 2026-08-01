@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/db"
+	"github.com/omurilo/canary-go/internal/db"
 	lua "github.com/yuin/gopher-lua"
 )
 

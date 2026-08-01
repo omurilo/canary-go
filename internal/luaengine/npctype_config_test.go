@@ -3,8 +3,8 @@ package luaengine
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // Every one of the 1033 npc scripts in data-otservbr-global builds a npcConfig

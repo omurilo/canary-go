@@ -1,9 +1,9 @@
 package luaengine
 
 import (
-	"github.com/opentibiabr/canary-go/internal/bestiary"
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/bestiary"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
 

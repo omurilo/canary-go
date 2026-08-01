@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/moveevents"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/moveevents"
 )
 
 // TestCitizenTempleTeleport drives the full temple/citizen "set town" chain:

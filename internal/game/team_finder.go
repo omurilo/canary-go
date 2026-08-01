@@ -11,7 +11,7 @@ type TeamFinder struct {
 	FreeSlots  uint16
 	PartyBool  bool
 	Timestamp  uint32
-	TeamType   uint8   // 1=boss, 2=hunt, 3=quest
+	TeamType   uint8 // 1=boss, 2=hunt, 3=quest
 	BossID     uint16
 	HuntType   uint16
 	HuntArea   uint16
@@ -23,8 +23,8 @@ type TeamFinder struct {
 
 // TeamFinderManager manages team finder listings.
 type TeamFinderManager struct {
-	mu       sync.RWMutex
-	entries  map[uint32]*TeamFinder // leader GUID -> entry
+	mu      sync.RWMutex
+	entries map[uint32]*TeamFinder // leader GUID -> entry
 }
 
 // NewTeamFinderManager creates a new TeamFinderManager.

@@ -3,9 +3,9 @@ package protocol
 import (
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/config"
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // getPreyMonsterInfo looks up a monster's name and outfit by raceID.

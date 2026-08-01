@@ -9,12 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/db"
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
-	"github.com/opentibiabr/canary-go/internal/network"
-	"github.com/opentibiabr/canary-go/internal/tibcrypto"
-	"github.com/opentibiabr/canary-go/internal/transport"
+	"github.com/omurilo/canary-go/internal/db"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/network"
+	"github.com/omurilo/canary-go/internal/tibcrypto"
+	"github.com/omurilo/canary-go/internal/transport"
 )
 
 // Outbound game opcodes.

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/netmsg"
-	"github.com/opentibiabr/canary-go/internal/network"
+	"github.com/omurilo/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/network"
 )
 
 // StatusProtocol handles server status requests (XML/binary), mirroring C++

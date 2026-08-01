@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/kv"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/kv"
 )
 
 // Achievements and titles live in the KV store, not in dedicated tables. The key

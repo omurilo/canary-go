@@ -3,12 +3,12 @@ package protocol
 import (
 	"context"
 
-	"github.com/opentibiabr/canary-go/internal/db"
+	"github.com/omurilo/canary-go/internal/db"
 	"log/slog"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // Market fee: 2% of the total cost.

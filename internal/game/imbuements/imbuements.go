@@ -9,13 +9,13 @@ import (
 )
 
 type BaseImbuement struct {
-	ID             uint16
-	Name           string
-	Price          uint32
+	ID              uint16
+	Name            string
+	Price           uint32
 	ProtectionPrice uint32
-	RemoveCost     uint32
-	Duration       uint32
-	Percent        uint8
+	RemoveCost      uint32
+	Duration        uint32
+	Percent         uint8
 }
 
 type CategoryImbuement struct {
@@ -85,10 +85,10 @@ func (r *Registry) GetAllImbuements() []*Imbuement {
 }
 
 type xmlImbuements struct {
-	XMLName     xml.Name           `xml:"imbuements"`
-	Bases       []xmlBase          `xml:"base"`
-	Categories  []xmlCategory      `xml:"category"`
-	ImbuementEl []xmlImbuementEl   `xml:"imbuement"`
+	XMLName     xml.Name         `xml:"imbuements"`
+	Bases       []xmlBase        `xml:"base"`
+	Categories  []xmlCategory    `xml:"category"`
+	ImbuementEl []xmlImbuementEl `xml:"imbuement"`
 }
 
 type xmlBase struct {
@@ -108,14 +108,14 @@ type xmlCategory struct {
 }
 
 type xmlImbuementEl struct {
-	Name       string          `xml:"name,attr"`
-	Base       uint16          `xml:"base,attr"`
-	Category   uint8           `xml:"category,attr"`
-	SubGroup   string          `xml:"subgroup,attr"`
-	IconID     uint16          `xml:"iconid,attr"`
-	Premium    uint8           `xml:"premium,attr"`
-	Storage    uint32          `xml:"storage,attr"`
-	Attributes []xmlImbAttr    `xml:"attribute"`
+	Name       string       `xml:"name,attr"`
+	Base       uint16       `xml:"base,attr"`
+	Category   uint8        `xml:"category,attr"`
+	SubGroup   string       `xml:"subgroup,attr"`
+	IconID     uint16       `xml:"iconid,attr"`
+	Premium    uint8        `xml:"premium,attr"`
+	Storage    uint32       `xml:"storage,attr"`
+	Attributes []xmlImbAttr `xml:"attribute"`
 }
 
 type xmlImbAttr struct {
@@ -140,13 +140,13 @@ func LoadRegistry(path string) (*Registry, error) {
 
 	for _, b := range parsed.Bases {
 		r.bases[b.ID] = &BaseImbuement{
-			ID:             b.ID,
-			Name:           b.Name,
-			Price:          b.Price,
+			ID:              b.ID,
+			Name:            b.Name,
+			Price:           b.Price,
 			ProtectionPrice: b.ProtectionPrice,
-			RemoveCost:     b.RemoveCost,
-			Duration:       b.Duration,
-			Percent:        b.Percent,
+			RemoveCost:      b.RemoveCost,
+			Duration:        b.Duration,
+			Percent:         b.Percent,
 		}
 	}
 

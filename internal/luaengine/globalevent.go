@@ -1,7 +1,7 @@
 package luaengine
 
 import (
-	"github.com/opentibiabr/canary-go/internal/globalevents"
+	"github.com/omurilo/canary-go/internal/globalevents"
 	lua "github.com/yuin/gopher-lua"
 )
 

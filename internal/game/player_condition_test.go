@@ -3,8 +3,8 @@ package game_test
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 func TestPlayerConditionAttributes(t *testing.T) {
@@ -37,7 +37,7 @@ func TestPlayerConditionAttributes(t *testing.T) {
 	// Modify sword skill (+10)
 	cond.SetParam(22, 10) // CONDITION_PARAM_SKILL_SWORD (22)
 	// Modify magic level (+5)
-	cond.SetParam(30, 5)  // CONDITION_PARAM_STAT_MAGICPOINTS (30)
+	cond.SetParam(30, 5) // CONDITION_PARAM_STAT_MAGICPOINTS (30)
 	// Modify max health (+100) and max health percent (110%)
 	cond.SetParam(27, 100) // CONDITION_PARAM_STAT_MAXHITPOINTS (27)
 	cond.SetParam(31, 110) // CONDITION_PARAM_STAT_MAXHITPOINTSPERCENT (31)

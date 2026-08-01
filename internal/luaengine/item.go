@@ -2,11 +2,11 @@ package luaengine
 
 import (
 	"fmt"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/items"
 	"math"
 	"strconv"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
 )
 

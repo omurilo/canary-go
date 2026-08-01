@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // LoadPlayerItems loads the items for a given player and populates the Inventory, StoreInbox, Depot, Inbox, and RewardChest.

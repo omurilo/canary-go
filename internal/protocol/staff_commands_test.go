@@ -3,7 +3,7 @@ package protocol
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 func TestStaffCommandPermissions(t *testing.T) {

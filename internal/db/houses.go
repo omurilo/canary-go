@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // LoadHouses loads all houses from the houses table into the world.

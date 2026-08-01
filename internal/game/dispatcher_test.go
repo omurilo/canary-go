@@ -213,7 +213,7 @@ func TestWDRR_DeficitAccumulation(t *testing.T) {
 
 	// Lane with high quantum should get more work done.
 	highQuantumLane := LaneProtocolInput // quantum=80
-	lowQuantumLane := LaneMaintenance     // quantum=5
+	lowQuantumLane := LaneMaintenance    // quantum=5
 
 	// Inject deficits manually to simulate accumulation.
 	d.deficits[highQuantumLane] = 0
@@ -317,8 +317,8 @@ func TestMonsterComputeService_Submit(t *testing.T) {
 
 // testPlayerSaver is a mock PlayerSaver for testing.
 type testPlayerSaver struct {
-	mu      sync.Mutex
-	saves   map[uint32]int // player DBID -> save count
+	mu    sync.Mutex
+	saves map[uint32]int // player DBID -> save count
 }
 
 func (ts *testPlayerSaver) SavePlayer(_ context.Context, p *Player) error {

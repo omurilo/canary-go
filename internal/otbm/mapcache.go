@@ -4,7 +4,7 @@ import (
 	"hash/fnv"
 	"sync"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // tileHash computes a 64-bit hash from the tile's ground ID and item IDs.

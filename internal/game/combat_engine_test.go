@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 // newTestCreature-ish helpers: build a small world with two adjacent tiles.

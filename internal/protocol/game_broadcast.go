@@ -1,8 +1,8 @@
 package protocol
 
 import (
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // talkTypePrivatePN is the player→NPC speech class (TALKTYPE_PRIVATE_PN). The

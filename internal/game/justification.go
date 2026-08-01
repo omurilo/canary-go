@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/config"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 // PvP justification, the port of Player::onKilledPlayer and

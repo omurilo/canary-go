@@ -4,8 +4,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game/combat"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // Monster movement, ported from src/creatures/monsters/monster.cpp.

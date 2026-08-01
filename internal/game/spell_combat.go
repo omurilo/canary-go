@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game/combat"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // This file drives Lua-defined spell combats through the same hit/death path as
@@ -292,7 +292,6 @@ func (e *CombatEngine) applySpellHit(c *combat.Combat, caster, target Creature, 
 		e.world.OnCombatHit(caster, target, amount, c.Params.ImpactEffect)
 	}
 
-
 	// Refresh the target's own stat bars (HP/mana) if it is a player.
 	if p, ok := target.(*Player); ok && e.world.OnPlayerStatsChange != nil {
 		e.world.OnPlayerStatsChange(p)
@@ -365,4 +364,3 @@ func (e *CombatEngine) DoAreaCombatMana(caster Creature, pos Position, area *com
 
 	e.DoCombatArea(c, caster, pos)
 }
-

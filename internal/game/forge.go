@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/opentibiabr/canary-go/internal/config"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // This file ports the Exaltation Forge from the C++ server:

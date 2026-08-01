@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 func TestAddItemToContainerStackable(t *testing.T) {

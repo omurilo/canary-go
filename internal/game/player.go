@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/bestiary"
-	"github.com/opentibiabr/canary-go/internal/bosstiary"
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
-	"github.com/opentibiabr/canary-go/internal/game/vocations"
-	"github.com/opentibiabr/canary-go/internal/items"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/bestiary"
+	"github.com/omurilo/canary-go/internal/bosstiary"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/game/vocations"
+	"github.com/omurilo/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // Session is implemented by the game protocol connection so the world and the
@@ -973,23 +973,22 @@ func (p *Player) SetTarget(target Creature) {
 // Crit and leech read straight out of the skills array, which is where C++ keeps
 // them (player->skills[SKILL_CRITICAL_HIT_CHANCE] and friends). They used to be
 // separate fields that nothing ever wrote, so every one of these returned 0.
-func (p *Player) GetCriticalChance() uint16           { return p.Skills[SkillCriticalHitChance] }
-func (p *Player) GetCriticalDamage() uint16           { return p.Skills[SkillCriticalHitDamage] }
-func (p *Player) GetLifeLeechChance() uint16          { return p.Skills[SkillLifeLeechChance] }
-func (p *Player) GetLifeLeechAmount() uint16          { return p.Skills[SkillLifeLeechAmount] }
-func (p *Player) GetManaLeechChance() uint16          { return p.Skills[SkillManaLeechChance] }
-func (p *Player) GetManaLeechAmount() uint16          { return p.Skills[SkillManaLeechAmount] }
-func (p *Player) GetReflectPercent() uint16           { return p.ReflectPercent }
-func (p *Player) GetAbsorbPercent() uint16            { return p.AbsorbPercent }
-func (p *Player) SetAttackTarget(id uint32)           { p.TargetID = id }
-func (p *Player) ChangeTargetDistance(distance int32) {}
-func (p *Player) GetPosition() Position               { return p.Pos }
-func (p *Player) SetPosition(pos Position)            { p.Pos = pos }
-func (p *Player) GetDirection() Direction             { return p.Direction }
-func (p *Player) SetDirection(dir Direction)          { p.Direction = dir }
-func (p *Player) GetOutfit() Outfit                   { return p.Outfit }
-func (p *Player) GetLightLevel() uint8                { return p.LightLevel }
-func (p *Player) GetLightColor() uint8                { return p.LightColor }
+func (p *Player) GetCriticalChance() uint16  { return p.Skills[SkillCriticalHitChance] }
+func (p *Player) GetCriticalDamage() uint16  { return p.Skills[SkillCriticalHitDamage] }
+func (p *Player) GetLifeLeechChance() uint16 { return p.Skills[SkillLifeLeechChance] }
+func (p *Player) GetLifeLeechAmount() uint16 { return p.Skills[SkillLifeLeechAmount] }
+func (p *Player) GetManaLeechChance() uint16 { return p.Skills[SkillManaLeechChance] }
+func (p *Player) GetManaLeechAmount() uint16 { return p.Skills[SkillManaLeechAmount] }
+func (p *Player) GetReflectPercent() uint16  { return p.ReflectPercent }
+func (p *Player) GetAbsorbPercent() uint16   { return p.AbsorbPercent }
+func (p *Player) SetAttackTarget(id uint32)  { p.TargetID = id }
+func (p *Player) GetPosition() Position      { return p.Pos }
+func (p *Player) SetPosition(pos Position)   { p.Pos = pos }
+func (p *Player) GetDirection() Direction    { return p.Direction }
+func (p *Player) SetDirection(dir Direction) { p.Direction = dir }
+func (p *Player) GetOutfit() Outfit          { return p.Outfit }
+func (p *Player) GetLightLevel() uint8       { return p.LightLevel }
+func (p *Player) GetLightColor() uint8       { return p.LightColor }
 
 // GetBaseSpeed returns the level-scaled base speed, mirroring
 // Player::updateBaseSpeed: vocation base speed + (level - 1). The vocation base

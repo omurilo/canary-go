@@ -3,8 +3,8 @@ package luaengine
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // eqWorld: one house, one tile in it, a player standing on that tile.

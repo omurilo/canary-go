@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // The frag list drives the skull system, so losing it on restart means a red or

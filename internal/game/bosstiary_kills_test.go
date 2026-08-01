@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/bestiary"
+	"github.com/omurilo/canary-go/internal/bestiary"
 )
 
 func TestBestiaryKillCount(t *testing.T) {

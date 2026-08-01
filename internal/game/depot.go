@@ -1,6 +1,6 @@
 package game
 
-import "github.com/opentibiabr/canary-go/internal/config"
+import "github.com/omurilo/canary-go/internal/config"
 
 // Depot box item ids (src/utils/utils_definitions.hpp:546-571). Boxes I..XVII are
 // contiguous from ITEM_DEPOT_NULL, and then the sequence BREAKS: XVIII, XIX and XX

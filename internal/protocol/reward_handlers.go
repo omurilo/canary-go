@@ -1,6 +1,6 @@
 package protocol
 
-import "github.com/opentibiabr/canary-go/internal/netmsg"
+import "github.com/omurilo/canary-go/internal/netmsg"
 
 // parseOpenRewardChest handles client request to open the reward chest (Opcode 0xD0).
 func (g *GameProtocol) parseOpenRewardChest(r *netmsg.Reader) {

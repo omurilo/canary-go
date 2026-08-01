@@ -3,11 +3,11 @@ package protocol
 import (
 	"strings"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/game/vocations"
-	"github.com/opentibiabr/canary-go/internal/luaengine"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
-	"github.com/opentibiabr/canary-go/internal/spells"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game/vocations"
+	"github.com/omurilo/canary-go/internal/luaengine"
+	"github.com/omurilo/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/spells"
 )
 
 // Spell-cast failure message class and effect constants.

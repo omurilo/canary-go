@@ -4,8 +4,8 @@ import (
 	"math"
 	"math/rand"
 
-	"github.com/opentibiabr/canary-go/internal/charms"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/charms"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 // charmCombatType maps a datapack COMBAT_* value to the engine combat type.

@@ -3,9 +3,9 @@ package protocol
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/config"
-	"github.com/opentibiabr/canary-go/internal/db"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/db"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // The client drains every opcode of ONE message and then hangs up

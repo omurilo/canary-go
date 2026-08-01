@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game/spawns"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game/spawns"
 )
 
 // ---- C++ spawnBlock_t equivalent ----

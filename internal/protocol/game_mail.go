@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // tileHasMailbox checks whether any item on the tile has the "mailbox" type.

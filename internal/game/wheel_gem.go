@@ -81,10 +81,10 @@ func selectBasicModifier2(m1 WheelGemBasicModifier) WheelGemBasicModifier {
 // NewRevealedGem creates a new gem with random modifiers for the given quality.
 func NewRevealedGem(quality WheelGemQuality) PlayerWheelGem {
 	gem := PlayerWheelGem{
-		UUID:    generateUUID(),
-		Locked:  false,
+		UUID:     generateUUID(),
+		Locked:   false,
 		Affinity: WheelGemAffinity(randomInt(4)),
-		Quality: quality,
+		Quality:  quality,
 	}
 	gem.BasicModifier1 = basicModifierPool[randomInt(len(basicModifierPool))]
 	if quality >= GemQualityRegular {

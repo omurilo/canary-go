@@ -4,7 +4,7 @@ A Go port of the **Canary** C++ Tibia 13.x MMORPG server. Goal: reach feature
 parity with the C++ server (`../src`), one subsystem at a time, validated against
 the official BattlEye client.
 
-- **Repo:** `./canary-go` (nested git repo; module `github.com/opentibiabr/canary-go`, Go 1.25). Work branch `dudantas/item-mechanics`.
+- **Repo:** `./canary-go` (nested git repo; module `github.com/omurilo/canary-go`, Go 1.25). Work branch `dudantas/item-mechanics`.
 - **C++ reference:** `../src` (~130k LOC). Go so far: ~26k LOC (`internal/`). **The C++ is the spec** — when porting, find the function in `../src` and mirror it (rules AND wire bytes).
 - **Datapacks:** core Lua in `../data`; live content in `../data-otservbr-global` (map/monsters/npcs/spells). Items: `../data/items/{items.xml,appearances.dat}`.
 - **DB:** MariaDB (host port 3307). Schema = repo-root `schema.sql` (canonical Canary schema).

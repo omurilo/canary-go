@@ -1,6 +1,6 @@
 package protocol
 
-import "github.com/opentibiabr/canary-go/internal/netmsg"
+import "github.com/omurilo/canary-go/internal/netmsg"
 
 // addLegacyItemCount appends the count byte for a stackable item in legacy
 // protocol encoding. The 0xFF marker byte is inserted for 10x+ legacy clients.

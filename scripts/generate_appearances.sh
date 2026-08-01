@@ -13,7 +13,7 @@ mkdir -p "$OUT_DIR"
 protoc --proto_path="$PROTO_DIR" \
        --go_out="$OUT_DIR" \
        --go_opt=paths=source_relative \
-       --go_opt=Mappearances.proto=github.com/opentibiabr/canary-go/internal/protobuf/appearances \
+       --go_opt=Mappearances.proto=github.com/omurilo/canary-go/internal/protobuf/appearances \
        "$PROTO_DIR/appearances.proto"
 
 echo "Successfully generated appearances protobuf for Go."

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/config"
 )
 
 // House represents a player house or guild hall. Houses are loaded from
@@ -23,7 +23,7 @@ type House struct {
 	Size       uint32 // square meters
 	RentPeriod string // "monthly", "weekly", "daily"
 	TownID     uint16
-	ClientID   uint32 // door item ID from XML (clientid attr)
+	ClientID   uint32   // door item ID from XML (clientid attr)
 	Position   Position // entrance
 
 	GuestList    []string

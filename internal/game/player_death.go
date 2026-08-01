@@ -65,12 +65,12 @@ func (p *Player) ApplyDeathPenaltyWith(lossReduction float64) {
 	}
 	if p.SkillLoss && p.Level > 7 && p.Vocation != 0 {
 		lostPercent := p.GetLostPercent() * (1 - lossReduction)
-		
+
 		lost := uint64(math.Ceil(float64(p.Experience) * lostPercent))
 		if lost > 0 {
 			p.RemoveExperience(lost)
 		}
-		
+
 		// Magic level loss (ManaSpent)
 		lostMana := uint64(math.Ceil(float64(p.ManaSpent) * lostPercent))
 		if lostMana >= p.ManaSpent {
@@ -78,7 +78,7 @@ func (p *Player) ApplyDeathPenaltyWith(lossReduction float64) {
 		} else {
 			p.ManaSpent -= lostMana
 		}
-		
+
 		// Skill loss (SkillTries)
 		for i := range p.SkillTries {
 			lostTries := uint64(math.Ceil(float64(p.SkillTries[i]) * lostPercent))

@@ -3,8 +3,8 @@ package luaengine
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/talkactions"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/talkactions"
 )
 
 func TestTalkActionRegisterAndCall(t *testing.T) {

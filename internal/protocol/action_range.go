@@ -1,8 +1,8 @@
 package protocol
 
 import (
-	"github.com/opentibiabr/canary-go/internal/actions"
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/actions"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // The reach rules for using an item, ported from src/lua/creature/actions.cpp

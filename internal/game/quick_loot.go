@@ -3,7 +3,7 @@ package game
 import (
 	"slices"
 
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 const (
@@ -334,7 +334,7 @@ func (w *World) PlayerOpenManagedContainer(playerID uint32, category uint8, isLo
 	if !ok {
 		return
 	}
-	
+
 	// We don't have container opening implemented fully here yet, so just stub it out.
 	// C++ sends the open container packet if the container exists.
 	// For now this is a no-op until container windows are fully built in Go.

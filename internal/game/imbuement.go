@@ -13,47 +13,47 @@ const (
 
 // Imbuement types
 const (
-	ImbuementNone         uint8 = 0
-	ImbuementLifeLeech    uint8 = 1
-	ImbuementManaLeech    uint8 = 2
-	ImbuementCriticalHit  uint8 = 3
-	ImbuementHPRegen      uint8 = 4
-	ImbuementMPRegen      uint8 = 5
-	ImbuementSkillAxe     uint8 = 6
-	ImbuementSkillSword   uint8 = 7
-	ImbuementSkillClub    uint8 = 8
+	ImbuementNone          uint8 = 0
+	ImbuementLifeLeech     uint8 = 1
+	ImbuementManaLeech     uint8 = 2
+	ImbuementCriticalHit   uint8 = 3
+	ImbuementHPRegen       uint8 = 4
+	ImbuementMPRegen       uint8 = 5
+	ImbuementSkillAxe      uint8 = 6
+	ImbuementSkillSword    uint8 = 7
+	ImbuementSkillClub     uint8 = 8
 	ImbuementSkillDistance uint8 = 9
-	ImbuementSkillShield  uint8 = 10
-	ImbuementSkillFist    uint8 = 11
-	ImbuementMagicLevel   uint8 = 12
-	ImbuementCapacity     uint8 = 13
-	ImbuementFireDamage   uint8 = 14
-	ImbuementEnergyDamage uint8 = 15
-	ImbuementIceDamage    uint8 = 16
-	ImbuementDeathDamage  uint8 = 17
-	ImbuementEarthDamage  uint8 = 18
-	ImbuementHolyDamage   uint8 = 19
+	ImbuementSkillShield   uint8 = 10
+	ImbuementSkillFist     uint8 = 11
+	ImbuementMagicLevel    uint8 = 12
+	ImbuementCapacity      uint8 = 13
+	ImbuementFireDamage    uint8 = 14
+	ImbuementEnergyDamage  uint8 = 15
+	ImbuementIceDamage     uint8 = 16
+	ImbuementDeathDamage   uint8 = 17
+	ImbuementEarthDamage   uint8 = 18
+	ImbuementHolyDamage    uint8 = 19
 )
 
 // Imbuement tiers
 const (
-	ImbuementTierBasic       uint8 = 1
-	ImbuementTierIntricate   uint8 = 2
-	ImbuementTierPowerful    uint8 = 3
+	ImbuementTierBasic     uint8 = 1
+	ImbuementTierIntricate uint8 = 2
+	ImbuementTierPowerful  uint8 = 3
 )
 
 // ImbuementSlot represents a slot on an item where an imbuement can be applied.
 type ImbuementSlot struct {
-	ID           uint8
-	ImbuementID  uint8
-	Tier         uint8
-	Duration     time.Duration // remaining duration
-	IsEmpty      bool
+	ID          uint8
+	ImbuementID uint8
+	Tier        uint8
+	Duration    time.Duration // remaining duration
+	IsEmpty     bool
 }
 
 // PlayerImbuement manages a player's active imbuements across items.
 type PlayerImbuement struct {
-	Slots   []ImbuementSlot
+	Slots    []ImbuementSlot
 	maxSlots uint8
 }
 

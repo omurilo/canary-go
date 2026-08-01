@@ -1,8 +1,8 @@
 package protocol
 
 import (
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // sendAttachedEffect sends an attached effect notification to the client (opcode 0x34).

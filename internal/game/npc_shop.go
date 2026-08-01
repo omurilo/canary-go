@@ -3,7 +3,7 @@ package game
 import (
 	"math"
 
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // Shopping-bag constants from the anonymous namespace at the top of

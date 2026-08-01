@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net"
 
-	"github.com/opentibiabr/canary-go/internal/transport"
+	"github.com/omurilo/canary-go/internal/transport"
 )
 
 // ProtocolFactory builds a fresh Protocol for each accepted connection.

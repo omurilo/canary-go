@@ -3,8 +3,8 @@ package game
 import (
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 // Monster attack selection, ported from src/creatures/monsters/monster.cpp.

@@ -3,8 +3,8 @@ package luaengine
 import (
 	"strings"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/spells"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/spells"
 	lua "github.com/yuin/gopher-lua"
 )
 

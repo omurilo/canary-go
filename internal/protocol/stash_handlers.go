@@ -1,8 +1,8 @@
 package protocol
 
 import (
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 // parseStashAction handles opcode 0x28 (stash stow/withdraw). Ported 1:1 from

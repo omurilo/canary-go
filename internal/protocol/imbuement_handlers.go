@@ -3,9 +3,9 @@ package protocol
 import (
 	"strings"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/game/imbuements"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game/imbuements"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 const emptyImbuementScrollID = 51442

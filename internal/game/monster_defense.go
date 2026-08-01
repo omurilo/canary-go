@@ -3,7 +3,7 @@ package game
 import (
 	"math"
 
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 // Monster defensive stats, ported from src/creatures/monsters/monster.cpp.

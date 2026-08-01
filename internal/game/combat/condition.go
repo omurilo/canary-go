@@ -72,11 +72,11 @@ type ConditionGeneric struct {
 	IsPersistent bool
 }
 
-func (c *ConditionGeneric) GetId() ConditionId { return c.Id }
+func (c *ConditionGeneric) GetId() ConditionId     { return c.Id }
 func (c *ConditionGeneric) GetType() ConditionType { return c.Type }
-func (c *ConditionGeneric) GetTicks() int32 { return c.Ticks }
-func (c *ConditionGeneric) GetEndTime() int64 { return c.EndTime }
-func (c *ConditionGeneric) SetTicks(ticks int32) { c.Ticks = ticks }
+func (c *ConditionGeneric) GetTicks() int32        { return c.Ticks }
+func (c *ConditionGeneric) GetEndTime() int64      { return c.EndTime }
+func (c *ConditionGeneric) SetTicks(ticks int32)   { c.Ticks = ticks }
 
 func (c *ConditionGeneric) SetParam(key int32, value int32) {
 	switch key {
@@ -159,13 +159,13 @@ func (c *ConditionGeneric) GetIcons() uint64 {
 // ConditionDamageStruct applies damage over time (e.g. poison, fire, energy)
 type ConditionDamageStruct struct {
 	ConditionGeneric
-	MaxDamage     int32
-	MinDamage     int32
-	StartDamage   int32
-	PeriodDamage  int32
-	TickInterval  int32
-	DamageList    []IntervalInfo
-	DamageTicks   int32
+	MaxDamage    int32
+	MinDamage    int32
+	StartDamage  int32
+	PeriodDamage int32
+	TickInterval int32
+	DamageList   []IntervalInfo
+	DamageTicks  int32
 }
 
 func (c *ConditionDamageStruct) StartCondition(creature Creature) bool {
@@ -199,13 +199,13 @@ func (c *ConditionDamageStruct) AddDamage(rounds int32, ticks int32, value int32
 func (c *ConditionDamageStruct) Clone() Condition {
 	clone := &ConditionDamageStruct{
 		ConditionGeneric: *c.ConditionGeneric.Clone().(*ConditionGeneric),
-		MaxDamage:     c.MaxDamage,
-		MinDamage:     c.MinDamage,
-		StartDamage:   c.StartDamage,
-		PeriodDamage:  c.PeriodDamage,
-		TickInterval:  c.TickInterval,
-		DamageList:    make([]IntervalInfo, len(c.DamageList)),
-		DamageTicks:   c.DamageTicks,
+		MaxDamage:        c.MaxDamage,
+		MinDamage:        c.MinDamage,
+		StartDamage:      c.StartDamage,
+		PeriodDamage:     c.PeriodDamage,
+		TickInterval:     c.TickInterval,
+		DamageList:       make([]IntervalInfo, len(c.DamageList)),
+		DamageTicks:      c.DamageTicks,
 	}
 	copy(clone.DamageList, c.DamageList)
 	return clone
@@ -240,7 +240,7 @@ func (c *ConditionRegenerationStruct) ExecuteCondition(creature Creature, interv
 
 func (c *ConditionRegenerationStruct) Clone() Condition {
 	return &ConditionRegenerationStruct{
-		ConditionGeneric: *c.ConditionGeneric.Clone().(*ConditionGeneric),
+		ConditionGeneric:    *c.ConditionGeneric.Clone().(*ConditionGeneric),
 		InternalHealthTicks: c.InternalHealthTicks,
 		InternalManaTicks:   c.InternalManaTicks,
 		HealthTicks:         c.HealthTicks,
@@ -290,7 +290,7 @@ func (c *ConditionSpeedStruct) StartCondition(creature Creature) bool {
 		baseSpeed := creature.GetBaseSpeed()
 		min, max := c.getFormulaValues(int32(baseSpeed))
 		c.SpeedDelta = c.uniformRandom(min, max) - int32(baseSpeed)
-		
+
 		if c.Type == ConditionParalyze && c.SpeedDelta < int32(40-baseSpeed) {
 			c.SpeedDelta = int32(40 - baseSpeed)
 		}

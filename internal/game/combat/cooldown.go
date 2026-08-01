@@ -13,10 +13,10 @@ type SpellCooldown struct {
 
 // CooldownManager manages spell cooldowns for a creature
 type CooldownManager struct {
-	mu           sync.RWMutex
-	Spells       map[uint16]int64
-	GroupSpells  map[uint32]int64
-	GlobalCD     int64
+	mu          sync.RWMutex
+	Spells      map[uint16]int64
+	GroupSpells map[uint32]int64
+	GlobalCD    int64
 }
 
 // NewCooldownManager creates a new CooldownManager
@@ -71,7 +71,7 @@ func (c *CooldownManager) CleanExpired() {
 	now := GetTimeNow()
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	for id, expiration := range c.Spells {
 		if now >= expiration {
 			delete(c.Spells, id)

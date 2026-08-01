@@ -3,10 +3,10 @@ package protocol
 import (
 	"sort"
 
-	"github.com/opentibiabr/canary-go/internal/bestiary"
-	"github.com/opentibiabr/canary-go/internal/charms"
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/bestiary"
+	"github.com/omurilo/canary-go/internal/charms"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
 func bestiaryThresholds(mt *creatures.MonsterType) bestiary.Thresholds {

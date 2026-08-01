@@ -3,8 +3,8 @@ package luaengine
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 func TestPlayerConstructorByName(t *testing.T) {

@@ -3,9 +3,9 @@ package db
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/io/propstream"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/io/propstream"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 func tileStoreCatalog() *items.Catalog {

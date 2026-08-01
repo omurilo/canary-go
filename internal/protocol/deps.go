@@ -5,13 +5,13 @@ package protocol
 import (
 	"log/slog"
 
-	"github.com/opentibiabr/canary-go/internal/config"
-	"github.com/opentibiabr/canary-go/internal/db"
-	"github.com/opentibiabr/canary-go/internal/events"
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/items"
-	"github.com/opentibiabr/canary-go/internal/luaengine"
-	"github.com/opentibiabr/canary-go/internal/tibcrypto"
+	"github.com/omurilo/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/db"
+	"github.com/omurilo/canary-go/internal/events"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/luaengine"
+	"github.com/omurilo/canary-go/internal/tibcrypto"
 )
 
 // ClientVersion is the protocol version the server speaks (Tibia 13.x).

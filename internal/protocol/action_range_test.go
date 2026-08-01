@@ -3,9 +3,9 @@ package protocol
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/actions"
-	"github.com/opentibiabr/canary-go/internal/game"
-	"github.com/opentibiabr/canary-go/internal/items"
+	"github.com/omurilo/canary-go/internal/actions"
+	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // rangeProto builds a protocol with a player standing at 100,100,7 on open

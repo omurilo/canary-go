@@ -38,10 +38,10 @@ func (o *MarketOffer) IsExpired(durationSecs int32) bool {
 // The authoritative state lives in the market_offers DB table; this
 // provides fast lookups for the protocol layer.
 type Market struct {
-	mu      sync.RWMutex
-	byID    map[uint32]*MarketOffer
-	byItem  map[uint16][]*MarketOffer // itemID → offers (buy or sell)
-	nextID  uint32
+	mu     sync.RWMutex
+	byID   map[uint32]*MarketOffer
+	byItem map[uint16][]*MarketOffer // itemID → offers (buy or sell)
+	nextID uint32
 }
 
 // NewMarket creates an empty market.

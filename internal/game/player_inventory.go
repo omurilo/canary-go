@@ -1,6 +1,6 @@
 package game
 
-import "github.com/opentibiabr/canary-go/internal/items"
+import "github.com/omurilo/canary-go/internal/items"
 
 // This file mirrors the inventory block of src/creatures/players/player.cpp:
 // item counting, type search, type removal, capacity/weight, and placement.

@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/config"
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // Market offer expiry, the port of IOMarket::checkExpiredOffers and

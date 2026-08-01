@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/config"
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/game"
 )
 
 // liveDB connects to the MariaDB the compose stack runs on 3307, or skips. The unit

@@ -3,7 +3,7 @@ package luaengine
 import (
 	"strings"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/creatures"
 	lua "github.com/yuin/gopher-lua"
 )
 

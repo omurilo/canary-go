@@ -1,4 +1,4 @@
-module github.com/opentibiabr/canary-go
+module github.com/omurilo/canary-go
 
 go 1.25.0
 
@@ -14,4 +14,4 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 )
 
-replace github.com/opentibiabr/canary-go => ./
+replace github.com/omurilo/canary-go => ./

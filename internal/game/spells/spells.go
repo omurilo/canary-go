@@ -5,6 +5,7 @@ import (
 )
 
 type SpellType uint8
+
 const (
 	SpellTypeInstant SpellType = iota
 	SpellTypeRune
@@ -12,6 +13,7 @@ const (
 )
 
 type SpellGroup uint8
+
 const (
 	SpellGroupNone SpellGroup = iota
 	SpellGroupAttack

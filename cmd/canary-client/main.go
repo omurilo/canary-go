@@ -14,9 +14,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/opentibiabr/canary-go/internal/netmsg"
-	"github.com/opentibiabr/canary-go/internal/tibcrypto"
-	"github.com/opentibiabr/canary-go/internal/transport"
+	"github.com/omurilo/canary-go/internal/netmsg"
+	"github.com/omurilo/canary-go/internal/tibcrypto"
+	"github.com/omurilo/canary-go/internal/transport"
 )
 
 const clientVersion = 1525

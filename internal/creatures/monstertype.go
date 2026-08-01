@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/opentibiabr/canary-go/internal/bosstiary"
+	"github.com/omurilo/canary-go/internal/bosstiary"
 )
 
 type Outfit struct {

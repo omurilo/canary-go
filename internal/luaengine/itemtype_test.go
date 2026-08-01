@@ -1,7 +1,7 @@
 package luaengine
 import (
 	"testing"
-	"github.com/opentibiabr/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game"
 	"log/slog"
 )
 func TestItemTypeCall(t *testing.T) {

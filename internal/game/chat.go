@@ -699,7 +699,7 @@ func (w *World) SendPrivateMessage(sender, receiver *Player, talkType byte, text
 	if receiver == nil || receiver.Session == nil {
 		return
 	}
-		receiver.Session.SendToChannel(0, sender.Name, uint16(sender.Level), talkType, 0, text)
+	receiver.Session.SendToChannel(0, sender.Name, uint16(sender.Level), talkType, 0, text)
 }
 
 // ---------------------------------------------------------------------------
@@ -708,7 +708,7 @@ func (w *World) SendPrivateMessage(sender, receiver *Player, talkType byte, text
 
 // chatChannelXML is the XML structure for chatchannels.xml.
 type chatChannelXML struct {
-	XMLName xml.Name          `xml:"channels"`
+	XMLName  xml.Name           `xml:"channels"`
 	Channels []chatChannelEntry `xml:"channel"`
 }
 
@@ -746,4 +746,3 @@ func (w *World) LoadChatChannels(path string) error {
 
 	return nil
 }
-

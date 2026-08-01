@@ -12,7 +12,7 @@ import (
 // exact bytes are the compatibility contract.
 func TestAnimusMasterySerializeGolden(t *testing.T) {
 	am := NewAnimusMastery()
-	am.Add(1, "Rat")     // stored lowercase
+	am.Add(1, "Rat") // stored lowercase
 	am.Add(2, "dragon")
 
 	// sorted: "dragon" then "rat"

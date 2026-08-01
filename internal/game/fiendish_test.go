@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"github.com/opentibiabr/canary-go/internal/creatures"
+	"github.com/omurilo/canary-go/internal/creatures"
 )
 
 func TestMonsterForgeSystem(t *testing.T) {

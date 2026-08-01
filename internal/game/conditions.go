@@ -3,7 +3,7 @@ package game
 import (
 	"sync"
 
-	"github.com/opentibiabr/canary-go/internal/game/combat"
+	"github.com/omurilo/canary-go/internal/game/combat"
 )
 
 // conditionStore is an embeddable, concurrency-safe holder for the combat

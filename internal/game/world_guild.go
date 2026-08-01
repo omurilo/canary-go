@@ -31,21 +31,21 @@ func (p *Player) GetGuild() *Guild {
 	if p.World == nil {
 		return nil
 	}
-	
+
 	if p.GuildName == "" {
 		return nil
 	}
-	
+
 	w := p.World
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	
+
 	for _, guild := range w.guilds {
 		if guild.Name == p.GuildName {
 			return guild
 		}
 	}
-	
+
 	return nil
 }
 
@@ -62,7 +62,7 @@ func (p *Player) GetGuildRankLevel() uint8 {
 	if guild == nil {
 		return 0
 	}
-	
+
 	for _, rank := range guild.Ranks {
 		if rank.Name == p.GuildRankName {
 			return rank.Level
