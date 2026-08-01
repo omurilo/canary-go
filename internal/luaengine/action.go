@@ -18,7 +18,7 @@ func (e *Engine) registerAction() {
 }
 
 func actionConstructor(L *lua.LState) int {
-	a := &actions.Action{}
+	a := actions.New()
 	ud := L.NewUserData()
 	ud.Value = a
 	L.SetMetatable(ud, L.GetTypeMetatable(luaActionTypeName))
@@ -51,12 +51,21 @@ func actionPosition(L *lua.LState) int {
 	return 1
 }
 
+// actionBlockWalls is action:blockWalls(bool) — Action::setCheckLineOfSight.
+// The Lua name and the field name disagree upstream too.
 func actionBlockWalls(L *lua.LState) int {
+	a := checkAction(L)
+	a.CheckLineOfSight = L.GetTop() < 2 || L.CheckBool(2)
 	L.Push(L.Get(1))
 	return 1
 }
 
+// actionCheckFloor is action:checkFloor(bool) — Action::setCheckFloor. Both of
+// these used to discard the argument, so a script turning a check off was
+// silently ignored and one turning it on got no protection either.
 func actionCheckFloor(L *lua.LState) int {
+	a := checkAction(L)
+	a.CheckFloor = L.GetTop() < 2 || L.CheckBool(2)
 	L.Push(L.Get(1))
 	return 1
 }

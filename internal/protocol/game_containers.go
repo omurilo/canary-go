@@ -28,15 +28,33 @@ func (g *GameProtocol) parseUseItem(r *netmsg.Reader) {
 	stackpos := r.GetByte() // stackpos
 	index := r.GetByte()    // index
 
+	g.useItem(pos, itemID, stackpos, index)
+}
+
+// useItem is the body of Game::playerUseItem, split from the packet read so an
+// out-of-reach use can walk over and run again.
+func (g *GameProtocol) useItem(pos netmsg.Position, itemID uint16, stackpos, index uint8) {
+	if g.player == nil {
+		return
+	}
 	item := g.getItemAt(pos, itemID, stackpos)
 	if item == nil {
 		return
 	}
 	gamePos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
-	if pos.X != 0xFFFF {
-		if dist := g.player.Pos.MaxDistance(gamePos); dist < 0 || dist > 8 {
+
+	// Actions::canUse (src/lua/creature/actions.cpp:179-191): a plain use has to be
+	// within arm's reach, and out of reach means walk there — not refuse. The
+	// square-8 guard this replaces allowed a use from across the screen and said
+	// nothing at all beyond that.
+	if ret := g.actionCanUse(gamePos); ret != retNoError {
+		if ret == retTooFarAway && g.walkToThenRetry(gamePos, func() {
+			g.useItem(pos, itemID, stackpos, index)
+		}) {
 			return
 		}
+		g.sendCancelMessage(ret.message())
+		return
 	}
 
 	t := g.deps.Items.Get(item.ID)
@@ -621,6 +639,15 @@ func (g *GameProtocol) parseUseItemWith(r *netmsg.Reader) {
 
 	g.deps.Log.Debug("parseUseItemWith", "player", g.player.Name, "fromPos", fromPos, "fromItemID", fromItemID, "toPos", toPos, "toItemID", toItemID)
 
+	g.useItemWith(fromPos, fromItemID, fromStackPos, toPos, toItemID, toStackPos)
+}
+
+// useItemWith is the body of playerUseItemEx, split out from the packet read so
+// that walkToThenRetry can run it again once the player has walked into reach.
+func (g *GameProtocol) useItemWith(fromPos netmsg.Position, fromItemID uint16, fromStackPos uint8, toPos netmsg.Position, toItemID uint16, toStackPos uint8) {
+	if g.player == nil {
+		return
+	}
 	fromItem := g.getItemAt(fromPos, fromItemID, fromStackPos)
 	if fromItem == nil {
 		g.deps.Log.Debug("parseUseItemWith: fromItem is nil")
@@ -628,20 +655,37 @@ func (g *GameProtocol) parseUseItemWith(r *netmsg.Reader) {
 	}
 	fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
 	toGamePos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
-	if dist := g.player.Pos.MaxDistance(fromGamePos); dist < 0 || dist > 8 {
-		return
-	}
-	if fromPos.X != 0xFFFF && toPos.X != 0xFFFF {
-		if dist := g.player.Pos.MaxDistance(toGamePos); dist < 0 || dist > 8 {
-			return
-		}
-	}
 
 	toItem := g.getItemAt(toPos, toItemID, toStackPos)
 
 	// Execute Lua action
 	action := actions.FindAction(fromItem, game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z})
 	if action != nil {
+		// Game::playerUseItemEx (src/game/game.cpp:4594-4601): reach the item
+		// first, then ask the action whether the target is reachable — an action
+		// with allowFarUse answers by the viewport rather than by arm's length.
+		ret := g.actionCanUse(fromGamePos)
+		if ret == retNoError {
+			ret = g.actionCanExecute(action, toGamePos)
+		}
+		if ret == retTooFarAway {
+			// Out of reach is not a refusal upstream: the player walks over and
+			// the action runs again on arrival.
+			walkTo := fromGamePos
+			if g.actionCanUse(fromGamePos) == retNoError {
+				walkTo = toGamePos
+			}
+			if isMapPosition(walkTo) && g.walkToThenRetry(walkTo, func() {
+				g.useItemWith(fromPos, fromItemID, fromStackPos, toPos, toItemID, toStackPos)
+			}) {
+				return
+			}
+		}
+		if ret != retNoError {
+			g.sendCancelMessage(ret.message())
+			return
+		}
+
 		isEx := g.isExAction(fromItem)
 		if isEx {
 			if !g.player.CanDoPotionAction() {
@@ -687,30 +731,56 @@ func (g *GameProtocol) parseUseWithCreature(r *netmsg.Reader) {
 
 	g.deps.Log.Debug("parseUseWithCreature", "player", g.player.Name, "fromPos", fromPos, "fromItemID", fromItemID, "creatureID", creatureID)
 
+	g.useWithCreature(fromPos, fromItemID, fromStackPos, creatureID)
+}
+
+// useWithCreature is the body of playerUseWithCreature, split from the packet
+// read so an out-of-reach use can walk over and run again.
+func (g *GameProtocol) useWithCreature(fromPos netmsg.Position, fromItemID uint16, fromStackPos uint8, creatureID uint32) {
+	if g.player == nil {
+		return
+	}
 	fromItem := g.getItemAt(fromPos, fromItemID, fromStackPos)
 	if fromItem == nil {
 		g.deps.Log.Debug("parseUseWithCreature: fromItem is nil")
 		return
 	}
 	fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
-	if fromPos.X != 0xFFFF {
-		if dist := g.player.Pos.MaxDistance(fromGamePos); dist < 0 || dist > 8 {
-			return
-		}
-	}
 
 	targetCreature := g.deps.World.CreatureByID(creatureID)
 	if targetCreature == nil {
 		g.deps.Log.Debug("parseUseWithCreature: targetCreature is nil", "creatureID", creatureID)
 		return
 	}
-	if dist := g.player.Pos.MaxDistance(targetCreature.GetPosition()); dist < 0 || dist > 8 {
-		return
-	}
 
 	// Execute Lua action
 	action := actions.FindAction(fromItem, game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z})
 	if action != nil {
+		// Game::playerUseWithCreature (src/game/game.cpp:4911-4917), the same two
+		// checks as playerUseItemEx. The square-8 guards this replaces both let a
+		// rune fly further than the client can draw and refused a container item
+		// outright, since a container slot's "z" is a slot index.
+		creaturePos := targetCreature.GetPosition()
+		ret := g.actionCanUse(fromGamePos)
+		if ret == retNoError {
+			ret = g.actionCanExecute(action, creaturePos)
+		}
+		if ret == retTooFarAway {
+			walkTo := fromGamePos
+			if g.actionCanUse(fromGamePos) == retNoError {
+				walkTo = creaturePos
+			}
+			if isMapPosition(walkTo) && g.walkToThenRetry(walkTo, func() {
+				g.useWithCreature(fromPos, fromItemID, fromStackPos, creatureID)
+			}) {
+				return
+			}
+		}
+		if ret != retNoError {
+			g.sendCancelMessage(ret.message())
+			return
+		}
+
 		isEx := g.isExAction(fromItem)
 		if isEx {
 			if !g.player.CanDoPotionAction() {

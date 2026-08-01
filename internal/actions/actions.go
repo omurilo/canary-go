@@ -8,12 +8,25 @@ import (
 
 // Action represents a Lua action script.
 type Action struct {
-	ItemIDs     []uint16
-	ActionIDs   []uint16
-	UniqueIDs   []uint16
-	Positions   []game.Position
-	OnUse       *lua.LFunction
-	AllowFarUse bool
+	ItemIDs   []uint16
+	ActionIDs []uint16
+	UniqueIDs []uint16
+	Positions []game.Position
+	OnUse     *lua.LFunction
+
+	// The three range knobs from src/lua/creature/actions.hpp:129-131. Upstream
+	// defaults CheckFloor and CheckLineOfSight to TRUE, so an Action built with a
+	// bare `&Action{}` is not the upstream default — use New().
+	AllowFarUse      bool
+	CheckLineOfSight bool
+	CheckFloor       bool
+}
+
+// New builds an Action with upstream's defaults. Zero-valuing the struct gives
+// checkFloor and checkLineOfSight of false, which is the opposite of what C++
+// starts from and would let every action shoot through walls and floors.
+func New() *Action {
+	return &Action{CheckLineOfSight: true, CheckFloor: true}
 }
 
 // Engine represents the global Actions Engine

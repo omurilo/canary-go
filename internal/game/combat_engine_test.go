@@ -32,8 +32,11 @@ func TestCombatEngine_MeleeHitDamagesTarget(t *testing.T) {
 
 	e := NewCombatEngine(w)
 
-	// A high-skill fist guarantees non-zero damage.
-	attacker := &Player{Skills: [SkillCount]uint16{SkillFist: 120}}
+	// Skill alone only raises the ceiling: meleeDamage rolls
+	// randomRange(level/5, ...), so a level-0 attacker rolls 0 about one time in
+	// 72 and the hit lands for nothing. The level is what puts a floor under the
+	// roll, and without it this test failed intermittently.
+	attacker := &Player{Level: 100, Skills: [SkillCount]uint16{SkillFist: 120}}
 	attacker.SetPosition(Position{X: 100, Y: 100, Z: 7})
 
 	before := monster.GetHealth()

@@ -265,74 +265,14 @@ func sign(v int) int {
 	return 0
 }
 
-// IsSightClear is Map::checkSightLine (src/map/map.cpp:845-...): can a projectile
-// travel from start to destination without a BLOCKPROJECTILE tile in the way.
+// IsSightClear asks whether a projectile can travel from start to destination on
+// one floor. It is Map::isSightClear with floorCheck on, which is what combat
+// uses; the line walk itself lives in CheckSightLine (sightline.go).
 //
-// The horizontal and vertical arms are the C++ ones exactly. The diagonal is NOT:
-// upstream uses Xiaolin Wu's line algorithm, and this walks the major axis
-// instead. The two agree on straight lines and on clear ground, and can disagree
-// on which tiles a shallow diagonal clips — so a monster may occasionally judge a
-// diagonal shot possible where C++ would not. Porting Wu's version is the fix;
-// this is honest about being an approximation until then.
+// This used to carry its own line walk with a Bresenham diagonal standing in for
+// upstream's Xiaolin Wu. The two agree on straight lines and open ground and
+// disagree on shallow diagonals, which meant a monster could take a shot the C++
+// server would have refused. The real algorithm is ported now.
 func (w *World) IsSightClear(start, destination Position) bool {
-	if start.Z != destination.Z {
-		return false
-	}
-	if start.X == destination.X && start.Y == destination.Y {
-		return true
-	}
-	blocked := func(x, y int) bool {
-		tile := w.Map.GetTile(Position{X: uint16(x), Y: uint16(y), Z: start.Z})
-		return tile != nil && tile.BlocksProjectile(w.Items)
-	}
-
-	dx, dy := abs(int(destination.X)-int(start.X)), abs(int(destination.Y)-int(start.Y))
-	sx, sy := sign(int(destination.X)-int(start.X)), sign(int(destination.Y)-int(start.Y))
-
-	// Both endpoints are excluded, as in C++: the shooter and the target never
-	// block their own line.
-	if start.Y == destination.Y {
-		for i := 1; i < dx; i++ {
-			if blocked(int(start.X)+i*sx, int(start.Y)) {
-				return false
-			}
-		}
-		return true
-	}
-	if start.X == destination.X {
-		for i := 1; i < dy; i++ {
-			if blocked(int(start.X), int(start.Y)+i*sy) {
-				return false
-			}
-		}
-		return true
-	}
-
-	x, y := int(start.X), int(start.Y)
-	if dx >= dy {
-		err := dx / 2
-		for i := 1; i < dx; i++ {
-			x += sx
-			if err -= dy; err < 0 {
-				y += sy
-				err += dx
-			}
-			if blocked(x, y) {
-				return false
-			}
-		}
-	} else {
-		err := dy / 2
-		for i := 1; i < dy; i++ {
-			y += sy
-			if err -= dx; err < 0 {
-				x += sx
-				err += dy
-			}
-			if blocked(x, y) {
-				return false
-			}
-		}
-	}
-	return true
+	return w.IsSightClearFloors(start, destination, true)
 }
