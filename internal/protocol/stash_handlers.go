@@ -135,9 +135,93 @@ func (g *GameProtocol) resolveStowItem(pos netmsg.Position, stackpos int, itemID
 		return slotItem
 	}
 
-	// Map position → find in open containers by matching position
+	// A map position means the TILE. This only searched the open containers, so an
+	// item lying on the floor could never be resolved — dropping a decoration kit
+	// in your own house and choosing unwrap answered "Sorry, not possible", because
+	// the kit was never found in the first place.
 	gamePos := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
+	if tile := g.deps.World.Map.GetTile(gamePos); tile != nil {
+		if it := g.tileFindThing(tile, stackpos); it != nil {
+			return it
+		}
+	}
+	// Browse-field and other open-container views of the same position remain a
+	// fallback, which is how an item inside a container on the tile is reached.
 	return g.player.FindItemInOpenContainers(gamePos, stackpos, itemID)
+}
+
+// tileFindThing is internalGetThing's STACKPOS_FIND_THING branch
+// (src/game/game.cpp:1156-1167): the thing at the client's index, else the tile's
+// door, else its top down item.
+func (g *GameProtocol) tileFindThing(tile *game.Tile, index int) *game.Item {
+	if it := g.tileThingAt(tile, index); it != nil {
+		return it
+	}
+	// getDoorItem, then getTopDownItem (tile.cpp:1956, and the top of the down
+	// items). Both fall back to the ground on an empty tile, as C++ does.
+	if len(tile.Items) == 0 {
+		return tile.Ground
+	}
+	for _, it := range tile.Items {
+		if it == nil {
+			continue
+		}
+		if t := g.deps.Items.Get(it.ID); t != nil && t.IsDoor {
+			return it
+		}
+	}
+	for i := len(tile.Items) - 1; i >= 0; i-- {
+		if tile.Items[i] != nil {
+			return tile.Items[i]
+		}
+	}
+	return nil
+}
+
+// tileThingAt is Tile::getThing (src/items/tile.cpp:1570-1599). The order is
+// ground, top items, creatures, down items — and note C++ counts EVERY creature
+// here, not only the ones the asking player can see.
+//
+// The Go tile keeps one Items slice rather than C++'s split vector, so the two
+// groups are walked separately instead of indexed by offset.
+func (g *GameProtocol) tileThingAt(tile *game.Tile, index int) *game.Item {
+	if index < 0 {
+		return nil
+	}
+	if tile.Ground != nil {
+		if index == 0 {
+			return tile.Ground
+		}
+		index--
+	}
+
+	tops := make([]*game.Item, 0, len(tile.Items))
+	downs := make([]*game.Item, 0, len(tile.Items))
+	for _, it := range tile.Items {
+		if it == nil {
+			continue
+		}
+		if g.isTopItem(it) {
+			tops = append(tops, it)
+		} else {
+			downs = append(downs, it)
+		}
+	}
+
+	if index < len(tops) {
+		return tops[index]
+	}
+	index -= len(tops)
+
+	if index < len(tile.Creatures) {
+		return nil // a creature is not an item; the caller falls through
+	}
+	index -= len(tile.Creatures)
+
+	if index < len(downs) {
+		return downs[index]
+	}
+	return nil
 }
 
 // sendStashRefresh envia stash + inventário + containers abertos atualizados.

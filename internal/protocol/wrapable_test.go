@@ -289,3 +289,39 @@ func TestStackPosOfItemCapsAtTen(t *testing.T) {
 		t.Errorf("the first down item is at %d, want 2", got)
 	}
 }
+
+// The unwrap refusal: resolveStowItem answered only from the player's open
+// containers for a map position, so a kit lying on the floor of your own house was
+// never found and the whole action died on "Sorry, not possible" before any of the
+// house checks ran.
+func TestResolveStowItemFindsItemsOnTheFloor(t *testing.T) {
+	g, w, _, pos := wrapSetup(t)
+	tile := w.Map.GetTile(pos)
+
+	kit := &game.Item{ID: game.ItemDecorationKit}
+	tile.Items = append(tile.Items, kit)
+
+	// ground(0), the viewer is a creature, then the kit as the first down item.
+	idx := g.stackPosOfItem(pos, kit)
+	if idx == -1 {
+		t.Fatalf("the kit must have a stack index")
+	}
+	got := g.resolveStowItem(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, idx, game.ItemDecorationKit)
+	if got != kit {
+		t.Fatalf("the kit on the floor was not resolved: %v", got)
+	}
+}
+
+// STACKPOS_FIND_THING falls back when the index misses, which is what keeps the
+// action working while a creature walks over the tile and shifts the client's view.
+func TestResolveStowItemFallsBackToTheTopDownItem(t *testing.T) {
+	g, w, _, pos := wrapSetup(t)
+	tile := w.Map.GetTile(pos)
+	kit := &game.Item{ID: game.ItemDecorationKit}
+	tile.Items = append(tile.Items, kit)
+
+	got := g.resolveStowItem(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, 99, game.ItemDecorationKit)
+	if got != kit {
+		t.Errorf("an out-of-range index must fall back to the top down item, got %v", got)
+	}
+}
