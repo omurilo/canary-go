@@ -635,6 +635,13 @@ func parseMonsterFlags(m *creatures.MonsterType, table *lua.LTable) {
 	boolFlag("lootDrop", &m.Flags.LootDrop)
 	intFlag("staticAttackChance", &m.Flags.StaticAttackChance)
 	intFlag("targetDistance", &m.Flags.TargetDistance)
+	// Weighted target-search strategies (monster.cpp:906-924). No datapack monster
+	// sets these today, so every one of them resolves to nearest — the plumbing is
+	// here so a type that does set them is obeyed rather than silently ignored.
+	intFlag("strategiesTargetNearest", &m.Flags.StrategiesTargetNearest)
+	intFlag("strategiesTargetHealth", &m.Flags.StrategiesTargetHealth)
+	intFlag("strategiesTargetDamage", &m.Flags.StrategiesTargetDamage)
+	intFlag("strategiesTargetRandom", &m.Flags.StrategiesTargetRandom)
 	intFlag("runHealth", &m.Flags.RunHealth)
 }
 

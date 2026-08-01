@@ -211,3 +211,26 @@ func (m *Map) GenerateFlatField(center Position, radius int, groundID uint16) {
 		}
 	}
 }
+
+// BlocksProjectile reports CONST_PROP_BLOCKPROJECTILE for the tile: whether a
+// shot or a spell can pass over it. Used by the sight line, so a monster does
+// not fire through a wall.
+func (t *Tile) BlocksProjectile(catalog *items.Catalog) bool {
+	if t == nil || catalog == nil {
+		return false
+	}
+	if t.Ground != nil {
+		if it := catalog.Get(t.Ground.ID); it != nil && it.BlockProjectile {
+			return true
+		}
+	}
+	for _, item := range t.Items {
+		if item == nil {
+			continue
+		}
+		if it := catalog.Get(item.ID); it != nil && it.BlockProjectile {
+			return true
+		}
+	}
+	return false
+}

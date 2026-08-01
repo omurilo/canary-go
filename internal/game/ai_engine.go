@@ -44,59 +44,77 @@ func (e *AIEngine) updateAI() {
 			continue
 		}
 
-		target := c.GetTarget()
-		if target != nil {
-			// Check if target is still valid
-			if targetPlayer, ok := target.(*Player); ok {
-				if e.world.PlayerByID(targetPlayer.GetID()) == nil ||
-					targetPlayer.CannotBeAttacked() ||
-					!c.GetPosition().InRangeOf(target.GetPosition()) {
-					c.SetTarget(nil)
-				}
-			} else {
-				c.SetTarget(nil)
+		// --- target upkeep -------------------------------------------------
+		// A target that walked out of range, went ghost or became unattackable is
+		// dropped; C++ does the same in onThink before considering a new one.
+		if t := monster.GetTarget(); t != nil {
+			p, isPlayer := t.(*Player)
+			gone := !isPlayer ||
+				e.world.PlayerByID(p.GetID()) == nil ||
+				p.CannotBeAttacked() || p.Ghost ||
+				!monster.GetPosition().InRangeOf(p.GetPosition())
+			if gone {
+				monster.SetTarget(nil)
 			}
 		}
 
-		// Aggro: Find a target if we don't have one. Staff (god/gm/community
-		// manager) and ghosts cannot be attacked, so monsters never aggro them —
-		// mirroring PlayerFlags_t::CannotBeAttacked.
-		if c.GetTarget() == nil {
-			players := e.world.Spectators(c.GetPosition(), c.GetID())
-			var closest *Player
-			var minDist int = 1000
-			for _, p := range players {
-				if p.CannotBeAttacked() {
-					continue
-				}
-				dist := chebyshevDistance(c.GetPosition(), p.GetPosition())
-				if dist < minDist {
-					minDist = dist
-					closest = p
-				}
-			}
-			if closest != nil {
-				c.SetTarget(closest)
-			}
+		// --- target selection ----------------------------------------------
+		// The strategy roll, not "always nearest". A type with
+		// strategiesTargetHealth set hunts the weakest thing it can reach.
+		if monster.GetTarget() == nil {
+			monster.SearchTarget(e.world, TargetSearchDefault)
 		}
 
-		// Move towards target or wander
-		if c.GetTarget() != nil {
-			// Pathfinding towards target
-			path := FindPath(e.world.Map, e.world.Items, c.GetPosition(), c.GetTarget().GetPosition(), 100)
-			if len(path) > 0 {
-				nextPos := path[0]
-				e.world.TryMoveCreature(c, getDirectionTo(c.GetPosition(), nextPos))
-			}
-		} else {
-			// Wander
-			if rand.Intn(3) == 0 { // 33% chance to move randomly
+		target := monster.GetTarget()
+		if target == nil {
+			if rand.Intn(3) == 0 {
 				dirs := []Direction{DirNorth, DirEast, DirSouth, DirWest}
-				dir := dirs[rand.Intn(len(dirs))]
-				e.world.TryMoveCreature(c, dir)
+				e.world.TryMoveCreature(monster, dirs[rand.Intn(len(dirs))])
+			}
+			continue
+		}
+
+		// --- movement --------------------------------------------------------
+		// Monster::doFollowCreature (monster.cpp:2529-2549): a fleeing monster
+		// backs away, and one already at its fighting distance dances around the
+		// target instead of standing still — but only when staticAttackChance says
+		// so, which is what keeps a static caster planted.
+		if monster.IsFleeing() {
+			if dir, ok := monster.FleeStep(e.world); ok {
+				e.world.TryMoveCreature(monster, dir)
+			}
+			continue
+		}
+
+		pos := monster.GetPosition()
+		dist := chebyshevDistance(pos, target.GetPosition())
+		want := monster.TargetDistanceOf()
+
+		if dist > want {
+			// Close the gap. A distance monster stops at its targetDistance rather
+			// than walking into melee, which the old engine always did.
+			path := FindPath(e.world.Map, e.world.Items, pos, target.GetPosition(), 100)
+			for _, step := range path {
+				if chebyshevDistance(step, target.GetPosition()) < want {
+					break
+				}
+				e.world.TryMoveCreature(monster, StepDirection(pos, step))
+				break
+			}
+			continue
+		}
+
+		static := 0
+		if monster.Type != nil {
+			static = monster.Type.Flags.StaticAttackChance
+		}
+		if static < rand.Intn(100)+1 {
+			if dir, ok := monster.DanceStep(e.world, true, true); ok {
+				e.world.TryMoveCreature(monster, dir)
 			}
 		}
 	}
+
 	GlobalDispatcher.AddEvent(1*time.Second, e.updateAI)
 }
 

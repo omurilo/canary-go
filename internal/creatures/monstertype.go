@@ -131,6 +131,15 @@ type MonsterFlags struct {
 	CanPushCreatures   bool
 	StaticAttackChance int
 	TargetDistance     int
+	// Weighted percentages for Monster::searchTargetImmediate
+	// (src/creatures/monsters/monster.cpp:906-924). One roll of 1..100 walks them
+	// in this order; whatever it overshoots becomes a random pick. All zero, the
+	// default, means always-nearest — which is what the engine did unconditionally
+	// before these existed.
+	StrategiesTargetNearest int
+	StrategiesTargetHealth  int
+	StrategiesTargetDamage  int
+	StrategiesTargetRandom  int
 	RunHealth          int
 	HealthHidden       bool
 	CanWalkOnEnergy    bool
