@@ -90,3 +90,34 @@ func TestGeneratedEnumsDoNotOverlapHandWritten(t *testing.T) {
 		}
 	}
 }
+
+// registerTeleportType and registerImbuementType were defined and never called,
+// and mockClass("Teleport") then papered over the hole with a userdata whose
+// __index answers every call with nil — so a datapack calling teleport:getDestination()
+// got nil instead of an error, and nothing in the logs said why.
+func TestTeleportAndImbuementAreRealClasses(t *testing.T) {
+	e := newTestEngine()
+	for _, name := range []string{"Teleport", "Imbuement"} {
+		mt := e.L.GetTypeMetatable(name)
+		if mt == lua.LNil {
+			t.Errorf("%s has no metatable: its register function is not being called", name)
+			continue
+		}
+		tbl, ok := mt.(*lua.LTable)
+		if !ok {
+			t.Errorf("%s metatable is %T", name, mt)
+			continue
+		}
+		idx := e.L.RawGet(tbl, lua.LString("__index"))
+		methods, ok := idx.(*lua.LTable)
+		if !ok {
+			t.Errorf("%s __index is %s, not a method table — a mock has replaced it", name, idx.Type())
+			continue
+		}
+		n := 0
+		methods.ForEach(func(lua.LValue, lua.LValue) { n++ })
+		if n == 0 {
+			t.Errorf("%s exposes no methods", name)
+		}
+	}
+}

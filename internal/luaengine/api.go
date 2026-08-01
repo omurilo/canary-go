@@ -244,6 +244,11 @@ func (e *Engine) registerAPI() {
 	e.registerVocation()
 	e.registerModalWindowType()
 	e.registerWeaponType()
+	// Both of these were written and never called, so Teleport and Imbuement had no
+	// methods at all — and mockClass("Teleport") then covered the hole with a
+	// userdata that answers every call with nil, which is why nothing errored.
+	e.registerTeleportType()
+	e.registerImbuementType()
 	e.registerWebhookType()
 	e.registerMetrics()
 
@@ -337,7 +342,6 @@ func (e *Engine) registerAPI() {
 	// misses what the datapack calls. Zone no longer does — it is backed by the real
 	// registry now, with the nineteen methods C++ registers.
 	// Same caveat for Imbuement: registerImbuementType is intentionally left unwired.
-	mockClass("Teleport")
 
 	// ItemClassification has a real binding (not a mock) so it can be
 	// populated from data/scripts/systems/item_tiers.lua.
