@@ -1,6 +1,8 @@
 package game
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -129,6 +131,7 @@ func (h *House) SetOwner(w *World, guid uint32, updateDatabase bool, player *Pla
 	h.mu.Unlock()
 
 	if guid == 0 {
+		h.UpdateDoorDescription(w)
 		return
 	}
 
@@ -142,6 +145,7 @@ func (h *House) SetOwner(w *World, guid uint32, updateDatabase bool, player *Pla
 		h.OwnerID = guid
 		h.State = HouseStateRented
 		h.mu.Unlock()
+		h.UpdateDoorDescription(w)
 		return
 	}
 	name, accountID, ok := w.LookupPlayerAccount(guid)
@@ -154,6 +158,99 @@ func (h *House) SetOwner(w *World, guid uint32, updateDatabase bool, player *Pla
 	h.OwnerAccountID = accountID
 	h.State = HouseStateRented
 	h.mu.Unlock()
+
+	// house.cpp:153 — the door text is refreshed as the last step of setOwner, so
+	// looking at the door reports the new owner immediately.
+	h.UpdateDoorDescription(w)
+}
+
+// GetPrice is House::getPrice (house.cpp:1069-1073).
+func (h *House) GetPrice() uint32 {
+	h.mu.RLock()
+	size, rent := h.Size, h.Rent
+	h.mu.RUnlock()
+	sqmPrice := uint32(config.Number("housePriceEachSQM", 1000)) * size
+	rentPrice := uint32(float64(rent) * config.Float("housePriceRentMultiplier", 1.0))
+	return sqmPrice + rentPrice
+}
+
+// UpdateDoorDescription writes the house blurb onto every door of the house, the
+// text a player reads when they look at it — and, with no /houseinfo command in
+// the datapack, the only way in game to find out who owns a house.
+//
+// Port of House::updateDoorDescription (src/map/house/house.cpp:156-181). C++ can
+// walk doorList because its entries are the door items themselves; game.HouseDoor
+// carries only an id, so the doors are found by scanning the house tiles for
+// items with a HouseDoorID.
+func (h *House) UpdateDoorDescription(w *World) {
+	if w == nil {
+		return
+	}
+	desc := h.doorDescription()
+	for _, pos := range h.HouseTilesSnapshot() {
+		tile := w.Map.GetTile(pos)
+		if tile == nil {
+			continue
+		}
+		for _, it := range tile.Items {
+			if it == nil || it.Attr == nil || it.Attr.HouseDoorID == nil {
+				continue
+			}
+			d := desc
+			it.Attr.Description = &d
+		}
+	}
+}
+
+func (h *House) doorDescription() string {
+	h.mu.RLock()
+	name, owner, ownerName, size, rent := h.Name, h.OwnerID, h.OwnerName, h.Size, h.Rent
+	h.mu.RUnlock()
+
+	var b strings.Builder
+	if owner != 0 {
+		fmt.Fprintf(&b, "It belongs to house '%s'. %s owns this house.", name, ownerName)
+	} else {
+		fmt.Fprintf(&b, "It belongs to house '%s'. Nobody owns this house.", name)
+	}
+
+	// With the cyclopedia auction on — the default — C++ stops here and leaves the
+	// size, price and rent to the auction window.
+	if config.Bool("toggleCyclopediaHouseAuction", true) {
+		return b.String()
+	}
+
+	fmt.Fprintf(&b, " It is %d square meters.", size)
+	price := h.GetPrice()
+	if config.Bool("housePurchasedShowPrice", false) || owner == 0 {
+		fmt.Fprintf(&b, " It costs %s gold coins.", formatNumber(uint64(price)))
+	}
+	if period := strings.ToLower(config.Str("houseRentPeriod", "never")); period != "never" {
+		fmt.Fprintf(&b, " The rent cost is %s gold coins and it is billed %s.",
+			formatNumber(uint64(rent)), period)
+	}
+	return b.String()
+}
+
+// formatNumber groups digits in threes with commas, as the C++ helper of the same
+// name does for prices in item and house descriptions.
+func formatNumber(n uint64) string {
+	s := strconv.FormatUint(n, 10)
+	if len(s) <= 3 {
+		return s
+	}
+	var b strings.Builder
+	lead := len(s) % 3
+	if lead > 0 {
+		b.WriteString(s[:lead])
+	}
+	for i := lead; i < len(s); i += 3 {
+		if b.Len() > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(s[i : i+3])
+	}
+	return b.String()
 }
 
 // housePaidUntil is the rent clock C++ starts in setOwner from the configured

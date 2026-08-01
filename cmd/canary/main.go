@@ -474,6 +474,22 @@ func run(o runOpts, log *slog.Logger) error {
 		world.RegisterHouseTiles()
 		log.Info("houses loaded and tiles registered", "count", len(world.Houses))
 
+		// House::House ends in updateDoorDescription (house.cpp:30), so a door reads
+		// correctly from the first look, not only after an ownership change. The
+		// owner name is not on the houses row, so it is resolved here — LoadHouses
+		// reads `owner` alone.
+		named := 0
+		for _, h := range world.Houses {
+			if h.OwnerID != 0 {
+				if name, accountID, ok := database.LookupPlayerAccount(ctx, h.OwnerID); ok {
+					h.OwnerName, h.OwnerAccountID = name, accountID
+					named++
+				}
+			}
+			h.UpdateDoorDescription(world)
+		}
+		log.Info("house door descriptions built", "owned", named)
+
 		// Furniture and container contents inside houses live in tile_store. Nothing
 		// read this table before, so everything a player left in their house was lost
 		// on every restart (IOMapSerialize::loadHouseItems).

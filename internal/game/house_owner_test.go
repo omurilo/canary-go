@@ -121,3 +121,39 @@ func TestSetOwnerTransferClearsTheOldAccessLists(t *testing.T) {
 		t.Errorf("owner name = %q, want Second", h.OwnerName)
 	}
 }
+
+// Looking at a door is the only way in game to find out who owns a house — there
+// is no /houseinfo command in the datapack. The description was never built, so
+// the door said nothing at all.
+func TestDoorDescriptionNamesTheOwner(t *testing.T) {
+	w := NewWorld()
+	pos := Position{X: 100, Y: 100, Z: 7}
+	doorID := uint8(1)
+	door := &Item{ID: 1209, Attr: &ItemAttributes{HouseDoorID: &doorID}}
+	w.Map.SetTile(pos, &Tile{Ground: &Item{ID: 1}, Items: []*Item{door}})
+
+	h := &House{ID: 5, Name: "Harbour Place 7", HouseTiles: []Position{pos}}
+	w.RegisterHouse(h)
+	w.LookupPlayerAccount = func(uint32) (string, uint32, bool) { return "Gm Test", 42, true }
+
+	h.UpdateDoorDescription(w)
+	if door.Attr.Description == nil {
+		t.Fatalf("an unowned house must still describe itself")
+	}
+	if got := *door.Attr.Description; got != "It belongs to house 'Harbour Place 7'. Nobody owns this house." {
+		t.Errorf("unowned door reads %q", got)
+	}
+
+	h.SetOwner(w, 77, false, nil)
+	if got := *door.Attr.Description; got != "It belongs to house 'Harbour Place 7'. Gm Test owns this house." {
+		t.Errorf("owned door reads %q", got)
+	}
+}
+
+func TestFormatNumber(t *testing.T) {
+	for in, want := range map[uint64]string{0: "0", 42: "42", 999: "999", 1000: "1,000", 12345: "12,345", 1234567: "1,234,567"} {
+		if got := formatNumber(in); got != want {
+			t.Errorf("formatNumber(%d) = %q, want %q", in, got, want)
+		}
+	}
+}

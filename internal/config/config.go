@@ -47,6 +47,21 @@ func (c *Config) Bool(key string, def bool) bool {
 	return def
 }
 
+// Float returns the floating-point value of a config.lua key, or def when
+// absent. Separate from Number because config.lua carries genuine fractions
+// (housePriceRentMultiplier, rateExperience multipliers), which Number truncates.
+func (c *Config) Float(key string, def float64) float64 {
+	if c == nil || c.Custom == nil {
+		return def
+	}
+	if v, ok := c.Custom[normalizeKey(key)]; ok {
+		if n, ok := v.(lua.LNumber); ok {
+			return float64(n)
+		}
+	}
+	return def
+}
+
 // String returns the string value of a config.lua key, or def when absent.
 func (c *Config) String(key, def string) string {
 	if c == nil || c.Custom == nil {
@@ -65,6 +80,9 @@ func Number(key string, def int64) int64 { return Active.Number(key, def) }
 
 // Bool reads a boolean config value from the active configuration.
 func Bool(key string, def bool) bool { return Active.Bool(key, def) }
+
+// Float reads a floating-point config value from the active configuration.
+func Float(key string, def float64) float64 { return Active.Float(key, def) }
 
 // Str reads a string config value from the active configuration.
 func Str(key, def string) string { return Active.String(key, def) }
