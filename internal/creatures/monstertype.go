@@ -11,13 +11,16 @@ import (
 )
 
 type Outfit struct {
-	LookType  uint16
-	Head      uint8
-	Body      uint8
-	Legs      uint8
-	Feet      uint8
-	Addons    uint8
-	LookMount uint16
+	LookType uint16
+	// LookTypeEx is the item id an NPC wears instead of a body — 32 datapack
+	// NPCs use it, and it was dropped on the floor before.
+	LookTypeEx uint16
+	Head       uint8
+	Body       uint8
+	Legs       uint8
+	Feet       uint8
+	Addons     uint8
+	LookMount  uint16
 }
 
 type MonsterType struct {
@@ -26,8 +29,8 @@ type MonsterType struct {
 	MaxHealth      uint32
 	TargetDistance int32
 	Experience     uint64 // exp awarded to the killer (MonsterType::info.experience)
-	Corpse     uint16 // corpse item id dropped on death (0 = unknown)
-	RaceID     uint16 // bestiary race id (monster.raceId)
+	Corpse         uint16 // corpse item id dropped on death (0 = unknown)
+	RaceID         uint16 // bestiary race id (monster.raceId)
 	// BestiaryStars is the monster's bestiary difficulty tier (1..5, from
 	// monster.Bestiary.Stars). It drives task-hunting difficulty and prey grid
 	// staging. 0 means "not in the bestiary".
@@ -69,8 +72,8 @@ type MonsterType struct {
 	// MonsterType::info.lootItems (src/creatures/monsters/monsters.hpp).
 	Loot []LootBlock
 
-	Flags MonsterFlags
-	Elements map[uint32]int16
+	Flags      MonsterFlags
+	Elements   map[uint32]int16
 	Immunities []uint32 // combat type immunities
 }
 
@@ -105,12 +108,12 @@ func (a MonsterAttack) IsMelee() bool { return a.Name == "melee" }
 
 // LootBlock mirrors the C++ LootBlock (src/creatures/creatures_definitions.hpp:1763).
 type LootBlock struct {
-	ID        uint16 // resolved client/item id (0 until resolved by name)
-	Name      string // item name when the Lua entry used `name` instead of `id`
-	Chance    uint32 // out of MAX_LOOTCHANCE (100000)
-	CountMin  uint32
-	CountMax  uint32
-	SubType   int32
+	ID       uint16 // resolved client/item id (0 until resolved by name)
+	Name     string // item name when the Lua entry used `name` instead of `id`
+	Chance   uint32 // out of MAX_LOOTCHANCE (100000)
+	CountMin uint32
+	CountMax uint32
+	SubType  int32
 	// Unique marks an entry that may drop at most once per corpse. Mirrors
 	// LootBlock::unique; generateLootRoll de-duplicates on it.
 	Unique    bool
@@ -140,21 +143,30 @@ type MonsterFlags struct {
 	StrategiesTargetHealth  int
 	StrategiesTargetDamage  int
 	StrategiesTargetRandom  int
-	RunHealth          int
-	HealthHidden       bool
-	CanWalkOnEnergy    bool
-	CanWalkOnFire      bool
-	CanWalkOnPoison    bool
+	RunHealth               int
+	HealthHidden            bool
+	CanWalkOnEnergy         bool
+	CanWalkOnFire           bool
+	CanWalkOnPoison         bool
 	// LootDrop mirrors MonsterType::info.lootDrop; false disables loot entirely.
 	LootDrop bool
 }
 
+// ShopItem is ShopBlock (src/creatures/creatures_definitions.hpp:1802).
 type ShopItem struct {
 	ID        uint16
 	SubType   uint8
 	Name      string
 	BuyPrice  uint32
 	SellPrice uint32
+
+	// A shop entry can be gated on a player storage value, and can nest: the
+	// datapack builds category trees (a parent with no price and children that
+	// have one). Neither existed here, so setStorageKey/setStorageValue had no
+	// binding at all and every NPC using one failed to load.
+	StorageKey   int32
+	StorageValue int32
+	ChildShop    []ShopItem
 }
 
 // NpcVoice is one entry of npcConfig.voices, mirroring voiceBlock_t.
@@ -209,11 +221,22 @@ type NpcType struct {
 	CreatureEvents []string
 
 	// Flags from npcConfig.flags.
-	IsPushable        bool
-	FloorChange       bool
-	CanPushItems      bool
-	CanPushCreatures  bool
-	Profession        string
+	IsPushable       bool
+	FloorChange      bool
+	CanPushItems     bool
+	CanPushCreatures bool
+	// No Profession field: flags.profession is not an NpcType property in C++
+	// either — register_npc_type.lua puts it in the Lua global
+	// NpcDialogProfessionByName, which is where the dialogue system reads it. Go
+	// used to copy it onto the type, where nothing ever read it.
+
+	// Race is not a C++ NpcType method — but data/scripts/lib/register_npc_type.lua
+	// calls npcType:race(mask.race), so the field has to exist for the shim to
+	// have somewhere to put it. See the note on npcTypeMethods["race"].
+	Race string
+
+	// CanSpawn gates whether the NPC may be placed at all (luaNpcTypeCanSpawn).
+	CanSpawn bool
 
 	RespawnType RespawnType
 }
@@ -309,58 +332,58 @@ func (r *TypeRegistry) BosstiaryMonsters() map[uint16]*MonsterType {
 // block. After loading it is also appended to the MonsterType.Attacks slice as
 // a MonsterAttack so the existing combat-engine path works unchanged.
 type MonsterSpellData struct {
-	Name       string `xml:"name,attr"`
-	Interval   int    `xml:"interval,attr"`
-	Chance     int    `xml:"chance,attr"`
-	Skill      int    `xml:"skill,attr"`
-	Attack     int    `xml:"attack,attr"`
-	MinDamage  int    `xml:"min,attr"`
-	MaxDamage  int    `xml:"max,attr"`
-	Range      int    `xml:"range,attr"`
-	Shoot      int    `xml:"shoot,attr"`
-	Effect     int    `xml:"effect,attr"`
-	Radius     int    `xml:"radius,attr"`
-	Length     int    `xml:"length,attr"`
-	Spread     int    `xml:"spread,attr"`
-	Fire       int    `xml:"fire,attr"`
-	Poison     int    `xml:"poison,attr"`
-	Energy     int    `xml:"energy,attr"`
-	Ice        int    `xml:"ice,attr"`
-	Holy       int    `xml:"holy,attr"`
-	Death      int    `xml:"death,attr"`
-	Earth      int    `xml:"earth,attr"`
-	Physical   int    `xml:"physical,attr"`
-	Duration   int    `xml:"duration,attr"`
-	SpeedChange int   `xml:"speedchange,attr"`
-	Condition  string `xml:"condition,attr"`
+	Name        string `xml:"name,attr"`
+	Interval    int    `xml:"interval,attr"`
+	Chance      int    `xml:"chance,attr"`
+	Skill       int    `xml:"skill,attr"`
+	Attack      int    `xml:"attack,attr"`
+	MinDamage   int    `xml:"min,attr"`
+	MaxDamage   int    `xml:"max,attr"`
+	Range       int    `xml:"range,attr"`
+	Shoot       int    `xml:"shoot,attr"`
+	Effect      int    `xml:"effect,attr"`
+	Radius      int    `xml:"radius,attr"`
+	Length      int    `xml:"length,attr"`
+	Spread      int    `xml:"spread,attr"`
+	Fire        int    `xml:"fire,attr"`
+	Poison      int    `xml:"poison,attr"`
+	Energy      int    `xml:"energy,attr"`
+	Ice         int    `xml:"ice,attr"`
+	Holy        int    `xml:"holy,attr"`
+	Death       int    `xml:"death,attr"`
+	Earth       int    `xml:"earth,attr"`
+	Physical    int    `xml:"physical,attr"`
+	Duration    int    `xml:"duration,attr"`
+	SpeedChange int    `xml:"speedchange,attr"`
+	Condition   string `xml:"condition,attr"`
 }
 
 // xmlMonsterAttack is used to unmarshal a single <attack> element.
 type xmlMonsterAttack struct {
-	Name       string `xml:"name,attr"`
-	Interval   int    `xml:"interval,attr"`
-	Chance     int    `xml:"chance,attr"`
-	Skill      int    `xml:"skill,attr"`
-	Attack     int    `xml:"attack,attr"`
-	Min        int    `xml:"min,attr"`
-	Max        int    `xml:"max,attr"`
-	Range      int    `xml:"range,attr"`
-	Shoot      int    `xml:"shoot,attr"`
-	Effect     int    `xml:"effect,attr"`
-	Radius     int    `xml:"radius,attr"`
-	Length     int    `xml:"length,attr"`
-	Spread     int    `xml:"spread,attr"`
-	Fire       int    `xml:"fire,attr"`
-	Poison     int    `xml:"poison,attr"`
-	Energy     int    `xml:"energy,attr"`
-	Ice        int    `xml:"ice,attr"`
-	Holy       int    `xml:"holy,attr"`
-	Death      int    `xml:"death,attr"`
-	Earth      int    `xml:"earth,attr"`
-	Physical   int    `xml:"physical,attr"`
-	Duration   int    `xml:"duration,attr"`
-	SpeedChange int   `xml:"speedchange,attr"`
-	Condition  string `xml:"condition,attr"`
+	Name        string `xml:"name,attr"`
+	Interval    int    `xml:"interval,attr"`
+	Chance      int    `xml:"chance,attr"`
+	Skill       int    `xml:"skill,attr"`
+	Attack      int    `xml:"attack,attr"`
+	Min         int    `xml:"min,attr"`
+	Max         int    `xml:"max,attr"`
+	Range       int    `xml:"range,attr"`
+	Shoot       int    `xml:"shoot,attr"`
+	Effect      int    `xml:"effect,attr"`
+	Radius      int    `xml:"radius,attr"`
+	Length      int    `xml:"length,attr"`
+	Spread      int    `xml:"spread,attr"`
+	Fire        int    `xml:"fire,attr"`
+	Poison      int    `xml:"poison,attr"`
+	Energy      int    `xml:"energy,attr"`
+	Ice         int    `xml:"ice,attr"`
+	Holy        int    `xml:"holy,attr"`
+	Death       int    `xml:"death,attr"`
+	Earth       int    `xml:"earth,attr"`
+	Physical    int    `xml:"physical,attr"`
+	Duration    int    `xml:"duration,attr"`
+	SpeedChange int    `xml:"speedchange,attr"`
+	Condition   string `xml:"condition,attr"`
 	// Attributes key for complex spells
 	Attributes []xmlMonsterAttackAttribute `xml:"attribute"`
 }
@@ -372,16 +395,16 @@ type xmlMonsterAttackAttribute struct {
 
 // xmlMonsterDefense is used to unmarshal a single <defense> element.
 type xmlMonsterDefense struct {
-	Name       string `xml:"name,attr"`
-	Interval   int    `xml:"interval,attr"`
-	Chance     int    `xml:"chance,attr"`
-	Min        int    `xml:"min,attr"`
-	Max        int    `xml:"max,attr"`
-	Effect     int    `xml:"effect,attr"`
-	Shoot      int    `xml:"shoot,attr"`
-	Duration   int    `xml:"duration,attr"`
-	SpeedChange int   `xml:"speedchange,attr"`
-	Condition  string `xml:"condition,attr"`
+	Name        string `xml:"name,attr"`
+	Interval    int    `xml:"interval,attr"`
+	Chance      int    `xml:"chance,attr"`
+	Min         int    `xml:"min,attr"`
+	Max         int    `xml:"max,attr"`
+	Effect      int    `xml:"effect,attr"`
+	Shoot       int    `xml:"shoot,attr"`
+	Duration    int    `xml:"duration,attr"`
+	SpeedChange int    `xml:"speedchange,attr"`
+	Condition   string `xml:"condition,attr"`
 	// Attributes key for complex spells
 	Attributes []xmlMonsterAttackAttribute `xml:"attribute"`
 }
@@ -390,12 +413,12 @@ type xmlMonsterDefense struct {
 // xmlMonster XML structures
 // ---------------------------------------------------------------------------
 type xmlMonster struct {
-	Name       string      `xml:"name,attr"`
-	Speed      uint32      `xml:"speed,attr"`
-	Experience uint64      `xml:"experience,attr"`
-	Health     xmlHealth   `xml:"health"`
-	Look       xmlLook     `xml:"look"`
-	Elements   xmlElements `xml:"elements"`
+	Name       string              `xml:"name,attr"`
+	Speed      uint32              `xml:"speed,attr"`
+	Experience uint64              `xml:"experience,attr"`
+	Health     xmlHealth           `xml:"health"`
+	Look       xmlLook             `xml:"look"`
+	Elements   xmlElements         `xml:"elements"`
 	Attacks    []xmlMonsterAttack  `xml:"attacks>attack"`
 	Defenses   []xmlMonsterDefense `xml:"defenses>defense"`
 }
@@ -505,56 +528,56 @@ func (r *TypeRegistry) LoadMonsters(dataDir string) error {
 			// Parse <attacks> blocks into MonsterAttack entries.
 			for _, xa := range mon.Attacks {
 				atk := MonsterAttack{
-					Name:       xa.Name,
-					Interval:   xa.Interval,
-					Chance:     xa.Chance,
-					MinDamage:  xa.Min,
-					MaxDamage:  xa.Max,
-					Range:      xa.Range,
-					Effect:     uint16(xa.Effect),
-					ShootEffect: uint16(xa.Shoot),
-					Radius:     xa.Radius,
-					Length:     xa.Length,
-					Spread:     xa.Spread,
-					Duration:   xa.Duration,
-					SpeedChange: xa.SpeedChange,
+					Name:          xa.Name,
+					Interval:      xa.Interval,
+					Chance:        xa.Chance,
+					MinDamage:     xa.Min,
+					MaxDamage:     xa.Max,
+					Range:         xa.Range,
+					Effect:        uint16(xa.Effect),
+					ShootEffect:   uint16(xa.Shoot),
+					Radius:        xa.Radius,
+					Length:        xa.Length,
+					Spread:        xa.Spread,
+					Duration:      xa.Duration,
+					SpeedChange:   xa.SpeedChange,
 					ConditionType: xa.Condition,
-					NeedTarget: true,
+					NeedTarget:    true,
 				}
 				// Infer combat type from the highest non-zero damage element.
 				atk.CombatType = inferCombatType(xa)
 				// Store as both MonsterAttack (old path) and MonsterSpellData.
 				mType.Attacks = append(mType.Attacks, atk)
 				mType.Spells = append(mType.Spells, MonsterSpellData{
-					Name:       atk.Name,
-					Interval:   atk.Interval,
-					Chance:     atk.Chance,
-					MinDamage:  atk.MinDamage,
-					MaxDamage:  atk.MaxDamage,
-					Range:      atk.Range,
-					Effect:     xa.Effect,
-					Shoot:      xa.Shoot,
-					Radius:     xa.Radius,
-					Length:     xa.Length,
-					Spread:     xa.Spread,
-					Duration:   xa.Duration,
+					Name:        atk.Name,
+					Interval:    atk.Interval,
+					Chance:      atk.Chance,
+					MinDamage:   atk.MinDamage,
+					MaxDamage:   atk.MaxDamage,
+					Range:       atk.Range,
+					Effect:      xa.Effect,
+					Shoot:       xa.Shoot,
+					Radius:      xa.Radius,
+					Length:      xa.Length,
+					Spread:      xa.Spread,
+					Duration:    xa.Duration,
 					SpeedChange: xa.SpeedChange,
-					Condition:  xa.Condition,
+					Condition:   xa.Condition,
 				})
 			}
 
 			// Parse <defenses> blocks (healing spells etc.) into MonsterAttack entries.
 			for _, xd := range mon.Defenses {
 				atk := MonsterAttack{
-					Name:       xd.Name,
-					Interval:   xd.Interval,
-					Chance:     xd.Chance,
-					MinDamage:  xd.Min,
-					MaxDamage:  xd.Max,
-					Effect:     uint16(xd.Effect),
-					ShootEffect: uint16(xd.Shoot),
-					Duration:   xd.Duration,
-					SpeedChange: xd.SpeedChange,
+					Name:          xd.Name,
+					Interval:      xd.Interval,
+					Chance:        xd.Chance,
+					MinDamage:     xd.Min,
+					MaxDamage:     xd.Max,
+					Effect:        uint16(xd.Effect),
+					ShootEffect:   uint16(xd.Shoot),
+					Duration:      xd.Duration,
+					SpeedChange:   xd.SpeedChange,
 					ConditionType: xd.Condition,
 				}
 				if xd.Name == "healing" {
@@ -565,16 +588,16 @@ func (r *TypeRegistry) LoadMonsters(dataDir string) error {
 				mType.Attacks = append(mType.Attacks, atk)
 				// Defenses are stored as MonsterSpellData with their raw attributes.
 				mType.Spells = append(mType.Spells, MonsterSpellData{
-					Name:       atk.Name,
-					Interval:   atk.Interval,
-					Chance:     atk.Chance,
-					MinDamage:  atk.MinDamage,
-					MaxDamage:  atk.MaxDamage,
-					Effect:     xd.Effect,
-					Shoot:      xd.Shoot,
-					Duration:   xd.Duration,
+					Name:        atk.Name,
+					Interval:    atk.Interval,
+					Chance:      atk.Chance,
+					MinDamage:   atk.MinDamage,
+					MaxDamage:   atk.MaxDamage,
+					Effect:      xd.Effect,
+					Shoot:       xd.Shoot,
+					Duration:    xd.Duration,
 					SpeedChange: xd.SpeedChange,
-					Condition:  xd.Condition,
+					Condition:   xd.Condition,
 				})
 			}
 

@@ -71,13 +71,14 @@ func NewNpc(id uint32, name string, nType *creatures.NpcType) *Npc {
 			speed = 55
 		}
 		outfit = Outfit{
-			LookType:  nType.Outfit.LookType,
-			Head:      nType.Outfit.Head,
-			Body:      nType.Outfit.Body,
-			Legs:      nType.Outfit.Legs,
-			Feet:      nType.Outfit.Feet,
-			Addons:    nType.Outfit.Addons,
-			LookMount: nType.Outfit.LookMount,
+			LookType:   nType.Outfit.LookType,
+			LookTypeEx: nType.Outfit.LookTypeEx,
+			Head:       nType.Outfit.Head,
+			Body:       nType.Outfit.Body,
+			Legs:       nType.Outfit.Legs,
+			Feet:       nType.Outfit.Feet,
+			Addons:     nType.Outfit.Addons,
+			LookMount:  nType.Outfit.LookMount,
 		}
 	}
 

@@ -42,6 +42,7 @@ func buyFlowWorld(t *testing.T) (*game.World, *Engine, *game.Npc, *game.Player) 
 	)
 
 	e := New(w, slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})))
+	loadNpcRegisterShim(t, e)
 	if err := e.L.DoString(buyFlowNpc); err != nil {
 		t.Fatalf("register shopkeeper: %v", err)
 	}
@@ -89,6 +90,7 @@ func TestBuyFlowWithoutCallbackDoesNothing(t *testing.T) {
 	w.Items = items.NewCatalog(&items.ItemType{ID: 3003, Name: "rope"})
 
 	e := New(w, slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})))
+	loadNpcRegisterShim(t, e)
 	defer e.Close()
 
 	script := `
@@ -172,6 +174,7 @@ func TestSellNotificationDispatched(t *testing.T) {
 	w.Items = items.NewCatalog(&items.ItemType{ID: 3003, Name: "rope"})
 
 	e := New(w, slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})))
+	loadNpcRegisterShim(t, e)
 	defer e.Close()
 
 	script := `

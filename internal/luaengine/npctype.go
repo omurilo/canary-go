@@ -12,180 +12,17 @@ const luaNpcTypeName = "NpcType"
 func (e *Engine) registerNpcType() {
 	mt := e.L.NewTypeMetatable(luaNpcTypeName)
 
+	// There is no C++ NpcType::register. The 1033 npcConfig tables in the datapack
+	// are applied by data/scripts/lib/register_npc_type.lua, which assigns
+	// NpcType.register in Lua and calls one setter per field.
+	//
+	// Go used to carry a second, independent implementation of that shim written in
+	// Go — a table reader on this map. Two readers of the same config is exactly the
+	// divergence this port keeps paying for: the Go one knew nothing of sounds,
+	// light, events or nested child shops, and any field added upstream would land
+	// in the Lua shim and be silently dropped here. It is gone; the Lua shim is the
+	// only path, as in C++.
 	npcTypeMethods := map[string]lua.LGFunction{
-		"name": func(L *lua.LState) int {
-			n := checkNpcType(L)
-			L.Push(lua.LString(n.Name))
-			return 1
-		},
-		"register": func(L *lua.LState) int {
-			n := checkNpcType(L)
-			table := L.CheckTable(2)
-			
-			if val := table.RawGetString("health"); val.Type() == lua.LTNumber {
-				n.MaxHealth = uint32(lua.LVAsNumber(val))
-				n.Health = n.MaxHealth
-			}
-			if val := table.RawGetString("maxHealth"); val.Type() == lua.LTNumber && n.MaxHealth == 0 {
-				n.MaxHealth = uint32(lua.LVAsNumber(val))
-			}
-			if val := table.RawGetString("speed"); val.Type() == lua.LTNumber {
-				n.Speed = uint32(lua.LVAsNumber(val))
-			}
-			if outfitTable := table.RawGetString("outfit"); outfitTable.Type() == lua.LTTable {
-				tb := outfitTable.(*lua.LTable)
-				if val := tb.RawGetString("lookType"); val.Type() == lua.LTNumber {
-					n.Outfit.LookType = uint16(lua.LVAsNumber(val))
-				}
-				if val := tb.RawGetString("lookHead"); val.Type() == lua.LTNumber {
-					n.Outfit.Head = uint8(lua.LVAsNumber(val))
-				}
-				if val := tb.RawGetString("lookBody"); val.Type() == lua.LTNumber {
-					n.Outfit.Body = uint8(lua.LVAsNumber(val))
-				}
-				if val := tb.RawGetString("lookLegs"); val.Type() == lua.LTNumber {
-					n.Outfit.Legs = uint8(lua.LVAsNumber(val))
-				}
-				if val := tb.RawGetString("lookFeet"); val.Type() == lua.LTNumber {
-					n.Outfit.Feet = uint8(lua.LVAsNumber(val))
-				}
-				if val := tb.RawGetString("lookAddons"); val.Type() == lua.LTNumber {
-					n.Outfit.Addons = uint8(lua.LVAsNumber(val))
-				}
-				if val := tb.RawGetString("lookMount"); val.Type() == lua.LTNumber {
-					n.Outfit.LookMount = uint16(lua.LVAsNumber(val))
-				}
-			}
-
-			if val := table.RawGetString("description"); val.Type() == lua.LTString {
-				n.Description = val.String()
-			}
-			if val := table.RawGetString("speechBubble"); val.Type() == lua.LTNumber {
-				n.SpeechBubble = uint8(lua.LVAsNumber(val))
-			}
-			if val := table.RawGetString("currency"); val.Type() == lua.LTNumber {
-				n.CurrencyID = uint16(lua.LVAsNumber(val))
-			}
-			if val := table.RawGetString("walkInterval"); val.Type() == lua.LTNumber {
-				n.WalkInterval = uint32(lua.LVAsNumber(val))
-			}
-			if val := table.RawGetString("walkRadius"); val.Type() == lua.LTNumber {
-				n.WalkRadius = int32(lua.LVAsNumber(val))
-			}
-
-			// npcConfig.flags = { floorchange =, pushable =, canPushItems =, ... }
-			if flagsVal := table.RawGetString("flags"); flagsVal.Type() == lua.LTTable {
-				flags := flagsVal.(*lua.LTable)
-				boolFlag := func(key string, dst *bool) {
-					if v := flags.RawGetString(key); v.Type() == lua.LTBool {
-						*dst = lua.LVAsBool(v)
-					}
-				}
-				boolFlag("floorchange", &n.FloorChange)
-				boolFlag("pushable", &n.IsPushable)
-				boolFlag("canPushItems", &n.CanPushItems)
-				boolFlag("canPushCreatures", &n.CanPushCreatures)
-				if v := flags.RawGetString("profession"); v.Type() == lua.LTString {
-					n.Profession = v.String()
-				}
-			}
-
-			// npcConfig.voices = { interval =, chance =, { text =, yell = }, ... }
-			// interval/chance are named keys; the voices themselves are the array
-			// part of the same table, mirroring how the datapack writes it.
-			if voicesVal := table.RawGetString("voices"); voicesVal.Type() == lua.LTTable {
-				voices := voicesVal.(*lua.LTable)
-				if v := voices.RawGetString("interval"); v.Type() == lua.LTNumber {
-					n.YellInterval = uint32(lua.LVAsNumber(v))
-				}
-				if v := voices.RawGetString("chance"); v.Type() == lua.LTNumber {
-					n.YellChance = uint32(lua.LVAsNumber(v))
-				}
-				n.Voices = nil
-				for i := 1; ; i++ {
-					entry := voices.RawGetInt(i)
-					if entry.Type() != lua.LTTable {
-						break
-					}
-					tb := entry.(*lua.LTable)
-					voice := creatures.NpcVoice{}
-					if v := tb.RawGetString("text"); v.Type() == lua.LTString {
-						voice.Text = v.String()
-					}
-					if v := tb.RawGetString("yell"); v.Type() == lua.LTBool {
-						voice.Yell = lua.LVAsBool(v)
-					}
-					if voice.Text != "" {
-						n.Voices = append(n.Voices, voice)
-					}
-				}
-			}
-
-			if rt := table.RawGetString("respawnType"); rt.Type() == lua.LTTable {
-				tb := rt.(*lua.LTable)
-				if v := tb.RawGetString("period"); v.Type() == lua.LTNumber {
-					n.RespawnType.Period = int32(lua.LVAsNumber(v))
-				}
-				if v := tb.RawGetString("underground"); v.Type() == lua.LTBool {
-					n.RespawnType.Underground = lua.LVAsBool(v)
-				}
-			}
-
-			// Defaults matching NpcInfo's initializers.
-			if n.SpeechBubble == 0 {
-				n.SpeechBubble = creatures.SpeechBubbleNormal
-			}
-			if n.CurrencyID == 0 {
-				n.CurrencyID = creatures.DefaultNpcCurrency
-			}
-
-			// npcConfig.shop = { { itemName=, clientId=, buy=, sell=, subType= }, ... }
-			// Most merchant NPCs declare their catalog this way (rather than via
-			// npcType:addShopItem), so parse it into ShopItems — isMerchant() and
-			// openShopWindow() read from here.
-			if shopVal := table.RawGetString("shop"); shopVal.Type() == lua.LTTable {
-				n.ShopItems = nil
-				shopVal.(*lua.LTable).ForEach(func(_, v lua.LValue) {
-					entry, ok := v.(*lua.LTable)
-					if !ok {
-						return
-					}
-					item := creatures.ShopItem{}
-					if x := entry.RawGetString("clientId"); x.Type() == lua.LTNumber {
-						item.ID = uint16(lua.LVAsNumber(x))
-					}
-					if x := entry.RawGetString("itemId"); x.Type() == lua.LTNumber && item.ID == 0 {
-						item.ID = uint16(lua.LVAsNumber(x))
-					}
-					if x := entry.RawGetString("itemName"); x.Type() == lua.LTString {
-						item.Name = x.String()
-					}
-					if x := entry.RawGetString("name"); x.Type() == lua.LTString && item.Name == "" {
-						item.Name = x.String()
-					}
-					if x := entry.RawGetString("subType"); x.Type() == lua.LTNumber {
-						item.SubType = uint8(lua.LVAsNumber(x))
-					}
-					if x := entry.RawGetString("count"); x.Type() == lua.LTNumber && item.SubType == 0 {
-						item.SubType = uint8(lua.LVAsNumber(x))
-					}
-					if x := entry.RawGetString("buy"); x.Type() == lua.LTNumber {
-						item.BuyPrice = uint32(lua.LVAsNumber(x))
-					}
-					if x := entry.RawGetString("sell"); x.Type() == lua.LTNumber {
-						item.SellPrice = uint32(lua.LVAsNumber(x))
-					}
-					n.ShopItems = append(n.ShopItems, item)
-				})
-			}
-
-			if e != nil && e.world != nil && e.world.TypeRegistry != nil {
-				e.world.TypeRegistry.Npcs[strings.ToLower(n.Name)] = n
-			}
-
-			L.Push(lua.LTrue)
-			return 1
-		},
 		"addShopItem": func(L *lua.LState) int {
 			n := checkNpcType(L)
 			ud := L.CheckUserData(2)
@@ -193,24 +30,6 @@ func (e *Engine) registerNpcType() {
 				n.ShopItems = append(n.ShopItems, *shopItem)
 			}
 			L.Push(lua.LTrue)
-			return 1
-		},
-		"isPushable": func(L *lua.LState) int {
-			n := checkNpcType(L)
-			if n == nil { L.Push(lua.LFalse); return 1 }
-			L.Push(lua.LBool(n.IsPushable))
-			return 1
-		},
-		"health": func(L *lua.LState) int {
-			n := checkNpcType(L)
-			if n == nil { L.Push(lua.LNumber(0)); return 1 }
-			L.Push(lua.LNumber(n.Health))
-			return 1
-		},
-		"maxHealth": func(L *lua.LState) int {
-			n := checkNpcType(L)
-			if n == nil { L.Push(lua.LNumber(0)); return 1 }
-			L.Push(lua.LNumber(n.MaxHealth))
 			return 1
 		},
 	}
@@ -256,6 +75,97 @@ func (e *Engine) registerNpcType() {
 			L.Push(lua.LBool(get(n)))
 			return 1
 		}
+	}
+
+	strSetter := func(get func(*creatures.NpcType) string, set func(*creatures.NpcType, string)) lua.LGFunction {
+		return func(L *lua.LState) int {
+			n := checkNpcType(L)
+			if n == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			if L.GetTop() >= 2 {
+				set(n, L.CheckString(2))
+				L.Push(lua.LTrue)
+				return 1
+			}
+			L.Push(lua.LString(get(n)))
+			return 1
+		}
+	}
+
+	npcTypeMethods["name"] = strSetter(
+		func(n *creatures.NpcType) string { return n.Name },
+		func(n *creatures.NpcType, v string) { n.Name = v })
+	npcTypeMethods["nameDescription"] = strSetter(
+		func(n *creatures.NpcType) string { return n.Description },
+		func(n *creatures.NpcType, v string) { n.Description = v })
+
+	// race and getName are NOT C++ NpcType methods. register_npc_type.lua calls
+	// both anyway — upstream added getName with the comment "Assuming npcType has
+	// a getName method" (canary 0f8929d61) and it does not. Without them here the
+	// shim's shop parser dies on the first merchant and the type registers with no
+	// catalog, so they exist to make the datapack's own code run. The divergence is
+	// a superset, deliberate, and noted so nobody "fixes" it back.
+	npcTypeMethods["race"] = strSetter(
+		func(n *creatures.NpcType) string { return n.Race },
+		func(n *creatures.NpcType, v string) { n.Race = v })
+	npcTypeMethods["getName"] = func(L *lua.LState) int {
+		n := checkNpcType(L)
+		if n == nil {
+			L.Push(lua.LString(""))
+			return 1
+		}
+		L.Push(lua.LString(n.Name))
+		return 1
+	}
+
+	npcTypeMethods["health"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.Health) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.Health = uint32(v) })
+	npcTypeMethods["maxHealth"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.MaxHealth) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.MaxHealth = uint32(v) })
+	npcTypeMethods["canSpawn"] = boolSetter(
+		func(n *creatures.NpcType) bool { return n.CanSpawn },
+		func(n *creatures.NpcType, v bool) { n.CanSpawn = v })
+
+	// outfit(table) / outfit() -> table, as luaNpcTypeOutfit does.
+	npcTypeMethods["outfit"] = func(L *lua.LState) int {
+		n := checkNpcType(L)
+		if n == nil {
+			L.Push(lua.LNil)
+			return 1
+		}
+		if L.GetTop() >= 2 {
+			tb := L.CheckTable(2)
+			num := func(key string, dst func(lua.LNumber)) {
+				if v := tb.RawGetString(key); v.Type() == lua.LTNumber {
+					dst(lua.LVAsNumber(v))
+				}
+			}
+			num("lookType", func(v lua.LNumber) { n.Outfit.LookType = uint16(v) })
+			num("lookTypeEx", func(v lua.LNumber) { n.Outfit.LookTypeEx = uint16(v) })
+			num("lookHead", func(v lua.LNumber) { n.Outfit.Head = uint8(v) })
+			num("lookBody", func(v lua.LNumber) { n.Outfit.Body = uint8(v) })
+			num("lookLegs", func(v lua.LNumber) { n.Outfit.Legs = uint8(v) })
+			num("lookFeet", func(v lua.LNumber) { n.Outfit.Feet = uint8(v) })
+			num("lookAddons", func(v lua.LNumber) { n.Outfit.Addons = uint8(v) })
+			num("lookMount", func(v lua.LNumber) { n.Outfit.LookMount = uint16(v) })
+			L.Push(lua.LTrue)
+			return 1
+		}
+		out := L.NewTable()
+		L.SetField(out, "lookType", lua.LNumber(n.Outfit.LookType))
+		L.SetField(out, "lookTypeEx", lua.LNumber(n.Outfit.LookTypeEx))
+		L.SetField(out, "lookHead", lua.LNumber(n.Outfit.Head))
+		L.SetField(out, "lookBody", lua.LNumber(n.Outfit.Body))
+		L.SetField(out, "lookLegs", lua.LNumber(n.Outfit.Legs))
+		L.SetField(out, "lookFeet", lua.LNumber(n.Outfit.Feet))
+		L.SetField(out, "lookAddons", lua.LNumber(n.Outfit.Addons))
+		L.SetField(out, "lookMount", lua.LNumber(n.Outfit.LookMount))
+		L.Push(out)
+		return 1
 	}
 
 	npcTypeMethods["baseSpeed"] = numSetter(
@@ -431,9 +341,15 @@ func (e *Engine) registerNpcType() {
 		}
 	}
 
-	e.L.SetField(mt, "__index", e.L.SetFuncs(e.L.NewTable(), npcTypeMethods))
-
-	// Populate methods onto the global class table so they are discoverable via pairs()
+	// The metatable's __index IS the global class table, exactly as
+	// Lua::registerClass builds it (src/lua/functions/lua_functions_loader.cpp:
+	// 784-786, "className.metatable.__index = className").
+	//
+	// These were two separate tables before, and that is what kept the datapack's
+	// own shim inert: register_npc_type.lua assigns NpcType.register on the GLOBAL
+	// table, userdata resolved methods through the OTHER one, and the assignment
+	// had no effect on any NPC. One table means a Lua-side definition extends or
+	// overrides the class for real, which is the whole mechanism upstream relies on.
 	var tbl *lua.LTable
 	classTable := e.L.GetGlobal(luaNpcTypeName)
 	if classTable.Type() == lua.LTTable {
@@ -445,6 +361,7 @@ func (e *Engine) registerNpcType() {
 	for k, v := range npcTypeMethods {
 		e.L.SetField(tbl, k, e.L.NewFunction(v))
 	}
+	e.L.SetField(mt, "__index", tbl)
 	// Datapack NPC scripts assign event callbacks directly on the userdata, e.g.
 	// `npcType.onThink = function(npc, interval) ... end`. Without a __newindex,
 	// gopher-lua raises "attempt to index a non-table object(userdata)". Accept
@@ -455,7 +372,7 @@ func (e *Engine) registerNpcType() {
 		n := checkNpcType(L)
 		key := L.CheckString(2)
 		val := L.CheckAny(3)
-		
+
 		if fn, ok := val.(*lua.LFunction); ok {
 			e.npcCallbacksMu.Lock()
 			if e.npcCallbacks == nil {
@@ -476,11 +393,35 @@ func (e *Engine) registerNpcType() {
 	if gameTable.Type() == lua.LTTable {
 		e.L.SetField(gameTable, "createNpcType", e.L.NewFunction(func(L *lua.LState) int {
 			name := L.CheckString(1)
-			nType := &creatures.NpcType{
-				Name:      name,
-				Speed:     200,
-				Health:    100,
-				MaxHealth: 100,
+			key := strings.ToLower(name)
+
+			// luaNpcTypeCreate is g_npcs().getNpcType(name, true) — the `true` is
+			// "create if missing", and registration happens HERE, not in register().
+			// Go used to register at register() time, which only worked because Go
+			// also had its own register(); with the Lua shim in charge nothing would
+			// ever reach the registry. Returning the existing type on a second call
+			// also matches upstream, where reloading a script mutates one object
+			// rather than orphaning the first.
+			var reg map[string]*creatures.NpcType
+			if e != nil && e.world != nil && e.world.TypeRegistry != nil {
+				reg = e.world.TypeRegistry.Npcs
+			}
+			nType := reg[key]
+			if nType == nil {
+				nType = &creatures.NpcType{
+					Name:      name,
+					Speed:     200,
+					Health:    100,
+					MaxHealth: 100,
+					// NpcType's own field initializers, which used to be applied as
+					// fixups at the end of register().
+					SpeechBubble: creatures.SpeechBubbleNormal,
+					CurrencyID:   creatures.DefaultNpcCurrency,
+					CanSpawn:     true,
+				}
+				if reg != nil {
+					reg[key] = nType
+				}
 			}
 			ud := L.NewUserData()
 			ud.Value = nType
@@ -528,8 +469,28 @@ func (e *Engine) registerShop() {
 			s.SellPrice = uint32(L.CheckNumber(2))
 			return 0
 		},
+		"setStorageKey": func(L *lua.LState) int {
+			s := L.CheckUserData(1).Value.(*creatures.ShopItem)
+			s.StorageKey = int32(L.CheckNumber(2))
+			return 0
+		},
+		"setStorageValue": func(L *lua.LState) int {
+			s := L.CheckUserData(1).Value.(*creatures.ShopItem)
+			s.StorageValue = int32(L.CheckNumber(2))
+			return 0
+		},
+		// addChildShop nests one entry under another (luaShopAddChildShop). This
+		// used to be a no-op with the comment "addShopItem does it" — it does not;
+		// only the parent is ever passed to addShopItem, so every child category
+		// was discarded.
 		"addChildShop": func(L *lua.LState) int {
-			// Actually we don't need to do anything here because addShopItem does it
+			parent, ok := L.CheckUserData(1).Value.(*creatures.ShopItem)
+			if !ok {
+				return 0
+			}
+			if child, ok := L.CheckUserData(2).Value.(*creatures.ShopItem); ok {
+				parent.ChildShop = append(parent.ChildShop, *child)
+			}
 			return 0
 		},
 	}

@@ -26,7 +26,6 @@ npcConfig.outfit = { lookType = 22 }
 
 npcConfig.flags = {
 	floorchange = false,
-	profession = "trader",
 }
 npcConfig.speechBubble = SPEECHBUBBLE_TRADE
 
@@ -41,15 +40,13 @@ npcType:register(npcConfig)
 `
 
 func TestNpcConfigRegisterParsesDatapackFields(t *testing.T) {
-	w := game.NewWorld()
-	e := New(w, nil)
-	defer e.Close()
+	e := shimEngine(t)
 
 	if err := e.L.DoString(sweatyCyclopsConfig); err != nil {
 		t.Fatalf("register npcConfig: %v", err)
 	}
 
-	nt := w.TypeRegistry.Npcs["a sweaty cyclops"]
+	nt := e.world.TypeRegistry.Npcs["a sweaty cyclops"]
 	if nt == nil {
 		t.Fatal("npc type was not registered")
 	}
@@ -65,9 +62,6 @@ func TestNpcConfigRegisterParsesDatapackFields(t *testing.T) {
 	}
 	if nt.SpeechBubble != creatures.SpeechBubbleTrade {
 		t.Errorf("speechBubble: %d want %d", nt.SpeechBubble, creatures.SpeechBubbleTrade)
-	}
-	if nt.Profession != "trader" {
-		t.Errorf("profession: %q", nt.Profession)
 	}
 	if nt.FloorChange {
 		t.Error("floorchange should be false")
@@ -118,6 +112,7 @@ func TestNpcConfigSpeechBubbleDefault(t *testing.T) {
 	w := game.NewWorld()
 	e := New(w, nil)
 	defer e.Close()
+	loadNpcRegisterShim(t, e)
 
 	script := `
 		local npcType = Game.createNpcType("Plain Guy")

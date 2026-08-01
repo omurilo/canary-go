@@ -84,6 +84,9 @@ func TestNpcTradeOpensShop(t *testing.T) {
 	for _, sub := range []string{"lib", "libs", "npclib"} {
 		walkLoad(t, e, filepath.Join(core, sub))
 	}
+	// register_npc_type.lua: the datapack shim that applies npcConfig. Without it
+	// npcType:register does not exist, here or in C++.
+	walkLoad(t, e, filepath.Join(core, "scripts", "lib"))
 	if err := e.DoFile(benjamin); err != nil {
 		t.Fatalf("load benjamin: %v", err)
 	}

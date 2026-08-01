@@ -87,6 +87,10 @@ func TestBenjaminOnSay(t *testing.T) {
 	for _, sub := range []string{"lib", "libs", "npclib"} {
 		walkLoad(t, e, filepath.Join(core, sub))
 	}
+	// data/scripts/lib/register_npc_type.lua is what turns an npcConfig table into
+	// NpcType setter calls — there is no Go implementation of it, exactly as there
+	// is no C++ one. Leaving it out here is what let it sit inert unnoticed.
+	walkLoad(t, e, filepath.Join(core, "scripts", "lib"))
 	if err := e.DoFile(benjamin); err != nil {
 		t.Fatalf("load benjamin: %v", err)
 	}
@@ -116,6 +120,10 @@ func TestNpcGreetSmoke(t *testing.T) {
 	for _, sub := range []string{"lib", "libs", "npclib"} {
 		walkLoad(t, e, filepath.Join(core, sub))
 	}
+	// data/scripts/lib/register_npc_type.lua is what turns an npcConfig table into
+	// NpcType setter calls — there is no Go implementation of it, exactly as there
+	// is no C++ one. Leaving it out here is what let it sit inert unnoticed.
+	walkLoad(t, e, filepath.Join(core, "scripts", "lib"))
 
 	names := []string{
 		"walter_jaeger", "dallheim", "barbara", "seymour", "gamemaster",
