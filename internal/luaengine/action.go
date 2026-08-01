@@ -1,6 +1,7 @@
 package luaengine
 
 import (
+	"log/slog"
 	"github.com/opentibiabr/canary-go/internal/actions"
 	"github.com/opentibiabr/canary-go/internal/game"
 	lua "github.com/yuin/gopher-lua"
@@ -182,6 +183,12 @@ func (e *Engine) CallAction(a *actions.Action, player *game.Player, item *game.I
 	if target != nil {
 		switch t := target.(type) {
 		case *game.Item:
+			// A nil *game.Item still makes `target != nil` true — the interface holds a
+			// type — so this case used to wrap a nil item and hand Lua an Item that
+			// answers to nothing.
+			if t == nil {
+				break
+			}
 			ud := L.NewUserData()
 			ud.Value = luaItem{item: t, pos: toPos}
 			L.SetMetatable(ud, L.GetTypeMetatable("Item"))
@@ -193,7 +200,21 @@ func (e *Engine) CallAction(a *actions.Action, player *game.Player, item *game.I
 			targetUd = ud
 		}
 	}
+	// Substituting a placeholder item for "no target" is how a failed lookup turns
+	// into a silent no-op: exercise_training_weapons.lua opens with
+	//
+	//   if not target or type(target) ~= "userdata" or not target:isItem() then return true end
+	//
+	// which is written to notice a missing target — and then asks isDummy(getId()).
+	// Handed item id 1 it sails past the guard, fails the dummy check and returns
+	// with no message at all, which is exactly what using a wand on a dummy does.
+	//
+	// The placeholder stays, because scripts that index target unconditionally would
+	// otherwise error, but it is logged: a real target that failed to resolve is a
+	// bug upstream of here and should not be silent.
 	if targetUd == lua.LNil {
+		slog.Default().Warn("action target did not resolve",
+			"item", item.ID, "toX", toPos.X, "toY", toPos.Y, "toZ", toPos.Z)
 		dummyItem := &game.Item{ID: 1, Count: 0}
 		ud := L.NewUserData()
 		ud.Value = luaItem{item: dummyItem, pos: toPos}
