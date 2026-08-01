@@ -8,9 +8,15 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-// snapshot is scripts/lua_enums_snapshot.json, produced by
-// scripts/gen_lua_enums.py from the C++ sources: every global lua_enums.cpp
+// snapshot is scripts/lua_enums_snapshot.json: every global lua_enums.cpp
 // registers, with the value resolved from the enum body that defines it.
+//
+// The snapshot is committed and this test guards the Go side against drifting
+// from it. Regenerating it from the C++ needs a new extractor — the Python one
+// was deleted once the gap reached zero, and no Python goes back in the repo.
+// Write that in bash, or better, as a generator in Go.
+//
+// Last regenerated 2026-08-01: 1298 resolved, 0 missing, 0 value mismatches.
 type enumSnapshot struct {
 	Resolved   map[string]int `json:"resolved"`
 	Unresolved [][]string     `json:"unresolved"`
