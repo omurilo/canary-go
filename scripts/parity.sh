@@ -150,7 +150,7 @@ cmp_pair() {
 	row "$label" "$c" "$g" "$((g * 100 / c))%"
 }
 cmp_pair "monster AI" "creatures/monsters/monster.cpp" \
-	-- "internal/game/ai_engine.go" "internal/game/monster_ai.go"
+	-- "internal/game/ai_engine.go" "internal/game/monster_ai.go" "internal/game/monster_think.go"
 cmp_pair "npc (core)" "creatures/npcs/npc.cpp" \
 	-- "internal/game/npc.go" "internal/game/npc_engine.go" "internal/game/npc_shop.go"
 cmp_pair "npc (lua api)" \
