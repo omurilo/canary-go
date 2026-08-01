@@ -8,6 +8,12 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 BUILT_AT := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -X main.buildCommit=$(COMMIT) -X main.buildTime=$(BUILT_AT)
 
+# The same stamp for the container builds. docker-compose reads these two as
+# build args; exporting them here is what keeps the running server's first log
+# line saying which commit it is, instead of "unknown".
+export BUILD_COMMIT := $(COMMIT)
+export BUILD_TIME := $(BUILT_AT)
+
 build:
 	go build -ldflags "$(LDFLAGS)" -o bin/canary ./cmd/canary
 	go build -o bin/canary-client ./cmd/canary-client
