@@ -186,3 +186,28 @@ func TestAddItemSendsTheRealUnwrapID(t *testing.T) {
 		t.Errorf("the wrap-kit field must always be present: %d vs %d bytes", len(w2.Bytes()), len(b))
 	}
 }
+
+// House::getHouseAccessLevel grants HOUSE_OWNER to a staff member carrying
+// CanEditHouses, not only to the registered owner. Checking ownership alone stopped
+// a gamemaster from decorating in someone else's building, which upstream allows.
+func TestStaffCountAsHouseOwner(t *testing.T) {
+	house := &game.House{ID: 5}
+	house.SetOwner(77)
+
+	owner := &game.Player{Name: "Owner", DBID: 77, GroupID: 1}
+	stranger := &game.Player{Name: "Stranger", DBID: 78, GroupID: 1}
+	staff := &game.Player{Name: "God", DBID: 79, GroupID: 5}
+
+	if !houseAccessIsOwner(house, owner) {
+		t.Errorf("the registered owner must have owner access")
+	}
+	if houseAccessIsOwner(house, stranger) {
+		t.Errorf("a stranger must not have owner access")
+	}
+	if !houseAccessIsOwner(house, staff) {
+		t.Errorf("staff must have owner access to any house")
+	}
+	if houseAccessIsOwner(nil, owner) || houseAccessIsOwner(house, nil) {
+		t.Errorf("nil arguments must not grant access")
+	}
+}

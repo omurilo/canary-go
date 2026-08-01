@@ -339,7 +339,7 @@ func (g *GameProtocol) parseWrapableItem(r *netmsg.Reader) {
 		g.sendCancelMessage("You may construct this only inside a house.")
 		return
 	}
-	if !house.IsOwner(g.player.DBID) {
+	if !houseAccessIsOwner(house, g.player) {
 		g.sendCancelMessage("You are not allowed to construct this here.")
 		return
 	}
@@ -368,7 +368,7 @@ func (g *GameProtocol) parseWrapableItem(r *netmsg.Reader) {
 
 	// onlyInvitedCanMoveHouseItems: a guest may not rearrange the furniture.
 	if config.Bool("onlyInvitedCanMoveHouseItems", true) &&
-		!house.IsOwner(g.player.DBID) && !house.IsSubOwner(g.player.Name) {
+		!houseAccessIsOwner(house, g.player) && !house.IsSubOwner(g.player.Name) {
 		g.sendCancelMessage("You cannot use this object.")
 		return
 	}
@@ -732,3 +732,18 @@ func (g *GameProtocol) parseBugReport(r *netmsg.Reader) {
 //	parseWheelOfDestiny        → 0x61/0x62 are parseOpenWheel/parseSaveWheel
 //	parseQuestTracker          → no counterpart in the C++ dispatcher
 //	parseTrackAnalysis         → no counterpart in the C++ dispatcher
+
+// houseAccessIsOwner reports HOUSE_OWNER access, the top of
+// House::getHouseAccessLevel (src/map/house/house.cpp). Ownership is not the only
+// way in: a staff member carrying PlayerFlags_t::CanEditHouses counts as the owner
+// of EVERY house, which is what makes /owner and in-place decoration work for a
+// gamemaster standing in someone else's building.
+func houseAccessIsOwner(house *game.House, p *game.Player) bool {
+	if house == nil || p == nil {
+		return false
+	}
+	if p.CannotGainInFight() { // the same staff threshold used for the frag rules
+		return true
+	}
+	return house.IsOwner(p.DBID)
+}
