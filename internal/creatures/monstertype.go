@@ -194,6 +194,20 @@ type NpcType struct {
 	YellInterval uint32
 	YellChance   uint32
 
+	// Ambient sounds, the counterpart of Voices: SoundChance is rolled every
+	// SoundSpeedTicks (npc_type_functions.cpp addSound/soundChance).
+	Sounds          []uint16
+	SoundChance     uint32
+	SoundSpeedTicks uint32
+
+	// Light the NPC emits, and the script event name npcType:eventType/registerEvent
+	// attach. Present so the setters have somewhere to write rather than dropping
+	// the value.
+	LightLevel     uint8
+	LightColor     uint8
+	EventType      string
+	CreatureEvents []string
+
 	// Flags from npcConfig.flags.
 	IsPushable        bool
 	FloorChange       bool

@@ -215,6 +215,193 @@ func (e *Engine) registerNpcType() {
 		},
 	}
 
+	// Data setters, ported from src/lua/functions/creatures/npc/npc_type_functions.cpp.
+	//
+	// C++ exposes every npcConfig field as a METHOD, and data/scripts/lib/
+	// register_npc_type.lua is what turns the config table into those calls. Go had
+	// only the table reader, so a script written in the upstream style —
+	// `npcType:walkRadius(2)` — indexed a nil and died. These make both forms work;
+	// removing the table reader, so there is exactly one path as in C++, is the
+	// step that has to come after the shim is loading and covered by a test.
+	//
+	// All follow the upstream shape: no argument reads, one argument writes.
+	numSetter := func(get func(*creatures.NpcType) lua.LNumber, set func(*creatures.NpcType, lua.LNumber)) lua.LGFunction {
+		return func(L *lua.LState) int {
+			n := checkNpcType(L)
+			if n == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			if L.GetTop() >= 2 {
+				set(n, lua.LVAsNumber(L.Get(2)))
+				L.Push(lua.LTrue)
+				return 1
+			}
+			L.Push(get(n))
+			return 1
+		}
+	}
+	boolSetter := func(get func(*creatures.NpcType) bool, set func(*creatures.NpcType, bool)) lua.LGFunction {
+		return func(L *lua.LState) int {
+			n := checkNpcType(L)
+			if n == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			if L.GetTop() >= 2 {
+				set(n, lua.LVAsBool(L.Get(2)))
+				L.Push(lua.LTrue)
+				return 1
+			}
+			L.Push(lua.LBool(get(n)))
+			return 1
+		}
+	}
+
+	npcTypeMethods["baseSpeed"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.Speed) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.Speed = uint32(v) })
+	npcTypeMethods["walkInterval"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.WalkInterval) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.WalkInterval = uint32(v) })
+	npcTypeMethods["walkRadius"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.WalkRadius) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.WalkRadius = int32(v) })
+	npcTypeMethods["speechBubble"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.SpeechBubble) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.SpeechBubble = uint8(v) })
+	npcTypeMethods["currency"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.CurrencyID) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.CurrencyID = uint16(v) })
+	npcTypeMethods["yellChance"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.YellChance) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.YellChance = uint32(v) })
+	npcTypeMethods["yellSpeedTicks"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.YellInterval) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.YellInterval = uint32(v) })
+	npcTypeMethods["soundChance"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.SoundChance) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.SoundChance = uint32(v) })
+	npcTypeMethods["soundSpeedTicks"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.SoundSpeedTicks) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.SoundSpeedTicks = uint32(v) })
+	npcTypeMethods["respawnTypePeriod"] = numSetter(
+		func(n *creatures.NpcType) lua.LNumber { return lua.LNumber(n.RespawnType.Period) },
+		func(n *creatures.NpcType, v lua.LNumber) { n.RespawnType.Period = int32(v) })
+
+	npcTypeMethods["floorChange"] = boolSetter(
+		func(n *creatures.NpcType) bool { return n.FloorChange },
+		func(n *creatures.NpcType, v bool) { n.FloorChange = v })
+	npcTypeMethods["canPushItems"] = boolSetter(
+		func(n *creatures.NpcType) bool { return n.CanPushItems },
+		func(n *creatures.NpcType, v bool) { n.CanPushItems = v })
+	npcTypeMethods["canPushCreatures"] = boolSetter(
+		func(n *creatures.NpcType) bool { return n.CanPushCreatures },
+		func(n *creatures.NpcType, v bool) { n.CanPushCreatures = v })
+	npcTypeMethods["isPushable"] = boolSetter(
+		func(n *creatures.NpcType) bool { return n.IsPushable },
+		func(n *creatures.NpcType, v bool) { n.IsPushable = v })
+	npcTypeMethods["respawnTypeIsUnderground"] = boolSetter(
+		func(n *creatures.NpcType) bool { return n.RespawnType.Underground },
+		func(n *creatures.NpcType, v bool) { n.RespawnType.Underground = v })
+
+	// addVoice(text, interval, chance, yell). C++ keeps interval and chance on the
+	// TYPE, not per voice, so the last call wins for those two — mirrored here
+	// rather than storing them per entry.
+	npcTypeMethods["addVoice"] = func(L *lua.LState) int {
+		n := checkNpcType(L)
+		if n == nil {
+			L.Push(lua.LNil)
+			return 1
+		}
+		v := creatures.NpcVoice{Text: L.CheckString(2)}
+		if L.GetTop() >= 3 {
+			n.YellInterval = uint32(lua.LVAsNumber(L.Get(3)))
+		}
+		if L.GetTop() >= 4 {
+			n.YellChance = uint32(lua.LVAsNumber(L.Get(4)))
+		}
+		if L.GetTop() >= 5 {
+			v.Yell = lua.LVAsBool(L.Get(5))
+		}
+		if v.Text != "" {
+			n.Voices = append(n.Voices, v)
+		}
+		L.Push(lua.LTrue)
+		return 1
+	}
+	npcTypeMethods["getVoices"] = func(L *lua.LState) int {
+		n := checkNpcType(L)
+		tbl := L.NewTable()
+		if n != nil {
+			for i, v := range n.Voices {
+				entry := L.NewTable()
+				L.SetField(entry, "text", lua.LString(v.Text))
+				L.SetField(entry, "yellText", lua.LBool(v.Yell))
+				tbl.RawSetInt(i+1, entry)
+			}
+		}
+		L.Push(tbl)
+		return 1
+	}
+	npcTypeMethods["addSound"] = func(L *lua.LState) int {
+		n := checkNpcType(L)
+		if n == nil {
+			L.Push(lua.LNil)
+			return 1
+		}
+		n.Sounds = append(n.Sounds, uint16(L.CheckInt(2)))
+		L.Push(lua.LTrue)
+		return 1
+	}
+	npcTypeMethods["getSounds"] = func(L *lua.LState) int {
+		n := checkNpcType(L)
+		tbl := L.NewTable()
+		if n != nil {
+			for i, s := range n.Sounds {
+				tbl.RawSetInt(i+1, lua.LNumber(s))
+			}
+		}
+		L.Push(tbl)
+		return 1
+	}
+	// light(level, color) — two values in, a table out.
+	npcTypeMethods["light"] = func(L *lua.LState) int {
+		n := checkNpcType(L)
+		if n == nil {
+			L.Push(lua.LNil)
+			return 1
+		}
+		if L.GetTop() >= 3 {
+			n.LightLevel = uint8(L.CheckInt(2))
+			n.LightColor = uint8(L.CheckInt(3))
+			L.Push(lua.LTrue)
+			return 1
+		}
+		L.Push(lua.LNumber(n.LightLevel))
+		L.Push(lua.LNumber(n.LightColor))
+		return 2
+	}
+	npcTypeMethods["registerEvent"] = func(L *lua.LState) int {
+		n := checkNpcType(L)
+		if n != nil {
+			n.CreatureEvents = append(n.CreatureEvents, L.CheckString(2))
+		}
+		L.Push(lua.LTrue)
+		return 1
+	}
+	npcTypeMethods["getCreatureEvents"] = func(L *lua.LState) int {
+		n := checkNpcType(L)
+		tbl := L.NewTable()
+		if n != nil {
+			for i, ev := range n.CreatureEvents {
+				tbl.RawSetInt(i+1, lua.LString(ev))
+			}
+		}
+		L.Push(tbl)
+		return 1
+	}
+
 	// Register event callbacks on NpcType
 	npcTypeMethods["eventType"] = func(L *lua.LState) int {
 		L.Push(L.Get(1))
