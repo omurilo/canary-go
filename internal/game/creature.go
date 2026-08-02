@@ -130,6 +130,18 @@ func (c *BaseCreature) AddCondition(cond combat.Condition) {
 	c.conditionStore.AddCondition(adaptCreature(c), cond)
 }
 
+// RemoveCondition and ClearConditions complete the conditionHolder interface on
+// BaseCreature. Without them only Player satisfied it, so combatAdapter's type
+// assertion failed for every monster: a monster could not be poisoned, burned,
+// slowed or hasted at all, and the condition simply vanished with no error.
+func (c *BaseCreature) RemoveCondition(t combat.ConditionType) {
+	c.conditionStore.RemoveCondition(adaptCreature(c), t)
+}
+
+func (c *BaseCreature) ClearConditions() {
+	c.conditionStore.ClearConditions(adaptCreature(c))
+}
+
 func (c *BaseCreature) TickConditions(interval int32) {
 	c.conditionStore.ExecuteConditions(adaptCreature(c), interval)
 }

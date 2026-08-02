@@ -26,6 +26,12 @@ func (e *Engine) registerCombat() {
 	e.L.SetGlobal("doTargetCombat", e.L.NewFunction(e.luaDoTargetCombatHealth))
 	e.L.SetGlobal("doAreaCombat", e.L.NewFunction(e.luaDoAreaCombatHealth))
 
+	// doChallengeCreature(creature, target, targetChangeCooldown)
+	// (global_functions.cpp:599). It had no counterpart, so every taunt spell
+	// and challenge rune in the datapack was a no-op: Monster::challengeCreature
+	// was ported and this is its only caller.
+	e.L.SetGlobal("doChallengeCreature", e.L.NewFunction(e.luaDoChallengeCreature))
+
 	// Export setCombatCallback globally to appease tests that don't load compat.lua
 	e.L.SetGlobal("setCombatCallback", e.L.NewFunction(func(L *lua.LState) int {
 		c := checkCombat(L, 1)
@@ -392,6 +398,27 @@ func toCombatArea(L *lua.LState, index int) *combat.AreaCombat {
 		}
 	}
 	return nil
+}
+
+// luaDoChallengeCreature is doChallengeCreature(creature, target, cooldown)
+// (global_functions.cpp:580).
+//
+// Note the direction: the TARGET is challenged into attacking the creature, so
+// the receiver is argument 2 and the new focus is argument 1. Getting that
+// backwards would make a taunt rune turn the caster on the monster.
+func (e *Engine) luaDoChallengeCreature(L *lua.LState) int {
+	creature := toCreature(L, 1)
+	target := toCreature(L, 2)
+	monster, ok := target.(*game.Monster)
+	if creature == nil || !ok {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	// The default is upstream's: 6000ms, not zero.
+	cooldown := int(L.OptNumber(3, 6000))
+	monster.ChallengeCreature(e.world, creature, cooldown)
+	L.Push(lua.LTrue)
+	return 1
 }
 
 func (e *Engine) luaDoTargetCombatHealth(L *lua.LState) int {

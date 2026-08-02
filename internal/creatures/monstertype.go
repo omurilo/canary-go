@@ -117,6 +117,13 @@ type MonsterType struct {
 
 	Flags      MonsterFlags
 	Elements   map[uint32]int16
+	// Healing is MonsterTypeInfo::healingMap (monsters.hpp:55): a damage type
+	// that HEALS this monster for a percentage of the hit instead of hurting it.
+	//
+	// It is a separate map from Elements upstream, and the distinction matters:
+	// Elements is resistance, so reading it as healing — which the port did —
+	// turns every fire-resistant monster into one that is healed by fire.
+	Healing map[uint32]int32
 	Immunities []uint32 // combat type immunities
 }
 

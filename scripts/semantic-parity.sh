@@ -75,10 +75,25 @@ go_body() { # dir recv name
 # when they are in fact called from internal/luaengine or internal/protocol —
 # which is where most of this behaviour is reached from.
 callers() { # _ name
-	# `\.Name\b`, not `\.Name\(`. A method passed as a VALUE — d.CheckDecay handed
-	# to the dispatcher — is a caller, and requiring the paren reported it dead.
-	grep -rE "\.$2\b" "$GO_ROOT/internal" "$GO_ROOT/cmd" --include='*.go' 2>/dev/null |
-		grep -v '_test.go' | grep -vc "func " | tr -d ' '
+	# Two shapes count:
+	#
+	#   `\.Name\b`  — a method call or a method VALUE. Not `\.Name\(`: a method
+	#                 handed to the dispatcher (d.CheckDecay) is a caller, and
+	#                 requiring the paren reported it dead.
+	#   `\bName\(`  — a plain function. Not everything upstream models as a
+	#                 method is one here: getPushItemLocationOptions is a free
+	#                 function in Go and the dot-only pattern could not see it.
+	#
+	# The `func ` filter drops the definition line. It also drops a call that
+	# shares a line with a function definition, which is why one-line method
+	# bodies get split rather than left compact.
+	# Comments are stripped and the match re-checked. Widening the pattern to bare
+	# `Name(` made prose count: a comment reading "getType():isRewardBoss()" was
+	# reporting a method as reachable that nothing calls.
+	grep -rE "(\.$2\b|\b$2\()" "$GO_ROOT/internal" "$GO_ROOT/cmd" --include='*.go' 2>/dev/null |
+		grep -v '_test.go' | grep -v "func " |
+		sed -e 's://.*::' |
+		grep -cE "(\.$2\b|\b$2\()" | tr -d ' '
 }
 
 # DEAD_OK lists methods that have no caller in the C++ source EITHER. Porting one

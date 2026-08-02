@@ -26,9 +26,10 @@ func (m *Monster) SelectTarget(w *World, c Creature) bool {
 		m.Targets = make(map[uint32]Creature)
 	}
 	m.Targets[c.GetID()] = c
-	m.SetTarget(c)
-	m.Idle = false
-	return true
+	// setAttackedCreature, not a raw assignment: it is the override that also
+	// takes the monster out of idle, and Monster::selectTarget is one of its two
+	// callers upstream (monster.cpp:1367).
+	return m.SetAttackedCreature(c)
 }
 
 // ChallengeCreature is Monster::challengeCreature (monster.cpp:3469): force the

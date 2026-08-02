@@ -368,7 +368,10 @@ func (m *Monster) IsInSpawnRange(pos Position) bool {
 func (m *Monster) UpdateIdleStatus() {
 	idle := false
 	if m.Master == nil && m.GetTarget() == nil && len(m.Targets) == 0 {
-		if m.GetPosition() == m.SpawnPosition || m.SpawnPosition == (Position{}) {
+		// isInSpawnLocation, not an inline position compare: it is the one place
+		// that decides "home" and it also answers true for a monster with no spawn
+		// at all, which a script-placed monster has.
+		if m.IsInSpawnLocation() {
 			idle = true
 		} else {
 			m.walkingBack = true

@@ -93,6 +93,7 @@ func (e *Engine) registerMonsterType() {
 			parseMonsterSummons(m, table)
 			parseMonsterMisc(m, table)
 			parseMonsterElements(m, table)
+			parseMonsterHealing(m, table)
 			if outfitTable := table.RawGetString("outfit"); outfitTable.Type() == lua.LTTable {
 				tb := outfitTable.(*lua.LTable)
 				if val := tb.RawGetString("lookType"); val.Type() == lua.LTNumber {
@@ -888,6 +889,35 @@ func parseMonsterElements(m *creatures.MonsterType, table *lua.LTable) {
 			actualType := uint32(luaToCombatType(int(cType)))
 			m.Elements[actualType] = percent
 		}
+	})
+}
+
+// parseMonsterHealing reads monster.healing, the healingMap that
+// monsterType:addHealing writes upstream (monster_type_functions.cpp:1113):
+// { type = COMBAT_FIREDAMAGE, percent = 100 } means fire heals rather than
+// hurts. It is a different table from elements and had no parser at all.
+func parseMonsterHealing(m *creatures.MonsterType, table *lua.LTable) {
+	healing, ok := table.RawGetString("healing").(*lua.LTable)
+	if !ok {
+		return
+	}
+	if m.Healing == nil {
+		m.Healing = make(map[uint32]int32)
+	}
+	healing.ForEach(func(_, v lua.LValue) {
+		ht, ok := v.(*lua.LTable)
+		if !ok {
+			return
+		}
+		typeVal := ht.RawGetString("type")
+		if typeVal.Type() != lua.LTNumber {
+			return
+		}
+		var percent int32
+		if val := ht.RawGetString("percent"); val.Type() == lua.LTNumber {
+			percent = int32(lua.LVAsNumber(val))
+		}
+		m.Healing[uint32(luaToCombatType(int(lua.LVAsNumber(typeVal))))] = percent
 	})
 }
 

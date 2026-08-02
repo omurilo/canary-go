@@ -55,6 +55,13 @@ type Monster struct {
 	// randomStepping distinguishes a monster wandering from one following, so a
 	// wandering monster is not treated as having a path.
 	randomStepping bool
+	// walkTicks and pendingStepCost pace the monster's steps. Upstream schedules
+	// one walk event per creature at exactly getStepDuration; here the walk sweep
+	// accumulates on the server beat and steps when the clock is due. The cost is
+	// charged AFTER the direction is chosen, because a diagonal costs three times
+	// a straight step.
+	walkTicks       uint32
+	pendingStepCost uint32
 	// ignoreFieldDamage is set while a monster is walking a path that crosses a
 	// magic field, and cleared the moment the path runs out. It is what lets a
 	// monster follow a player through its own fire wall.

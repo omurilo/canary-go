@@ -55,6 +55,12 @@ func (m *Monster) DoAttacking(w *World, interval uint32) bool {
 		if block.Chance < 100 && randomRange(1, 100) > int32(block.Chance) {
 			continue
 		}
+		// monster.cpp:1971 — the block's range is published on the monster before
+		// the spell runs, and Combat::getMinMaxValues reads it back through
+		// getCombatValues. This assignment was missing entirely, so the pair stayed
+		// at zero and getCombatValues always answered "no block mid-cast".
+		m.minCombatValue = int32(block.MinDamage)
+		m.maxCombatValue = int32(block.MaxDamage)
 		if w != nil && w.OnMonsterCastSpell != nil {
 			w.OnMonsterCastSpell(m, target, *block)
 		}

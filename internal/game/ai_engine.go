@@ -20,9 +20,54 @@ func NewAIEngine(w *World) *AIEngine {
 	return &AIEngine{world: w}
 }
 
+// walkBeat is SERVER_BEAT: the grid every step duration is rounded onto, and so
+// the finest cadence the walk loop needs to run at.
+const walkBeat = serverBeat * time.Millisecond
+
 // Start begins the AI loop.
+//
+// Thinking and walking are separate loops because upstream separates them:
+// Game::checkCreatures calls onThink once a second, while each creature's own
+// walk event is scheduled at exactly its getStepDuration. Running both off the
+// one-second think loop meant every monster in the game walked at one tile per
+// second — a rat and a dragon at the same pace, ground speed ignored, diagonals
+// free.
 func (e *AIEngine) Start() {
 	GlobalDispatcher.AddEvent(creatureThinkInterval, e.updateAI)
+	GlobalDispatcher.AddEvent(walkBeat, e.updateWalk)
+}
+
+// updateWalk advances every monster's step clock and moves the ones that are
+// due. Upstream schedules one event per creature; a single sweep on the beat
+// reaches the same grid without one timer per monster.
+func (e *AIEngine) updateWalk() {
+	const elapsed = uint32(serverBeat)
+
+	for _, c := range e.world.Creatures() {
+		monster, ok := c.(*Monster)
+		if !ok || monster.Idle {
+			continue
+		}
+		monster.walkTicks += elapsed
+		// The step is chosen first and paid for afterwards, because the duration
+		// depends on the direction: a diagonal costs three times a straight one,
+		// and that has to be charged for the step actually taken.
+		if monster.walkTicks < monster.pendingStepCost {
+			continue
+		}
+		dir, ok := monster.GetNextStep(e.world)
+		if !ok {
+			// Nothing to do this beat. The clock is not reset, so a monster that
+			// was blocked steps the moment its path clears rather than waiting out
+			// another full duration.
+			continue
+		}
+		monster.walkTicks = 0
+		monster.pendingStepCost = monster.GetStepDuration(e.world, dir)
+		e.world.TryMoveCreature(monster, dir)
+	}
+
+	GlobalDispatcher.AddEvent(walkBeat, e.updateWalk)
 }
 
 func (e *AIEngine) updateAI() {
@@ -54,15 +99,22 @@ func (e *AIEngine) updateAI() {
 		// whether anyone is around, and upstream only lets a monster wander while
 		// it is not idle. A rabbit alone in a field stands on its spawn; one with
 		// a player nearby hops about.
-		if monster.Type != nil && !monster.Type.Flags.Hostile {
+		if !monster.IsHostile() {
 			if monster.GetTarget() != nil {
 				monster.SetTarget(nil)
 			}
 			monster.UpdateTargetList(e.world)
 			monster.UpdateIdleStatus()
-			if dir, ok := monster.GetNextStep(e.world); ok {
-				e.world.TryMoveCreature(monster, dir)
-			}
+			continue
+		}
+
+		// A summon does not pick its own fights. Monster::onThink branches on
+		// isSummon() before anything else (monster.cpp:1714) and defers entirely
+		// to updateSummonTarget: the summon attacks what its master attacks and
+		// otherwise follows it. Nothing called that, so summons ran the full
+		// hostile AI below and wandered off after their own targets.
+		if monster.Master != nil {
+			monster.UpdateSummonTarget(e.world)
 			continue
 		}
 
@@ -118,12 +170,8 @@ func (e *AIEngine) updateAI() {
 			}
 		}
 
-		// --- movement --------------------------------------------------------
-		// One entry point, Monster::getNextStep (monster.cpp:2442): follow, walk
-		// back, or wander, then push whatever is in the way of the chosen tile.
-		if dir, ok := monster.GetNextStep(e.world); ok {
-			e.world.TryMoveCreature(monster, dir)
-		}
+		// Movement is not here: it runs on the walk beat, at each monster's own
+		// step duration. See updateWalk.
 	}
 
 	GlobalDispatcher.AddEvent(creatureThinkInterval, e.updateAI)

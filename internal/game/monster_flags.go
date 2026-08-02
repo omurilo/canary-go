@@ -134,13 +134,17 @@ func (m *Monster) GetLostExperience() uint64 {
 }
 
 // GetHealingCombatValue is Monster::getHealingCombatValue (monster.cpp:334):
-// how much a healing spell of this type restores. A monster listing a healing
-// element resists or amplifies healing the same way it does damage.
+// the percentage of an incoming hit of this damage type that HEALS the monster
+// instead of hurting it. A fire elemental healed by fire is the canonical case.
+//
+// It reads healingMap, a map of its own. The port read Elements, which is
+// resistance — so every fire-RESISTANT monster would have been healed by fire
+// had this ever been called.
 func (m *Monster) GetHealingCombatValue(healingType uint32) int32 {
-	if m.Type == nil || m.Type.Elements == nil {
+	if m.Type == nil || m.Type.Healing == nil {
 		return 0
 	}
-	return int32(m.Type.Elements[healingType])
+	return m.Type.Healing[healingType]
 }
 
 // SetNormalCreatureLight is Monster::setNormalCreatureLight (monster.cpp:3437):

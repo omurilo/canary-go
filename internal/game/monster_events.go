@@ -94,6 +94,22 @@ func (m *Monster) OnCreatureMove(w *World, c Creature, oldPos, newPos Position) 
 	if c == nil || c.GetID() == m.GetID() {
 		return
 	}
+
+	// Creature::onCreatureMove (creature.cpp:562): when the thing we are
+	// attacking moves, either it left our sight — drop it — or it is still there
+	// and we get a free swing if one is owed.
+	//
+	// The free swing is the whole reason extraMeleeAttack exists. Without it a
+	// monster whose target stepped away and back paid the full 1500ms melee
+	// cooldown again, so a player could dodge every second hit by stepping.
+	if target := m.GetTarget(); target != nil && target.GetID() == c.GetID() {
+		if newPos.Z != oldPos.Z || !m.GetPosition().InRangeOf(newPos) {
+			m.OnAttackedCreatureDisappear()
+		} else if m.HasExtraSwing() && w != nil {
+			m.DoAttacking(w, 0)
+		}
+	}
+
 	if m.GetPosition().InRangeOf(newPos) {
 		m.OnCreatureEnter(c)
 		return
@@ -139,10 +155,34 @@ func (m *Monster) OnAttackedCreatureDisappear() {
 // enough on its own to keep a monster out of idle — upstream's updateIdleStatus
 // checks `conditions.empty()` before anything else — so a poisoned monster
 // alone at its spawn keeps thinking until the poison runs out.
-func (m *Monster) OnAddCondition(t combat.ConditionType) { m.OnConditionStatusChange(t) }
+func (m *Monster) OnAddCondition(t combat.ConditionType) {
+	m.OnConditionStatusChange(t)
+}
 
 // OnEndCondition is Monster::onEndCondition (monster.cpp:1576).
-func (m *Monster) OnEndCondition(t combat.ConditionType) { m.OnConditionStatusChange(t) }
+func (m *Monster) OnEndCondition(t combat.ConditionType) {
+	m.OnConditionStatusChange(t)
+}
+
+// AddCondition and RemoveCondition are the Monster overrides that fire those
+// two hooks, the way Creature::addCondition and removeCondition call the
+// virtual onAddCondition / onEndCondition (creature.cpp:1390, :1431).
+//
+// Go has no virtual dispatch, so the override has to be spelled out here.
+// Without it a monster kept its idle state across being poisoned or hasted —
+// which is what onConditionStatusChange exists to correct.
+func (m *Monster) AddCondition(c combat.Condition) {
+	if c == nil {
+		return
+	}
+	m.BaseCreature.AddCondition(c)
+	m.OnAddCondition(c.GetType())
+}
+
+func (m *Monster) RemoveCondition(t combat.ConditionType) {
+	m.BaseCreature.RemoveCondition(t)
+	m.OnEndCondition(t)
+}
 
 // OnConditionStatusChange is Monster::onConditionStatusChange (monster.cpp:1572).
 func (m *Monster) OnConditionStatusChange(combat.ConditionType) { m.UpdateIdleStatus() }

@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"sync"
@@ -598,6 +599,16 @@ func applyDamageModifiers(attacker, target Creature, dmg int32) int32 {
 	}
 	multiplier := 1.0
 
+	// Damage of a type this monster is healed by heals it instead
+	// (game.cpp:7901). The healing percentage applies to the raw hit, before
+	// resistance — the monster is not resisting something that helps it.
+	if m, ok := target.(*Monster); ok {
+		if pct := m.GetHealingCombatValue(uint32(combat.CombatPhysical)); pct > 0 {
+			m.ChangeHealth(m.World, int32(math.Ceil(float64(dmg)*float64(pct)/100.0)))
+			return 0
+		}
+	}
+
 	// Monster::blockHit's element modifier. The combat package applies
 	// GetResistance for spells routed through DoCombatHealth, but the melee and
 	// distance paths reach applyDamageModifiers directly and skipped it, so a
@@ -661,7 +672,18 @@ func applyDamageModifiers(attacker, target Creature, dmg int32) int32 {
 		}
 	}
 
-	return int32(float64(dmg) * multiplier)
+	final := int32(float64(dmg) * multiplier)
+
+	// Combat::doCombatHealth fires the monster's onPlayerAttack script once the
+	// damage is settled (combat.cpp:790). Nothing called it, so a monster type
+	// with an onPlayerAttack event — the hook bosses use to change phase when a
+	// player lands a hit — never saw one.
+	if p, ok := attacker.(*Player); ok {
+		if m, ok := target.(*Monster); ok {
+			m.OnAttackedByPlayer(m.World, p)
+		}
+	}
+	return final
 }
 
 // hazardDodgeRoll rolls the dodge chance for a hazard monster.
@@ -865,7 +887,15 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 			if m.Type != nil {
 				raceID = m.Type.RaceID
 			}
-			if exp := m.Experience(); exp > 0 {
+			// getLostExperience, not the raw type value: it carries the forge
+			// multiplier, so an influenced or fiendish monster is worth what its
+			// stack says. Reading Type.Experience meant a fiendish dragon gave
+			// exactly as much as a plain one.
+			//
+			// Upstream additionally scales by getDamageRatio(attacker)
+			// (creature.cpp:1192) so the experience is split across everyone who
+			// hit it. That split is not modelled here — the killer takes it all.
+			if exp := m.GetLostExperience(); exp > 0 {
 				finalExp := exp
 				if e.world.OnGainExperience != nil {
 					finalExp = e.world.OnGainExperience(p, victim, exp, exp)
@@ -1007,8 +1037,14 @@ func (e *CombatEngine) executeMonsterSpell(m *Monster, target Creature, s creatu
 		e.world.OnDistanceEffect(m.GetPosition(), target.GetPosition(), s.ShootEffect)
 	}
 
-	minDmg := s.MinDamage
-	maxDmg := s.MaxDamage
+	// Combat::getMinMaxValues asks the caster for the range of the block it is
+	// mid-way through casting (combat.cpp:86) rather than reading the block
+	// again. It matters when a script has overridden the range for this cast:
+	// reading s directly would use the datapack value and ignore the override.
+	minDmg, maxDmg := s.MinDamage, s.MaxDamage
+	if lo, hi, ok := m.GetCombatValues(); ok {
+		minDmg, maxDmg = int(lo), int(hi)
+	}
 	if minDmg < 0 {
 		minDmg = -minDmg
 	}

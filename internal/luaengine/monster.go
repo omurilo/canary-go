@@ -3,6 +3,7 @@ package luaengine
 import (
 	"github.com/omurilo/canary-go/internal/creatures"
 	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/game/combat"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -119,12 +120,14 @@ func monsterAddattackspell(L *lua.LState) int {
 	return 0
 }
 
+// monsterAdddefense is monster:addDefense(defense) (monster_functions.cpp:749).
+//
+// ADD, not assign. Monster::addDefense accumulates (monster.cpp:253), and the
+// name says so; assigning meant two buffs in a row left only the second one.
 func monsterAdddefense(L *lua.LState) int {
-	m := checkMonster(L)
-	if m == nil {
-		return 0
+	if m := checkMonster(L); m != nil {
+		m.AddDefense(int32(L.CheckInt(2)))
 	}
-	m.Defense = int32(L.CheckInt(2))
 	return 0
 }
 
@@ -157,17 +160,14 @@ func monsterAddfriend(L *lua.LState) int {
 	return 0
 }
 
+// monsterAddreflectelement is monster:addReflectElement(type, percent)
+// (monster_functions.cpp:734). Like addDefense it ACCUMULATES
+// (monster.cpp:236); the inline copy assigned, so stacking two reflect buffs
+// of the same element kept only the last.
 func monsterAddreflectelement(L *lua.LState) int {
-	m := checkMonster(L)
-	if m == nil {
-		return 0
+	if m := checkMonster(L); m != nil {
+		m.AddReflectElement(combat.CombatType(L.CheckInt(2)), int16(L.CheckInt(3)))
 	}
-	combatType := uint32(L.CheckInt(2))
-	percent := int16(L.CheckInt(3))
-	if m.ReflectElements == nil {
-		m.ReflectElements = make(map[uint32]int16)
-	}
-	m.ReflectElements[combatType] = percent
 	return 0
 }
 
@@ -460,8 +460,17 @@ func monsterImmune(L *lua.LState) int {
 	return 1
 }
 
+// monsterIschallenged is monster:isChallenged() (monster_functions.cpp:398). It
+// returned nothing at all, so the datapack could not tell a challenged monster
+// from a free one — every script branching on it took the false path.
 func monsterIschallenged(L *lua.LState) int {
-	return 0
+	m := checkMonster(L)
+	if m == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	L.Push(lua.LBool(m.IsChallenged()))
+	return 1
 }
 
 func monsterIsdead(L *lua.LState) int {

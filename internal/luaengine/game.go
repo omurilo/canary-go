@@ -475,22 +475,7 @@ func (e *Engine) gameCreateMonster(L *lua.LState) int {
 		return 1
 	}
 
-	id := e.world.GenerateCreatureID()
-	var mType *creatures.MonsterType
-	if e.world.TypeRegistry != nil {
-		mType = e.world.TypeRegistry.Monsters[strings.ToLower(name)]
-		if mType == nil {
-			mType = e.world.TypeRegistry.Monsters[name]
-		}
-	}
-	if mType == nil && e.world.Monsters != nil {
-		mType = e.world.Monsters.Monsters[strings.ToLower(name)]
-		if mType == nil {
-			mType = e.world.Monsters.Monsters[name]
-		}
-	}
-
-	m := game.NewMonster(id, name, mType)
+	m := game.NewMonster(e.world.GenerateCreatureID(), name, e.lookupMonsterType(name))
 	m.SetPosition(pos)
 	e.world.AddCreature(m)
 
@@ -500,7 +485,70 @@ func (e *Engine) gameCreateMonster(L *lua.LState) int {
 	return 1
 }
 
-func (e *Engine) gameCreateSoulPitMonster(L *lua.LState) int { return 0 }
+// gameCreateSoulPitMonster is
+// Game.createSoulPitMonster(name, position, stack, extended, force, master)
+// (game_functions.cpp:620). It was a stub returning nothing, so the whole Soul
+// Pit event spawned no monsters — and Monster::setSoulPitStack, its only
+// caller, had nowhere to be called from.
+func (e *Engine) gameCreateSoulPitMonster(L *lua.LState) int {
+	name := L.CheckString(1)
+	pos, ok := parsePosition(L, 2)
+	if !ok || e.world == nil || e.world.Map == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if tile := e.world.Map.GetTile(pos); tile == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	mType := e.lookupMonsterType(name)
+	m := game.NewMonster(e.world.GenerateCreatureID(), name, mType)
+	m.SetPosition(pos)
+
+	// The master is read BEFORE placement upstream, because a failed placement
+	// has to undo it — and isSummon changes what setSoulPitStack does to the
+	// skill-loss flag.
+	isSummon := false
+	if L.GetTop() >= 6 {
+		if master := toCreature(L, 6); master != nil {
+			m.Master = master
+			isSummon = true
+		}
+	}
+
+	stack := uint8(L.OptNumber(3, 1))
+	e.world.AddCreature(m)
+	m.SetSoulPitStack(stack, isSummon)
+	m.OnSpawn(e.world, pos)
+
+	if !e.pushCreatureAs(L, m, "Monster") {
+		L.Push(lua.LNil)
+	}
+	return 1
+}
+
+// lookupMonsterType resolves a monster type by name across both registries,
+// case-insensitively then exactly. Factored out of gameCreateMonster so the
+// soul-pit spawner resolves names the same way.
+func (e *Engine) lookupMonsterType(name string) *creatures.MonsterType {
+	lower := strings.ToLower(name)
+	if e.world.TypeRegistry != nil {
+		if mType := e.world.TypeRegistry.Monsters[lower]; mType != nil {
+			return mType
+		}
+		if mType := e.world.TypeRegistry.Monsters[name]; mType != nil {
+			return mType
+		}
+	}
+	if e.world.Monsters != nil {
+		if mType := e.world.Monsters.Monsters[lower]; mType != nil {
+			return mType
+		}
+		return e.world.Monsters.Monsters[name]
+	}
+	return nil
+}
 
 func (e *Engine) gameCreateNpc(L *lua.LState) int {
 	name := L.CheckString(1)
