@@ -184,6 +184,7 @@ SKIP_METHODS='
 Monster createMonster getMonster setID addList removeList
 Npc createNpc getNpc getLowerName setSpawnNpc
 getInstance
+House
 getName setName getTypeName getNameDescription setNameDescription getDescription
 getType getMasterPos setMasterPos getRaceId getRace getMonsterType
 isDead setDead getIdleStatus isTargetNearby israndomStepping

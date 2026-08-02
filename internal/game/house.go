@@ -54,6 +54,19 @@ type House struct {
 	BidEndDate     uint32
 	Bidder         uint32 // player GUID who bid
 
+	// doorLists caches an access list written for a door that has not loaded
+	// yet. Door items load after the house, so an early write would be dropped.
+	doorLists map[uint32]string
+	// BedList is the beds actually placed in the house; Beds is derived from it
+	// rather than trusted from the XML.
+	BedList []Position
+	// hasNewOwnerOnStartup and NewOwnerGuid queue an ownership change for the
+	// next boot, when house transfers are configured to apply on restart.
+	hasNewOwnerOnStartup bool
+	NewOwnerGuid         int32
+	// transferItem is the single outstanding house transfer document.
+	transferItem *Item
+
 	// Transfer fields
 	TransferToName string
 	TransferPrice  uint64
@@ -65,6 +78,7 @@ type HouseDoor struct {
 	ID     uint8
 	Locked bool
 	Level  uint8 // minimum level required
+	Pos    Position
 }
 
 // AccessList controls who can enter a house.

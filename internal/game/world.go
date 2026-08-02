@@ -124,9 +124,12 @@ type World struct {
 	OnNpcCreatureSay  func(n *Npc, speaker Creature, talkType byte, text string)
 	OnNpcCloseChannel func(n *Npc, p *Player)
 	OnCloseShopWindow func(p *Player)
-	OnNpcBuyItem      func(n *Npc, p *Player, itemID uint16, subType uint8, amount uint16, ignore, inBackpacks bool, totalCost uint64)
-	OnNpcSellItem     func(n *Npc, p *Player, itemID uint16, subType uint8, amount uint32, ignore bool, totalPrice uint64)
-	OnNpcCheckItem    func(n *Npc, p *Player, itemID uint16, subType uint8)
+	// OnHouseItemsToDepot hands the items cleared out of a house to the
+	// persistence layer, which is where the owner.s depot lives.
+	OnHouseItemsToDepot func(h *House, owner *Player, items []*Item)
+	OnNpcBuyItem        func(n *Npc, p *Player, itemID uint16, subType uint8, amount uint16, ignore, inBackpacks bool, totalCost uint64)
+	OnNpcSellItem       func(n *Npc, p *Player, itemID uint16, subType uint8, amount uint32, ignore bool, totalPrice uint64)
+	OnNpcCheckItem      func(n *Npc, p *Player, itemID uint16, subType uint8)
 	// The Monster:: script callbacks the datapack attaches through
 	// monsterType:eventType. Each is the send half of one Monster::on* handler.
 	OnMonsterCreatureSay      func(m *Monster, speaker Creature, talkType byte, text string)
