@@ -427,7 +427,7 @@ func (m *Monster) pushItem(w *World, from Position, item *Item, dir Direction) b
 		if toTile == nil || !w.CanThrowObjectTo(from, to, true, true, MaxClientViewportX, MaxClientViewportY) {
 			continue
 		}
-		if !w.Map.RemoveItemPtr(from, item) {
+		if !w.RemoveMapItem(from, item) {
 			continue
 		}
 		if w.AddItem(to, item) {
@@ -471,7 +471,7 @@ func (m *Monster) PushItems(w *World, tile *Tile, pos Position, nextDirection Di
 			moveCount++
 			continue
 		}
-		if removeCount < 10 && !it.IsCorpse && w.Map.RemoveItemPtr(pos, item) {
+		if removeCount < 10 && !it.IsCorpse && w.RemoveMapItem(pos, item) {
 			removeCount++
 		}
 	}

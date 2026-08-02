@@ -48,7 +48,7 @@ func TestUnwrapRestoresTheItem(t *testing.T) {
 	kit.SetCustomAttribute("unWrapId", int64(1650))
 	tile.Items = append(tile.Items, kit)
 
-	g.unwrapItem(pos, kit)
+	g.unwrapItem(pos, kit, nil)
 
 	if kit.ID != 1650 {
 		t.Fatalf("kit became %d, want the table (1650)", kit.ID)
@@ -69,7 +69,7 @@ func TestUnwrapWithoutTheAttributeIsRefused(t *testing.T) {
 	kit := &game.Item{ID: game.ItemDecorationKit}
 	tile.Items = append(tile.Items, kit)
 
-	g.unwrapItem(pos, kit)
+	g.unwrapItem(pos, kit, nil)
 	if kit.ID != game.ItemDecorationKit {
 		t.Errorf("a kit with no unWrapId must stay a kit, became %d", kit.ID)
 	}
@@ -82,7 +82,7 @@ func TestWrapUnwrapRoundTrip(t *testing.T) {
 	stamp := int64(1234567)
 
 	table := &game.Item{ID: 1650, Count: 1, Attr: &game.ItemAttributes{StoreTimestamp: &stamp}}
-	g.wrapItem(pos, table, g.deps.Items.Get(1650))
+	g.wrapItem(pos, table, g.deps.Items.Get(1650), nil)
 
 	if table.ID != game.ItemDecorationKit {
 		t.Fatalf("wrapping produced %d, want a decoration kit", table.ID)
@@ -97,7 +97,7 @@ func TestWrapUnwrapRoundTrip(t *testing.T) {
 		t.Errorf("the store stamp must survive wrapping")
 	}
 
-	g.unwrapItem(pos, table)
+	g.unwrapItem(pos, table, nil)
 	if table.ID != 1650 {
 		t.Errorf("the round trip lost the item: %d", table.ID)
 	}
@@ -112,12 +112,12 @@ func TestCaskChargesSurviveTheWrap(t *testing.T) {
 	g, _, _, pos := wrapSetup(t)
 	cask := &game.Item{ID: 25879, Count: 37}
 
-	g.wrapItem(pos, cask, g.deps.Items.Get(25879))
+	g.wrapItem(pos, cask, g.deps.Items.Get(25879), nil)
 	if cask.Attr == nil || cask.Attr.WrittenDate == nil || *cask.Attr.WrittenDate != 37 {
 		t.Fatalf("the cask charges were not hidden in the kit: %+v", cask.Attr)
 	}
 
-	g.unwrapItem(pos, cask)
+	g.unwrapItem(pos, cask, nil)
 	if cask.ID != 25879 {
 		t.Fatalf("cask became %d", cask.ID)
 	}

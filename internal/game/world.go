@@ -310,7 +310,7 @@ func (w *World) InternalRemoveItem(pos Position, item *Item, count uint16) {
 	if int(item.Count) > int(count) {
 		item.Count -= count
 	} else {
-		w.Map.RemoveItemPtr(pos, item)
+		w.RemoveMapItem(pos, item)
 		// Remove from open browse field
 		if bf := w.BrowseFieldGet(pos); bf != nil {
 			for i, cit := range bf.Contents {

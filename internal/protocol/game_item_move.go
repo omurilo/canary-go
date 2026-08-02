@@ -251,7 +251,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			// Captured before the removal, because the index is only knowable while
 			// the item is still on the tile. -1 means no client holds it there.
 			actualStack := g.stackPosOfItem(pos, item)
-			g.deps.World.Map.RemoveItemPtr(pos, item)
+			g.deps.World.RemoveMapItem(pos, item)
 			if actualStack != -1 {
 				g.onRemoveTileItem(pos, uint8(actualStack), item)
 			}
@@ -264,7 +264,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 					for bfPos, bf := range g.deps.World.BrowseFields {
 						if bf == fromContainer {
 							tileStack := g.stackPosOfItem(bfPos, item)
-							g.deps.World.Map.RemoveItemPtr(bfPos, item)
+							g.deps.World.RemoveMapItem(bfPos, item)
 							if tileStack != -1 {
 								g.broadcastRemoveTileThing(bfPos, uint8(tileStack))
 							}

@@ -210,7 +210,7 @@ func (d *DecayManager) InternalDecayItem(pos Position, item *Item) {
 
 	if it.DecayTo != 0 {
 		newItem := &Item{ID: it.DecayTo, Count: 1}
-		d.world.Map.RemoveItemPtr(pos, item)
+		d.world.RemoveMapItem(pos, item)
 		d.world.AddItem(pos, newItem)
 		if d.world.OnItemDecay != nil {
 			d.world.OnItemDecay(pos, stackPos, item, newItem)
@@ -232,7 +232,7 @@ func (d *DecayManager) InternalDecayItem(pos Position, item *Item) {
 	if item.Attr == nil {
 		return
 	}
-	d.world.Map.RemoveItemPtr(pos, item)
+	d.world.RemoveMapItem(pos, item)
 	if d.world.OnItemDecay != nil {
 		d.world.OnItemDecay(pos, stackPos, item, nil)
 	}

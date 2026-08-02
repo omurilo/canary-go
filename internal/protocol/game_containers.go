@@ -340,7 +340,7 @@ func (g *GameProtocol) reconcileUsedItem(item *game.Item, pos netmsg.Position, s
 	// On the map.
 	gp := game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
 	if consumed {
-		g.deps.World.Map.RemoveItemPtr(gp, item)
+		g.deps.World.RemoveMapItem(gp, item)
 		g.broadcastRemoveTileThing(gp, stackpos)
 	} else {
 		g.broadcastUpdateTileThing(gp, stackpos, item)

@@ -285,12 +285,20 @@ func (g *GameProtocol) parseTextWindow(r *netmsg.Reader) {
 	_ = r.GetString() // new text
 }
 
-// parseHouseWindow handles 0x8A — house window action.
+// parseHouseWindow handles 0x8A — the player closed a house access-list window
+// (ProtocolGame::parseHouseWindow, protocolgame.cpp:2742).
+//
+// The old body read two bytes and dropped them, which is not even the right
+// shape: the packet is a list id byte, then a u32 window id, then the text. So
+// every subsequent field was left in the reader.
 func (g *GameProtocol) parseHouseWindow(r *netmsg.Reader) {
-	houseID := r.GetByte()
-	action := r.GetByte()
-	_ = houseID
-	_ = action
+	if g.player == nil {
+		return
+	}
+	listID := r.GetByte()
+	windowTextID := r.GetU32()
+	text := r.GetString()
+	g.player.UpdateHouseWindow(g.deps.World, listID, windowTextID, text)
 }
 
 // Wrap/unwrap constants (src/utils/utils_definitions.hpp).
@@ -435,16 +443,25 @@ func (g *GameProtocol) wrapableAt(pos netmsg.Position, itemID uint16, stackpos u
 	}
 
 	if isKit {
-		g.unwrapItem(gamePos, item)
+		if !g.unwrapItem(gamePos, item, house) {
+			return
+		}
 	} else {
-		g.wrapItem(gamePos, item, t)
+		g.wrapItem(gamePos, item, t, house)
 	}
 	g.sendMagicEffect(gamePos, 3) // CONST_ME_POFF
 }
 
 // wrapItem turns furniture into a decoration kit, remembering what it was.
-func (g *GameProtocol) wrapItem(pos game.Position, item *game.Item, t *items.ItemType) {
+func (g *GameProtocol) wrapItem(pos game.Position, item *game.Item, t *items.ItemType, house *game.House) {
 	original := item.ID
+	// Game::wrapItem (game.cpp:5463) drops the bed from the house's list before
+	// transforming it. Without this the house keeps counting a bed that is now a
+	// decoration kit in someone's backpack, and eventually refuses to accept a
+	// real one because it believes it is at the cap.
+	if house != nil && t != nil && t.Type == items.ItemTypeBed {
+		house.RemoveBed(pos)
+	}
 	name := "item"
 	if t != nil && t.Name != "" {
 		name = t.Name
@@ -479,8 +496,9 @@ func (g *GameProtocol) wrapItem(pos game.Position, item *game.Item, t *items.Ite
 	}
 }
 
-// unwrapItem turns a kit back into what it was wrapped from.
-func (g *GameProtocol) unwrapItem(pos game.Position, item *game.Item) {
+// unwrapItem turns a kit back into what it was wrapped from. It reports whether
+// the unwrap happened, so the caller can skip the effect when it did not.
+func (g *GameProtocol) unwrapItem(pos game.Position, item *game.Item, house *game.House) bool {
 	raw, ok := item.GetCustomAttribute("unWrapId")
 	unwrapID := customAttrUint16(raw)
 	if !ok || unwrapID == 0 {
@@ -489,7 +507,16 @@ func (g *GameProtocol) unwrapItem(pos game.Position, item *game.Item) {
 		// that was dropped.
 		g.wrapRefuse("noUnwrapId", "Sorry, not possible.",
 			netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, item.ID, 0)
-		return
+		return false
+	}
+
+	// The bed cap is checked BEFORE the transform (game.cpp:5493): a refused
+	// unwrap has to leave the kit intact, and a transform is not undoable.
+	newType := g.deps.Items.Get(unwrapID)
+	isBed := newType != nil && newType.Type == items.ItemTypeBed
+	if isBed && house != nil && house.MaxBeds > -1 && int32(house.BedCount()) >= house.MaxBeds {
+		g.player.SendCancelMessage("You reached the maximum beds in this house")
+		return false
 	}
 	if g.deps != nil && g.deps.Log != nil {
 		g.deps.Log.Warn("unwrap proceeding", "item", item.ID, "into", unwrapID,
@@ -521,10 +548,12 @@ func (g *GameProtocol) unwrapItem(pos game.Position, item *game.Item) {
 		item.Attr.WrittenDate = nil
 		item.Attr.StoreTimestamp = storeStamp
 	}
-	// NOT ported: house bed accounting (House::addBed and the getMaxBeds cap).
-	// There is no bed subsystem here, so unwrapping a bed does not count against the
-	// house limit — flagged rather than faked, since a wrong count would let a house
-	// exceed its cap silently.
+	// game.cpp:5507 — the house takes the new bed onto its list, which is what
+	// getBedCount reports and what the houses table stores.
+	if isBed && house != nil {
+		house.AddBed(pos)
+	}
+	return true
 }
 
 // topTopItem returns the tile's topmost always-on-top item, Tile::getTopTopItem.

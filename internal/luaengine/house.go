@@ -8,6 +8,30 @@ import (
 
 const houseTypeName = "House"
 
+// ReturnValue_t values used by house:startTrade, and MESSAGE_EVENT_ADVANCE.
+// The datapack turns the number into the message the player reads, so these
+// have to be the upstream values and not a local invention.
+const (
+	returnValueTradePlayerFarAway           = 72
+	returnValueYouDontOwnThisHouse          = 73
+	returnValueTradePlayerAlreadyOwnsAHouse = 74
+	returnValueYouCannotTradeThisHouse      = 76
+	msgEventAdvance                         = 19
+)
+
+// withinRange is Position::areInRange<dx, dy, 0>: same floor, within a box.
+func withinRange(a, b game.Position, dx, dy int) bool {
+	if a.Z != b.Z {
+		return false
+	}
+	ax, bx := int(a.X), int(b.X)
+	ay, by := int(a.Y), int(b.Y)
+	if ax-bx > dx || bx-ax > dx {
+		return false
+	}
+	return !(ay-by > dy || by-ay > dy)
+}
+
 // checkHouse returns the *game.House from L.Get(1) or nil.
 func checkHouse(L *lua.LState) *game.House {
 	if ud, ok := L.Get(1).(*lua.LUserData); ok {
@@ -128,27 +152,51 @@ func houseGetSize(L *lua.LState) int {
 	return 1
 }
 
-// canEditAccessList checks if a player can edit the given access list type.
-// GUEST_LIST (0) can be edited by owner and sub-owners.
-// SUBOWNER_LIST (1) can only be edited by the owner.
+// houseCanEditAccessList is house:canEditAccessList(listId, player)
+// (house_functions.cpp).
+//
+// It carried its own copy of the rule and compared the list id against 0. The
+// Lua GUEST_LIST enum is 0x100 (map_definitions.hpp:14), so the sub-owner
+// branch could never be taken: a sub-owner was refused the guest list, which is
+// the one list they are supposed to be able to edit.
 func houseCanEditAccessList(L *lua.LState) int {
 	h := checkHouseArg(L, 1)
-	listType := L.CheckInt(2)
-	p := checkPlayer(L)
+	listID := uint32(L.CheckInt(2))
+	p := checkPlayerArg(L, 3)
 	if h == nil || p == nil {
 		L.Push(lua.LFalse)
 		return 1
 	}
-	if h.IsOwner(p.DBID) {
-		L.Push(lua.LTrue)
+	L.Push(lua.LBool(h.CanEditAccessList(listID, p)))
+	return 1
+}
+
+// houseGetAccessList is house:getAccessList(listId) (house_functions.cpp). It
+// had no Go counterpart at all, so a script could read no list.
+func houseGetAccessList(L *lua.LState) int {
+	h := checkHouseArg(L, 1)
+	if h == nil {
+		L.Push(lua.LNil)
 		return 1
 	}
-	// GUEST_LIST can be edited by sub-owners too
-	if listType == 0 && h.IsSubOwner(p.Name) {
-		L.Push(lua.LTrue)
+	list, ok := h.GetAccessList(uint32(L.CheckInt(2)))
+	if !ok {
+		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LFalse)
+	L.Push(lua.LString(list))
+	return 1
+}
+
+// houseSetAccessList is house:setAccessList(listId, list) (house_functions.cpp).
+func (e *Engine) houseSetAccessList(L *lua.LState) int {
+	h := checkHouseArg(L, 1)
+	if h == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	h.SetAccessList(e.world, uint32(L.CheckInt(2)), L.CheckString(3))
+	L.Push(lua.LTrue)
 	return 1
 }
 
@@ -177,14 +225,26 @@ func (e *Engine) registerHouseMetatable() {
 			L.Push(lua.LTrue)
 			return 1
 		},
-		// getDoorIdByPosition returns nil when the door is unknown. game.HouseDoor
-		// carries no position yet (internal/game/house.go:43), so this cannot be
-		// resolved properly; callers guard with `if ... then`, so nil is the safe
-		// answer. TODO: needs door positions on House.DoorList.
+		// getDoorIdByPosition is house:getDoorIdByPosition(position)
+		// (house_functions.cpp:335). It used to answer a flat nil because
+		// HouseDoor carried no position; registerHouseFurniture now fills one in
+		// from the door item's HouseDoorID attribute, so the lookup is real.
 		"getDoorIdByPosition": func(L *lua.LState) int {
-			L.Push(lua.LNil)
+			h := checkHouseArg(L, 1)
+			if h == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			door, ok := h.GetDoorByPosition(checkPosition(L, 2))
+			if !ok {
+				L.Push(lua.LNil)
+				return 1
+			}
+			L.Push(lua.LNumber(door.ID))
 			return 1
 		},
+		"getAccessList": houseGetAccessList,
+		"setAccessList": e.houseSetAccessList,
 		// hasNewOwnership reports whether a transfer is pending.
 		"hasNewOwnership": func(L *lua.LState) int {
 			h := checkHouseArg(L, 1)
@@ -212,8 +272,54 @@ func (e *Engine) registerHouseMetatable() {
 		// startTrade is not implemented: House::startTrade in C++
 		// (src/map/house/house.cpp:629) needs the HouseTransferItem/onTradeEvent
 		// machinery, which has no Go counterpart yet. Returns RETURNVALUE_NOTPOSSIBLE.
+		// startTrade is house:startTrade(player, tradePartner)
+		// (house_functions.cpp:221). It answered a flat NOTPOSSIBLE, so a house
+		// owner trying to sell got "sorry, not possible" whatever was actually
+		// wrong — including when nothing was.
+		//
+		// The validation chain below is upstream's, in upstream's order, and its
+		// return value is what the datapack turns into the message the player
+		// reads. The handoff at the end is not: internalStartTrade needs the
+		// player-to-player trade window, and World.PlayerRequestTrade is still
+		// empty. So the document is minted, the trade fails to start, and
+		// resetTransferItem takes it back — which is exactly the path upstream
+		// runs when internalStartTrade returns false.
 		"startTrade": func(L *lua.LState) int {
-			L.Push(lua.LNumber(1)) // RETURNVALUE_NOTPOSSIBLE
+			h := checkHouseArg(L, 1)
+			p := checkPlayerArg(L, 2)
+			partner := checkPlayerArg(L, 3)
+			if h == nil || p == nil || partner == nil {
+				L.Push(lua.LNil)
+				return 1
+			}
+			if !withinRange(partner.GetPosition(), p.GetPosition(), 2, 2) {
+				L.Push(lua.LNumber(returnValueTradePlayerFarAway))
+				return 1
+			}
+			if !h.IsOwner(p.DBID) {
+				L.Push(lua.LNumber(returnValueYouDontOwnThisHouse))
+				return 1
+			}
+			if e.world != nil && e.world.GetHouseByPlayerID(partner.DBID) != nil {
+				L.Push(lua.LNumber(returnValueTradePlayerAlreadyOwnsAHouse))
+				return 1
+			}
+			transferItem := h.GetTransferItem()
+			if transferItem == nil {
+				L.Push(lua.LNumber(returnValueYouCannotTradeThisHouse))
+				return 1
+			}
+			if optBool(L, 4, false) && h.HasNewOwnership() {
+				partner.SendTextMessage(msgEventAdvance, "You cannot buy this house. Ownership is already scheduled to be transferred upon the next server restart.")
+				p.SendTextMessage(msgEventAdvance, "You cannot sell this house. Ownership is already scheduled to be transferred upon the next server restart.")
+				h.ResetTransferItem()
+				L.Push(lua.LNumber(returnValueYouCannotTradeThisHouse))
+				return 1
+			}
+			// internalStartTrade has no counterpart yet; it would always fail, and
+			// upstream resets the document when it does.
+			h.ResetTransferItem()
+			L.Push(lua.LNumber(returnValueYouCannotTradeThisHouse))
 			return 1
 		},
 		"getId": func(L *lua.LState) int {
@@ -241,28 +347,19 @@ func (e *Engine) registerHouseMetatable() {
 			L.Push(L.NewTable())
 			return 1
 		},
+		// hasItemOnTile is house:hasItemOnTile() (house_functions.cpp:188).
+		//
+		// The inline copy answered true for ANY item on any house tile. Upstream
+		// only counts wrapable and pickupable ones (house.cpp:401) — a house with
+		// a plain fixed decoration inside is still purchasable, and under the old
+		// rule it never was.
 		"hasItemOnTile": func(L *lua.LState) int {
 			h := checkHouseArg(L, 1)
-			if h == nil || len(h.HouseTiles) == 0 {
-				L.Push(lua.LFalse)
+			if h == nil {
+				L.Push(lua.LNil)
 				return 1
 			}
-			world := e.world
-			if world == nil {
-				L.Push(lua.LTrue)
-				return 1
-			}
-			for _, pos := range h.HouseTiles {
-				tile := world.Map.GetTile(pos)
-				if tile == nil {
-					continue
-				}
-				if len(tile.Items) > 0 {
-					L.Push(lua.LTrue)
-					return 1
-				}
-			}
-			L.Push(lua.LFalse)
+			L.Push(lua.LBool(h.HasItemOnTile(e.world)))
 			return 1
 		},
 	}

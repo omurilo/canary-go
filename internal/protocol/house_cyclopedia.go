@@ -4,10 +4,10 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
-	"time"
 
 	"context"
 
+	"github.com/omurilo/canary-go/internal/config"
 	"github.com/omurilo/canary-go/internal/game"
 	"github.com/omurilo/canary-go/internal/netmsg"
 )
@@ -133,11 +133,18 @@ func (g *GameProtocol) processHouseBid(clientID uint32, bidValue uint64) {
 	p.BankBalance = newBalance
 
 	house.BidderName = p.Name
-	house.HighestBid = bidValue
+	// The FIRST bidder's highest bid is zero, not their own bid (game.cpp:12793):
+	// highestBid is what someone else must beat, and it only becomes a real figure
+	// once a second bidder appears. Setting it to bidValue meant the opening bidder
+	// had to be outbid above their own maximum.
+	house.HighestBid = 0
 	house.InternalBid = bidValue
 	house.BidHolderLimit = bidValue
 	house.Bidder = p.DBID
-	house.BidEndDate = uint32(time.Now().Add(7 * 24 * time.Hour).Unix())
+	// An auction closes N days out AT the server save, not N days from the moment
+	// of the bid — House::calculateBidEndDate aligns it. The hardcoded 7*24h here
+	// drifted by however far into the day the first bid landed.
+	house.CalculateBidEndDate(uint8(config.Number("daysToCloseBid", 7)))
 
 	if g.deps.DB != nil {
 		if err := g.deps.DB.SaveHouseBid(context.Background(), house); err != nil {

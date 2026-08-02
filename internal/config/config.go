@@ -120,6 +120,12 @@ type Config struct {
 	// backpack may hold. The buy path refuses a purchase that would exceed it.
 	MaxContainer int
 
+	// DaysToCloseBid is DAYS_TO_CLOSE_BID and GlobalServerSaveTime is
+	// GLOBAL_SERVER_SAVE_TIME ("HH:MM:SS"). House::calculateBidEndDate needs both:
+	// an auction closes N days out AT the server save, not N days from now.
+	DaysToCloseBid       int
+	GlobalServerSaveTime string
+
 	RSAKeyFile string
 	WorldFile  string
 
@@ -163,7 +169,10 @@ func Default() *Config {
 		RSAKeyFile:         "key.pem",
 		MapDownloadURL:     "https://github.com/opentibiabr/canary/releases/download/v3.6.1/otservbr.otbm",
 		MapDownloadEnabled: true,
-		Custom:             make(map[string]lua.LValue),
+		// config.lua.dist:396 and :556.
+		DaysToCloseBid:       7,
+		GlobalServerSaveTime: "06:00:00",
+		Custom:               make(map[string]lua.LValue),
 	}
 }
 
@@ -244,6 +253,8 @@ func Load(path string) (*Config, error) {
 	cfg.AllowOldProto = boolean("allowOldProtocol", cfg.AllowOldProto)
 	cfg.AutoBank = boolean("autoBank", cfg.AutoBank)
 	cfg.MaxContainer = num("maxContainer", cfg.MaxContainer)
+	cfg.DaysToCloseBid = num("daysToCloseBid", cfg.DaysToCloseBid)
+	cfg.GlobalServerSaveTime = str("globalServerSaveTime", cfg.GlobalServerSaveTime)
 	cfg.RSAKeyFile = str("rsaKeyFile", cfg.RSAKeyFile)
 
 	// Map download settings (matches CANARY_MAP_URL in the docker stack).

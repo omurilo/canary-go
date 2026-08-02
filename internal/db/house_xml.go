@@ -46,7 +46,9 @@ func (d *DB) ParseHouseFile(path string) ([]game.House, error) {
 			Name:       hx.Name,
 			Rent:       uint32(hx.Rent),
 			Size:       uint32(hx.Size),
-			Beds:       uint8(hx.Beds),
+			// The XML `beds` attribute is the maximum, not the current count
+			// (house.cpp:940). Beds is derived from the beds actually placed.
+			MaxBeds:    int32(hx.Beds),
 			TownID:     uint16(hx.TownID),
 			ClientID:   uint32(hx.ClientID),
 			RentPeriod: "monthly",

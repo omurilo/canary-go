@@ -377,6 +377,13 @@ type Player struct {
 	// action (forge, wheel, ...), mirroring Player::lastUIInteraction.
 	lastUIInteraction int64
 
+	// The house access-list window being edited. windowTextID increments on every
+	// open and is echoed back by the client, which is how a reply from a stale
+	// window is told apart from the current one — see house_window.go.
+	editHouse    *House
+	editListID   uint32
+	windowTextID uint32
+
 	// Action exhaustion timestamps (mirroring Player::nextPotionAction / nextAction).
 	NextPotionAction time.Time
 	NextAction       time.Time

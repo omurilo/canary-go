@@ -3612,13 +3612,21 @@ func playerSenddoublesoundeffect(L *lua.LState) int {
 	return 1
 }
 
+// playerSendhousewindow is player:sendHouseWindow(house, listId)
+// (player_functions.cpp:3667). It returned true without opening anything, so
+// the "edit list" option on every house door was a no-op.
 func playerSendhousewindow(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LNil)
+		return 1
 	}
-	// Check if this is a race condition or an already open window and
-	// just return success to avoid Lua errors.
+	house := checkHouseArg(L, 2)
+	if house == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	p.SendHouseWindow(house, uint32(L.CheckInt(3)))
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -3816,11 +3824,22 @@ func playerSetdailyreward(L *lua.LState) int {
 	return 1
 }
 
+// playerSetedithouse is player:setEditHouse(house, listId)
+// (player_functions.cpp:3687). The datapack calls it immediately before
+// sendHouseWindow: it is what arms the window id the reply is checked against,
+// so without it the reply would be rejected even once the window opened.
 func playerSetedithouse(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
-		return 0
+		L.Push(lua.LNil)
+		return 1
 	}
+	house := checkHouseArg(L, 2)
+	if house == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	p.SetEditHouse(house, uint32(L.CheckInt(3)))
 	L.Push(lua.LTrue)
 	return 1
 }

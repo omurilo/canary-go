@@ -61,6 +61,15 @@ type House struct {
 	// BedList is the beds actually placed in the house; Beds is derived from it
 	// rather than trusted from the XML.
 	BedList []Position
+	// MaxBeds is House::maxBeds, the `beds` attribute of houses.xml
+	// (house.cpp:940). It is the CAP, not the count — the count is Beds, and it
+	// is what the houses table stores (iomapserialize.cpp:411 writes
+	// getBedCount()). The loader used to put the cap into Beds, so a house
+	// reported four beds the moment it loaded and then had that overwritten by
+	// however many were actually placed.
+	//
+	// -1 means uncapped, matching the default when the attribute is absent.
+	MaxBeds int32
 	// hasNewOwnerOnStartup and NewOwnerGuid queue an ownership change for the
 	// next boot, when house transfers are configured to apply on restart.
 	hasNewOwnerOnStartup bool
@@ -293,11 +302,18 @@ func housePaidUntil(guid uint32) int64 {
 	}
 }
 
-// tryTransferOwnership mirrors House::tryTransferOwnership (house.cpp:72-92) for
-// the parts that exist here: kick everyone standing in the house and clear the
-// access lists. The depot transfer of the furniture (transferToDepot) has no Go
-// counterpart yet, so items are left where they are — see clearHouseInfo.
+// tryTransferOwnership is House::tryTransferOwnership (house.cpp:72).
+//
+// The furniture goes to the departing owner's depot FIRST, before anyone is
+// kicked and before the access lists are cleared. Order matters: kicking first
+// would move the owner off their own tiles, and clearing the lists first would
+// make the sweep look at a house with no owner to send the items to.
 func (h *House) tryTransferOwnership(w *World, player *Player, serverStartup bool) {
+	if player != nil {
+		h.TransferToDepotFor(w, player)
+	} else {
+		h.TransferToDepot(w)
+	}
 	if w != nil {
 		for _, pos := range h.HouseTilesSnapshot() {
 			tile := w.Map.GetTile(pos)
@@ -329,6 +345,9 @@ func (h *House) clearHouseInfo(preventOwnerDeletion bool) {
 	h.SubOwnerList = nil
 	h.GuestList = nil
 	h.AccessList = AccessList{}
+	// house.cpp:67 clears every door's list too. Leaving them behind hands the
+	// next owner a set of doors the previous owner's friends can still open.
+	h.doorLists = nil
 }
 
 // kickPlayer sends a player standing in the house back to their town temple, the
@@ -349,6 +368,27 @@ func (h *House) HouseTilesSnapshot() []Position {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return append([]Position(nil), h.HouseTiles...)
+}
+
+// RemoveMapItem takes an item off a tile and runs the removal hooks that go
+// with it. It is Game::internalRemoveItem's call into Item::onRemoved.
+//
+// Right now the only hook is the house door one: Door::onRemoved
+// (house.cpp:848) drops the door from its house, and without it a house keeps
+// a door in its list after the item is gone — so getDoorByNumber still finds
+// it and getAccessList still opens an editing window for a door that no longer
+// exists.
+func (w *World) RemoveMapItem(pos Position, item *Item) bool {
+	if w == nil || w.Map == nil || item == nil {
+		return false
+	}
+	removed := w.Map.RemoveItemPtr(pos, item)
+	if removed && item.Attr != nil && item.Attr.HouseDoorID != nil {
+		if house := w.GetHouseByPosition(pos); house != nil {
+			house.RemoveDoor(*item.Attr.HouseDoorID)
+		}
+	}
+	return removed
 }
 
 // GetHouseByDoorID finds the house that contains a door with the given door ID.

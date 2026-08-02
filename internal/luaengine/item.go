@@ -206,7 +206,7 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			ud := L.CheckUserData(2)
 			if destItem, ok := ud.Value.(*luaItem); ok {
 				if it.pos.X != 0 || it.pos.Y != 0 {
-					e.world.Map.RemoveItemPtr(it.pos, it.item)
+					e.world.RemoveMapItem(it.pos, it.item)
 					it.pos = game.Position{}
 				} else {
 					// We need to detach it from the player's inventory if it's there
@@ -243,7 +243,7 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			// Otherwise, it must be a Position
 			if dest, ok := ud.Value.(game.Position); ok {
 				if it.pos.X != 0 || it.pos.Y != 0 {
-					e.world.Map.RemoveItemPtr(it.pos, it.item)
+					e.world.RemoveMapItem(it.pos, it.item)
 				}
 				ok := e.world.AddItem(dest, it.item)
 				if ok {

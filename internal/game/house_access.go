@@ -2,6 +2,7 @@ package game
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -68,6 +69,10 @@ func (h *House) SetAccessList(w *World, listID uint32, textList string) {
 		h.SubOwnerList = parseAccessList(textList)
 		h.mu.Unlock()
 	default:
+		// Upstream writes onto the Door when it exists and caches on the house
+		// otherwise, because door items load after the house does. The Go Door
+		// carries no list of its own, so the house map is the single home for
+		// both cases and the branch collapses.
 		h.mu.Lock()
 		if h.doorLists == nil {
 			h.doorLists = make(map[uint32]string)
@@ -81,17 +86,29 @@ func (h *House) SetAccessList(w *World, listID uint32, textList string) {
 }
 
 // GetAccessList is House::getAccessList (house.cpp:483).
+//
+// The bool is what stops sendHouseWindow opening a window for a list id that
+// does not name a real door — so the check is door existence, NOT whether a
+// list has been written. Keying it on the map (which is what this did) meant a
+// door nobody had set a list on yet could never have one set, because the
+// window refused to open.
 func (h *House) GetAccessList(listID uint32) (string, bool) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
 	switch listID {
 	case GuestList:
+		h.mu.RLock()
+		defer h.mu.RUnlock()
 		return strings.Join(h.GuestList, "\n"), true
 	case SubOwnerList:
+		h.mu.RLock()
+		defer h.mu.RUnlock()
 		return strings.Join(h.SubOwnerList, "\n"), true
 	}
-	list, ok := h.doorLists[listID]
-	return list, ok
+	if _, ok := h.GetDoorByNumber(listID); !ok {
+		return "", false
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.doorLists[listID], true
 }
 
 // CanEditAccessList is House::canEditAccessList (house.cpp:552).
@@ -212,6 +229,14 @@ func (h *House) AddBed(pos Position) {
 	}
 	h.BedList = append(h.BedList, pos)
 	h.Beds = uint8(len(h.BedList))
+}
+
+// BedCount is House::getBedCount: the beds actually placed, which is what the
+// houses table stores and what the maxBeds cap is checked against.
+func (h *House) BedCount() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.BedList)
 }
 
 // RemoveBed is House::removeBed (house.cpp:529).
@@ -349,7 +374,7 @@ func (h *House) TransferToDepotFor(w *World, p *Player) bool {
 			}
 		}
 		for _, item := range moveList {
-			w.Map.RemoveItemPtr(pos, item)
+			w.RemoveMapItem(pos, item)
 		}
 	}
 
@@ -462,17 +487,39 @@ func (h *House) ExecuteTransfer(w *World, item *Item, newOwner *Player, transfer
 //
 // Truncating to midnight first is what makes every auction in a batch end at the
 // same moment regardless of what time of day each bid was placed.
-func (h *House) CalculateBidEndDate(daysToEnd uint8, serverSaveHour, serverSaveMin, serverSaveSec int) {
+// GLOBAL_SERVER_SAVE_TIME is "HH", "HH:MM" or "HH:MM:SS". Upstream reads it
+// inside calculateBidEndDate (house.cpp:600), so the lookup lives here rather
+// than at the call site.
+func (h *House) CalculateBidEndDate(daysToEnd uint8) {
+	hour, min, sec := parseServerSaveTime(config.Str("globalServerSaveTime", "06:00:00"))
+
 	now := time.Now().UTC()
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	target := midnight.AddDate(0, 0, int(daysToEnd)).
-		Add(time.Duration(serverSaveHour)*time.Hour +
-			time.Duration(serverSaveMin)*time.Minute +
-			time.Duration(serverSaveSec)*time.Second)
+		Add(time.Duration(hour)*time.Hour +
+			time.Duration(min)*time.Minute +
+			time.Duration(sec)*time.Second)
 
 	h.mu.Lock()
 	h.BidEndDate = uint32(target.Unix())
 	h.mu.Unlock()
+}
+
+// parseServerSaveTime is vectorAtoi(explodeString(t, ":")) with the same
+// tolerance: a missing minute or second is zero, and an unparsable field is too.
+func parseServerSaveTime(t string) (hour, min, sec int) {
+	parts := strings.Split(t, ":")
+	atoi := func(i int) int {
+		if i >= len(parts) {
+			return 0
+		}
+		n, err := strconv.Atoi(strings.TrimSpace(parts[i]))
+		if err != nil {
+			return 0
+		}
+		return n
+	}
+	return atoi(0), atoi(1), atoi(2)
 }
 
 // itemDocumentRO is ITEM_DOCUMENT_RO, the read-only document the house transfer
