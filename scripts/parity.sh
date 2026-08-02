@@ -253,6 +253,6 @@ behaviour_coverage "creatures/monsters/monster.cpp" "internal/game" "Monster"
 behaviour_coverage "creatures/npcs/npc.cpp" "internal/game" "Npc"
 behaviour_coverage "map/house/house.cpp" "internal/game" "House"
 behaviour_coverage "items/decay/decay.cpp" "internal/game" "Decay" "DecayManager" "DecayManager"
-behaviour_coverage "creatures/monsters/spawns/spawn_monster.cpp" "internal/game" "SpawnMonster" "SpawnEngine" "SpawnEngine"
+behaviour_coverage "creatures/monsters/spawns/spawn_monster.cpp" "internal/game" "SpawnMonster" "SpawnBlock" "SpawnEngine"
 
 echo

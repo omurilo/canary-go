@@ -87,6 +87,10 @@ type SpawnBlock struct {
 	// occupancy is spawnedMonsterMap membership, per slot.
 	stateMu sync.Mutex
 
+	// checkActive mirrors checkSpawnMonsterEvent != 0: whether this group is on
+	// the maintenance sweep.
+	checkActive bool
+
 	// Reference to parent engine
 	engine *SpawnEngine
 }
@@ -251,39 +255,7 @@ func (e *SpawnEngine) checkSpawns() {
 // clock instead of only from the dispatcher.
 func (e *SpawnEngine) checkSpawnsOnce(now time.Time) {
 	for _, block := range e.blocks {
-		block.stateMu.Lock()
-		// C++ gates each spawn slot only on spawnedMonsterMap.contains(id): there
-		// is no group-wide state. Gating the whole group on one shared state meant
-		// a single living monster suppressed every other slot in the same spawn,
-		// so a 20-monster spawn kept exactly one alive.
-		for id, sb := range block.blocks {
-			if _, alive := block.spawned[id]; alive {
-				continue
-			}
-
-			mType := sb.getMonsterType()
-			if mType == nil {
-				continue
-			}
-
-			// C++ checks canSpawn/findPlayer BEFORE the interval and pushes
-			// lastSpawn forward when blocked, so the respawn clock restarts while
-			// a player stands there instead of firing the moment they leave.
-			if e.findPlayerNear(sb.pos) {
-				sb.lastSpawn = now
-				continue
-			}
-
-			// Check respawn timer (C++ lastSpawn + interval)
-			if !sb.lastSpawn.IsZero() && now.Before(sb.lastSpawn.Add(sb.interval)) {
-				continue
-			}
-
-			if creature := e.spawnCreatureInBlock(block, id, sb, mType, now); creature != nil {
-				block.spawned[id] = creature
-			}
-		}
-		block.stateMu.Unlock()
+		block.CheckSpawnMonster(e.world, now)
 	}
 }
 

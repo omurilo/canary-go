@@ -830,6 +830,7 @@ func parseMonsterFlags(m *creatures.MonsterType, table *lua.LTable) {
 	boolFlag("canWalkOnFire", &m.Flags.CanWalkOnFire)
 	boolFlag("canWalkOnPoison", &m.Flags.CanWalkOnPoison)
 	boolFlag("lootDrop", &m.Flags.LootDrop)
+	boolFlag("isBlockable", &m.Flags.IsBlockable)
 	intFlag("staticAttackChance", &m.Flags.StaticAttackChance)
 	intFlag("targetDistance", &m.Flags.TargetDistance)
 	// Weighted target-search strategies (monster.cpp:906-924). No datapack monster

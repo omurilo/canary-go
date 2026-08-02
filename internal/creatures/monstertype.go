@@ -216,6 +216,14 @@ type MonsterFlags struct {
 	CanWalkOnPoison         bool
 	// LootDrop mirrors MonsterType::info.lootDrop; false disables loot entirely.
 	LootDrop bool
+	// IsBlockable is MonsterType::info.isBlockable. It decides how the spawn
+	// engine treats the monster: a blockable one is held back while a player
+	// stands in the spawn and then appears instantly, a non-blockable one spawns
+	// regardless but is announced with a teleport effect first.
+	//
+	// 1647 of the 1655 datapack monsters set it to false, so getting the branch
+	// backwards affects essentially every spawn in the game.
+	IsBlockable bool
 }
 
 // ShopItem is ShopBlock (src/creatures/creatures_definitions.hpp:1802).
