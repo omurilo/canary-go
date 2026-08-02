@@ -219,6 +219,7 @@ func (e *Engine) registerCreatureType() {
 	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
 	e.L.SetField(mt, "getZoneType", e.L.NewFunction(e.creatureGetzonetype))
 	e.L.SetField(mt, "setOutfit", e.L.NewFunction(e.creatureSetoutfit))
+	e.L.SetField(mt, "setDirection", e.L.NewFunction(e.creatureSetdirection))
 	e.L.SetField(mt, "__index", mt)
 }
 
@@ -278,7 +279,6 @@ var creatureMethods = map[string]lua.LGFunction{
 	"setSkillLoss":       creatureSetskillloss,
 	"getPosition":        creatureGetposition,
 	"getDirection":       creatureGetdirection,
-	"setDirection":       creatureSetdirection,
 	"getHealth":          creatureGethealth,
 	"setHealth":          creatureSethealth,
 	"addHealth":          creatureAddhealth,
@@ -809,12 +809,15 @@ func creatureSay(L *lua.LState) int {
 	return 1
 }
 
-func creatureSetdirection(L *lua.LState) int {
+func (e *Engine) creatureSetdirection(L *lua.LState) int {
 	c := checkCreature(L)
 	if c == nil {
 		return 0
 	}
 	c.SetDirection(game.Direction(luaOptInt(L, 2)))
+	if e.world != nil && e.world.OnCreatureTurn != nil {
+		e.world.OnCreatureTurn(c)
+	}
 	L.Push(lua.LTrue)
 	return 1
 }

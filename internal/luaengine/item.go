@@ -157,6 +157,18 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			L.Push(lua.LBool(has))
 			return 1
 		},
+		"getType": func(L *lua.LState) int {
+			it := checkItem(L)
+			var itemType *items.ItemType
+			if cat := e.itemCatalog(); cat != nil {
+				itemType = cat.Get(it.item.ID)
+			}
+			ud := L.NewUserData()
+			ud.Value = &luaItemType{id: it.item.ID, item: itemType}
+			L.SetMetatable(ud, L.GetTypeMetatable(itemTypeClassName))
+			L.Push(ud)
+			return 1
+		},
 		"getId": func(L *lua.LState) int {
 			it := checkItem(L)
 			L.Push(lua.LNumber(it.item.ID))

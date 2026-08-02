@@ -278,11 +278,7 @@ func (e *Engine) tileMethods() map[string]lua.LGFunction {
 		},
 		"getItemCount": func(L *lua.LState) int {
 			t := checkTile(L, 1)
-			count := len(t.tile.Items)
-			if t.tile.Ground != nil {
-				count++
-			}
-			L.Push(lua.LNumber(count))
+			L.Push(lua.LNumber(len(t.tile.Items)))
 			return 1
 		},
 		"getItems": func(L *lua.LState) int {
