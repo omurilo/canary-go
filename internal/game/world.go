@@ -469,6 +469,7 @@ func (w *World) AddCreature(c Creature) {
 	w.creatures[c.GetID()] = c
 	w.addCreatureToTile(c)
 	w.mu.Unlock()
+	w.notifyCreatureAppear(c)
 	if w.OnCreatureAppear != nil {
 		w.OnCreatureAppear(c)
 	}
@@ -510,6 +511,9 @@ func (w *World) RemoveCreature(id uint32) {
 		w.removeCreatureFromTile(c)
 	}
 	w.mu.Unlock()
+	if exists {
+		w.notifyCreatureRemove(c)
+	}
 	if exists && w.OnCreatureRemove != nil {
 		w.OnCreatureRemove(c, oldStackPos)
 	}
@@ -707,6 +711,7 @@ func (w *World) TryMoveCreature(c Creature, dir Direction) (Position, bool) {
 	w.addCreatureToTile(c)
 	w.mu.Unlock()
 
+	w.notifyCreatureMove(c, oldPos, dest)
 	if w.OnCreatureMove != nil {
 		w.OnCreatureMove(c, oldPos, dest, oldStackPos)
 	}

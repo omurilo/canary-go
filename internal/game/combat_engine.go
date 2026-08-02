@@ -63,10 +63,23 @@ type CombatEngine struct {
 
 // NewCombatEngine creates a combat engine for the world.
 func NewCombatEngine(w *World) *CombatEngine {
-	return &CombatEngine{
+	e := &CombatEngine{
 		world:      w,
 		lastAttack: make(map[uint32]time.Time),
 	}
+	// Monster::doAttacking decides WHICH block fires; executing it is the engine's
+	// job. Without this hook DoAttacking picked blocks correctly and then dropped
+	// them on the floor, which is worse than the old ad-hoc selection it replaced.
+	if w != nil {
+		w.OnMonsterCastSpell = func(m *Monster, target Creature, block creatures.MonsterAttack) {
+			if block.IsMelee() {
+				e.doMeleeHit(combat.NewCombat(), m, target)
+				return
+			}
+			e.executeMonsterSpell(m, target, block)
+		}
+	}
+	return e
 }
 
 // Start begins the self-rescheduling combat loop.
@@ -949,37 +962,24 @@ func randomRange(min, max int) int32 {
 	return int32(min + rand.Intn(max-min+1))
 }
 
+// doMonsterAttack runs one attack tick through Monster::doAttacking.
+//
+// It used to roll its own spell selection: shuffle the non-melee blocks, take
+// the first whose chance passed and whose range covered the target, else melee.
+// That ignored canUseSpell entirely — no shared attackTicks, no 1500ms melee
+// floor, no extra swing, and at most one block per tick where upstream can fire
+// several.
 func (e *CombatEngine) doMonsterAttack(m *Monster, target Creature) {
 	if m.Type == nil || len(m.Type.Attacks) == 0 {
 		e.doMeleeHit(combat.NewCombat(), m, target)
 		return
 	}
-
-	var spells []creatures.MonsterAttack
-
-	for i := range m.Type.Attacks {
-		atk := &m.Type.Attacks[i]
-		if !atk.IsMelee() {
-			spells = append(spells, *atk)
-		}
+	m.SetTarget(target)
+	if m.DoAttacking(e.world, uint32(combatTickInterval/time.Millisecond)) {
+		return
 	}
 
-	ap, tp := m.GetPosition(), target.GetPosition()
-	dist := chebyshevDistance(ap, tp)
-
-	for _, s := range spells {
-		chanceRoll := rand.Intn(100)
-		if chanceRoll < s.Chance {
-			maxRange := s.Range
-			if maxRange <= 0 {
-				maxRange = 1
-			}
-			if dist <= maxRange {
-				e.executeMonsterSpell(m, target, s)
-				return
-			}
-		}
-	}
+	dist := chebyshevDistance(m.GetPosition(), target.GetPosition())
 
 	if dist <= 1 {
 		e.doMeleeHit(combat.NewCombat(), m, target)
