@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/omurilo/canary-go/internal/creatures"
 	"github.com/omurilo/canary-go/internal/game"
 	"github.com/omurilo/canary-go/internal/game/imbuements"
 	"github.com/omurilo/canary-go/internal/game/vocations"
@@ -1123,6 +1122,11 @@ func (g *GameProtocol) sendCancelTarget() {
 	g.SendToClient(w)
 }
 
+// uiExhaustionMS is the default of Player::isUIExhausted (player.hpp:1248): a
+// shop action within 250ms of the last one is refused, which is what stops a
+// held-down buy button from racing the inventory refresh.
+const uiExhaustionMS = 250
+
 func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 	if g.player == nil {
 		return
@@ -1139,129 +1143,67 @@ func (g *GameProtocol) parseBuyItem(r *netmsg.Reader) {
 	ignoreCap := r.GetByte() != 0
 	inBackpacks := r.GetByte() != 0
 
+	if amount == 0 {
+		return
+	}
+
 	npc := g.shopOwner()
 	if npc == nil {
 		return
 	}
 
-	price, found := npc.ShopBuyPrice(itemID, subType)
-	if !found {
-		g.player.SendTextMessage(0x13, "This item is not available.")
-		return
-	}
-
-	// Cap amounts like the client (stackable ≤ 10000, non-stackable ≤ 100).
 	it := g.deps.Items.Get(itemID)
-	stackable := it != nil && it.Stackable
-	maxAmount := uint16(100)
-	if stackable {
-		maxAmount = 10000
-	}
-	if amount == 0 {
-		return
-	}
-	if amount > maxAmount {
-		amount = maxAmount
-	}
-
-	// Validations ported from Npc::onPlayerBuyItem (npc.cpp:738). Both answer
-	// RETURNVALUE_NOTENOUGHROOM.
-	if g.player.IsBackpackSlotUnavailable(g.deps.Items, itemID, ignoreCap) {
-		g.player.SendTextMessage(0x13, "You do not have enough room to carry this item.")
-		return
-	}
-	if g.deps.World.ExceedsTileLimit(g.player, it, amount, inBackpacks, ignoreCap) {
-		g.player.SendTextMessage(0x13, "You do not have enough room to carry this item.")
+	if it == nil {
 		return
 	}
 
-	totalCost := uint64(price) * uint64(amount)
-	bagsCost := game.CalculateBagsCost(it, amount, inBackpacks)
-	currency := npc.CurrencyID()
-
-	if g.player.HasInsufficientFunds(g.deps.Items, currency, totalCost, bagsCost) {
-		g.player.SendTextMessage(0x13, "You do not have enough money.")
+	// Upstream REFUSES an over-large amount, it does not clamp it
+	// (game.cpp:6234). Clamping — which this did — turns a malformed packet into
+	// a purchase the player never asked for.
+	stackable := it.Stackable
+	if (stackable && amount > 10000) || (!stackable && amount > 100) {
 		return
 	}
 
-	// Only gold purchases are settled through the money helpers below. A custom
-	// currency (a token, a coin item) would have to be removed as items, which
-	// addCustomCurrencyItems does upstream and has no Go counterpart yet — so those
-	// shops are refused rather than silently handing out free goods.
-	if currency != game.GoldCoinID {
-		g.player.SendTextMessage(0x13, "You cannot trade with this merchant right now.")
+	if !g.player.HasShopItemForSale(npc, itemID, subType) {
 		return
 	}
 
-	g.deps.Log.Debug("parseBuyItem: dispatching onBuyItem", "player", g.player.Name, "itemID", itemID, "amount", amount, "price", price, "totalCost", totalCost, "bagsCost", bagsCost)
-
-	// The core stops here. Npc::onPlayerBuyItem validates and prices the purchase
-	// and then hands off to the script; delivery and payment happen inside
-	// npc:sellItem, which is what onBuyItem calls. Note totalCost is passed WITHOUT
-	// the bag cost, matching the callback's argument upstream — npc:sellItem
-	// recomputes the bags itself.
-	if !g.deps.Lua.CallNpcOnBuyItem(npc, g.player, itemID, subType, amount, ignoreCap, inBackpacks, totalCost) {
-		// No onBuyItem on this NPC means nothing happens, exactly as upstream: the
-		// core never delivers on its own. Three otservbr merchants (elgar, murim,
-		// enpa-deia_pema) declare buy prices without the callback and so cannot be
-		// bought from — a datapack bug, not one to paper over here.
-		g.deps.Log.Warn("npc has no onBuyItem callback; purchase ignored",
-			"npc", npc.Name, "itemID", itemID)
+	if g.player.IsUIExhausted(uiExhaustionMS) {
+		g.player.SendCancelMessage("You are exhausted.")
 		return
 	}
+
+	// The container guards belong to Game::playerBuyItem, not to the NPC: a full
+	// backpack tree or a tile already holding 20 items stops the purchase before
+	// the merchant is ever asked.
+	if inBackpacks || it.IsContainer() {
+		if g.player.ContainerHoldingCountExceeded(g.deps.World.MaxContainer) {
+			g.player.SendCancelMessage("This container is full.")
+			return
+		}
+		if g.deps.World.TileItemCount(g.player.Pos) >= 20 {
+			g.player.SendCancelMessage("This container is full.")
+			return
+		}
+	}
+
+	// Npc::onPlayerBuyItem owns the room / tile-limit / price / funds checks and
+	// the script hand-off. Reimplementing them here is what left the ported
+	// method unreachable and let the two copies drift: this one priced off the
+	// type's shop list, so a per-player list installed by a quest NPC was ignored.
+	npc.OnPlayerBuyItem(g.deps.World, g.player, itemID, subType, amount, ignoreCap, inBackpacks)
+	g.player.UpdateUIExhausted()
 
 	g.refreshAfterTrade()
 }
 
-// deliveredUnits sums the stack counts of the items actually placed by a buy.
-func deliveredUnits(placed []*game.Item) uint32 {
-	var n uint32
-	for _, it := range placed {
-		if it == nil {
-			continue
-		}
-		if it.Count == 0 {
-			n++
-		} else {
-			n += uint32(it.Count)
-		}
-	}
-	return n
-}
-
-func itemName(it *items.ItemType, id uint16) string {
-	if it != nil && it.Name != "" {
-		return it.Name
-	}
-	return fmt.Sprintf("item %d", id)
-}
-
-// shopOwnerType returns the NPC type the player is currently trading with, or
-// nil when there is no valid shop owner in range.
-func (g *GameProtocol) shopOwnerType() *creatures.NpcType {
-	if g.player == nil || g.player.ShopOwnerID == 0 {
-		return nil
-	}
-	npc, ok := g.deps.World.CreatureByID(g.player.ShopOwnerID).(*game.Npc)
-	if !ok {
-		// Owner vanished — close the shop client-side.
-		g.player.CloseShop()
-		g.SendCloseShop()
-		return nil
-	}
-	// Auto-close when the NPC walks out of interaction range (same floor,
-	// chebyshev distance > 4), mirroring getInteractableShopOwner.
-	if !sameFloorWithin(g.player.Pos, npc.GetPosition(), 4) {
-		g.player.CloseShop()
-		g.SendCloseShop()
-		return nil
-	}
-	return g.deps.World.TypeRegistry.Npcs[strings.ToLower(npc.Name)]
-}
-
-// shopOwner returns the NPC the player currently has a shop open with, applying the
-// same liveness and range checks as shopOwnerType. Needed alongside it because the
-// currency and price lookups live on the NPC, not on its type.
+// shopOwner is Game::getInteractableShopOwner: the NPC the player currently has
+// a shop open with, or nil once it is gone or out of range.
+//
+// It replaced a parallel shopOwnerType that returned the NpcType instead. Two
+// lookups meant two shop lists, and the type-based one could not see a
+// per-player list at all.
 func (g *GameProtocol) shopOwner() *game.Npc {
 	if g.player == nil || g.player.ShopOwnerID == 0 {
 		return nil
@@ -1340,48 +1282,36 @@ func (g *GameProtocol) parseSellItem(r *netmsg.Reader) {
 	amount := r.GetU16()
 	ignoreEquipped := r.GetByte() != 0
 
+	if amount == 0 {
+		return
+	}
+
 	npc := g.shopOwner()
 	if npc == nil {
 		return
 	}
 
-	price, found := npc.ShopSellPrice(itemID, subType)
-	if !found {
-		g.player.SendTextMessage(0x13, "This NPC does not buy this item.")
-		return
-	}
-	if amount == 0 {
-		return
-	}
-
-	// Scan the whole inventory tree (skipping tiered items) and remove up to
-	// `amount`, mirroring Npc::removeItemsFromInventory.
-	sub := -1
-	if subType != 0 {
-		sub = int(subType)
-	}
-	sold := g.player.RemoveForSale(g.deps.Items, itemID, uint32(amount), sub)
-	if sold == 0 {
-		g.player.SendTextMessage(0x13, "You do not have so many of this item.")
-		return
-	}
-
-	totalGain := uint64(price) * uint64(sold)
-	// Proceeds go to inventory coins (visible to the player). AUTOBANK routing
-	// to the bank is a config-driven follow-up.
-	g.player.AddMoney(totalGain)
-
-	// Unlike buying, the core owns the whole sale: Npc::onPlayerSellItem removes the
-	// items and credits the proceeds itself, and only then fires onSellItem as a
-	// NOTIFICATION. The datapack scripts use it purely to send the "Sold Nx ..."
-	// message, which is why this no longer sends one of its own.
 	it := g.deps.Items.Get(itemID)
-	name := itemName(it, itemID)
-	if !g.deps.Lua.CallNpcOnSellItem(npc, g.player, itemID, subType, sold, ignoreEquipped, name, totalGain) {
-		// No onSellItem means no confirmation would ever reach the player, so fall
-		// back to the built-in message rather than leaving the sale silent.
-		g.player.SendTextMessage(0x14, fmt.Sprintf("Sold %dx %s for %d gold.", sold, name, totalGain))
+	if it == nil {
+		return
 	}
+	// Refused, not clamped — same as the buy path (game.cpp:6291).
+	if (it.Stackable && amount > 10000) || (!it.Stackable && amount > 100) {
+		return
+	}
+
+	if g.player.IsUIExhausted(uiExhaustionMS) {
+		g.player.SendCancelMessage("You are exhausted.")
+		return
+	}
+
+	// Npc::onPlayerSellItem owns the whole sale: it prices against the per-player
+	// shop list, removes the items, credits the proceeds through the AUTOBANK
+	// path, and only then fires onSellItem as a notification. The copy that used
+	// to live here priced off the type's list and always paid into the purse.
+	npc.OnPlayerSellItem(g.deps.World, g.player, itemID, subType, uint32(amount), ignoreEquipped)
+	g.player.UpdateUIExhausted()
+
 	g.refreshAfterTrade()
 }
 

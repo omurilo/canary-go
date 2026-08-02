@@ -98,6 +98,74 @@ func (p *Player) HasInsufficientFunds(catalog *items.Catalog, currency uint16, t
 	return available < totalCost || (p.GetMoney()+p.BankBalance) < bagsCost
 }
 
+// HasShopItemForSale is Player::hasShopItemForSale (player.cpp:5971): does the
+// merchant the player has open actually offer this item.
+//
+// It reads the per-player shop vector, so an item a script installed for this
+// player alone passes and one only on the type's list does not — which is the
+// gate that stops a crafted packet buying anything the NPC happens to know
+// about.
+func (p *Player) HasShopItemForSale(npc *Npc, itemID uint16, subType uint8) bool {
+	if p == nil || npc == nil || p.World == nil {
+		return false
+	}
+	it := p.World.Items.Get(itemID)
+	fluid := it != nil && it.IsFluidContainer()
+	for _, block := range npc.GetShopItemVector(p.DBID) {
+		if block.ID != itemID || block.BuyPrice == 0 {
+			continue
+		}
+		// Only fluid containers are matched on subtype: for everything else the
+		// client's count byte is a stack size, not a discriminator.
+		if !fluid || block.SubType == subType {
+			return true
+		}
+	}
+	return false
+}
+
+// ContainerHoldingCountExceeded is the MAX_CONTAINER guard in Game::playerBuyItem
+// (game.cpp:6250): how many containers the main backpack holds, recursively.
+//
+// A limit of zero means unconfigured, and is treated as no limit rather than as
+// "no containers allowed".
+func (p *Player) ContainerHoldingCountExceeded(maxContainer uint32) bool {
+	if p == nil || maxContainer == 0 {
+		return false
+	}
+	backpack := p.Inventory[ConstSlotBackpack]
+	if backpack == nil {
+		return false
+	}
+	return containerHoldingCount(backpack) >= maxContainer
+}
+
+// containerHoldingCount is Container::getContainerHoldingCount
+// (container.cpp:410): every nested container, not every item.
+func containerHoldingCount(container *Item) uint32 {
+	var n uint32
+	for _, child := range container.Contents {
+		if child == nil || len(child.Contents) == 0 {
+			continue
+		}
+		n += 1 + containerHoldingCount(child)
+	}
+	return n
+}
+
+// TileItemCount is tile->getItemCount() at pos, used by the buy path's
+// twenty-item floor guard.
+func (w *World) TileItemCount(pos Position) int {
+	if w == nil || w.Map == nil {
+		return 0
+	}
+	tile := w.Map.GetTile(pos)
+	if tile == nil {
+		return 0
+	}
+	return len(tile.Items)
+}
+
 // ShopBuyPrice returns the NPC's buy price for an item, and whether it sells it at
 // all. Mirrors the shop-vector scan in onPlayerBuyItem, which only accepts an entry
 // whose itemBuyPrice is non-zero.

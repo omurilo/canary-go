@@ -175,16 +175,20 @@ func (g *GameProtocol) parseLookInShop(r *netmsg.Reader) {
 	if g.deps.Events != nil && !g.deps.Events.ExecutePlayerOnLookInShop(g.player, itemID, uint16(count)) {
 		return
 	}
-	if nType := g.shopOwnerType(); nType != nil {
-		for _, si := range nType.ShopItems {
-			if si.ID == itemID {
-				g.sendStatusText(si.Name)
-				break
-			}
-		}
-	} else {
+	npc := g.shopOwner()
+	if npc == nil {
 		g.sendStatusText("You are not currently trading with anyone.")
+		return
 	}
+	for _, si := range npc.GetShopItemVector(g.player.DBID) {
+		if si.ID == itemID {
+			g.sendStatusText(si.Name)
+			break
+		}
+	}
+	// Npc::onPlayerCheckItem fires the npc's onCheckItem script, which is how a
+	// merchant comments on what the player is inspecting. It had no caller.
+	npc.OnPlayerCheckItem(g.deps.World, g.player, itemID, count)
 }
 
 // parseRequestTrade handles 0x7D — player requests trade with another player.

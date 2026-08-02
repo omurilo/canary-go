@@ -567,9 +567,55 @@ func (p *Player) SendOpenShop(npc Creature, items []creatures.ShopItem) {
 	}
 }
 
-// CloseShop clears the player's active shop binding. Mirrors
-// Player::closeShopWindow (the NPC-side onCloseChannel is fired by the caller).
+// SendCloseShop tells the client the trade window is gone (0x7C). It is the
+// send half of Player::sendCloseShop, needed here so the NPC side can shut a
+// window down — closeAllShopWindows runs when the merchant wanders off, and
+// until now had no way to reach the client.
+func (p *Player) SendCloseShop() {
+	if p.Session == nil {
+		return
+	}
+	w := netmsg.NewWriter()
+	w.AddByte(0x7C)
+	p.Session.SendToClient(w)
+}
+
+// OpenShopWindow is Player::openShopWindow (player.cpp:2853).
+//
+// The NPC has to be told, not just the player: the per-player shop registry is
+// what onPlayerBuyItem prices against, and it is what closeAllShopWindows walks
+// when the NPC wanders off. Setting ShopOwnerID alone — which is what both Lua
+// entry points used to do — left the registry empty, so every purchase was
+// priced off the type's list and no window was ever closed from the NPC side.
+//
+// shopItems is the script-supplied list and may be empty: getShopItemVector
+// falls back to the type's list in that case, which is how npc:openShopWindow
+// (no table) works upstream.
+func (p *Player) OpenShopWindow(npc *Npc, shopItems []creatures.ShopItem) bool {
+	if npc == nil {
+		return false
+	}
+	// Re-opening the same window is a no-op upstream, which stops a spammed
+	// greeting from swapping the shop list out from under an in-flight purchase.
+	if npc.IsShopPlayer(p.DBID) && len(npc.GetShopItemVector(p.DBID)) == len(shopItems) {
+		return false
+	}
+	npc.AddShopPlayer(p.DBID, shopItems)
+	p.ShopOwnerID = npc.ID
+	p.SendOpenShop(npc, npc.GetShopItemVector(p.DBID))
+	return true
+}
+
+// CloseShop is Player::closeShopWindow (the NPC-side onCloseChannel is fired by
+// the caller). It drops the player from the NPC's registry as well as clearing
+// the binding — leaving them registered makes the NPC think the window is still
+// open and keeps a stale per-player price list alive.
 func (p *Player) CloseShop() {
+	if p.World != nil && p.ShopOwnerID != 0 {
+		if npc, ok := p.World.CreatureByID(p.ShopOwnerID).(*Npc); ok {
+			npc.RemoveShopPlayer(p.DBID)
+		}
+	}
 	p.ShopOwnerID = 0
 }
 

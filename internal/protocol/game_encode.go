@@ -167,7 +167,14 @@ func (g *GameProtocol) addCreature(w *netmsg.Writer, c game.Creature) {
 	if c.GetCreatureType() == 0 {
 		w.AddByte(0) // vocation client id
 	}
-	w.AddByte(0)    // speech bubble
+	// Speech bubble. Creature::getSpeechBubble is SPEECHBUBBLE_NONE and only Npc
+	// overrides it; hardcoding the zero meant no NPC in the game ever rendered
+	// the "talk to me" marker over its head (protocolgame.cpp:9646).
+	bubble := byte(0)
+	if b, ok := c.(interface{ GetSpeechBubble() uint8 }); ok {
+		bubble = b.GetSpeechBubble()
+	}
+	w.AddByte(bubble)
 	w.AddByte(0xFF) // mark (unmarked)
 	w.AddByte(0)    // inspection type
 	walkthrough := byte(0x01)
@@ -279,6 +286,12 @@ func (g *GameProtocol) canSeeCreature(c game.Creature) bool {
 			return true
 		}
 		return false
+	}
+	// Player::canSeeCreature (player.cpp:1395): invisibility hides monsters and
+	// NPCs but never other players — a player under invisibility is still drawn,
+	// which is why the getPlayer() guard is there and not an oversight.
+	if _, isPlayer := c.(*game.Player); !isPlayer {
+		return game.CanSeeCreature(g.player, c)
 	}
 	return true
 }

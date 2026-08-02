@@ -116,6 +116,10 @@ type Config struct {
 	AllowOldProto bool
 	AutoBank      bool
 
+	// MaxContainer is MAX_CONTAINER: how many nested containers the main
+	// backpack may hold. The buy path refuses a purchase that would exceed it.
+	MaxContainer int
+
 	RSAKeyFile string
 	WorldFile  string
 
@@ -239,6 +243,7 @@ func Load(path string) (*Config, error) {
 	cfg.MOTD = str("serverMotd", str("motd", cfg.MOTD))
 	cfg.AllowOldProto = boolean("allowOldProtocol", cfg.AllowOldProto)
 	cfg.AutoBank = boolean("autoBank", cfg.AutoBank)
+	cfg.MaxContainer = num("maxContainer", cfg.MaxContainer)
 	cfg.RSAKeyFile = str("rsaKeyFile", cfg.RSAKeyFile)
 
 	// Map download settings (matches CANARY_MAP_URL in the docker stack).

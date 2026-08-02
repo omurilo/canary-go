@@ -154,7 +154,7 @@ func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {
 		}
 	}
 
-	return &Monster{
+	m := &Monster{
 		BaseCreature: BaseCreature{
 			ID:        id,
 			Name:      name,
@@ -167,6 +167,11 @@ func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {
 		Type:           mType,
 		spellCooldowns: make(map[string]int64),
 	}
+	// Monster::Monster seeds internalLight from the type (monster.cpp:100), and
+	// setNormalCreatureLight restores that same value when a light condition
+	// ends. Neither happened, so a demon lit nothing around it.
+	m.SetNormalCreatureLight()
+	return m
 }
 
 func (m *Monster) GetCreatureType() uint8 { return 1 } // CREATURETYPE_MONSTER

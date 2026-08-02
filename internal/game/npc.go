@@ -122,7 +122,7 @@ func NewNpc(id uint32, name string, nType *creatures.NpcType) *Npc {
 		}
 	}
 
-	return &Npc{
+	n := &Npc{
 		BaseCreature: BaseCreature{
 			ID:        id,
 			Name:      name,
@@ -133,6 +133,11 @@ func NewNpc(id uint32, name string, nType *creatures.NpcType) *Npc {
 		},
 		Type: nType,
 	}
+	// Npc::Npc seeds internalLight from the type (npc.cpp:430), and
+	// setNormalCreatureLight restores that same value when a light condition
+	// ends. Both were missing: no NPC carried its own light at all.
+	n.SetNormalCreatureLight()
+	return n
 }
 
 // SpeechBubble returns the SPEECHBUBBLE_* icon the client should draw, defaulting

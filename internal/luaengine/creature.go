@@ -368,8 +368,13 @@ func creatureCansee(L *lua.LState) int {
 	return 1
 }
 
+// creatureCanseecreature is creature:canSeeCreature(other)
+// (creature_functions.cpp:227). It answered a flat true, so a script asking
+// whether a monster could spot an invisible player was always told yes.
 func creatureCanseecreature(L *lua.LState) int {
-	L.Push(lua.LTrue)
+	c := checkCreature(L)
+	other, _ := L.CheckUserData(2).Value.(game.Creature)
+	L.Push(lua.LBool(game.CanSeeCreature(c, other)))
 	return 1
 }
 

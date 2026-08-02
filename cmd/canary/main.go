@@ -197,6 +197,12 @@ func run(o runOpts, log *slog.Logger) error {
 	world := game.NewWorld()
 	world.Items = catalog
 	world.Achievements = game.NewAchievementRegistry()
+	// AUTOBANK and MAX_CONTAINER are read by the NPC shop paths, which live in
+	// the game package and cannot reach the config loader.
+	world.AutoBank = cfg.AutoBank
+	if cfg.MaxContainer > 0 {
+		world.MaxContainer = uint32(cfg.MaxContainer)
+	}
 
 	// Initialize the WDRR dispatcher as the process-wide scheduler.
 	game.GlobalDispatcher.Start(ctx)
@@ -696,6 +702,40 @@ func run(o runOpts, log *slog.Logger) error {
 	// the way Weapon::internalUseWeapon branches on isLoadedScriptId. Registered
 	// weapons had nowhere to be consulted from before this.
 	world.OnUseWeapon = lengine.UseWeapon
+
+	// The NPC shop callbacks. Npc::onPlayerBuyItem / onPlayerSellItem /
+	// onPlayerCheckItem end in a script hand-off, and these are the only way the
+	// game package can reach the Lua state. They were declared on World and never
+	// assigned, so the ported handlers had nothing to hand off to and the protocol
+	// layer called the engine itself.
+	world.OnNpcBuyItem = func(n *game.Npc, p *game.Player, itemID uint16, subType uint8, amount uint16, ignore, inBackpacks bool, totalCost uint64) {
+		if !lengine.CallNpcOnBuyItem(n, p, itemID, subType, amount, ignore, inBackpacks, totalCost) {
+			// No onBuyItem means nothing happens, exactly as upstream: the core
+			// never delivers on its own — delivery lives in npc:sellItem, which the
+			// callback calls. Three otservbr merchants declare buy prices without
+			// the callback and so cannot be bought from; that is a datapack bug.
+			log.Warn("npc has no onBuyItem callback; purchase ignored", "npc", n.Name, "itemID", itemID)
+		}
+	}
+	world.OnNpcSellItem = func(n *game.Npc, p *game.Player, itemID uint16, subType uint8, amount uint32, ignore bool, totalPrice uint64) {
+		name := fmt.Sprintf("item %d", itemID)
+		if it := catalog.Get(itemID); it != nil && it.Name != "" {
+			name = it.Name
+		}
+		if !lengine.CallNpcOnSellItem(n, p, itemID, subType, amount, ignore, name, totalPrice) {
+			// onSellItem is a notification, not the sale — the core has already
+			// removed the items and paid. Without it the sale would be silent, so
+			// the built-in confirmation stands in.
+			p.SendTextMessage(51, fmt.Sprintf("Sold %dx %s for %d gold.", amount, name, totalPrice))
+		}
+	}
+	world.OnNpcCheckItem = func(n *game.Npc, p *game.Player, itemID uint16, subType uint8) {
+		lengine.CallNpcOnCheckItem(n, p, itemID, subType)
+	}
+	world.OnCloseShopWindow = func(p *game.Player) {
+		p.CloseShop()
+		p.SendCloseShop()
+	}
 
 	// Database migrations, mirroring DatabaseManager::updateDatabase. They run
 	// after the schema and before the datapack loads, and they need the Lua state

@@ -145,7 +145,7 @@ func npcGetshopitem(L *lua.LState) int {
 func npcGetspeechbubble(L *lua.LState) int {
 	// Reads the type's npcConfig.speechBubble, defaulting to SPEECHBUBBLE_NORMAL.
 	if n := checkNpc(L); n != nil {
-		L.Push(lua.LNumber(n.SpeechBubble()))
+		L.Push(lua.LNumber(n.GetSpeechBubble()))
 		return 1
 	}
 	L.Push(lua.LNumber(creatures.SpeechBubbleNormal))
@@ -215,8 +215,16 @@ func npcIsnpc(L *lua.LState) int {
 	return 1
 }
 
+// npcIsplayerinteractingontopic is npc:isPlayerInteractingOnTopic(player, topic).
+// It answered a flat false, so every datapack dialogue branch keyed on the
+// current topic took the else path.
 func npcIsplayerinteractingontopic(L *lua.LState) int {
-	L.Push(lua.LFalse)
+	n := checkNpc(L)
+	if n == nil {
+		L.Push(lua.LFalse)
+		return 1
+	}
+	L.Push(lua.LBool(n.IsPlayerInteractingOnTopic(interactionPlayerID(L, 2), int(L.CheckInt(3)))))
 	return 1
 }
 
@@ -238,8 +246,10 @@ func (e *Engine) npcOpenshopwindow(L *lua.LState) int {
 	if e.world != nil {
 		nType := e.world.TypeRegistry.Npcs[strings.ToLower(n.Name)]
 		if nType != nil && len(nType.ShopItems) > 0 {
-			p.ShopOwnerID = n.ID
-			p.SendOpenShop(n, nType.ShopItems)
+			// Empty list: Player::openShopWindow registers the player with no
+			// override, and getShopItemVector then falls back to the type's list.
+			// That registration is what onPlayerBuyItem prices against.
+			p.OpenShopWindow(n, nil)
 		}
 	}
 	return 0
@@ -291,8 +301,10 @@ func npcOpenshopwindowtable(L *lua.LState) int {
 		}
 	})
 
-	p.ShopOwnerID = n.ID
-	p.SendOpenShop(n, shopItems)
+	// The script-supplied list becomes this player's shop, which is exactly what
+	// openShopWindowTable is for — a quest NPC selling one player something it
+	// sells nobody else.
+	p.OpenShopWindow(n, shopItems)
 
 	L.Push(lua.LTrue)
 	return 1
@@ -421,7 +433,14 @@ func itemDisplayName(catalog *items.Catalog, itemID uint16) string {
 	return fmt.Sprintf("item %d", itemID)
 }
 
-func npcSetcurrency(L *lua.LState) int { return 0 }
+// npcSetcurrency is npc:setCurrency(itemId) (npc_functions.cpp:128). It was a
+// no-op, so a shop script switching to a token currency kept charging gold.
+func npcSetcurrency(L *lua.LState) int {
+	if n := checkNpc(L); n != nil {
+		n.SetCurrency(uint16(L.CheckInt(2)))
+	}
+	return 0
+}
 
 func npcSetmasterpos(L *lua.LState) int { return 0 }
 
@@ -447,7 +466,15 @@ func npcSetplayerinteraction(L *lua.LState) int {
 	return 0
 }
 
-func npcSetspeechbubble(L *lua.LState) int { return 0 }
+// npcSetspeechbubble is npc:setSpeechBubble(bubble) (npc_functions.cpp:145).
+// Hirelings switch their bubble to signal what they will talk about, and with
+// this a no-op they all rendered as plain merchants.
+func npcSetspeechbubble(L *lua.LState) int {
+	if n := checkNpc(L); n != nil {
+		n.SetSpeechBubble(uint8(L.CheckInt(2)))
+	}
+	return 0
+}
 
 func npcTurn(L *lua.LState) int { return 0 }
 
@@ -653,6 +680,33 @@ func (e *Engine) CallNpcOnSellItem(npc *game.Npc, p *game.Player, itemID uint16,
 
 	if err := L.PCall(8, 0, nil); err != nil {
 		e.log.Error("lua npc onSellItem", "npc", npc.Name, "err", err)
+		return false
+	}
+	return true
+}
+
+// CallNpcOnCheckItem dispatches npc:onCheckItem(player, itemId, subType),
+// mirroring the callback that is the whole body of Npc::onPlayerCheckItem
+// (npc.cpp:1007). It fires when the player looks at an entry in the shop
+// window, which is how a merchant comments on its own wares.
+func (e *Engine) CallNpcOnCheckItem(npc *game.Npc, p *game.Player, itemID uint16, subType uint8) bool {
+	fn := e.npcCallback(npc, "onCheckItem")
+	if fn == nil {
+		return false
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	L := e.L
+	L.Push(fn)
+	e.pushNpcUserdata(npc)
+	e.pushPlayerUserdata(p)
+	L.Push(lua.LNumber(itemID))
+	L.Push(lua.LNumber(subType))
+
+	if err := L.PCall(4, 0, nil); err != nil {
+		e.log.Error("lua npc onCheckItem", "npc", npc.Name, "err", err)
 		return false
 	}
 	return true

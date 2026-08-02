@@ -25,6 +25,7 @@ type World struct {
 	DefaultSpawn        Position
 	WorldType           uint8 // 1 = WORLD_TYPE_NO_PVP, 2 = WORLD_TYPE_PVP, 3 = WORLD_TYPE_PVP_ENFORCED
 	AutoBank            bool
+	MaxContainer        uint32 // MAX_CONTAINER; 0 means unconfigured, i.e. no limit
 	OnModalWindowAnswer func(p *Player, id uint32, button uint8, choice uint8)
 	ChatManager         *ChatManager
 	WaitingList         *WaitingList
