@@ -44,6 +44,10 @@ type Engine struct {
 	npcCallbacksMu sync.Mutex
 	npcCallbacks   map[string]map[string]*lua.LFunction
 
+	// moduleCallbacks maps an inbound opcode to the module script's onRecvbyte
+	// that handles it (data/modules/modules.xml). Guarded by mu.
+	moduleCallbacks map[uint8]*lua.LFunction
+
 	// Scheduled Lua events (addEvent/stopEvent). Guarded by eventMu.
 	eventMu  sync.Mutex
 	eventSeq int
@@ -146,35 +150,85 @@ func New(world *game.World, log *slog.Logger) *Engine {
 }
 
 // registerLuaCompat patches standard-library incompatibilities between
-// gopher-lua and the Lua 5.1 the datapack targets. Currently: string.gsub
-// rejects a numeric replacement, but real Lua coerces it to a string (used by
-// NPC message parsing, e.g. |BLESSCOST| → a number). Wrap gsub to coerce arg 3.
+// gopher-lua and the Lua 5.1 the datapack targets. Currently:
+//
+//   - string.gsub rejects a numeric replacement, but real Lua coerces it to a
+//     string (used by NPC message parsing, e.g. |BLESSCOST| → a number). Wrap
+//     gsub to coerce arg 3.
+//
+//   - string.gmatch returns (iterator, state-userdata), while real Lua 5.1
+//     returns (iterator, subject, init). Scripts that bind only the iterator
+//     and iterate it — `local m = s:gmatch(pat); for v in m do ... end` —
+//     therefore drop the state and call the iterator with nil, which
+//     gopher-lua rejects with "userdata expected, got nil". Upstream Canary
+//     has this latent bug in store.lua (hireling / name-change offers). Wrap
+//     gmatch so the returned iterator closes over the state as an upvalue and
+//     never reads it from its own arguments, keeping the datapack byte-identical
+//     to upstream.
 func (e *Engine) registerLuaCompat() {
 	strTbl, ok := e.L.GetGlobal("string").(*lua.LTable)
 	if !ok {
 		return
 	}
-	orig, ok := e.L.GetField(strTbl, "gsub").(*lua.LFunction)
-	if !ok {
-		return
-	}
-	e.L.SetField(strTbl, "gsub", e.L.NewFunction(func(L *lua.LState) int {
-		n := L.GetTop()
-		args := make([]lua.LValue, 0, n)
-		for i := 1; i <= n; i++ {
-			a := L.Get(i)
-			if i == 3 && a.Type() == lua.LTNumber {
-				a = lua.LString(a.String())
+
+	if orig, ok := e.L.GetField(strTbl, "gsub").(*lua.LFunction); ok {
+		e.L.SetField(strTbl, "gsub", e.L.NewFunction(func(L *lua.LState) int {
+			n := L.GetTop()
+			args := make([]lua.LValue, 0, n)
+			for i := 1; i <= n; i++ {
+				a := L.Get(i)
+				if i == 3 && a.Type() == lua.LTNumber {
+					a = lua.LString(a.String())
+				}
+				args = append(args, a)
 			}
-			args = append(args, a)
-		}
-		// gsub returns (string, count); forward both.
-		if err := L.CallByParam(lua.P{Fn: orig, NRet: 2, Protect: true}, args...); err != nil {
-			L.RaiseError("%s", err.Error())
-			return 0
-		}
-		return 2
-	}))
+			// gsub returns (string, count); forward both.
+			if err := L.CallByParam(lua.P{Fn: orig, NRet: 2, Protect: true}, args...); err != nil {
+				L.RaiseError("%s", err.Error())
+				return 0
+			}
+			return 2
+		}))
+	}
+
+	if origGmatch, ok := e.L.GetField(strTbl, "gmatch").(*lua.LFunction); ok {
+		e.L.SetField(strTbl, "gmatch", e.L.NewFunction(func(L *lua.LState) int {
+			n := L.GetTop()
+			args := make([]lua.LValue, 0, n)
+			for i := 1; i <= n; i++ {
+				args = append(args, L.Get(i))
+			}
+			// The original returns (iterator, state); capture both in a
+			// closure so callers that keep only the iterator still work.
+			if err := L.CallByParam(lua.P{Fn: origGmatch, NRet: 2, Protect: true}, args...); err != nil {
+				L.RaiseError("%s", err.Error())
+				return 0
+			}
+			iter := L.Get(-2)
+			state := L.Get(-1)
+			L.Pop(2)
+			L.Push(L.NewClosure(gmatchCompatIter, iter, state))
+			return 1
+		}))
+	}
+}
+
+// gmatchCompatIter is the iterator returned by the string.gmatch compat
+// wrapper. It ignores its own arguments and drives the original gopher-lua
+// iterator with the state captured as an upvalue.
+func gmatchCompatIter(L *lua.LState) int {
+	iter, ok := L.Get(lua.UpvalueIndex(1)).(*lua.LFunction)
+	if !ok {
+		L.RaiseError("gmatch: iterator upvalue missing")
+		return 0
+	}
+	state := L.Get(lua.UpvalueIndex(2))
+	top := L.GetTop()
+	if err := L.CallByParam(lua.P{Fn: iter, NRet: lua.MultRet, Protect: true}, state); err != nil {
+		L.RaiseError("%s", err.Error())
+		return 0
+	}
+	return L.GetTop() - top
 }
 
 // overrideMathRandom replaces gopher-lua's math.random with a version that

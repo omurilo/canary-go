@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -585,6 +586,11 @@ func run(o runOpts, log *slog.Logger) error {
 		protocol.BroadcastCreatureRemove(world, c, oldStackPos)
 		notifyNpcsAround(world, lengine, c, false)
 	}
+	world.OnCreatureOutfitChange = func(c game.Creature) {
+		// creature:setOutfit → the hireling's outfit change (and any script-driven
+		// appearance change) must reach spectators or the client never redraws.
+		protocol.BroadcastCreatureOutfit(world, c)
+	}
 	world.OnGhostModeChange = func(p *game.Player) {
 		protocol.BroadcastGhostModeChange(world, p)
 	}
@@ -845,21 +851,7 @@ func run(o runOpts, log *slog.Logger) error {
 		// Load core module scripts that are required by action scripts (e.g.
 		// daily_reward module defines the DailyReward global used by the shrine
 		// action). These must be loaded BEFORE the core scripts directory.
-		modulesDir := filepath.Join(coreData, "modules", "scripts")
-		if entries, err := os.ReadDir(modulesDir); err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() && entry.Name() != "gamestore" {
-					modFile := filepath.Join(modulesDir, entry.Name(), entry.Name()+".lua")
-					if _, statErr := os.Stat(modFile); statErr == nil {
-						if err := lengine.DoFile(modFile); err != nil {
-							log.Warn("loading module script", "module", entry.Name(), "err", err)
-						}
-					}
-				}
-			}
-		} else {
-			log.Warn("modules scripts dir not found", "dir", modulesDir)
-		}
+		loadModules(lengine, coreData, log)
 		for _, sub := range []string{"lib", "libs", "npclib", "scripts"} {
 			d := filepath.Join(coreData, sub)
 			if err := loadScripts(lengine, d, log); err != nil {
@@ -1091,9 +1083,18 @@ func run(o runOpts, log *slog.Logger) error {
 	case <-ctx.Done():
 		log.Info("shutting down")
 		saveHouseItems("shutdown")
+		if lengine != nil {
+			// Fire onShutdown global events: the hireling save (hireling_save.lua)
+			// persists spawned hirelings' active flag and position so they
+			// re-spawn after a restart instead of coming back lamped.
+			lengine.RunShutdownGlobalEvents()
+		}
 		return nil
 	case err := <-errCh:
 		saveHouseItems("shutdown")
+		if lengine != nil {
+			lengine.RunShutdownGlobalEvents()
+		}
 		return err
 	}
 }
@@ -1162,6 +1163,76 @@ func loadScripts(e *luaengine.Engine, dir string, log *slog.Logger) error {
 	return walkErr
 }
 
+// recvbyteModule and modulesFileXML mirror data/modules/modules.xml, the C++
+// source of truth for which module script handles which inbound opcode.
+type recvbyteModule struct {
+	Type   string `xml:"type,attr"`
+	Byte   int    `xml:"byte,attr"`
+	Script string `xml:"script,attr"`
+}
+
+type modulesFileXML struct {
+	XMLName xml.Name         `xml:"modules"`
+	Modules []recvbyteModule `xml:"module"`
+}
+
+// loadModules loads the module scripts registered in modules.xml and captures
+// each one's global onRecvbyte keyed by the bytes it handles.
+//
+// The previous loader walked subdirectories and dofiled <dir>/<dir>.lua, which
+// (a) never found modules whose entry file has another name — hirelings ships
+// hireling_module.lua, cults_of_tibia/death.lua — and (b) left every module
+// overwriting the same global onRecvbyte, so only the last-loaded one (the
+// gamestore, loaded separately below) ever dispatched. The gamestore is
+// excluded here for the same reason it was excluded from the old loop: it
+// bootstraps its own libs and is loaded at the end.
+func loadModules(lengine *luaengine.Engine, coreData string, log *slog.Logger) {
+	xmlPath := filepath.Join(coreData, "modules", "modules.xml")
+	data, err := os.ReadFile(xmlPath)
+	if err != nil {
+		log.Warn("reading modules.xml", "err", err)
+		return
+	}
+	var mf modulesFileXML
+	if err := xml.Unmarshal(data, &mf); err != nil {
+		log.Warn("parsing modules.xml", "err", err)
+		return
+	}
+
+	// Group bytes by script, preserving modules.xml order.
+	type scriptDef struct {
+		script string
+		bytes  []uint8
+	}
+	var byScript []scriptDef
+	seen := make(map[string]int)
+	for _, m := range mf.Modules {
+		if m.Script == "gamestore/gamestore.lua" {
+			continue
+		}
+		idx, ok := seen[m.Script]
+		if !ok {
+			idx = len(byScript)
+			seen[m.Script] = idx
+			byScript = append(byScript, scriptDef{script: m.Script})
+		}
+		byScript[idx].bytes = append(byScript[idx].bytes, uint8(m.Byte))
+	}
+
+	for _, sd := range byScript {
+		p := filepath.Join(coreData, "modules", "scripts", sd.script)
+		if _, err := os.Stat(p); err != nil {
+			log.Warn("module script missing", "script", sd.script, "err", err)
+			continue
+		}
+		if err := lengine.DoFile(p); err != nil {
+			log.Warn("loading module script", "script", sd.script, "err", err)
+			continue
+		}
+		lengine.CaptureOnRecvbyteFor(sd.bytes)
+	}
+}
+
 // resolveMonsterLoot resolves loot entries declared by name (e.g. "gold coin")
 // to item ids using the item catalog, mirroring the name lookup the C++ loot
 // loader performs. Entries with an explicit id are left as-is.
@@ -1204,8 +1275,11 @@ func jobHandler(_ *db.DB, log *slog.Logger) db.JobHandler {
 
 // notifyNpcsAround fires onAppear/onDisappear on every NPC that can see the
 // creature. C++ delivers these through the spectator list the same way
-// (Npc::onCreatureAppear / onCreatureDisappear); the NPC itself is skipped so it
-// does not greet its own arrival.
+// (Npc::onCreatureAppear / onCreatureDisappear), and the placed creature is
+// itself a spectator of its own tile — the hireling NPC binds its Lua `hireling`
+// local from its own onAppear (getHirelingByPosition at its own position), so
+// skipping the self fired nothing and every later onSay crashed on a nil
+// hireling (data-otservbr-global/npc/hireling.lua:626).
 func notifyNpcsAround(world *game.World, lengine *luaengine.Engine, c game.Creature, appearing bool) {
 	if lengine == nil || c == nil {
 		return
@@ -1213,7 +1287,7 @@ func notifyNpcsAround(world *game.World, lengine *luaengine.Engine, c game.Creat
 	pos := c.GetPosition()
 	for _, other := range world.Creatures() {
 		npc, ok := other.(*game.Npc)
-		if !ok || game.Creature(npc) == c {
+		if !ok {
 			continue
 		}
 		// Spectator range, so a distant NPC is not woken for someone it cannot see.

@@ -15,7 +15,7 @@ func TestTeleportLibLoads(t *testing.T) {
 	e := New(game.NewWorld(), nil)
 	defer e.Close()
 
-	if err := e.DoFile(filepath.Join("..", "..", "..", "data", "libs", "functions", "teleport.lua")); err != nil {
+	if err := e.DoFile(filepath.Join("..", "..", "data", "libs", "functions", "teleport.lua")); err != nil {
 		t.Fatalf("teleport.lua: %v", err)
 	}
 	if err := e.DoString(`

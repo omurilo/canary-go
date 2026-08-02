@@ -1,6 +1,7 @@
 package luaengine
 
 import (
+	"context"
 	"strings"
 
 	"github.com/omurilo/canary-go/internal/config"
@@ -594,8 +595,45 @@ func (e *Engine) gameCreateNpc(L *lua.LState) int {
 	return 1
 }
 
-func (e *Engine) gameGenerateNpc(L *lua.LState) int { return 0 }
-func (e *Engine) gameCreateTile(L *lua.LState) int  { return 0 }
+// gameGenerateNpc is luaGameGenerateNpc (game_functions.cpp:654) — Npc::createNpc:
+// look up the npc type by name and build the Npc, but do NOT place it or add it
+// to the world (that is Game.createNpc, above). Hirelings use this after
+// createHirelingType so the lamp spawn (hireling.lua:323) gets a live creature.
+// Returns nil when no such npc type exists, mirroring the C++ nullptr path.
+func (e *Engine) gameGenerateNpc(L *lua.LState) int {
+	name := L.CheckString(1)
+
+	var nType *creatures.NpcType
+	if e.world != nil {
+		if e.world.TypeRegistry != nil {
+			nType = e.world.TypeRegistry.Npcs[strings.ToLower(name)]
+			if nType == nil {
+				nType = e.world.TypeRegistry.Npcs[name]
+			}
+		}
+		if nType == nil && e.world.Monsters != nil {
+			nType = e.world.Monsters.Npcs[strings.ToLower(name)]
+			if nType == nil {
+				nType = e.world.Monsters.Npcs[name]
+			}
+		}
+	}
+	if nType == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	id := uint32(1)
+	if e.world != nil {
+		id = e.world.GenerateCreatureID()
+	}
+	npc := game.NewNpc(id, name, nType)
+	if !e.pushCreatureAs(L, npc, "Npc") {
+		L.Push(lua.LNil)
+	}
+	return 1
+}
+func (e *Engine) gameCreateTile(L *lua.LState) int { return 0 }
 func (e *Engine) gameCreateBestiaryCharm(L *lua.LState) int {
 	mt := L.GetTypeMetatable("BestiaryCharm")
 	ud := L.NewUserData()
@@ -624,7 +662,50 @@ func (e *Engine) gameGetClientVersion(L *lua.LState) int  { return 0 }
 func (e *Engine) gameReload(L *lua.LState) int            { return 0 }
 func (e *Engine) gameHasDistanceEffect(L *lua.LState) int { return 0 }
 func (e *Engine) gameHasEffect(L *lua.LState) int         { return 0 }
-func (e *Engine) gameGetOfflinePlayer(L *lua.LState) int  { return 0 }
+
+// gameGetOfflinePlayer is luaGameGetOfflinePlayer (game_functions.cpp:816):
+// return the player by id or name, falling back to a DB load when offline.
+// Hirelings use it for checkHouseAccess / hasSkill when the owner is not online.
+func (e *Engine) gameGetOfflinePlayer(L *lua.LState) int {
+	arg := L.Get(1)
+	var p *game.Player
+	switch arg.Type() {
+	case lua.LTNumber:
+		id := uint32(lua.LVAsNumber(arg))
+		if e.world != nil {
+			if c := e.world.CreatureByID(id); c != nil {
+				if pl, ok := c.(*game.Player); ok {
+					p = pl
+				}
+			}
+		}
+		if p == nil && e.database != nil {
+			if loaded, err := e.database.LoadPlayerByGUID(context.Background(), id); err == nil {
+				p = loaded
+			}
+		}
+	case lua.LTString:
+		name := lua.LVAsString(arg)
+		if e.world != nil {
+			if c := e.world.CreatureByName(name); c != nil {
+				if pl, ok := c.(*game.Player); ok {
+					p = pl
+				}
+			}
+		}
+		if p == nil && e.database != nil {
+			if loaded, err := e.database.LoadPlayer(context.Background(), name); err == nil {
+				p = loaded
+			}
+		}
+	}
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	e.pushPlayerUserdata(p)
+	return 1
+}
 func (e *Engine) gameGetNormalizedPlayerName(L *lua.LState) int {
 	name := L.CheckString(1)
 	if name == "" {

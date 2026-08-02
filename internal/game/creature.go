@@ -16,6 +16,7 @@ type Creature interface {
 	GetDirection() Direction
 	SetDirection(dir Direction)
 	GetOutfit() Outfit
+	SetOutfit(outfit Outfit)
 	GetLightLevel() uint8
 	GetLightColor() uint8
 	GetSpeed() uint16
@@ -83,6 +84,7 @@ func (c *BaseCreature) SetPosition(pos Position)   { c.Pos = pos }
 func (c *BaseCreature) GetDirection() Direction    { return c.Direction }
 func (c *BaseCreature) SetDirection(dir Direction) { c.Direction = dir }
 func (c *BaseCreature) GetOutfit() Outfit          { return c.Outfit }
+func (c *BaseCreature) SetOutfit(outfit Outfit)    { c.Outfit = outfit }
 func (c *BaseCreature) GetLightLevel() uint8       { return c.LightLevel }
 func (c *BaseCreature) GetLightColor() uint8       { return c.LightColor }
 func (c *BaseCreature) GetSpeed() uint16           { return c.Speed }

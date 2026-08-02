@@ -5,7 +5,8 @@ import (
 	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
-// sendModalWindow sends a modal dialog to the client (opcode 0x7D).
+// sendModalWindow sends a modal dialog to the client (opcode 0xFA). The client
+// answers on 0xF9 (inModalWindowAnswer).
 func (g *GameProtocol) sendModalWindow(modal *game.ModalWindow) {
 	if g.player == nil {
 		return
@@ -13,7 +14,7 @@ func (g *GameProtocol) sendModalWindow(modal *game.ModalWindow) {
 	g.player.AddModalWindow(modal.ID)
 
 	w := netmsg.NewWriter()
-	w.AddByte(0x7D)
+	w.AddByte(0xFA)
 	w.AddU32(modal.ID)
 	w.AddString(modal.Title)
 	w.AddString(modal.Message)

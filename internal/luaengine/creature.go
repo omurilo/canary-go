@@ -64,9 +64,17 @@ func (e *Engine) creatureConstructorCall(L *lua.LState, kind string) int {
 			c = v
 		}
 	case lua.LTNumber:
+		id := uint32(lua.LVAsNumber(arg))
 		if e.world != nil {
-			if cr := e.world.CreatureByID(uint32(lua.LVAsNumber(arg))); cr != nil {
+			if cr := e.world.CreatureByID(id); cr != nil {
 				c = cr
+			} else if kind == "Player" {
+				// C++ getPlayerByGUID fallback (player_functions.cpp:626): the
+				// hireling's owner is stored by DB guid, not creature id, so
+				// Player(ownerGuid) must resolve the online player by DBID too.
+				if p := e.world.PlayerByDBID(id); p != nil {
+					c = p
+				}
 			}
 		}
 	case lua.LTString:
@@ -210,6 +218,7 @@ func (e *Engine) registerCreatureType() {
 	e.L.SetField(mt, "getTile", e.L.NewFunction(e.creatureGettile))
 	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
 	e.L.SetField(mt, "getZoneType", e.L.NewFunction(e.creatureGetzonetype))
+	e.L.SetField(mt, "setOutfit", e.L.NewFunction(e.creatureSetoutfit))
 	e.L.SetField(mt, "__index", mt)
 }
 
@@ -283,7 +292,6 @@ var creatureMethods = map[string]lua.LGFunction{
 	"getSkull":           creatureGetskull,
 	"setSkull":           creatureSetskull,
 	"getOutfit":          creatureGetoutfit,
-	"setOutfit":          creatureSetoutfit,
 	"getCondition":       creatureGetcondition,
 	"addCondition":       creatureAddcondition,
 	"removeCondition":    creatureRemovecondition,
@@ -769,9 +777,11 @@ func (e *Engine) creatureRemove(L *lua.LState) int {
 		} else {
 			if e.world != nil {
 				id := c.GetID()
-				game.GlobalDispatcher.AddEvent(0, func() {
-					e.world.RemoveCreature(id)
-				})
+				// Goroutine, not the GlobalDispatcher: a synchronous dispatcher task
+				// that blocks on world state stalls the loop, and the return-to-lamp
+				// removal (hireling.lua npc:remove) never ran — the hireling stayed
+				// spawned until a server restart.
+				go e.world.RemoveCreature(id)
 			}
 		}
 	}
@@ -849,10 +859,51 @@ func creatureSetmaxhealth(L *lua.LState) int {
 
 func creatureSetmovelocked(L *lua.LState) int { return 0 }
 
-func creatureSetoutfit(L *lua.LState) int {
-	// Outfit mutation isn't exposed through the interface yet; accept the call.
+// creatureSetoutfit is luaCreatureSetOutfit (creature_functions.cpp:728):
+// set the creature's default outfit and broadcast the change. It was a no-op,
+// so the hireling's outfit window selection updated nothing on the client.
+func (e *Engine) creatureSetoutfit(L *lua.LState) int {
+	c := getCreature(L, 1)
+	if c == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	outfit := tableToOutfit(L, 2)
+	c.SetOutfit(outfit)
+	if e.world != nil && e.world.OnCreatureOutfitChange != nil {
+		e.world.OnCreatureOutfitChange(c)
+	}
 	L.Push(lua.LTrue)
 	return 1
+}
+
+// tableToOutfit reads a { lookType, lookHead, ... } table into a game.Outfit,
+// the reverse of outfitToTable.
+func tableToOutfit(L *lua.LState, n int) game.Outfit {
+	t := L.Get(n)
+	var o game.Outfit
+	if tbl, ok := t.(*lua.LTable); ok {
+		num := func(key string) uint16 {
+			v := L.GetField(tbl, key)
+			if v.Type() == lua.LTNumber {
+				return uint16(lua.LVAsNumber(v))
+			}
+			return 0
+		}
+		o.LookType = num("lookType")
+		o.LookTypeEx = num("lookTypeEx")
+		o.Head = uint8(num("lookHead"))
+		o.Body = uint8(num("lookBody"))
+		o.Legs = uint8(num("lookLegs"))
+		o.Feet = uint8(num("lookFeet"))
+		o.Addons = uint8(num("lookAddons"))
+		o.LookMount = num("lookMount")
+		o.MountHead = uint8(num("lookMountHead"))
+		o.MountBody = uint8(num("lookMountBody"))
+		o.MountLegs = uint8(num("lookMountLegs"))
+		o.MountFeet = uint8(num("lookMountFeet"))
+	}
+	return o
 }
 
 func creatureSetshader(L *lua.LState) int { return 0 }

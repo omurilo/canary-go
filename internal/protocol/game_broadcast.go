@@ -173,6 +173,17 @@ func BroadcastCreatureAppear(w *game.World, c game.Creature) {
 	}
 }
 
+// BroadcastCreatureOutfit tells spectators a creature's appearance changed
+// (creature:setOutfit → internalCreatureChangeOutfit). Without it the hireling
+// outfit change updated the server-side looktype but the client never saw it.
+func BroadcastCreatureOutfit(w *game.World, c game.Creature) {
+	for _, s := range w.Spectators(c.GetPosition(), c.GetID()) {
+		if gp, ok := s.Session.(*GameProtocol); ok {
+			gp.SendCreatureOutfit(c, c.GetOutfit())
+		}
+	}
+}
+
 // BroadcastCreatureRemove tells spectators a creature was removed. oldStackPos
 // holds the per-spectator stack index captured while it was still on the tile.
 func BroadcastCreatureRemove(w *game.World, c game.Creature, oldStackPos map[uint32]int) {

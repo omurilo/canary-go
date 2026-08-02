@@ -37,35 +37,8 @@ func (d *DB) LoadPlayerHirelings(ctx context.Context, p *game.Player) error {
 	return rows.Err()
 }
 
-// SavePlayerHirelings persists all hirelings for a player.
-func (d *DB) SavePlayerHirelings(ctx context.Context, p *game.Player) error {
-	if p == nil {
-		return nil
-	}
-	tx, err := d.SQL.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// Delete existing and re-insert.
-	if _, err := tx.ExecContext(ctx, `DELETE FROM player_hirelings WHERE player_id = ?`, p.DBID); err != nil {
-		return err
-	}
-	for _, h := range p.Hirelings {
-		active := 0
-		if h.Active {
-			active = 1
-		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO player_hirelings (player_id, name, active, sex, posx, posy, posz,
-			 lookbody, lookfeet, lookhead, looklegs, looktype)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			h.PlayerID, h.Name, active, h.Sex,
-			int32(h.Pos.X), int32(h.Pos.Y), int32(h.Pos.Z),
-			h.LookBody, h.LookFeet, h.LookHead, h.LookLegs, h.LookType); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
-}
+// There is no Go-side save for player_hirelings: the Lua hireling system owns
+// that table (PersistHireling INSERT / SaveHirelings UPDATE), and the C++ spec
+// never writes it from a player save. A DELETE-and-reinsert here wiped rows the
+// Lua added mid-session, so do not reintroduce one — see the note at the
+// SavePlayer subsystem loop (db/player.go).

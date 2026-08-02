@@ -56,10 +56,14 @@ type World struct {
 	// before the removal (Map::moveCreature, src/map/map.cpp:739-747); reconstructing
 	// a single index afterwards is wrong for every spectator whose view differs, and
 	// races with concurrent edits to the tile.
-	OnCreatureMove    func(c Creature, oldPos Position, newPos Position, oldStackPos map[uint32]int)
-	OnCreatureAppear  func(c Creature)
-	OnCreatureRemove  func(c Creature, oldStackPos map[uint32]int)
-	OnGhostModeChange func(p *Player)
+	OnCreatureMove   func(c Creature, oldPos Position, newPos Position, oldStackPos map[uint32]int)
+	OnCreatureAppear func(c Creature)
+	OnCreatureRemove func(c Creature, oldStackPos map[uint32]int)
+	// OnCreatureOutfitChange fires when a creature's outfit is changed by a script
+	// (creature:setOutfit → internalCreatureChangeOutfit in C++). The hook
+	// broadcasts the new appearance to spectators.
+	OnCreatureOutfitChange func(c Creature)
+	OnGhostModeChange      func(p *Player)
 
 	// CaptureStackPositions is populated by the protocol layer. It is always called
 	// with w.mu already held, so its implementation must not take the lock again.

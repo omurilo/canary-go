@@ -157,6 +157,19 @@ func (g *GameProtocol) parseSetOutfit(r *netmsg.Reader) {
 		return
 	}
 
+	// C++ runs the recvbyte module first and skips the normal change if the
+	// module consumed the packet (protocolgame.cpp:2431-2434). The hireling
+	// outfit helper intercepts this opcode while the player is changing a
+	// hireling's outfit; rewind r so the normal path reads the same bytes when
+	// no module handled it.
+	if g.deps != nil && g.deps.Lua != nil {
+		data := r.GetBytes(r.Remaining())
+		if g.deps.Lua.DispatchModulePacket(p, 0xD3, data) {
+			return
+		}
+		r = netmsg.NewReader(data)
+	}
+
 	outfitType := r.GetByte()
 	lookType := r.GetU16()
 	lookHead := uint8(minInt(132, int(r.GetByte())))

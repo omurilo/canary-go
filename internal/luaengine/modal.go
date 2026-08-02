@@ -30,7 +30,16 @@ func (e *Engine) registerModalWindowType() {
 		"setDefaultEscapeButton": e.modalWindowSetDefaultEscapeButton,
 		"setDefaultEnterButton":  e.modalWindowSetDefaultEnterButton,
 		"setPriority":            e.modalWindowSetPriority,
+		"sendToPlayer":           e.modalWindowSendToPlayer,
 	}
+	// Userdata type metatable: the constructor attaches
+	// GetTypeMetatable("ModalWindow") to instances, so without this table
+	// method calls fail with "attempt to index a non-table object(userdata)".
+	// setClassConstructor only adds the _ClassCtor sugar and expects this to
+	// already exist (see town.go/container.go for the full pattern).
+	mt := e.L.NewTypeMetatable(modalWindowTypeName)
+	e.L.SetFuncs(mt, methods)
+	e.L.SetField(mt, "__index", mt)
 	e.setClassConstructor("ModalWindow", e.modalWindowConstructor, methods)
 }
 
@@ -111,6 +120,31 @@ func (e *Engine) modalWindowSetPriority(L *lua.LState) int {
 	}
 	mw.Priority = L.CheckBool(2)
 	return 0
+}
+
+// modalWindowSendToPlayer sends this modal window to a player. ModalWindow is
+// luaModalWindowSendToPlayer (modal_window_functions.cpp:234).
+//
+// C++ also skips the send when the player already has the window open
+// (hasModalWindowOpen); the port does not track open windows, so that guard is
+// omitted here.
+// Lua: modalWindow:sendToPlayer(player)
+func (e *Engine) modalWindowSendToPlayer(L *lua.LState) int {
+	mw := checkModalWindow(L)
+	if mw == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	p := checkPlayerArg(L, 2) // modalWindow:sendToPlayer(player) → player is arg 2
+	if p == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	if session, ok := p.Session.(interface{ SendModalWindow(modal *game.ModalWindow) }); ok {
+		session.SendModalWindow(mw)
+	}
+	L.Push(lua.LTrue)
+	return 1
 }
 
 // playerSendModalWindow sends a modal window to a player.

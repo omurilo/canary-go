@@ -38,6 +38,10 @@ func (e *Engine) registerNpc() {
 	e.L.SetField(mt, "getParent", e.L.NewFunction(e.creatureGetparent))
 	e.L.SetField(mt, "getTile", e.L.NewFunction(e.creatureGettile))
 	e.L.SetField(mt, "remove", e.L.NewFunction(e.creatureRemove))
+	e.L.SetField(mt, "place", e.L.NewFunction(e.npcPlace))
+	e.L.SetField(mt, "openShopWindowTable", e.L.NewFunction(e.npcOpenshopwindowtable))
+	e.L.SetField(mt, "turn", e.L.NewFunction(e.npcTurn))
+	e.L.SetField(mt, "turnToCreature", e.L.NewFunction(e.npcTurntocreature))
 	e.L.SetField(mt, "__index", mt)
 }
 
@@ -70,24 +74,42 @@ var npcMethods = map[string]lua.LGFunction{
 	// getId/getName/move are inherited from creatureMethods (which are now
 	// implemented); don't shadow them with stubs here.
 	"setName":                    npcSetname,
-	"place":                      npcPlace,
 	"say":                        npcSay,
-	"turnToCreature":             npcTurntocreature,
 	"setPlayerInteraction":       npcSetplayerinteraction,
 	"removePlayerInteraction":    npcRemoveplayerinteraction,
 	"isInteractingWithPlayer":    npcIsinteractingwithplayer,
 	"isInTalkRange":              npcIsintalkrange,
 	"isPlayerInteractingOnTopic": npcIsplayerinteractingontopic,
 	"openShopWindow":             npcOpenshopwindow,
-	"openShopWindowTable":        npcOpenshopwindowtable,
 	"closeShopWindow":            npcCloseshopwindow,
 	"getShopItem":                npcGetshopitem,
-	"turn":                       npcTurn,
 	"follow":                     npcFollow,
 	"getDistanceTo":              npcGetdistanceto,
 }
 
-func npcCloseshopwindow(L *lua.LState) int { return 0 }
+// npcCloseshopwindow is luaNpcCloseShopWindow (npc_functions.cpp:437): close the
+// shop only when the player's open shop belongs to this npc. Was a no-op, so the
+// hireling's shop stayed open and could not be swapped for another category.
+func npcCloseshopwindow(L *lua.LState) int {
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	p, _ := L.CheckUserData(2).Value.(*game.Player)
+	if p == nil {
+		return 0
+	}
+	if p.ShopOwnerID == n.ID {
+		// Player::closeShopWindow (player.cpp:2877): drop the per-player shop
+		// entry so a subsequent openShopWindow is not treated as a no-op, then
+		// tell the client the window is gone.
+		n.RemoveShopPlayer(p.DBID)
+		p.ShopOwnerID = 0
+		p.SendCloseShop()
+	}
+	L.Push(lua.LTrue)
+	return 1
+}
 
 func npcFollow(L *lua.LState) int {
 	L.Push(lua.LTrue)
@@ -255,7 +277,12 @@ func (e *Engine) npcOpenshopwindow(L *lua.LState) int {
 	return 0
 }
 
-func npcOpenshopwindowtable(L *lua.LState) int {
+// npcOpenshopwindowtable is luaNpcOpenShopWindowTable (npc_functions.cpp:400).
+// The shop entry fields are clientId/itemName — the C++ reads clientId and
+// falls back to Item::items[id].name. This used to read id/itemId/name, so every
+// shop table (including the hireling's potions/equipment lists) yielded ID 0
+// and the window opened empty.
+func (e *Engine) npcOpenshopwindowtable(L *lua.LState) int {
 	n := checkNpc(L)
 	if n == nil {
 		return 0
@@ -272,7 +299,9 @@ func npcOpenshopwindowtable(L *lua.LState) int {
 		if innerTbl, ok := val.(*lua.LTable); ok {
 			var si creatures.ShopItem
 
-			if idVal := innerTbl.RawGetString("id"); idVal.Type() == lua.LTNumber {
+			if idVal := innerTbl.RawGetString("clientId"); idVal.Type() == lua.LTNumber {
+				si.ID = uint16(lua.LVAsNumber(idVal))
+			} else if idVal := innerTbl.RawGetString("id"); idVal.Type() == lua.LTNumber {
 				si.ID = uint16(lua.LVAsNumber(idVal))
 			} else if idVal := innerTbl.RawGetString("itemId"); idVal.Type() == lua.LTNumber {
 				si.ID = uint16(lua.LVAsNumber(idVal))
@@ -286,13 +315,32 @@ func npcOpenshopwindowtable(L *lua.LState) int {
 				si.SellPrice = uint32(lua.LVAsNumber(sellVal))
 			}
 
-			if nameVal := innerTbl.RawGetString("name"); nameVal.Type() == lua.LTString {
+			if nameVal := innerTbl.RawGetString("itemName"); nameVal.Type() == lua.LTString {
+				si.Name = lua.LVAsString(nameVal)
+			} else if nameVal := innerTbl.RawGetString("name"); nameVal.Type() == lua.LTString {
 				si.Name = lua.LVAsString(nameVal)
 			}
 
-			// SubType check if we support it
+			// subType / subtype, then the catalog name fallback (Item::items[id].name).
 			if subTypeVal := innerTbl.RawGetString("subType"); subTypeVal.Type() == lua.LTNumber {
 				si.SubType = uint8(lua.LVAsNumber(subTypeVal))
+			} else if subTypeVal := innerTbl.RawGetString("subtype"); subTypeVal.Type() == lua.LTNumber {
+				si.SubType = uint8(lua.LVAsNumber(subTypeVal))
+			}
+
+			if storageKeyVal := innerTbl.RawGetString("storageKey"); storageKeyVal.Type() == lua.LTNumber {
+				si.StorageKey = int32(lua.LVAsNumber(storageKeyVal))
+			}
+			if storageValueVal := innerTbl.RawGetString("storageValue"); storageValueVal.Type() == lua.LTNumber {
+				si.StorageValue = int32(lua.LVAsNumber(storageValueVal))
+			}
+
+			if si.Name == "" {
+				var catalog *items.Catalog
+				if e.world != nil {
+					catalog = e.world.Items
+				}
+				si.Name = itemDisplayName(catalog, si.ID)
 			}
 
 			if si.ID != 0 {
@@ -300,6 +348,15 @@ func npcOpenshopwindowtable(L *lua.LState) int {
 			}
 		}
 	})
+
+	// luaNpcOpenShopWindowTable closes the current window first (npc_functions.cpp
+	// :428): without it the "already in shop" guard in openShopWindow treats a
+	// category switch as a no-op and the client keeps the stale list.
+	if p.ShopOwnerID != 0 {
+		n.RemoveShopPlayer(p.DBID)
+		p.ShopOwnerID = 0
+		p.SendCloseShop()
+	}
 
 	// The script-supplied list becomes this player's shop, which is exactly what
 	// openShopWindowTable is for — a quest NPC selling one player something it
@@ -310,8 +367,33 @@ func npcOpenshopwindowtable(L *lua.LState) int {
 	return 1
 }
 
-func npcPlace(L *lua.LState) int {
-	L.Push(lua.LTrue)
+// npcPlace is luaNpcPlace (npc_functions.cpp:182): Game::placeCreature for this
+// npc at position, returning the npc on success and nil on failure. The C++
+// queryAdd chain is thinner in this port's tile model, so the check is "the
+// tile exists" rather than the full walkability chain; the hireling lamp spawn
+// (hireling.lua:328) and dynamic npc placement both go through here.
+func (e *Engine) npcPlace(L *lua.LState) int {
+	n := checkNpc(L)
+	if n == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+	pos, ok := parsePosition(L, 2)
+	if !ok {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	if e.world == nil || e.world.Map == nil || e.world.Map.GetTile(pos) == nil {
+		L.Push(lua.LNil)
+		return 1
+	}
+
+	n.SetPosition(pos)
+	e.world.AddCreature(n)
+	if !e.pushCreatureAs(L, n, "Npc") {
+		L.Push(lua.LNil)
+	}
 	return 1
 }
 
@@ -476,19 +558,45 @@ func npcSetspeechbubble(L *lua.LState) int {
 	return 0
 }
 
-func npcTurn(L *lua.LState) int { return 0 }
+// npcTurn is luaNpcTurn (npc_functions.cpp): face the npc in a direction and
+// broadcast the change. It was a no-op, so NPCs never turned on the client.
+func (e *Engine) npcTurn(L *lua.LState) int {
+	n := checkNpc(L)
+	if n == nil {
+		return 0
+	}
+	dir := game.Direction(uint8(L.CheckInt(2)))
+	if n.GetDirection() != dir {
+		n.SetDirection(dir)
+		if e.world != nil && e.world.OnCreatureTurn != nil {
+			e.world.OnCreatureTurn(n)
+		}
+	}
+	return 0
+}
 
-func npcTurntocreature(L *lua.LState) int {
+// npcTurntocreature is luaNpcTurnToCreature (npc_functions.cpp:196): face the
+// npc toward a creature and broadcast it. The turn was applied server-side but
+// never sent, so the hireling stayed facing north when the player talked to it.
+func (e *Engine) npcTurntocreature(L *lua.LState) int {
 	n := checkNpc(L)
 	if n == nil {
 		return 0
 	}
 	ud := L.CheckUserData(2)
-	if c, ok := ud.Value.(game.Creature); ok {
-		game.GlobalDispatcher.AddEvent(0, func() {
-			n.TurnToCreature(c)
-		})
+	c, ok := ud.Value.(game.Creature)
+	if !ok {
+		return 0
 	}
+	// Goroutine, not the GlobalDispatcher (which stalls on blocked tasks and left
+	// the hireling never turning toward the player).
+	go func() {
+		old := n.GetDirection()
+		n.TurnToCreature(c)
+		if n.GetDirection() != old && e.world != nil && e.world.OnCreatureTurn != nil {
+			e.world.OnCreatureTurn(n)
+		}
+	}()
 	return 0
 }
 
@@ -775,9 +883,13 @@ func (e *Engine) dispatchNpcCreatureCallback(key string, npc *game.Npc, c game.C
 	if npc == nil || c == nil {
 		return
 	}
-	game.GlobalDispatcher.AddEvent(0, func() {
-		e.execNpcCreatureCallback(key, npc, c)
-	})
+	// Run on its own goroutine, not the GlobalDispatcher. The dispatcher executes
+	// tasks synchronously on one loop (dispatcher_wdrr.go:84), and this callback
+	// blocks on e.mu — which the main goroutine holds during the Lua call that
+	// placed the creature. A wait that outlives the call stalls the dispatcher
+	// permanently, so the next onAppear and every RemoveCreature never run (the
+	// hireling both failed to bind on lamp spawn AND stayed after return-to-lamp).
+	go e.execNpcCreatureCallback(key, npc, c)
 }
 
 func (e *Engine) execNpcCreatureCallback(key string, npc *game.Npc, c game.Creature) bool {

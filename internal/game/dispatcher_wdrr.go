@@ -77,6 +77,12 @@ func (d *WDRRDispatcher) executeTask(lane Lane, task *TaskMeta) {
 		if r := recover(); r != nil {
 			slog.Error("dispatcher task panicked", "lane", LaneNames[lane], "taskID", task.ID, "panic", r)
 		}
+		// A task that takes longer than half a second stalls the whole loop (the
+		// dispatcher is single-threaded). The hireling onAppear/RemoveCreature were
+		// silently dropped this way, so surface slow tasks rather than masking them.
+		if dur := time.Since(start); dur > 500*time.Millisecond {
+			slog.Warn("dispatcher task slow", "lane", LaneNames[lane], "taskID", task.ID, "duration", dur.String())
+		}
 		d.telemetry.record(start)
 		d.budgets.reportLatency(time.Since(start))
 	}()

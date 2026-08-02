@@ -405,6 +405,16 @@ func (e *Engine) RunStartupGlobalEvents() {
 	}
 }
 
+// RunShutdownGlobalEvents runs all registered GlobalEvent onShutdown callbacks.
+// Called from main.go when the server shuts down. The hireling save lives on
+// onShutdown (hireling_save.lua) — without this the active flag and position of
+// spawned hirelings were never persisted, so a restart left them lamped.
+func (e *Engine) RunShutdownGlobalEvents() {
+	if e.GlobalEvents != nil {
+		e.GlobalEvents.ExecuteShutdown()
+	}
+}
+
 // RunRecordGlobalEvent fires record-type events with the actual current and
 // old player-count values. Called from the game loop when the player count
 // changes.

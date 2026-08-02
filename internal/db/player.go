@@ -15,7 +15,18 @@ import (
 // LoadPlayer loads a character by name into a game.Player. The town temple is
 // used when the stored position is (0,0,0).
 func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) {
-	const q = `SELECT p.id, p.account_id, a.type as account_type, a.coins, a.coins_transferable, a.tournament_coins, p.group_id, p.name, p.level, p.vocation, p.sex,
+	return d.loadPlayer(ctx, "p.name = ?", name)
+}
+
+// LoadPlayerByGUID loads a player by database id (guid). Game.getOfflinePlayer
+// uses it to bring an offline owner back for hireling checks (checkHouseAccess,
+// hasSkill); C++ is getPlayerByGUID(id, true).
+func (d *DB) LoadPlayerByGUID(ctx context.Context, guid uint32) (*game.Player, error) {
+	return d.loadPlayer(ctx, "p.id = ?", guid)
+}
+
+func (d *DB) loadPlayer(ctx context.Context, where string, arg any) (*game.Player, error) {
+	q := `SELECT p.id, p.account_id, a.type as account_type, a.coins, a.coins_transferable, a.tournament_coins, p.group_id, p.name, p.level, p.vocation, p.sex,
 	                  p.health, p.healthmax, p.mana, p.manamax, p.experience,
 	                  p.maglevel, p.manaspent, p.soul, p.cap, p.balance,
 	                  p.skull, p.skulltime, p.conditions,
@@ -42,7 +53,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	                  p.lastlogin, p.lastlogout,
 	                  p.blessings1, p.blessings2, p.blessings3, p.blessings4,
 	                  p.blessings5, p.blessings6, p.blessings7, p.blessings8
-	           FROM players p JOIN accounts a ON a.id = p.account_id WHERE p.name = ? LIMIT 1`
+	           FROM players p JOIN accounts a ON a.id = p.account_id WHERE ` + where + ` LIMIT 1`
 
 	p := &game.Player{}
 	var townID int
@@ -53,7 +64,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 	var offlineTimeSeconds int32
 	var taskPoints uint32
 	var quickLootFallback bool
-	err := d.SQL.QueryRowContext(ctx, q, name).Scan(
+	err := d.SQL.QueryRowContext(ctx, q, arg).Scan(
 		&p.DBID, &p.AccountID, &p.AccountType, &p.CoinBalance, &p.CoinTransferable, &p.TournamentBalance, &p.GroupID, &p.Name, &p.Level, &p.Vocation, &p.Sex,
 		&p.Health, &p.MaxHealth, &p.Mana, &p.MaxMana, &p.Experience,
 		&p.MagLevel, &p.ManaSpent, &p.Soul, &capValue, &p.BankBalance,
@@ -194,6 +205,7 @@ func (d *DB) LoadPlayer(ctx context.Context, name string) (*game.Player, error) 
 		{"hazard", d.LoadPlayerHazard},
 		{"concoctions", d.LoadPlayerConcoctions},
 		{"hirelings", d.LoadPlayerHirelings},
+		{"kv", d.LoadPlayerKV},
 		{"animus_mastery", d.LoadPlayerAnimusMastery},
 		{"weapon_proficiency", d.LoadPlayerWeaponProficiency},
 		{"mounts", d.LoadPlayerMounts},
@@ -459,8 +471,17 @@ func (d *DB) SavePlayer(ctx context.Context, p *game.Player) error {
 		{"familiars", d.SavePlayerFamiliars},
 		{"hazard", d.SavePlayerHazard},
 		{"concoctions", d.SavePlayerConcoctions},
-		{"hirelings", d.SavePlayerHirelings},
+		// player_hirelings is owned by the Lua hireling system: hireling.lua
+		// INSERTs on creation (PersistHireling), UPDATEs on server save
+		// (SaveHirelings → Hireling:save), and the C++ spec has no player
+		// hireling save of its own (the only C++ touch is a COUNT for the
+		// cyclopedia, player_cyclopedia.cpp:29). SavePlayerHirelings' DELETE +
+		// re-insert from p.Hirelings — a slice loaded at LOGIN that never sees
+		// hirelings bought mid-session — wiped them on logout. Leave the table
+		// to Lua; keep LoadPlayerHirelings so p.Hirelings still serves
+		// GetHirelingCount for the inspect window.
 		{"animus_mastery", d.SavePlayerAnimusMastery},
+		{"kv", d.SavePlayerKV},
 		{"weapon_proficiency", d.SavePlayerWeaponProficiency},
 		{"mounts", d.SavePlayerMounts},
 		{"outfits", d.SavePlayerOutfits},
