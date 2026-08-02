@@ -40,22 +40,34 @@ little under 100% is normal; near zero is the signal.
 
 ### Current state
 
-| class | methods | decisions (C++ → Go) | reachable |
+| class | methods | decisions (C++ → Go) | unreachable |
 |---|---|---|---|
-| `Monster` | 101/101 | 574 → 630 | 68/102 |
-| `Npc` | 43/43 | 121 → 133 | 30/43 |
-| `House` | 29/29 | 96 → 92 | 12/29 |
-| `Decay` | 4/4 | 46 → 38 | 3/4 |
-| `SpawnMonster` | 15/15 | 54 → 59 | 7/15 |
+| `Monster` | 101/101 | 574 → 621 | 3 (+3) |
+| `Npc` | 43/43 | 121 → 142 | 0 |
+| `House` | 29/29 | 96 → 93 | 1 |
+| `Decay` | 4/4 | 46 → 38 | 0 |
+| `SpawnMonster` | 15/15 | 54 → 60 | 0 (+3) |
 
-The decision ratios say the logic survived translation. The reachable column is
-the open work: **73 ported methods still have no caller**, mostly in the house
-flow and the NPC shop, because the protocol layer still reaches past them to the
-older code paths. Porting the behaviour and wiring the callers are two jobs and
-only the first is finished.
+The parenthesised figure is methods that have no caller in the **C++** source
+either — porting one and leaving it unreachable is 1:1, not a gap. Each is
+listed with a reason in `DEAD_OK` at the top of `semantic-parity.sh` and is
+re-checkable with a grep.
+
+Down from 73 unreachable. Wiring them was not mechanical: most had no caller
+because the behaviour they belong to was missing, and finding that out is what
+the measurement is for. It turned up, among others, that no monster in the game
+could be poisoned (only `Player` satisfied the condition interface, so the
+combat adapter's type assertion failed silently), that every monster walked at
+exactly one tile per second regardless of its speed, that a fire-*resistant*
+monster would have been *healed* by fire, and that the NPC shop priced every
+purchase off the type's list because the per-player registry was never filled.
+
+The four still unreachable need subsystems that do not exist yet: magic fields
+(`canWalkOnFieldType`, `isIgnoringFieldDamage`), the composed damage message
+(`checkCanApplyCharm`), and player-to-player trade (`executeTransfer`).
 
 Broader counts from `parity.sh`: 152 → 140 inbound opcodes dispatched, 159 → 112
-outbound, 1225 → 988 Lua class methods, 35 of 48 schema tables referenced from
+outbound, 1225 → 990 Lua class methods, 35 of 48 schema tables referenced from
 code. Lua enum parity is closed and pinned by `TestRegisteredEnumsMatchUpstream`.
 
 ## What works end to end
@@ -157,11 +169,11 @@ The datapack tests load real monster and NPC files from
 
 ## What is next
 
-1. **Wire the 73 unreachable methods.** The behaviour is ported and tested; the
-   callers still take the old paths.
-2. **Measure the classes nobody has looked at.** `Monster`, `Npc`, `House`,
+1. **Measure the classes nobody has looked at.** `Monster`, `Npc`, `House`,
    `Decay` and `SpawnMonster` are covered. Point `behaviour_coverage` at another
    class in `scripts/parity.sh` and its gap becomes visible.
+2. **The subsystems the last four unreachable methods are waiting on:** magic
+   fields, the composed damage message, and player-to-player trade.
 3. **Concurrency model.** The dispatcher exists with its lanes transcribed, but
    the protocol layer still mutates players directly from the connection
    goroutine under an ad-hoc mutex rather than enqueueing onto a lane.
