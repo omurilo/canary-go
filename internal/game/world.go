@@ -466,10 +466,37 @@ func (w *World) CreatureByID(id uint32) Creature {
 
 // AddCreature adds a non-player creature to the world.
 func (w *World) AddCreature(c Creature) {
+	w.addCreature(c, false)
+}
+
+// AddCreatureAtStartup is Game::internalPlaceCreature with sendToSpectators
+// false, the branch SpawnMonster::spawnMonster takes when startup is set
+// (spawn_monster.cpp:216): "no need to send out events to the surrounding since
+// there is no one out there to listen".
+//
+// The startup flag was threaded as far as ScheduleSpawn and then dropped, so
+// booting the world broadcast an appear for all 1655 monsters to nobody.
+func (w *World) AddCreatureAtStartup(c Creature) {
+	w.addCreature(c, true)
+}
+
+func (w *World) addCreature(c Creature, startup bool) {
 	w.mu.Lock()
 	w.creatures[c.GetID()] = c
 	w.addCreatureToTile(c)
 	w.mu.Unlock()
+	if startup {
+		// The creature is still notified about ITSELF — Monster::onCreatureAppear
+		// builds its target list from that, and skipping it would leave every
+		// boot-placed monster blind until its first sweep.
+		switch self := c.(type) {
+		case *Monster:
+			self.OnCreatureAppear(w, self)
+		case *Npc:
+			self.OnPlacedCreature(w)
+		}
+		return
+	}
 	w.notifyCreatureAppear(c)
 	if w.OnCreatureAppear != nil {
 		w.OnCreatureAppear(c)

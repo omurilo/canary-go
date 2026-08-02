@@ -296,7 +296,7 @@ func (e *SpawnEngine) findPlayerNear(pos Position) bool {
 	return false
 }
 
-func (e *SpawnEngine) spawnCreatureInBlock(block *SpawnBlock, id uint32, sb *spawnBlock, mType *creatures.MonsterType, now time.Time) Creature {
+func (e *SpawnEngine) spawnCreatureInBlock(block *SpawnBlock, id uint32, sb *spawnBlock, mType *creatures.MonsterType, now time.Time, startup bool) Creature {
 	pos := sb.pos
 	if block.radius > 0 {
 		pos = e.randomSpawnPos(block.centerPos, block.radius)
@@ -310,7 +310,11 @@ func (e *SpawnEngine) spawnCreatureInBlock(block *SpawnBlock, id uint32, sb *spa
 	monster.SetPosition(pos)
 	monster.SetDirection(sb.direction)
 
-	e.world.AddCreature(monster)
+	if startup {
+		e.world.AddCreatureAtStartup(monster)
+	} else {
+		e.world.AddCreature(monster)
+	}
 
 	sb.lastSpawn = now
 	e.mu.Lock()

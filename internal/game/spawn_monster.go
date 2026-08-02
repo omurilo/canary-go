@@ -84,9 +84,19 @@ func (b *SpawnBlock) FindPlayer(w *World, pos Position) bool {
 func (b *SpawnBlock) CheckSpawnMonster(w *World, now time.Time) {
 	b.Cleanup(now)
 
-	b.stateMu.Lock()
-	defer b.stateMu.Unlock()
+	// Upstream is single-threaded and walks the map while acting on it. Here the
+	// due slots are collected under stateMu and acted on after it is released,
+	// because spawnMonster takes the same lock — the alternative is a
+	// lock-holding call chain that reaches the dispatcher.
+	type due struct {
+		id        uint32
+		sb        *spawnBlock
+		mType     *creatures.MonsterType
+		blockable bool
+	}
+	var ready []due
 
+	b.stateMu.Lock()
 	for id, sb := range b.blocks {
 		if _, alive := b.spawned[id]; alive {
 			continue
@@ -105,12 +115,16 @@ func (b *SpawnBlock) CheckSpawnMonster(w *World, now time.Time) {
 		if !sb.lastSpawn.IsZero() && now.Before(sb.lastSpawn.Add(sb.interval)) {
 			continue
 		}
+		ready = append(ready, due{id: id, sb: sb, mType: mType, blockable: mType.Flags.IsBlockable})
+	}
+	b.stateMu.Unlock()
 
-		if mType.Flags.IsBlockable {
-			b.spawnMonsterLocked(w, id, sb, mType, now)
+	for _, d := range ready {
+		if d.blockable {
+			b.SpawnMonster(w, d.id, d.sb, d.mType, false)
 			continue
 		}
-		b.ScheduleSpawn(w, id, sb, mType, 3*nonBlockableInterval, false)
+		b.ScheduleSpawn(w, d.id, d.sb, d.mType, 3*nonBlockableInterval, false)
 	}
 }
 
@@ -121,9 +135,7 @@ func (b *SpawnBlock) CheckSpawnMonster(w *World, now time.Time) {
 // makes a non-blockable monster visibly materialise instead of blinking in.
 func (b *SpawnBlock) ScheduleSpawn(w *World, id uint32, sb *spawnBlock, mType *creatures.MonsterType, interval time.Duration, startup bool) {
 	if interval <= 0 {
-		b.stateMu.Lock()
-		b.spawnMonsterLocked(w, id, sb, mType, time.Now())
-		b.stateMu.Unlock()
+		b.SpawnMonster(w, id, sb, mType, startup)
 		return
 	}
 	if w != nil && w.OnMagicEffect != nil {
@@ -135,10 +147,14 @@ func (b *SpawnBlock) ScheduleSpawn(w *World, id uint32, sb *spawnBlock, mType *c
 }
 
 // SpawnMonster is SpawnMonster::spawnMonster (spawn_monster.cpp:211).
+//
+// Both callers used to reach past it into spawnMonsterLocked, which is how the
+// startup flag came to be threaded through checkSpawnMonster and scheduleSpawn
+// and then dropped on the floor at the last step.
 func (b *SpawnBlock) SpawnMonster(w *World, id uint32, sb *spawnBlock, mType *creatures.MonsterType, startup bool) bool {
 	b.stateMu.Lock()
 	defer b.stateMu.Unlock()
-	return b.spawnMonsterLocked(w, id, sb, mType, time.Now())
+	return b.spawnMonsterLocked(w, id, sb, mType, time.Now(), startup)
 }
 
 // spawnMonsterLocked is the body of spawnMonster, with stateMu already held.
@@ -146,11 +162,11 @@ func (b *SpawnBlock) SpawnMonster(w *World, id uint32, sb *spawnBlock, mType *cr
 // The slot check is repeated here and not only in the caller: ScheduleSpawn
 // takes 4.2 seconds to run down, and the slot can be filled in the meantime by
 // a script or a reload.
-func (b *SpawnBlock) spawnMonsterLocked(w *World, id uint32, sb *spawnBlock, mType *creatures.MonsterType, now time.Time) bool {
+func (b *SpawnBlock) spawnMonsterLocked(w *World, id uint32, sb *spawnBlock, mType *creatures.MonsterType, now time.Time, startup bool) bool {
 	if _, alive := b.spawned[id]; alive {
 		return false
 	}
-	creature := b.engine.spawnCreatureInBlock(b, id, sb, mType, now)
+	creature := b.engine.spawnCreatureInBlock(b, id, sb, mType, now, startup)
 	if creature == nil {
 		return false
 	}
