@@ -182,6 +182,7 @@ head_ "Behaviour coverage (methods with a Go counterpart)"
 # covered by the synchronous path.
 SKIP_METHODS='
 Monster createMonster getMonster setID addList removeList
+Npc createNpc getNpc getLowerName setSpawnNpc
 getName setName getTypeName getNameDescription setNameDescription getDescription
 getType getMasterPos setMasterPos getRaceId getRace getMonsterType
 isDead setDead getIdleStatus isTargetNearby israndomStepping
@@ -248,5 +249,6 @@ behaviour_coverage() { # cpp-file  go-dir  class
 }
 
 behaviour_coverage "creatures/monsters/monster.cpp" "internal/game" "Monster"
+behaviour_coverage "creatures/npcs/npc.cpp" "internal/game" "Npc"
 
 echo

@@ -19,7 +19,7 @@ func TestRandomStepRadiusZeroDoesNotWalk(t *testing.T) {
 	e := &NpcEngine{world: NewWorld()}
 	npc := newTestNpc(&creatures.NpcType{WalkRadius: 0, WalkInterval: 1000}, Position{X: 100, Y: 100, Z: 7})
 
-	if _, ok := e.randomStep(npc); ok {
+	if _, ok := npc.GetRandomStep(e.world); ok {
 		t.Error("an NPC with walkRadius 0 must not step")
 	}
 }
@@ -64,7 +64,7 @@ func TestThinkWalkPausedWhileInteracting(t *testing.T) {
 
 	npc.walkTicks = 900
 	npc.SetPlayerInteraction(42, 0)
-	e.thinkWalk(npc, 500)
+	npc.OnThinkWalk(e.world, 500)
 
 	if npc.walkTicks != 0 {
 		t.Errorf("walkTicks should reset while interacting, got %d", npc.walkTicks)
@@ -77,17 +77,17 @@ func TestThinkWalkAccumulatesInterval(t *testing.T) {
 	nt := &creatures.NpcType{WalkRadius: 2, WalkInterval: 1000}
 	npc := newTestNpc(nt, Position{X: 100, Y: 100, Z: 7})
 
-	e.thinkWalk(npc, 400)
+	npc.OnThinkWalk(e.world, 400)
 	if npc.walkTicks != 400 {
 		t.Fatalf("expected 400 ticks, got %d", npc.walkTicks)
 	}
-	e.thinkWalk(npc, 400)
+	npc.OnThinkWalk(e.world, 400)
 	if npc.walkTicks != 800 {
 		t.Fatalf("expected 800 ticks, got %d", npc.walkTicks)
 	}
 	// Crossing the interval resets the counter. There is no map here so the step
 	// itself fails, but the timer must still have rolled over.
-	e.thinkWalk(npc, 400)
+	npc.OnThinkWalk(e.world, 400)
 	if npc.walkTicks != 0 {
 		t.Errorf("expected the counter to reset at the interval, got %d", npc.walkTicks)
 	}
@@ -98,7 +98,7 @@ func TestThinkWalkDisabledByZeroInterval(t *testing.T) {
 	e := &NpcEngine{world: NewWorld()}
 	npc := newTestNpc(&creatures.NpcType{WalkRadius: 5, WalkInterval: 0}, Position{X: 100, Y: 100, Z: 7})
 
-	e.thinkWalk(npc, 5000)
+	npc.OnThinkWalk(e.world, 5000)
 	if npc.walkTicks != 0 {
 		t.Errorf("walkTicks must stay 0 when walking is disabled, got %d", npc.walkTicks)
 	}
@@ -106,10 +106,8 @@ func TestThinkWalkDisabledByZeroInterval(t *testing.T) {
 
 func TestThinkYellFiresAtInterval(t *testing.T) {
 	var said []string
-	e := &NpcEngine{
-		world: NewWorld(),
-		Say:   func(_ *Npc, _ byte, text string) { said = append(said, text) },
-	}
+	e := &NpcEngine{world: NewWorld()}
+	e.world.OnCreatureSay = func(_ Creature, _ byte, text string) { said = append(said, text) }
 	nt := &creatures.NpcType{
 		YellInterval: 1000,
 		YellChance:   100, // always
@@ -117,11 +115,11 @@ func TestThinkYellFiresAtInterval(t *testing.T) {
 	}
 	npc := newTestNpc(nt, Position{X: 100, Y: 100, Z: 7})
 
-	e.thinkYell(npc, 500)
+	npc.OnThinkYell(e.world, 500)
 	if len(said) != 0 {
 		t.Fatalf("should not yell before the interval, got %v", said)
 	}
-	e.thinkYell(npc, 500)
+	npc.OnThinkYell(e.world, 500)
 	if len(said) != 1 || said[0] != "hello" {
 		t.Fatalf("expected one yell of %q, got %v", "hello", said)
 	}
@@ -134,10 +132,8 @@ func TestThinkYellFiresAtInterval(t *testing.T) {
 // accumulate forever.
 func TestThinkYellZeroChanceNeverSpeaks(t *testing.T) {
 	var said []string
-	e := &NpcEngine{
-		world: NewWorld(),
-		Say:   func(_ *Npc, _ byte, text string) { said = append(said, text) },
-	}
+	e := &NpcEngine{world: NewWorld()}
+	e.world.OnCreatureSay = func(_ Creature, _ byte, text string) { said = append(said, text) }
 	nt := &creatures.NpcType{
 		YellInterval: 1000,
 		YellChance:   0,
@@ -146,7 +142,7 @@ func TestThinkYellZeroChanceNeverSpeaks(t *testing.T) {
 	npc := newTestNpc(nt, Position{X: 100, Y: 100, Z: 7})
 
 	for i := 0; i < 20; i++ {
-		e.thinkYell(npc, 1000)
+		npc.OnThinkYell(e.world, 1000)
 	}
 	if len(said) != 0 {
 		t.Errorf("chance 0 must never yell, got %v", said)
@@ -156,10 +152,8 @@ func TestThinkYellZeroChanceNeverSpeaks(t *testing.T) {
 // A voice marked yell goes out as TALKTYPE_YELL, otherwise TALKTYPE_SAY.
 func TestThinkYellTalkType(t *testing.T) {
 	var types []byte
-	e := &NpcEngine{
-		world: NewWorld(),
-		Say:   func(_ *Npc, talkType byte, _ string) { types = append(types, talkType) },
-	}
+	e := &NpcEngine{world: NewWorld()}
+	e.world.OnCreatureSay = func(_ Creature, talkType byte, _ string) { types = append(types, talkType) }
 	nt := &creatures.NpcType{
 		YellInterval: 1000,
 		YellChance:   100,
@@ -167,7 +161,7 @@ func TestThinkYellTalkType(t *testing.T) {
 	}
 	npc := newTestNpc(nt, Position{X: 100, Y: 100, Z: 7})
 
-	e.thinkYell(npc, 1000)
+	npc.OnThinkYell(e.world, 1000)
 	if len(types) != 1 || types[0] != talkTypeYell {
 		t.Errorf("expected TALKTYPE_YELL (%d), got %v", talkTypeYell, types)
 	}
@@ -175,13 +169,11 @@ func TestThinkYellTalkType(t *testing.T) {
 
 func TestThinkYellDisabledWithoutVoices(t *testing.T) {
 	var said []string
-	e := &NpcEngine{
-		world: NewWorld(),
-		Say:   func(_ *Npc, _ byte, text string) { said = append(said, text) },
-	}
+	e := &NpcEngine{world: NewWorld()}
+	e.world.OnCreatureSay = func(_ Creature, _ byte, text string) { said = append(said, text) }
 	npc := newTestNpc(&creatures.NpcType{YellInterval: 1000, YellChance: 100}, Position{X: 1, Y: 1, Z: 7})
 
-	e.thinkYell(npc, 5000)
+	npc.OnThinkYell(e.world, 5000)
 	if len(said) != 0 {
 		t.Errorf("no voices means no yelling, got %v", said)
 	}

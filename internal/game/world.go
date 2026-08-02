@@ -119,6 +119,14 @@ type World struct {
 	OnCreatureSay    func(speaker Creature, talkType byte, text string)
 	// OnSoundEffect is Game::sendSingleSoundEffect.
 	OnSoundEffect func(pos Position, sound uint16)
+	// The Npc:: hooks: the script callbacks the datapack attaches, plus the shop
+	// window close that Npc::closeAllShopWindows drives.
+	OnNpcCreatureSay  func(n *Npc, speaker Creature, talkType byte, text string)
+	OnNpcCloseChannel func(n *Npc, p *Player)
+	OnCloseShopWindow func(p *Player)
+	OnNpcBuyItem      func(n *Npc, p *Player, itemID uint16, subType uint8, amount uint16, ignore, inBackpacks bool, totalCost uint64)
+	OnNpcSellItem     func(n *Npc, p *Player, itemID uint16, subType uint8, amount uint32, ignore bool, totalPrice uint64)
+	OnNpcCheckItem    func(n *Npc, p *Player, itemID uint16, subType uint8)
 	// The Monster:: script callbacks the datapack attaches through
 	// monsterType:eventType. Each is the send half of one Monster::on* handler.
 	OnMonsterCreatureSay      func(m *Monster, speaker Creature, talkType byte, text string)

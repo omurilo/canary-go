@@ -18,9 +18,25 @@ type Npc struct {
 	// matching Npc::isInSpawnRange against masterPos.
 	MasterPos Position
 
-	// Tick accumulators for onThinkWalk and onThinkYell.
-	walkTicks uint32
-	yellTicks uint32
+	// Tick accumulators for onThinkWalk, onThinkYell and onThinkSound.
+	walkTicks  uint32
+	yellTicks  uint32
+	soundTicks uint32
+
+	// spectators is the set of players who can currently see this NPC. Npc::onThink
+	// runs yell, walk and sound only while it is non-empty, and manageIdle takes the
+	// NPC off the check list when it empties.
+	spectators map[uint32]*Player
+	idle       bool
+
+	// interactionOrder is playerInteractionsOrder: the order conversations were
+	// started in. handlePlayerMove turns the NPC to follow only the most recent
+	// one, so it does not swivel at every passer-by.
+	interactionOrder []uint32
+
+	// shopPlayers is the per-player shop list a script may install with
+	// npc:addShopPlayer. A player with no entry sees the type's own list.
+	shopPlayers map[uint32][]creatures.ShopItem
 }
 
 // SetPlayerInteraction marks playerID as interacting with the NPC at the given
@@ -29,12 +45,36 @@ func (n *Npc) SetPlayerInteraction(playerID uint32, topic int) {
 	if n.interactions == nil {
 		n.interactions = make(map[uint32]int)
 	}
+	if _, existing := n.interactions[playerID]; !existing {
+		n.interactionOrder = append(n.interactionOrder, playerID)
+	}
 	n.interactions[playerID] = topic
 }
 
 // RemovePlayerInteraction ends playerID's conversation with the NPC.
 func (n *Npc) RemovePlayerInteraction(playerID uint32) {
 	delete(n.interactions, playerID)
+	for i, id := range n.interactionOrder {
+		if id == playerID {
+			n.interactionOrder = append(n.interactionOrder[:i], n.interactionOrder[i+1:]...)
+			break
+		}
+	}
+}
+
+// lastInteraction is playerInteractionsOrder.back(): the player this NPC is
+// currently facing.
+func (n *Npc) lastInteraction() (uint32, bool) {
+	if len(n.interactionOrder) == 0 {
+		return 0, false
+	}
+	return n.interactionOrder[len(n.interactionOrder)-1], true
+}
+
+// IsPlayerInteractingOnTopic is Npc::isPlayerInteractingOnTopic (npc.cpp:565).
+func (n *Npc) IsPlayerInteractingOnTopic(playerID uint32, topic int) bool {
+	t, ok := n.interactions[playerID]
+	return ok && t == topic
 }
 
 // IsInteractingWithPlayer reports whether playerID is mid-conversation.

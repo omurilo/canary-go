@@ -25,9 +25,6 @@ type NpcEngine struct {
 	// Lua engine, following the same indirection as World.OnCreatureSay so the
 	// game package does not import luaengine.
 	OnNpcThink func(npc *Npc, interval uint32)
-
-	// Say emits creature speech; wired to World.OnCreatureSay.
-	Say func(npc *Npc, talkType byte, text string)
 }
 
 // Talk types used by onThinkYell (TALKTYPE_SAY / TALKTYPE_YELL).
@@ -61,7 +58,9 @@ func (e *NpcEngine) tick() {
 	}
 }
 
-// thinkNpc ports Npc::onThink (npc.cpp:707).
+// thinkNpc runs one NPC.s think tick. The script callback is the engine.s to
+// make — it is the only part of Npc::onThink that needs the Lua bridge — and
+// everything after it is Npc::OnThink.
 func (e *NpcEngine) thinkNpc(npc *Npc, interval uint32) {
 	if npc == nil {
 		return
@@ -71,28 +70,40 @@ func (e *NpcEngine) thinkNpc(npc *Npc, interval uint32) {
 	if e.OnNpcThink != nil {
 		e.OnNpcThink(npc, interval)
 	}
+	npc.OnThink(e.world, interval)
+}
 
-	// Teleport home when the NPC has drifted out of its spawn range, resetting
-	// conversations — Npc::onThink does this via internalTeleport +
-	// resetPlayerInteractions.
+// OnThink is Npc::onThink (npc.cpp:707), minus the script callback the engine
+// fires for it.
+func (npc *Npc) OnThink(w *World, interval uint32) {
+	// Who can see the NPC is recomputed here rather than maintained from
+	// spectator events, because the port has no creature-movement hook to drive
+	// OnPlayerAppear/OnPlayerDisappear from yet. The resulting set is the same.
+	npc.LoadPlayerSpectators(w)
+
+	// Teleport home when the NPC has drifted out of its spawn range. Upstream
+	// also closes every open shop window here: a trade window survives the
+	// teleport otherwise, and the player keeps buying from across the map.
 	if !npc.isInSpawnRange(npc.GetPosition()) {
 		npc.SetPosition(npc.MasterPos)
 		npc.resetPlayerInteractions()
+		npc.CloseAllShopWindows(w)
 	}
 
 	// Yell, walk and sound only run while a player can see the NPC
 	// (`if (!playerSpectators.empty())`). Skipping it when nobody is watching is
 	// both upstream behaviour and what keeps this loop cheap on a full map.
-	if !e.hasPlayerSpectator(npc) {
+	if npc.IsIdle() {
 		return
 	}
 
-	e.thinkYell(npc, interval)
-	e.thinkWalk(npc, interval)
+	npc.OnThinkYell(w, interval)
+	npc.OnThinkWalk(w, interval)
+	npc.OnThinkSound(w, interval)
 }
 
-// thinkYell ports Npc::onThinkYell (npc.cpp:1046).
-func (e *NpcEngine) thinkYell(npc *Npc, interval uint32) {
+// OnThinkYell is Npc::onThinkYell (npc.cpp:1046).
+func (npc *Npc) OnThinkYell(w *World, interval uint32) {
 	if npc.Type == nil || npc.Type.YellInterval == 0 || len(npc.Type.Voices) == 0 {
 		return
 	}
@@ -113,13 +124,13 @@ func (e *NpcEngine) thinkYell(npc *Npc, interval uint32) {
 	if voice.Yell {
 		talkType = talkTypeYell
 	}
-	if e.Say != nil {
-		e.Say(npc, talkType, voice.Text)
+	if w != nil && w.OnCreatureSay != nil {
+		w.OnCreatureSay(npc, talkType, voice.Text)
 	}
 }
 
-// thinkWalk ports Npc::onThinkWalk (npc.cpp:1068).
-func (e *NpcEngine) thinkWalk(npc *Npc, interval uint32) {
+// OnThinkWalk is Npc::onThinkWalk (npc.cpp:1068).
+func (npc *Npc) OnThinkWalk(w *World, interval uint32) {
 	if npc.Type == nil || npc.Type.WalkInterval == 0 || npc.Speed == 0 {
 		return
 	}
@@ -137,15 +148,16 @@ func (e *NpcEngine) thinkWalk(npc *Npc, interval uint32) {
 	}
 	npc.walkTicks = 0
 
-	if dir, ok := e.randomStep(npc); ok {
-		e.world.TryMoveCreature(npc, dir)
+	if dir, ok := npc.GetRandomStep(w); ok {
+		w.TryMoveCreature(npc, dir)
+		npc.OnCreatureWalk()
 	}
 }
 
 // randomStep ports Npc::getRandomStep (npc.cpp:1207) together with the checks in
 // Npc::canWalkTo (npc.cpp:1177): shuffle the four cardinal directions and take the
 // first the NPC may enter.
-func (e *NpcEngine) randomStep(npc *Npc) (Direction, bool) {
+func (npc *Npc) GetRandomStep(w *World) (Direction, bool) {
 	// canWalkTo returns false outright when walkRadius is 0 — that means "does not
 	// walk", not "walks anywhere".
 	if npc.Type == nil || npc.Type.WalkRadius == 0 {
@@ -161,13 +173,13 @@ func (e *NpcEngine) randomStep(npc *Npc) (Direction, bool) {
 		if !npc.isInSpawnRange(dest) {
 			continue
 		}
-		tile := e.world.Map.GetTile(dest)
-		if tile == nil || !tile.WalkableFor(npc, e.world.Items, e.world.WorldType) {
+		tile := w.Map.GetTile(dest)
+		if tile == nil || !tile.WalkableFor(npc, w.Items, w.WorldType) {
 			continue
 		}
 		// !floorChange && (TILESTATE_FLOORCHANGE || teleport) blocks the step, so an
 		// NPC without the flag never wanders onto stairs or a teleport.
-		if !npc.Type.FloorChange && e.isFloorChangeTile(tile) {
+		if !npc.Type.FloorChange && w.isFloorChangeTile(tile) {
 			continue
 		}
 		return dir, true
@@ -179,17 +191,17 @@ func (e *NpcEngine) randomStep(npc *Npc) (Direction, bool) {
 // using the same ItemType.FloorChange signal as resolveFloorChangeDest. Go does not
 // map TILESTATE_FLOORCHANGE off the raw OTBM tile flags yet, so this reads the
 // items instead.
-func (e *NpcEngine) isFloorChangeTile(tile *Tile) bool {
-	if tile == nil || e.world.Items == nil {
+func (w *World) isFloorChangeTile(tile *Tile) bool {
+	if tile == nil || w.Items == nil {
 		return false
 	}
 	if tile.Ground != nil {
-		if ct := e.world.Items.Get(tile.Ground.ID); ct != nil && ct.FloorChange != "" {
+		if ct := w.Items.Get(tile.Ground.ID); ct != nil && ct.FloorChange != "" {
 			return true
 		}
 	}
 	for _, it := range tile.Items {
-		if ct := e.world.Items.Get(it.ID); ct != nil && ct.FloorChange != "" {
+		if ct := w.Items.Get(it.ID); ct != nil && ct.FloorChange != "" {
 			return true
 		}
 	}
@@ -244,4 +256,51 @@ func absInt(v int) int {
 		return -v
 	}
 	return v
+}
+
+// OnThinkSound is Npc::onThinkSound (npc.cpp:691), the audio counterpart of
+// onThinkYell. It shares nothing with the yell timer: an NPC can be silent and
+// still make ambient noise, and both counters run independently.
+func (npc *Npc) OnThinkSound(w *World, interval uint32) {
+	if npc.Type == nil || npc.Type.SoundSpeedTicks == 0 {
+		return
+	}
+	npc.soundTicks += interval
+	if npc.soundTicks < npc.Type.SoundSpeedTicks {
+		return
+	}
+	npc.soundTicks = 0
+
+	if len(npc.Type.Sounds) == 0 || npc.Type.SoundChance < uint32(rand.Intn(100)+1) {
+		return
+	}
+	if w != nil && w.OnSoundEffect != nil {
+		w.OnSoundEffect(npc.GetPosition(), npc.Type.Sounds[rand.Intn(len(npc.Type.Sounds))])
+	}
+}
+
+// CanWalkTo is Npc::canWalkTo (npc.cpp:1177), the per-tile test getRandomStep
+// runs. Kept as its own method because the shop and script layers ask it too.
+func (npc *Npc) CanWalkTo(w *World, from Position, dir Direction) bool {
+	if w == nil || npc.Type == nil {
+		return false
+	}
+	dest := from.Offset(dir)
+	if !npc.isInSpawnRange(dest) {
+		return false
+	}
+	tile := w.Map.GetTile(dest)
+	if tile == nil || !tile.WalkableFor(npc, w.Items, w.WorldType) {
+		return false
+	}
+	return npc.Type.FloorChange || !w.isFloorChangeTile(tile)
+}
+
+// GetNextStep is Npc::getNextStep (npc.cpp:1203). An NPC has no target to
+// follow, so its only source of movement is the wander step.
+func (npc *Npc) GetNextStep(w *World) (Direction, bool) {
+	if npc.IsIdle() {
+		return DirNorth, false
+	}
+	return npc.GetRandomStep(w)
 }
