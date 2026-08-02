@@ -1,128 +1,345 @@
-# canary-go — Handoff / Migration Status
+# Handoff
 
-A Go port of the **Canary** C++ Tibia 13.x MMORPG server. Goal: reach feature
-parity with the C++ server (`../src`), one subsystem at a time, validated against
-the official BattlEye client.
+For whoever picks this up next — human or model. Read this before touching
+anything; section 1 is the part that will save you the most time.
 
-- **Repo:** `./canary-go` (nested git repo; module `github.com/omurilo/canary-go`, Go 1.25). Work branch `dudantas/item-mechanics`.
-- **C++ reference:** `../src` (~130k LOC). Go so far: ~26k LOC (`internal/`). **The C++ is the spec** — when porting, find the function in `../src` and mirror it (rules AND wire bytes).
-- **Datapacks:** core Lua in `../data`; live content in `../data-otservbr-global` (map/monsters/npcs/spells). Items: `../data/items/{items.xml,appearances.dat}`.
-- **DB:** MariaDB (host port 3307). Schema = repo-root `schema.sql` (canonical Canary schema).
-
-Build/test (must stay green): `cd canary-go && go build ./... && go test ./...`
-Run (Docker): `docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build canary-go`. The user usually runs the server themselves — you mostly just keep build+tests green and they recompile.
+Last updated after the reachability work landed (`d5fa474`).
 
 ---
 
-## 1. Current state — the working vertical slice
+## 1. The rules that are not negotiable
 
-A player can, **end-to-end against the real client**: log in → walk/turn/auto-walk →
-change floors via stairs/ramps/holes/teleports → chat → talk to NPCs (dialogue,
-shop buy/sell, bank, travel, become a citizen) → manage inventory & containers →
-buy/sell moving real items + gold → deposit/withdraw → eat food (regen + "full") →
-fight monsters (melee + basic spells, loot, xp) → die and respawn at their town
-temple → form a party (invite/join/shields/shared-exp toggle). GM/GOD chars are
-untargetable by monsters.
+**`../src` is the specification.** Never modify it. Every divergence found so
+far has turned out to be a silent bug — not one has turned out to be an
+improvement. When Go cannot express something 1:1, write the reason in a comment
+next to the code rather than leaving it for the next person to rediscover.
 
-This is the "essential playability" milestone. Everything below the line is what
-separates that from full parity.
+**Do not trust prose, including this file.** The two parity scripts re-derive
+every number on each run. If this document and `scripts/semantic-parity.sh`
+disagree, the script is right and this file is stale. That rule exists because
+the previous version of this document had three headline numbers that were wrong
+by the time someone acted on them.
 
-**Scale check:** C++ `creatures/` ≈ 43k LOC, `lua/` ≈ 37k, `game/` ≈ 16k. The Lua
-`player_functions.cpp` alone is 5,600 lines. The Go Lua layer has **414 stubbed
-methods** (`grep -rn "not modelled yet\|safe default\|TODO: implement" internal/luaengine`).
-So the port is roughly "core loop done, long tail of systems remaining."
+**Commit only inside `canary-go/`, and stage only files you touched.** The
+repository owner runs parallel work in the same tree — `docs/MIGRATION-STATE.md`
+is theirs. `git add -A` from the repo root will sweep it up. Push with
+`GIT_SSH_COMMAND=ssh git push`.
 
----
+**Do not stop or drop the MariaDB container on port 3307.** It is shared with
+MyAAC and the login-server.
 
-## 2. C++ → Go migration matrix
+**No Python in this repo.** Tooling goes in bash, or as a Go test.
 
-Legend: ✅ done · 🟡 partial (works but incomplete/simplified) · ❌ not started
-
-| Subsystem | C++ location | Go location | Status | Notes / gaps |
-|---|---|---|---|---|
-| Net framing / crypto (RSA, XTEA, Adler, seq) | `server/network` | `network`, `tibcrypto`, `transport`, `netmsg` | ✅ | Real client connects/authenticates. Bundled headless client's 7172 handshake still fails (pre-encryption challenge framing) — doesn't affect BattlEye. |
-| Login (char list) | `server` | `protocol` (login), `db/auth` | ✅ | 7171 old-style + login-server (8088) by email. |
-| OTBM map | `map`, `io` | `otbm`, `game/map.go` | ✅ | Parses 1.94M tiles, 8 towns, spawns. Stores uid/aid. |
-| Item catalog | `items` | `items` | ✅ | appearances.dat + items.xml merged. Most flags parsed. |
-| Player core (stats/skills/look) | `creatures/players` | `game/player.go` | 🟡 | Stats/level/exp/mana/cap/soul work. Skill **tries** not accumulated; maglevel percent simplified; varStats/wheel bonuses stubbed. |
-| Movement (walk/turn/autowalk/floors) | `game`, `map` | `protocol/game_actions.go`, `game/world.go` | ✅ | Walk pacing (level-scaled speed), stairs (height ramps), floor-change tiles with offsets, teleports. |
-| Inventory / equipment | `creatures/players` | `game/player_inventory.go` | ✅ | Slots, capacity/weight, add/remove/find, stack split. Equip stat bonuses NOT applied. |
-| Containers | `items/containers` | `game/player_containers.go`, `protocol/game_containers.go` | ✅ | Open state unified on Player; real capacity; add/update/remove packets. Pagination (store inbox) minimal. |
-| Money & bank | `game`, `account` | `game/player_money.go`, `luaengine/bank.go` | ✅ | Coins 3031/3035/3043; inventory-first + bank fallback; transfer (online only). |
-| NPC shop / trade | `game`, `creatures/npcs` | `protocol/game_actions.go`, `luaengine/npc*` | ✅ | Buy/sell/close, currency, auto-close on range. Shopping-bags & gold-pouch sell-all not done. |
-| NPC dialogue / travel / set-town | `creatures/npcs` | `luaengine`, datapack npclib | ✅ | keyword handler, delayed say, travel, citizen tiles. |
-| Combat (melee + spell damage) | `creatures/combat` | `game/combat_engine.go`, `game/combat/*` | 🟡 | Melee + spell damage/heal via one hit/death path. **Missing:** PvP rules, damage-split across attackers, full element/absorb/block, crit/leech, condition DoT. |
-| Monsters | `creatures/monsters` | `game/monster.go`, `game/ai_engine.go`, `creatures` | 🟡 | Spawn, aggro/pathfind, melee, loot roll, xp to killer. **Missing:** monster spells/abilities, summons, targeting strategies, threat, exp split. |
-| Spells | `creatures/combat/spells` | `spells`, `luaengine/spell.go` | 🟡 | Instant-spell cast + combat damage. **Missing:** most support/condition spells, runes, conjure, haste (speed), cooldown edge cases. |
-| Conditions | `creatures/combat/condition*` | `game/conditions.go`, `luaengine/condition.go` | 🟡 | Regeneration/food modelled; generic storage for others. **Missing:** DoT (poison/fire/energy), attribute conditions, haste/paralyze **speed**, drunk, light, most icons. |
-| Death / respawn | `creatures` | `game/player_death.go`, `protocol/game_death.go` | 🟡 | Temple respawn + 0x28 relogin window + exp/level loss. **Missing:** per-vocation stat downgrade, skill/mana loss, black-skull vitals, blessings, corpse ownership. |
-| Party | `creatures/players/grouping` | `game/party.go`, `game/world_party.go` | 🟡 | Invite/join/leave/lead/disband/shared-exp/shields. **Missing:** analyzer (loot/supply/dmg), shared-exp level/distance gating. |
-| Vocations | `creatures/players/vocation` | `game/vocations` | 🟡 | Loaded (base speed/attack/gains). **Missing:** per-vocation formulas, skill multipliers, HP/mana/cap per-level gains applied on level-up. |
-| Events: Action / MoveEvent / TalkAction | `lua`, `game` | `actions`, `moveevents`, `talkactions` | 🟡 | Registered & firing (by id/uid/aid). CreatureEvent/GlobalEvent/Zone largely **❌** → most of the ~560 load-time warns. |
-| Persistence (DB) | `io`, `database` | `db` | 🟡 | players core + item blob + accounts/auth + async jobs. **Missing saves:** maglevel, skills+tries, manaspent, conditions, storages, learned spells, blessings, stamina, town; **missing tables:** depot/inbox/stash, player_storage, player_spells, VIP, etc. |
-| Lua API surface | `lua/functions` (~1300 fns) | `luaengine` | 🟡 | Core Creature/Player/Item/Container/Npc/Position/Game/Condition/Combat/MoveEvent/Action/Town/Party done. **414 stubs remain.** |
+**The live datapack is `canary-go/data/`.** Monster and NPC definitions come
+from `../data-otservbr-global/`. The OTBM in the working tree is not the one the
+running server has loaded.
 
 ---
 
-## 3. What's left, roughly prioritized
+## 2. How to know where you are
 
-**A. Deepen the core loop (highest gameplay value)**
-1. **Conditions engine** — DoT (poison/fire/energy/bleed), attribute mods, **haste/paralyze speed** (needs `0x8F` sendChangeSpeed + `ConditionSpeed` formula `min=mina*(var-40)+minb` → `Player.SpeedBonus`, with expiry). Unlocks combat spells, food-buff icon, many scripts.
-2. **Combat completeness** — element/absorb/block/defense, damage split across attackers, PvP rules, crit/leech, monster spells & summons.
-3. **Persistence gaps** — save skills/tries/maglevel/manaspent/conditions/storages/spells; add depot/inbox/stash + player_storage tables. Without this, progression doesn't survive relog.
-4. **Status icons** — `0xA2 sendIcons` (poison/haste/hungry/pz/etc.).
+```bash
+bash scripts/parity.sh            # syntactic: does a counterpart exist?
+bash scripts/semantic-parity.sh   # semantic: is it reachable, and does it decide as much?
+go build ./... && go test ./...
+```
 
-**B. Progression systems (each = model + DB table + protocol packets + Lua bindings)**
-mounts/outfits, blessings, bestiary/bosstiary, imbuement, charms, prey, task hunting,
-achievements/titles, wheel of destiny, familiars, forge, market, store/Tibia coins,
-reward system, depot/stash, hazard, animus mastery, concoctions, houses.
-Each is a full subsystem; the 414 Lua stubs map to these. Do them one at a time,
-each validated in-client.
+`parity.sh` walks the C++ methods of a class and asks whether a Go function of
+that name exists. That can be satisfied by a one-line stub, so it is half an
+answer. Methods that will never have a counterpart are listed in `SKIP_METHODS`
+with a reason, so the denominator stays honest.
 
-**C. Long-tail Lua/events** — CreatureEvent / GlobalEvent / Zone registration
-(kills most of the ~560 load warns), quest catalogs, gamestore modules.
+`semantic-parity.sh` asks the two harder questions:
 
-Suggested order: A1 (conditions/haste) → A2 (combat) → A3 (persistence) → A4 (icons)
-→ then B systems by player demand → C cleanup.
+- **Is it reachable?** A method nothing calls is not parity, it is dead code
+  with the right name.
+- **Does it decide as much?** Branch-point counts are crude but hard to fake. A
+  40-branch C++ function reimplemented in 3 branches did not survive.
 
----
+Both are proxies. A ratio slightly under 100% is normal — Go needs fewer
+branches than C++ for the same logic. Near zero is the signal.
 
-## 4. Architecture (how the layers connect)
+### Current reading
 
-- **`game`** = authoritative world model (World, Map/Tile, Player/Monster/Npc, Item, combat/AI engines, conditions, inventory, party, death). **No wire code.** It notifies clients only through: (a) callback fields on `World` (`OnCreatureMove`, `OnPlayerDeath`, `OnShieldUpdate`, `OnChangeSpeed`, `OnIconsUpdate`, …) wired in `cmd/canary/main.go` to `protocol.*` broadcasters, and (b) the **`game.Session`** interface (implemented by `*protocol.GameProtocol`) for per-player pushes (SendStats, OpenContainer, SendChangeSpeed, SendIcons, …).
-- **`protocol`** = `GameProtocol`, the per-connection codec: parse inbound opcodes (31 handled; see `OnPacket` in `game.go`), encode outbound (~22 opcodes). Implements `game.Session`.
-- **`luaengine`** = gopher-lua VM + the ~1300-fn API as metatables/globals. Most remaining work lives here (bindings) + backing model in `game`.
-- Support: `items` (catalog), `otbm` (map), `creatures` (types), `spells`/`actions`/`moveevents`/`talkactions`/`events` (script registries), `db` (MariaDB), `network`/`netmsg`/`tibcrypto`/`transport` (wire), `appproto` (generated protobuf).
-- Boot: `cmd/canary/main.go` → catalog → OTBM → vocations → datapack Lua → wire `world.On*` callbacks → start services.
+```
+Monster        compared 102  decisions C++ 574   Go 621   108%   thin 3   dead 3 (+3 dead upstream too)
+Npc            compared 43   decisions C++ 121   Go 142   117%   thin 0   dead 0
+House          compared 29   decisions C++ 96    Go 93     96%   thin 0   dead 1
+Decay          compared 4    decisions C++ 46    Go 38     82%   thin 0   dead 0
+SpawnMonster   compared 15   decisions C++ 54    Go 60    111%   thin 1   dead 0 (+3 dead upstream too)
+```
 
----
-
-## 5. Critical invariants (READ before porting — these silently break the game)
-
-1. **revscriptsys metatable contract.** `data/libs/functions/revscriptsys.lua` overwrites the `__index` of Player/Monster/Npc/Item/Container/Teleport with `getmetatable(self)[key]`. So Lua methods for those types MUST be **directly on the metatable** (`SetFuncs(mt, methods); SetField(mt,"__index",mt)`), never in a separate index table. Engine-bound methods (need `e.world`/catalog) go via `SetField(mt, name, e.L.NewFunction(e.method))`.
-2. **Mirror the C++ for anything wire-facing.** Field order/width in packets, tile stack order (ground→on-top→creatures→normal), player-only vocation byte in AddCreature, 0xAA always carries a position (except PRIVATE_PN→NPCs only). Diagnose client crashes by base64-decoding the client's error packet (`echo <b64> | base64 -d | xxd`).
-3. **Keep-alive:** server must send ping `0x1D` every 5 s or the client drops.
-4. **Floor changes resolve BEFORE the walkability check** (target tile often has no ground): height ramps (`Game::internalMoveCreature`) + floor-change tiles with directional offsets (`Tile::queryDestination`). Far teleports must re-send the full map to the moved player's OWN client (`sendFullMapAt`), not just spectators.
-5. **Container open-state** has one source of truth: `game.Player.openContainers` (cid→OpenContainer; `GetContainerID` returns -1 when closed, cid 0 is valid).
-6. **OTBM:** store ATTR_UNIQUE_ID/ACTION_ID; `str()` must un-escape (read n chars via `u8()`).
-7. **StepIn/Action dispatch:** wrap the creature with its concrete metatable (`metatableForCreature`) or `getPlayer()` returns nil; pass items as `luaItem{item,pos}` not raw `*game.Item`; movements are looked up by item id + uid + aid.
-8. **Items:** never hand-encode — use the catalog-aware `protocol.addItem`. Coins are 3031/3035/3043.
-9. **gopher-lua:** `dofile/loadfile` are resilient (log+swallow) and preprocess `\z`; chunks named by file path; `string.gsub` numeric-replacement shim in `registerLuaCompat`.
+`(+N dead upstream too)` counts methods with no caller in the **C++** source
+either. Porting one and leaving it unreachable is 1:1, not a gap. They live in
+`DEAD_OK` at the top of `semantic-parity.sh`, each with a reason, each
+re-checkable with a grep. **Add to that list only after grepping `../src` and
+finding nothing but the declaration and the definition.** It is the one place in
+the tooling where a wrong entry hides real work.
 
 ---
 
-## 6. Testing methodology
+## 3. What is actually left
 
-- Test client = official **CipSoft/BattlEye 13.x** (not OTClient, but `../otclient` is a good protocol reference). It logs `Error while processing network packet ... at position N` + a base64 of the bad packet — decode it to find the exact byte.
-- Prefer a **failing Go test first**: pure helpers were extracted for this (`stairDestination`, `floorChangeDestination`, `InternalAddItem`, `PartyShield`, `CannotBeAttacked`, …). Some behaviors only reproduce with the FULL datapack libs loaded (see `luaengine/food_repro_test.go` loading all of `data/libs`).
-- Loop: `go build ./...` + `go test ./...` green → user recompiles → validate the specific behavior in-client → if "still broken", get the SPECIFIC symptom (state changed? server-log Lua error? just the display?).
+### 3a. The four unreachable methods (each blocked on a missing subsystem)
+
+These are not wiring jobs. Do not try to "reach" them by inventing a call site —
+that is how you get a method that is technically called and behaviourally wrong.
+
+| method | blocked on |
+|---|---|
+| `Monster::canWalkOnFieldType` | magic fields |
+| `Monster::isIgnoringFieldDamage` | magic fields |
+| `Monster::checkCanApplyCharm` | the composed damage message |
+| `House::executeTransfer` | player-to-player trade |
+
+**Magic fields.** No field item anywhere in the port applies damage or a
+condition. `items.ItemTypeMagicField` exists as a type constant and nothing
+reads it. What is needed: a field → `CombatType` mapping, per-tick field damage,
+and the walk guard in `Tile::__queryAdd` (`src/items/tile.cpp:710`). Once that
+exists, `Monster.CanWalkTo` gains the field branch and both methods are reached
+from it. `ignoreFieldDamage` is already set correctly by `Monster.DrainHealth`;
+it just has nobody asking.
+
+**The composed damage message.** `Game::combatChangeHealth`
+(`src/game/game.cpp:8890`) builds the "X loses N hitpoints due to your attack"
+string and appends `" (low blow charm)"` when `checkCanApplyCharm` says so. The
+port sends damage text from the combat engine without composing it. Port the
+message builder and this falls out.
+
+**Player-to-player trade.** `World.PlayerRequestTrade` and `PlayerAcceptTrade`
+are empty function bodies (`internal/game/world.go`). The protocol handlers for
+`0x7D`/`0x7E`/`0x7F`/`0x80` parse and discard. `house:startTrade` already runs
+upstream's full validation chain and stops exactly where `internalStartTrade`
+would be called, performing the reset that upstream performs on failure — so
+once trade exists, that one call site completes the house transfer flow.
+
+### 3b. The four thin methods
+
+Thin means the Go body branches far less than the C++ one. Go and look; some are
+legitimate, some are missing logic.
+
+| method | Go/C++ branches | what to check |
+|---|---|---|
+| `Monster::death` | 6/17 | probably a real reduction — the port splits it across `Death`, `GetCorpse` and `DropLoot`. Confirm before "fixing". |
+| `Monster::onCreatureAppear` | 2/6 | upstream's extra branches are summon/master bookkeeping. |
+| `Monster::onThink` | 2/7 | the port moved the timers into the AI engine. Confirm nothing was dropped in the move. |
+| `SpawnMonster::startup` | 4/11 | genuinely missing: the `RANDOM_MONSTER_SPAWN` block (`spawn_monster.cpp:241`) that merges monster types across spawn blocks. Config-gated, off by default. |
+
+### 3c. Classes nobody has measured
+
+Only five classes have been through `behaviour_coverage`. The big ones have not:
+
+| class | C++ lines |
+|---|---|
+| `Player` | 13232 |
+| `Game` | 13104 |
+| `Item` | 3690 |
+| `Combat` | 2730 |
+| `Creature` | 2239 |
+| `Tile` | 2030 |
+| `Container` | 1387 |
+
+Adding a row is one line at the bottom of `scripts/parity.sh`:
+
+```bash
+behaviour_coverage "creatures/players/player.cpp" "internal/game" "Player"
+```
+
+and the same in `semantic-parity.sh`:
+
+```bash
+report "creatures/players/player.cpp" "Player" "internal/game" "Player"
+```
+
+Expect the first run on `Player` to be ugly. That is the point.
+
+### 3d. Everything else the scripts report
+
+```
+inbound opcodes dispatched     C++ 152   Go 140    92%
+outbound opcodes sent          C++ 159   Go 112    70%
+Lua class methods              C++ 1225  Go 990
+schema tables referenced       48 in schema, 35 referenced
+```
+
+Two `parse*` handlers exist and are never dispatched: `parseBuyBlessing`,
+`parseReportViolation`. Decide per handler whether to wire the opcode or delete
+the dead function — do not wire one by guessing its opcode.
+
+Thirteen tables are never touched from Go: `account_ban_history`,
+`account_bans`, `account_sessions`, `active_livestream_casters`,
+`coins_transactions`, `daily_reward_history`, `forge_history`,
+`global_storage`, `guild_invites`, `guildwar_kills`, `ip_bans`,
+`player_namelocks`, `store_history`. Each is a feature that silently does not
+persist.
+
+Subsystem size ratios (a hint, not a verdict — `decay` sits at 146% and is
+correct):
+
+```
+monster AI     C++ 4013  Go 907   22%
+npc (core)     C++ 1270  Go 736   57%
+house          C++ 1073  Go 730   68%
+spawn          C++  511  Go 381   74%
+map serialize  C++  468  Go 298   63%
+```
 
 ---
 
-## 7. Detailed change history
+## 4. Open bugs from the last runtime log
 
-Living blow-by-blow (every fix, with C++ line references and the reasoning) is in the
-assistant's project memory file `canary-go-migration.md` — ask the user to share it
-when you need the full history. Recent focus (2026-07): the essential-playability
-slice (inventory/containers/money/shop/death/party), then movement (speed, stairs,
-floor-changes), food/regeneration, and the temple/citizen teleport chain.
+`canary.log` in the repo root is a real session. Three things in it are unsolved
+and **none has been diagnosed to the root** — treat the theories below as
+starting points, not conclusions.
+
+**1. Store hireling purchase fails.**
+```
+[parseBuyStoreOffer] - Purchase failed due to an unhandled script error.
+data/libs/gamestore/store.lua:244: bad argument #1 to (anonymous) (userdata expected, got nil)
+```
+Line 244 is `for v in match do`, iterating a `string.gmatch` result inside
+`canUseHirelingName`. "userdata expected" is gopher-lua's `CheckUserData`
+message, which means a Go-registered function is being invoked as the iterator —
+so something in the engine is shadowing `gmatch` or the string metatable.
+Nothing in `internal/luaengine` or the datapack assigns `string.gmatch`, so the
+next step is a focused Go test that runs that exact snippet through
+`luaengine.Engine` and bisects from there.
+
+**2. Modal windows are broken.**
+```
+data/libs/functions/modal_window_helper.lua:192:
+attempt to index a non-table object(userdata) with key 'setPriority'
+```
+The `ModalWindow` userdata reaches Lua without a metatable carrying the methods
+the datapack expects. Same class of failure as (1).
+
+**3. NPCs behaving as bankers.** Reported by the repository owner, **not yet
+investigated**. The suspects, in order, all come from the NPC batch (`598788d`):
+`npc:isPlayerInteractingOnTopic` went from a hardcoded `false` to a real answer,
+which changes which branch every topic-keyed dialogue takes; `npc:setSpeechBubble`
+and `npc:setCurrency` went from no-ops to real writes; and the creature encoder
+now sends the real speech-bubble byte instead of a hardcoded zero.
+`SetSpeechBubble` writes to `n.Type`, shared by every NPC of that name — which
+is what upstream does, but verify it is not being called with a stale type.
+**Start by reverting `npcIsplayerinteractingontopic` to `false` locally and
+seeing whether the behaviour goes away.** That isolates it in one run.
+
+Also in the log, and almost certainly pre-existing: ~45 `[loadLuaMapAction] -
+Wrong item id N found` errors. Map action/unique ids referencing item ids the
+catalog does not have. Worth a pass, low priority.
+
+---
+
+## 5. How to do the work
+
+### Find the C++ first, always
+
+Before writing a line of Go, read the upstream function end to end. Then find
+its **callers** — `grep -rn "\bmethodName(" ../src`. The caller tells you two
+things the definition does not: where the behaviour belongs, and what the
+arguments actually mean at that site. Half the bugs in this port came from
+porting a function correctly and hanging it in the wrong place.
+
+### Traps that have each cost real time here
+
+- **`grep` on this machine respects `.gitignore`.** A module-wide rename
+  silently skipped all of `cmd/canary`, and the verification grep came back
+  clean while the build was broken. Use `find(1)` when completeness matters.
+- **Bash 3.2 on macOS has no associative arrays.** `declare -A` fails.
+- **awk dynamic regex survives two levels of escaping.** `\*` degrades to a bare
+  `*` and awk rejects it. Locate the line with `grep -n` and hand awk a number.
+- **The LSP diagnostics in this repo are frequently stale**, reporting missing
+  methods and impossible type assertions that do not exist. `go build ./...` is
+  the authority. Do not chase LSP errors.
+- **`go vet` has pre-existing failures** (`House` contains a `sync.RWMutex` and
+  is copied in `db/house_xml.go` and `cmd/canary/main.go`). Not yours; do not
+  let them mask a new one.
+- **Many files are already unformatted at HEAD.** Run `gofmt -w` on the specific
+  files you touched, never on a directory — `gofmt -w internal/game/` reformats
+  dozens of files that are not yours and pollutes the diff.
+
+### The comment standard
+
+Comments carry the C++ reference and the *reason*, not a restatement of the
+code. The pattern that has worked:
+
+```go
+// GetAccessList is House::getAccessList (house.cpp:483).
+//
+// The bool is what stops sendHouseWindow opening a window for a list id that
+// does not name a real door — so the check is door existence, NOT whether a
+// list has been written. Keying it on the map (which is what this did) meant a
+// door nobody had set a list on yet could never have one set, because the
+// window refused to open.
+```
+
+Three parts: what it is upstream and where, what the non-obvious bit does, and —
+when fixing something — what the old behaviour was and why it was wrong. That
+last part is what stops the bug being reintroduced.
+
+When something genuinely cannot be ported, say so in place:
+
+```go
+// Upstream also mails a per-item breakdown to the store inbox
+// (sendSaleLetterIfNeeded). That needs the store inbox container, which the
+// port does not model yet, so the letter half is missing and the summary
+// line is not.
+```
+
+### The commit standard
+
+Subject as `type(scope): imperative`. The body explains what was wrong before,
+not what the code now does — the diff already says that. When wiring reveals
+bugs, list them; that list is the most valuable part of the message. End with:
+
+```
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+```
+
+### Verification before every commit
+
+```bash
+go build ./...
+go test ./...                     # 16 packages should report ok
+bash scripts/semantic-parity.sh   # the number should have moved the right way
+```
+
+Runtime, when the change touches gameplay: `make smoke`, or the full stack via
+`deploy/docker-compose.yml`, then read `canary.log` for new `level=ERROR`.
+Expect *more* errors after removing a stub, not fewer — a stub returning `true`
+was hiding a failure. That is the desired outcome; triage what surfaces.
+
+---
+
+## 6. What reachability taught us, so you do not relearn it
+
+Of the 73 methods that had no caller, almost none was a forgotten call. The
+method was dead because **the behaviour it belongs to did not exist**. Finding
+that out is the entire value of the measurement. A sample of what it surfaced:
+
+- No monster in the game could be poisoned, burned, slowed or hasted. Only
+  `Player` implemented the condition-holder interface, so the combat adapter's
+  type assertion failed for every monster and the condition vanished with no
+  error.
+- Every monster walked at exactly one tile per second. Movement ran on the
+  one-second think loop, so a rat and a dragon moved identically and ground
+  speed was ignored.
+- `getHealingCombatValue` read the resistance map. Had anything called it, every
+  fire-*resistant* monster would have been *healed* by fire.
+- The NPC shop priced every purchase off the type's list, because the per-player
+  registry was never filled — which is the entire purpose of that registry.
+- The house access-list window did not exist at all: two Lua bindings returned
+  `true` without doing anything, and the `0x8A` handler read two bytes and
+  discarded them, which is not even the right packet shape.
+
+So: when you find a dead method, **do not look for somewhere to call it from.**
+Look for the feature it belongs to and ask whether that feature is present. The
+answer is usually no, and that is the finding.
+
+The same applies to a stub that returns a plausible value. `return true`,
+`return 0` and `L.Push(lua.LTrue)` are the three shapes that hid the most here.
+Grepping for them is a productive afternoon:
+
+```bash
+grep -rn "func .*lua.LState) int {$" -A 1 internal/luaengine | grep -B 1 "return 0$"
+```
