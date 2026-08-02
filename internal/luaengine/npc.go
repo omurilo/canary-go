@@ -588,15 +588,11 @@ func (e *Engine) npcTurntocreature(L *lua.LState) int {
 	if !ok {
 		return 0
 	}
-	// Goroutine, not the GlobalDispatcher (which stalls on blocked tasks and left
-	// the hireling never turning toward the player).
-	go func() {
-		old := n.GetDirection()
-		n.TurnToCreature(c)
-		if n.GetDirection() != old && e.world != nil && e.world.OnCreatureTurn != nil {
-			e.world.OnCreatureTurn(n)
-		}
-	}()
+	old := n.GetDirection()
+	n.TurnToCreature(c)
+	if n.GetDirection() != old && e.world != nil && e.world.OnCreatureTurn != nil {
+		e.world.OnCreatureTurn(n)
+	}
 	return 0
 }
 

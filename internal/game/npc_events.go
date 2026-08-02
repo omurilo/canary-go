@@ -84,7 +84,7 @@ func (n *Npc) SetNormalCreatureLight() {
 // ignored-by-npcs flag is never added, which is what keeps a GM from waking
 // every NPC they walk past.
 func (n *Npc) OnPlayerAppear(p *Player) {
-	if p == nil || p.CannotBeAttacked() {
+	if p == nil || p.Ghost {
 		return
 	}
 	if n.spectators == nil {
@@ -132,7 +132,7 @@ func (n *Npc) LoadPlayerSpectators(w *World) {
 	}
 	n.spectators = make(map[uint32]*Player)
 	for _, p := range w.Spectators(n.GetPosition(), n.GetID()) {
-		if p == nil || p.CannotBeAttacked() {
+		if p == nil || p.Ghost {
 			continue
 		}
 		n.spectators[p.GetID()] = p
