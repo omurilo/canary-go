@@ -869,6 +869,17 @@ func (e *Engine) creatureSetoutfit(L *lua.LState) int {
 		return 1
 	}
 	outfit := tableToOutfit(L, 2)
+
+	if outfit.LookType != 0 && e.world != nil && e.world.Items != nil {
+		if !e.world.Items.IsLookTypeRegistered(outfit.LookType) {
+			if e.log != nil {
+				e.log.Warn("[CreatureFunctions::luaCreatureSetOutfit] An unregistered creature looktype was blocked to prevent client crash.", "lookType", outfit.LookType)
+			}
+			L.Push(lua.LTrue)
+			return 1
+		}
+	}
+
 	c.SetOutfit(outfit)
 	if e.world != nil && e.world.OnCreatureOutfitChange != nil {
 		e.world.OnCreatureOutfitChange(c)

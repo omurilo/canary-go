@@ -677,6 +677,8 @@ func (e *Engine) gameGetOfflinePlayer(L *lua.LState) int {
 				if pl, ok := c.(*game.Player); ok {
 					p = pl
 				}
+			} else if pDb := e.world.PlayerByDBID(id); pDb != nil {
+				p = pDb
 			}
 		}
 		if p == nil && e.database != nil {

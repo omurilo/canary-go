@@ -258,16 +258,21 @@ func (t *ItemType) GetWeight() uint32 {
 
 // Catalog maps client item ids to their metadata.
 type Catalog struct {
-	byID       map[uint16]*ItemType
-	byName     map[string]uint16 // lower-cased name -> first id seen
-	byClientID map[uint16]uint16 // client ID -> server item ID
+	byID                map[uint16]*ItemType
+	byName              map[string]uint16 // lower-cased name -> first id seen
+	byClientID          map[uint16]uint16 // client ID -> server item ID
+	RegisteredLookTypes map[uint16]bool
 }
 
 // NewCatalog builds a catalog from an explicit set of item types, indexing them
 // by id and (first-seen) name. Primarily for tests and synthetic setups; the
 // production path is Load.
 func NewCatalog(types ...*ItemType) *Catalog {
-	c := &Catalog{byID: make(map[uint16]*ItemType), byName: make(map[string]uint16)}
+	c := &Catalog{
+		byID:                make(map[uint16]*ItemType),
+		byName:              make(map[string]uint16),
+		RegisteredLookTypes: make(map[uint16]bool),
+	}
 	for _, t := range types {
 		if t == nil {
 			continue
@@ -301,6 +306,14 @@ func (c *Catalog) Get(id uint16) *ItemType {
 	return c.byID[id]
 }
 
+// IsLookTypeRegistered checks if a lookType exists in the parsed appearances.
+func (c *Catalog) IsLookTypeRegistered(lookType uint16) bool {
+	if c == nil || c.RegisteredLookTypes == nil {
+		return false
+	}
+	return c.RegisteredLookTypes[lookType]
+}
+
 // Len returns the number of loaded item types.
 func (c *Catalog) Len() int { return len(c.byID) }
 
@@ -316,9 +329,14 @@ func Load(path string) (*Catalog, error) {
 	}
 
 	cat := &Catalog{
-		byID:   make(map[uint16]*ItemType, len(app.GetObject())),
-		byName: make(map[string]uint16, len(app.GetObject())),
+		byID:                make(map[uint16]*ItemType, len(app.GetObject())),
+		byName:              make(map[string]uint16, len(app.GetObject())),
+		RegisteredLookTypes: make(map[uint16]bool, len(app.GetOutfit())),
 	}
+	for _, outfit := range app.GetOutfit() {
+		cat.RegisteredLookTypes[uint16(outfit.GetId())] = true
+	}
+	
 	for _, obj := range app.GetObject() {
 		if obj.GetId() == 0 || obj.GetId() > 0xFFFF {
 			continue
