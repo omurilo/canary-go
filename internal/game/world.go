@@ -487,6 +487,16 @@ func (w *World) AddCreatureAtStartup(c Creature) {
 func (w *World) addCreature(c Creature, startup bool) {
 	w.mu.Lock()
 	w.creatures[c.GetID()] = c
+	// Every creature should know its world — the NPC needs it to resolve the
+	// player it turns to when an interaction begins. Only Player got this
+	// (AddPlayer); monsters and NPCs silently kept a nil World, so anything on
+	// the creature that reached back through World was dead code.
+	switch cc := c.(type) {
+	case *Monster:
+		cc.World = w
+	case *Npc:
+		cc.World = w
+	}
 	w.addCreatureToTile(c)
 	w.mu.Unlock()
 	if startup {
@@ -592,6 +602,47 @@ func (w *World) captureStackPositions(pos Position, c Creature) map[uint32]int {
 	return w.CaptureStackPositions(pos, c)
 }
 
+// collectSpectators invokes fn for every creature standing on a tile that pos can
+// see, without allocating a result slice.
+//
+// The old implementation walked the whole w.creatures map — O(all creatures) per
+// query. On the full OTServBR world that is ~86k entries, and the monster AI runs
+// this per monster per think, so the single-threaded dispatcher spent all its
+// time in those scans and never reached the NPC think loop (NPCs stayed frozen).
+// Walking the viewport's tiles instead makes the cost proportional to the area
+// actually visible.
+func (w *World) collectSpectators(pos Position, fn func(c Creature)) {
+	if fn == nil {
+		return
+	}
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	px, py, pz := int(pos.X), int(pos.Y), int(pos.Z)
+	z0, z1 := 0, MapInitSurfaceLayer
+	if pz > MapInitSurfaceLayer {
+		z0 = pz - MapLayerViewLimit
+		z1 = pz + MapLayerViewLimit
+	}
+	for z := z0; z <= z1; z++ {
+		if z < 0 || z > 255 {
+			continue
+		}
+		// InRangeOf shifts the x/y window diagonally by the floor delta, because
+		// that is how a tile one floor down is drawn. Mirror it here so the
+		// rectangle enumerates exactly the positions InRangeOf accepts.
+		off := pz - z
+		w.Map.RangeRect(px-MapMaxViewPortX+off, py-MapMaxViewPortY+off,
+			px+MapMaxViewPortX+off, py+MapMaxViewPortY+off, z, func(t *Tile) {
+				for _, c := range t.Creatures {
+					if c != nil {
+						fn(c)
+					}
+				}
+			})
+	}
+}
+
 // SpectatorCreatures returns every creature that can see pos — the equivalent of
 // Map::getSpectators with onlyPlayers off.
 //
@@ -600,19 +651,12 @@ func (w *World) captureStackPositions(pos Position, c Creature) map[uint32]int {
 // filtered to NPCs and could not tell; the monster target list could, and saw an
 // empty world.
 func (w *World) SpectatorCreatures(pos Position) []Creature {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
 	var out []Creature
-	for _, c := range w.creatures {
-		if c.GetPosition().InRangeOf(pos) {
+	w.collectSpectators(pos, func(c Creature) {
+		if pos.InRangeOf(c.GetPosition()) {
 			out = append(out, c)
 		}
-	}
-	for _, p := range w.players {
-		if p.Pos.InRangeOf(pos) {
-			out = append(out, p)
-		}
-	}
+	})
 	return out
 }
 
@@ -652,19 +696,12 @@ func (w *World) CreaturesAt(pos Position) []Creature {
 
 // CreaturesInView returns all creatures (players, monsters, NPCs) within range of pos.
 func (w *World) CreaturesInView(pos Position) []Creature {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
 	var out []Creature
-	for _, p := range w.players {
-		if p.Pos.InRangeOf(pos) {
-			out = append(out, p)
-		}
-	}
-	for _, c := range w.creatures {
-		if c.GetPosition().InRangeOf(pos) {
+	w.collectSpectators(pos, func(c Creature) {
+		if pos.InRangeOf(c.GetPosition()) {
 			out = append(out, c)
 		}
-	}
+	})
 	return out
 }
 
@@ -709,6 +746,12 @@ func (w *World) TeleportCreature(c Creature, dest Position) {
 	c.SetPosition(dest)
 	w.addCreatureToTile(c)
 	w.mu.Unlock()
+
+	// TryMove notifies spectators at both ends of the move; a teleport jumped
+	// straight to the world hook and skipped it. With the monster AI idle gate
+	// relying on spectator events to wake monsters up, a creature that teleports
+	// past an idle monster would otherwise never be noticed until it stepped.
+	w.notifyCreatureMove(c, oldPos, dest)
 
 	if w.OnCreatureMove != nil {
 		w.OnCreatureMove(c, oldPos, dest, oldStackPos)

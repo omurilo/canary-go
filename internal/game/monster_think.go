@@ -376,6 +376,12 @@ func (m *Monster) UpdateIdleStatus() {
 		} else {
 			m.walkingBack = true
 		}
+	} else {
+		// A monster with a target (or a master) is fighting or following, not
+		// heading home. The walkingBack flag is only meaningful for an idle
+		// wanderer, and leaving it set once a fight starts would march the
+		// monster back to spawn mid-combat.
+		m.walkingBack = false
 	}
 	m.SetIdle(idle)
 	if !idle {

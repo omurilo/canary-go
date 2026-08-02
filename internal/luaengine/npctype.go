@@ -418,6 +418,8 @@ func (e *Engine) registerNpcType() {
 					SpeechBubble: creatures.SpeechBubbleNormal,
 					CurrencyID:   creatures.DefaultNpcCurrency,
 					CanSpawn:     true,
+					WalkInterval: 2000,
+					WalkRadius:   10,
 				}
 				if reg != nil {
 					reg[key] = nType

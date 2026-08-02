@@ -131,7 +131,8 @@ func (n *Npc) LoadPlayerSpectators(w *World) {
 		return
 	}
 	n.spectators = make(map[uint32]*Player)
-	for _, p := range w.Spectators(n.GetPosition(), n.GetID()) {
+	specs := w.Spectators(n.GetPosition(), n.GetID())
+	for _, p := range specs {
 		if p == nil || p.Ghost {
 			continue
 		}

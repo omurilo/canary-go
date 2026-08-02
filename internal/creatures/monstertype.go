@@ -751,6 +751,8 @@ func (r *TypeRegistry) LoadNpcs(dataDir string) error {
 					Addons:    npc.Look.Addons,
 					LookMount: npc.Look.Mount,
 				},
+				WalkInterval: 2000,
+				WalkRadius:   10,
 			}
 			if nType.MaxHealth == 0 {
 				nType.MaxHealth = npc.Health.Now

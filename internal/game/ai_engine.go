@@ -81,6 +81,16 @@ func (e *AIEngine) updateAI() {
 			continue
 		}
 
+		// Idle monsters are off the check list, as in C++ Game::checkCreatures /
+		// Npc::manageIdle. They wake through spectator events — a player's step
+		// calls OnCreatureEnter via notifyCreatureMove — not by being scanned
+		// every tick. Without this gate every one of the ~86k monsters ran a full
+		// vision scan per think (SpectatorCreatures used to walk all creatures),
+		// which pegged the dispatcher and starved the NPC think loop entirely.
+		if monster.Idle {
+			continue
+		}
+
 		// Monster::onThink runs the challenge timer first, so a monster dragged
 		// into melee is back at its own fighting distance on the tick the
 		// challenge lapses rather than one tick later (monster.cpp:1608-1615).

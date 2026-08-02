@@ -20,9 +20,12 @@ const (
 	LaneBackgroundMonster             // Background monster tasks (far from players)
 	LaneVisibleMonsterAI              // High-priority monster AI decisions
 	LaneMonsterAI                     // General monster AI
-	LaneDeferred                      // Deferred / best-effort work
-	LaneMaintenance                   // Server maintenance tasks (save, cleanup)
-	LaneGenericParallel               // General purpose (backward compat for AddEvent)
+	LaneNpcThink                      // NpcEngine onThink loop (dedicated so the
+	//                                  500ms tick is not queued behind the boot
+	//                                  spawn flood on LaneGenericParallel)
+	LaneDeferred        // Deferred / best-effort work
+	LaneMaintenance     // Server maintenance tasks (save, cleanup)
+	LaneGenericParallel // General purpose (backward compat for AddEvent)
 
 	laneCount
 )
@@ -38,6 +41,7 @@ var LaneNames = map[Lane]string{
 	LaneBackgroundMonster: "BackgroundMonster",
 	LaneVisibleMonsterAI:  "VisibleMonsterAI",
 	LaneMonsterAI:         "MonsterAI",
+	LaneNpcThink:          "NpcThink",
 	LaneDeferred:          "Deferred",
 	LaneMaintenance:       "Maintenance",
 	LaneGenericParallel:   "GenericParallel",
@@ -128,6 +132,7 @@ var defaultQuanta = [laneCount]int32{
 	LaneBackgroundMonster: 15,
 	LaneVisibleMonsterAI:  25,
 	LaneMonsterAI:         20,
+	LaneNpcThink:          20,
 	LaneDeferred:          10,
 	LaneMaintenance:       5,
 	LaneGenericParallel:   30,

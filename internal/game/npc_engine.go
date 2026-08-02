@@ -39,14 +39,21 @@ func NewNpcEngine(w *World) *NpcEngine {
 }
 
 // Start schedules the loop on the dispatcher.
+//
+// The tick uses its own lane rather than AddEvent (LaneGenericParallel). At boot
+// the spawn engine floods that lane with ~84k placement tasks, and every one of
+// them is queued with an earlier deadline than the tick, so an AddEvent tick
+// would not fire until the whole map had been spawned — minutes of frozen NPCs.
+// On a dedicated lane the 500ms tick is dispatched each scheduler cycle no
+// matter how long the spawn backlog takes.
 func (e *NpcEngine) Start() {
-	GlobalDispatcher.AddEvent(npcThinkInterval, e.tick)
+	GlobalDispatcher.AddTask(LaneNpcThink, npcThinkInterval, 0, e.tick)
 }
 
 func (e *NpcEngine) tick() {
 	// Re-arm first so a panic inside the body cannot silently kill the loop; the
 	// dispatcher's recover() would otherwise swallow it after this point.
-	defer GlobalDispatcher.AddEvent(npcThinkInterval, e.tick)
+	defer GlobalDispatcher.AddTask(LaneNpcThink, npcThinkInterval, 0, e.tick)
 
 	if e.world == nil {
 		return

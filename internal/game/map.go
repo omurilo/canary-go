@@ -143,6 +143,38 @@ func (m *Map) GetTile(pos Position) *Tile {
 	return m.tiles[pos]
 }
 
+// RangeRect invokes fn for every loaded tile whose (x,y) lies inside the
+// inclusive rectangle [x0,x1]x[y0,y1] on floor z, under a single read lock.
+//
+// It exists for the creature-vision queries (SpectatorCreatures and friends),
+// which used to walk the whole w.creatures map — O(all creatures) per query.
+// With the OTServBR world that is ~86k entries, and the monster AI runs the
+// query per monster per think, so the single-threaded dispatcher spent all its
+// time in those scans and never reached the NPC think loop. Enumerating the
+// viewport's tiles instead makes the query cost proportional to the area the
+// caller can actually see.
+func (m *Map) RangeRect(x0, y0, x1, y1 int, z int, fn func(t *Tile)) {
+	if fn == nil || x1 < x0 || y1 < y0 {
+		return
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for y := y0; y <= y1; y++ {
+		if y < 0 {
+			continue
+		}
+		for x := x0; x <= x1; x++ {
+			if x < 0 {
+				continue
+			}
+			t := m.tiles[Position{X: uint16(x), Y: uint16(y), Z: uint8(z)}]
+			if t != nil {
+				fn(t)
+			}
+		}
+	}
+}
+
 // Range invokes fn for every loaded tile. fn returns false to stop early.
 func (m *Map) Range(fn func(pos Position, t *Tile) bool) {
 	m.mu.RLock()

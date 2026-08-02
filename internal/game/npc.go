@@ -41,14 +41,34 @@ type Npc struct {
 
 // SetPlayerInteraction marks playerID as interacting with the NPC at the given
 // dialogue topic.
+//
+// When the player is newly added, the NPC also turns to face them, as
+// Npc::setPlayerInteraction does (npc.cpp): a fresh conversation is what makes
+// an NPC swivel toward the player on the first "hi". Without it the greeting
+// never turned the NPC, because npc_handler.lua's updateInteraction only calls
+// npc:turnToCreature once the player is already interacting.
 func (n *Npc) SetPlayerInteraction(playerID uint32, topic int) {
 	if n.interactions == nil {
 		n.interactions = make(map[uint32]int)
 	}
 	if _, existing := n.interactions[playerID]; !existing {
 		n.interactionOrder = append(n.interactionOrder, playerID)
+		if p := n.playerByID(playerID); p != nil {
+			n.TurnToCreature(p)
+			if n.World != nil && n.World.OnCreatureTurn != nil {
+				n.World.OnCreatureTurn(n)
+			}
+		}
 	}
 	n.interactions[playerID] = topic
+}
+
+// playerByID resolves an online player by creature id, or nil.
+func (n *Npc) playerByID(id uint32) *Player {
+	if n.World == nil {
+		return nil
+	}
+	return n.World.PlayerByID(id)
 }
 
 // RemovePlayerInteraction ends playerID's conversation with the NPC.
@@ -162,7 +182,38 @@ func (n *Npc) TurnToCreature(c Creature) {
 	if c == nil {
 		return
 	}
-	n.SetDirection(getDirectionTo(n.GetPosition(), c.GetPosition()))
+	from := n.GetPosition()
+	to := c.GetPosition()
+	dx := int(from.X) - int(to.X)
+	dy := int(from.Y) - int(to.Y)
+
+	var tan float32
+	if dx != 0 {
+		tan = float32(dy) / float32(dx)
+	} else {
+		tan = 10
+	}
+
+	var dir Direction
+	absTan := tan
+	if absTan < 0 {
+		absTan = -absTan
+	}
+
+	if absTan < 1 {
+		if dx > 0 {
+			dir = DirWest
+		} else {
+			dir = DirEast
+		}
+	} else {
+		if dy > 0 {
+			dir = DirNorth
+		} else {
+			dir = DirSouth
+		}
+	}
+	n.SetDirection(dir)
 }
 
 func (n *Npc) GetCreatureType() uint8 { return 2 } // CREATURETYPE_NPC
