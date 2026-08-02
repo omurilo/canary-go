@@ -598,19 +598,28 @@ func applyDamageModifiers(attacker, target Creature, dmg int32) int32 {
 	}
 	multiplier := 1.0
 
-	// 1. Fiendish / Influenced multipliers
-	if m, ok := attacker.(*Monster); ok {
-		// getAttackMultiplier (1.35 + (stacks-1)*0.1)
-		if m.ForgeStack > 0 {
-			multiplier *= (1.35 + float64(m.ForgeStack-1)*0.1)
+	// Monster::blockHit's element modifier. The combat package applies
+	// GetResistance for spells routed through DoCombatHealth, but the melee and
+	// distance paths reach applyDamageModifiers directly and skipped it, so a
+	// fire elemental took full physical-typed melee from a fire weapon.
+	if m, ok := target.(*Monster); ok {
+		if reduced, blocked := m.BlockHit(attacker, combat.CombatPhysical, dmg); blocked {
+			return 0
+		} else {
+			dmg = reduced
 		}
 	}
+
+	// 1. Fiendish / Influenced multipliers. The formulas lived inline here and
+	// were a second copy of Monster::getAttackMultiplier and
+	// getDefenseMultiplier — two places to keep in step with upstream instead of
+	// one, and the ported methods went uncalled.
+	if m, ok := attacker.(*Monster); ok {
+		multiplier *= m.GetAttackMultiplier()
+	}
 	if m, ok := target.(*Monster); ok {
-		// getDefenseMultiplier (1 + 0.1*stacks)
 		// More defense means LESS damage taken.
-		if m.ForgeStack > 0 {
-			multiplier /= (1.0 + 0.1*float64(m.ForgeStack))
-		}
+		multiplier /= m.GetDefenseMultiplier()
 	}
 
 	// 3. Hazard System modifiers

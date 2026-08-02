@@ -29,6 +29,9 @@ func newSpawnTestEngine(t *testing.T, slots int) (*SpawnEngine, *SpawnBlock) {
 		blocks:    make(map[uint32]*spawnBlock),
 		spawned:   make(map[uint32]Creature),
 		engine:    e,
+		// SpawnEngine.Start arms every group; a hand-built one has to say so or
+		// the sweep skips it.
+		checkActive: true,
 	}
 	for i := 0; i < slots; i++ {
 		block.addMonster("rat", Position{X: uint16(1000 + i), Y: 1000, Z: 7}, DirSouth, 30*time.Second)

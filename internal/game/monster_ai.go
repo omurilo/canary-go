@@ -121,10 +121,10 @@ func (m *Monster) SearchTarget(w *World, t TargetSearchType) bool {
 
 	var candidates []Creature
 	for _, s := range m.Targets {
-		if s == nil || s.GetHealth() == 0 {
-			continue
-		}
-		if p, ok := s.(*Player); ok && (p.CannotBeAttacked() || p.Ghost) {
+		// isTarget, not a hand-rolled set of checks. The two differ: an enemy in a
+		// protection zone or on another floor is a legal OPPONENT but not a legal
+		// target, and the inline version here missed both.
+		if !m.IsTarget(w, s) {
 			continue
 		}
 		if !melee && !m.CanUseAttack(myPos, s, w) {

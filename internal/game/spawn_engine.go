@@ -240,9 +240,24 @@ func (e *SpawnEngine) CreatureDied(c Creature) {
 	}
 }
 
-// Start begins spawn checking.
+// Start is SpawnsMonster::startup: fill every slot once, then arm the sweep.
+//
+// The boot fill was missing entirely — the engine started with an empty world
+// and let the respawn timers populate it over the following minutes, so a fresh
+// server had no monsters until players had been walking around for a while.
 func (e *SpawnEngine) Start() {
+	for _, block := range e.blocks {
+		block.StartSpawnMonsterCheck()
+		block.Startup(e.world, true)
+	}
 	GlobalDispatcher.AddEvent(1*time.Second, e.checkSpawns)
+}
+
+// Stop is SpawnsMonster::clear: take every group off the sweep.
+func (e *SpawnEngine) Stop() {
+	for _, block := range e.blocks {
+		block.StopEvent()
+	}
 }
 
 // checkSpawns runs every 1s, matching C++ SpawnMonster::checkSpawnMonster.
@@ -255,6 +270,11 @@ func (e *SpawnEngine) checkSpawns() {
 // clock instead of only from the dispatcher.
 func (e *SpawnEngine) checkSpawnsOnce(now time.Time) {
 	for _, block := range e.blocks {
+		// A group taken off the sweep by StopEvent stays off, which is what a
+		// reload needs so the old groups do not keep spawning alongside the new.
+		if !block.checkActive {
+			continue
+		}
 		block.CheckSpawnMonster(e.world, now)
 	}
 }

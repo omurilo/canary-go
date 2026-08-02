@@ -58,7 +58,24 @@ func (a combatAdapter) GetMaxMana() int32 {
 
 // ChangeHealth applies a signed health delta, mirroring Creature::changeHealth
 // (src/creatures/creature.cpp): drainHealth calls changeHealth(-damage).
-func (a combatAdapter) ChangeHealth(amount int32) { a.c.AddHealth(amount) }
+// ChangeHealth routes a monster through Monster::drainHealth / changeHealth
+// rather than touching health directly.
+//
+// Both do work beyond the arithmetic: changeHealth takes the monster out of idle
+// (so one attacked by a player monsters ignore still fights back) and rolls its
+// ambient sound, and drainHealth sets the ignore-field-damage flag when a
+// damaged monster cannot reach what it is fighting.
+func (a combatAdapter) ChangeHealth(amount int32) {
+	if m, ok := a.c.(*Monster); ok {
+		if amount < 0 {
+			m.DrainHealth(m.World, nil, -amount)
+			return
+		}
+		m.ChangeHealth(m.World, amount)
+		return
+	}
+	a.c.AddHealth(amount)
+}
 
 // AddDamagePoints forwards to the creature's damage tracker. BaseCreature and Player
 // both embed it, so every creature type answers.
