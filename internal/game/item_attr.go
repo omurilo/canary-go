@@ -56,9 +56,6 @@ const (
 	attrNone               = 0
 )
 
-// decayingFalse mirrors DECAYING_FALSE (src/enums/item_attribute.hpp:54).
-const decayingFalse = 0
-
 // DecodeItemAttributes parses the OTBR ATTR_* TLV blob into structured fields,
 // mirroring C++ Item::unserializeAttr / Item::readAttr (src/items/item.cpp:926,
 // 1365). subType is the initial subtype seeded from the player_items.count

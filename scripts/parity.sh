@@ -183,6 +183,7 @@ head_ "Behaviour coverage (methods with a Go counterpart)"
 SKIP_METHODS='
 Monster createMonster getMonster setID addList removeList
 Npc createNpc getNpc getLowerName setSpawnNpc
+getInstance
 getName setName getTypeName getNameDescription setNameDescription getDescription
 getType getMasterPos setMasterPos getRaceId getRace getMonsterType
 isDead setDead getIdleStatus isTargetNearby israndomStepping
@@ -213,8 +214,8 @@ removeVisiblePlayerSpectator forgetTargetReference onFollowCreatureComplete
 countsAsPlayerOnScreenTarget
 '
 
-behaviour_coverage() { # cpp-file  go-dir  class
-	local cpp="$SRC/$1" godir="$GO_ROOT/$2" class="$3"
+behaviour_coverage() { # cpp-file  go-dir  cpp-class  [go-receiver]
+	local cpp="$SRC/$1" godir="$GO_ROOT/$2" class="$3" recv="${4:-$3}"
 	[[ -f "$cpp" ]] || return
 	local total=0 have=0 skipped=0 name upper flat
 	local missing=""
@@ -231,7 +232,7 @@ behaviour_coverage() { # cpp-file  go-dir  class
 		# Go convention is the same name, exported. Accept either capitalisation:
 		# an unexported helper is still a counterpart.
 		upper="$(printf '%s' "${name:0:1}" | tr '[:lower:]' '[:upper:]')${name:1}"
-		if grep -rqE "func \([a-z]+ \*$class\) ($name|$upper)\(" "$godir" 2>/dev/null ||
+		if grep -rqE "func \([a-z]+ \*$recv\) ($name|$upper)\(" "$godir" 2>/dev/null ||
 			grep -rqE "func ($name|$upper)\(" "$godir" 2>/dev/null; then
 			have=$((have + 1))
 		else
@@ -250,5 +251,8 @@ behaviour_coverage() { # cpp-file  go-dir  class
 
 behaviour_coverage "creatures/monsters/monster.cpp" "internal/game" "Monster"
 behaviour_coverage "creatures/npcs/npc.cpp" "internal/game" "Npc"
+behaviour_coverage "map/house/house.cpp" "internal/game" "House"
+behaviour_coverage "items/decay/decay.cpp" "internal/game" "Decay" "DecayManager" "DecayManager"
+behaviour_coverage "creatures/monsters/spawns/spawn_monster.cpp" "internal/game" "SpawnMonster" "SpawnEngine" "SpawnEngine"
 
 echo

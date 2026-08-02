@@ -421,21 +421,25 @@ type ItemAttributes struct {
 	Description    *string   // ATTR_DESC (7)
 	Duration       *int32    // ATTR_DURATION (16)  int32
 	DecayState     *uint8    // ATTR_DECAYING_STATE (17) uint8
-	Name           *string   // ATTR_NAME (24)
-	Article        *string   // ATTR_ARTICLE (25)
-	PluralName     *string   // ATTR_PLURALNAME (26)
-	Weight         *uint32   // ATTR_WEIGHT (27)    uint32
-	Attack         *int32    // ATTR_ATTACK (28)    int32
-	Defense        *int32    // ATTR_DEFENSE (29)   int32
-	ExtraDefense   *int32    // ATTR_EXTRADEFENSE (30) int32
-	Armor          *int32    // ATTR_ARMOR (31)     int32
-	HitChance      *int8     // ATTR_HITCHANCE (32) int8
-	ShootRange     *uint8    // ATTR_SHOOTRANGE (33) uint8
-	Tier           *uint8
-	HouseDoorID    *uint8  // ATTR_TIER (40)      uint8
-	Amount         *uint16 // ATTR_AMOUNT (39)    uint16
-	Owner          *uint32 // ATTR_OWNER (43)     uint32
-	OpenContainer  *uint8  // ATTR_OPENCONTAINER (36) uint8
+	// DurationTimestamp is ItemAttribute_t::DURATION_TIMESTAMP: the absolute
+	// millisecond at which this item is due to decay. Decay::stopDecay finds the
+	// item in the decay map by it, so a decaying item must carry one.
+	DurationTimestamp *int64
+	Name              *string // ATTR_NAME (24)
+	Article           *string // ATTR_ARTICLE (25)
+	PluralName        *string // ATTR_PLURALNAME (26)
+	Weight            *uint32 // ATTR_WEIGHT (27)    uint32
+	Attack            *int32  // ATTR_ATTACK (28)    int32
+	Defense           *int32  // ATTR_DEFENSE (29)   int32
+	ExtraDefense      *int32  // ATTR_EXTRADEFENSE (30) int32
+	Armor             *int32  // ATTR_ARMOR (31)     int32
+	HitChance         *int8   // ATTR_HITCHANCE (32) int8
+	ShootRange        *uint8  // ATTR_SHOOTRANGE (33) uint8
+	Tier              *uint8
+	HouseDoorID       *uint8  // ATTR_TIER (40)      uint8
+	Amount            *uint16 // ATTR_AMOUNT (39)    uint16
+	Owner             *uint32 // ATTR_OWNER (43)     uint32
+	OpenContainer     *uint8  // ATTR_OPENCONTAINER (36) uint8
 	// QuickLootContainer / ObtainContainer are bitmasks of the ObjectCategory
 	// values this container is the managed loot / obtain container for
 	// (ATTR_QUICKLOOTCONTAINER 38 / ATTR_OBTAINCONTAINER 44, u32). They persist
