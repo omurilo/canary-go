@@ -53,6 +53,16 @@ func (d *WDRRDispatcher) dispatchLane(lane Lane) {
 		h := d.lanes[lane]
 		task := h.Peek()
 		if task == nil {
+			// Nothing queued — don't let the deficit bank up for a lane that has
+			// no work. The spawn engine floods LaneGenericParallel with ~84k
+			// placement tasks at boot; if the lane had been idle before that (the
+			// whole map/script load runs on the main goroutine while the
+			// dispatcher waits), the accumulated deficit was huge and dispatchLane
+			// spent it in ONE call, processing the entire flood back-to-back and
+			// starving every other lane — including the NPC think tick — for
+			// minutes. Resetting on an empty heap keeps a lane's budget tied to
+			// work it actually has.
+			d.deficits[lane] = 0
 			d.mu.Unlock()
 			return
 		}

@@ -215,16 +215,32 @@ func TestWDRR_DeficitAccumulation(t *testing.T) {
 	highQuantumLane := LaneProtocolInput // quantum=80
 	lowQuantumLane := LaneMaintenance    // quantum=5
 
-	// Inject deficits manually to simulate accumulation.
-	d.deficits[highQuantumLane] = 0
-	d.deficits[lowQuantumLane] = 0
-
-	// Run one cycle — high quantum lane should get more deficit.
+	// Run one cycle over empty heaps: an idle lane must NOT bank deficit, or a
+	// lane that idles through boot and then receives a flood of tasks (the spawn
+	// engine's ~84k placements) would spend the whole accumulated budget in one
+	// dispatchLane call and starve every other lane.
 	d.dispatchCycle()
+	if d.deficits[highQuantumLane] != 0 {
+		t.Errorf("idle high-quantum lane banked deficit: %d, want 0", d.deficits[highQuantumLane])
+	}
 
-	if d.deficits[highQuantumLane] <= d.deficits[lowQuantumLane] {
-		t.Errorf("expected high-quantum lane deficit (%d) > low-quantum lane deficit (%d)",
-			d.deficits[highQuantumLane], d.deficits[lowQuantumLane])
+	// With pending work, the high-quantum lane gets a larger per-cycle budget.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	d.Start(ctx)
+
+	var hi, lo atomic.Int32
+	for i := 0; i < 100; i++ {
+		d.AddTask(highQuantumLane, 0, 0, func() { hi.Add(1) })
+		d.AddTask(lowQuantumLane, 0, 0, func() { lo.Add(1) })
+	}
+	time.Sleep(100 * time.Millisecond)
+	if hi.Load() <= lo.Load() {
+		t.Errorf("high-quantum lane should complete more (%d) than low-quantum (%d)",
+			hi.Load(), lo.Load())
+	}
+	if hi.Load() == 0 {
+		t.Errorf("high-quantum lane did no work")
 	}
 }
 
