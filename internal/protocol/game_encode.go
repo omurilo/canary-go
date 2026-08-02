@@ -318,7 +318,7 @@ func (g *GameProtocol) addTileDescription(w *netmsg.Writer, t *game.Tile, pos ga
 	}
 
 	// Creatures.
-	for i := len(t.Creatures) - 1; i >= 0; i-- {
+	for i := 0; i < len(t.Creatures); i++ {
 		if count >= 10 {
 			return
 		}
@@ -426,7 +426,7 @@ func (g *GameProtocol) clientIndexOfCreatureLocked(pos game.Position, creatureID
 			n++
 		}
 	}
-	for i := len(tile.Creatures) - 1; i >= 0; i-- {
+	for i := 0; i < len(tile.Creatures); i++ {
 		c := tile.Creatures[i]
 		if c.GetID() == creatureID {
 			return n
