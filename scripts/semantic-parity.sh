@@ -75,7 +75,9 @@ go_body() { # dir recv name
 # when they are in fact called from internal/luaengine or internal/protocol —
 # which is where most of this behaviour is reached from.
 callers() { # _ name
-	grep -rE "\.$2\(" "$GO_ROOT/internal" "$GO_ROOT/cmd" --include='*.go' 2>/dev/null |
+	# `\.Name\b`, not `\.Name\(`. A method passed as a VALUE — d.CheckDecay handed
+	# to the dispatcher — is a caller, and requiring the paren reported it dead.
+	grep -rE "\.$2\b" "$GO_ROOT/internal" "$GO_ROOT/cmd" --include='*.go' 2>/dev/null |
 		grep -v '_test.go' | grep -vc "func " | tr -d ' '
 }
 

@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/omurilo/canary-go/internal/config"
 )
 
 // House access lists, doors, beds and the transfer flow, ported from
@@ -40,13 +42,10 @@ func (h *House) AddTile(w *World, pos Position) {
 // GetRent is House::getRent (house.cpp:1065): the XML rent scaled by the
 // server's rate. The port read the raw XML value, so every configured rent rate
 // was ignored.
-func (h *House) GetRent(rentRate float64) uint32 {
+func (h *House) GetRent() uint32 {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	if rentRate == 0 {
-		rentRate = 1
-	}
-	return uint32(rentRate * float64(h.Rent))
+	return uint32(config.Float("houseRentRate", 1.0) * float64(h.Rent))
 }
 
 // SetAccessList is House::setAccessList (house.cpp:235).

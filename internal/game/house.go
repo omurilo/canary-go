@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/omurilo/canary-go/internal/config"
+	"github.com/omurilo/canary-go/internal/items"
 )
 
 // House represents a player house or guild hall. Houses are loaded from
@@ -180,10 +181,13 @@ func (h *House) SetOwner(w *World, guid uint32, updateDatabase bool, player *Pla
 
 // GetPrice is House::getPrice (house.cpp:1069-1073).
 func (h *House) GetPrice() uint32 {
+	rent := h.GetRent()
 	h.mu.RLock()
-	size, rent := h.Size, h.Rent
+	size := h.Size
 	h.mu.RUnlock()
 	sqmPrice := uint32(config.Number("housePriceEachSQM", 1000)) * size
+	// getPrice multiplies the RATED rent, not the raw XML value, so a server
+	// running a rent rate sells houses at a price that matches what it charges.
 	rentPrice := uint32(float64(rent) * config.Float("housePriceRentMultiplier", 1.0))
 	return sqmPrice + rentPrice
 }
@@ -218,8 +222,9 @@ func (h *House) UpdateDoorDescription(w *World) {
 
 func (h *House) doorDescription() string {
 	h.mu.RLock()
-	name, owner, ownerName, size, rent := h.Name, h.OwnerID, h.OwnerName, h.Size, h.Rent
+	name, owner, ownerName, size := h.Name, h.OwnerID, h.OwnerName, h.Size
 	h.mu.RUnlock()
+	rent := h.GetRent()
 
 	var b strings.Builder
 	if owner != 0 {
@@ -608,20 +613,63 @@ func (w *World) GetHouseByPosition(pos Position) *House {
 }
 
 // RegisterHouseTiles iterates every map tile and populates each house's HouseTiles.
+// RegisterHouseTiles claims every OTBM tile carrying a house id, and picks up
+// the doors and beds standing on it.
+//
+// It used to append to HouseTiles directly. Going through House::addTile also
+// sets the tile.s protection-zone flag and keeps Size in step, and the door and
+// bed sweeps are what House::addDoor and addBed exist for — without them a
+// house had no doors to hang an access list on and reported the XML.s bed count
+// rather than the beds actually in it.
 func (w *World) RegisterHouseTiles() {
+	type claim struct {
+		h   *House
+		pos Position
+		t   *Tile
+	}
+	var claims []claim
+
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	w.Map.Range(func(pos Position, t *Tile) bool {
 		if t.HouseID == 0 {
 			return true
 		}
-		h := w.Houses[t.HouseID]
-		if h == nil {
-			return true
+		if h := w.Houses[t.HouseID]; h != nil {
+			claims = append(claims, claim{h: h, pos: pos, t: t})
 		}
-		h.HouseTiles = append(h.HouseTiles, pos)
 		return true
 	})
+	w.mu.Unlock()
+
+	// AddTile takes the house lock and touches the map, so it runs outside the
+	// world lock rather than inside Range.
+	for _, c := range claims {
+		c.h.AddTile(w, c.pos)
+		w.registerHouseFurniture(c.h, c.pos, c.t)
+	}
+}
+
+// registerHouseFurniture finds the doors and beds on a house tile.
+func (w *World) registerHouseFurniture(h *House, pos Position, t *Tile) {
+	if w.Items == nil {
+		return
+	}
+	for _, item := range t.Items {
+		if item == nil {
+			continue
+		}
+		it := w.Items.Get(item.ID)
+		if it == nil {
+			continue
+		}
+		if it.Type == items.ItemTypeBed {
+			h.AddBed(pos)
+			continue
+		}
+		if item.Attr != nil && item.Attr.HouseDoorID != nil {
+			h.AddDoor(w, HouseDoor{ID: *item.Attr.HouseDoorID, Pos: pos})
+		}
+	}
 }
 
 // HouseCountByAccount returns the number of houses owned by players of a given account.
