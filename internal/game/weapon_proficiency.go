@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"sync"
 )
 
 // WeaponProficiency stores per-weapon bonus data that feeds into cyclopedia
 // OffenceStats (bestiary damage, runes/auto critical, skill percentages, augments).
 type WeaponProficiency struct {
+	// mu guards the experience map. The stats maps are written once at load and
+	// read on every hit, but experience is written from the kill path.
+	mu                sync.RWMutex
 	stats             map[WeaponProfBonus]float64
 	skillPcts         map[Skill]SkillPercentage
 	bestiaryDamage    map[string]float64
@@ -18,6 +22,9 @@ type WeaponProficiency struct {
 	elementCritical   map[int]WeaponProfCritical
 	augments          map[uint16][]WeaponProfAugment
 	powerfulFoeDamage float64
+	// experience is the per-weapon proficiency progress. Nothing wrote it before:
+	// the type modelled what a proficiency gives you and not how it is earned.
+	experience map[uint16]*weaponProfState
 
 	// Derived sinks that applyPerks feeds and that had no Go counterpart before.
 	specializedMagic map[uint8]float64 // element → bonus magic level

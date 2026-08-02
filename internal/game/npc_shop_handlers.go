@@ -99,22 +99,14 @@ func (n *Npc) OnPlayerSellAllLoot(w *World, p *Player, ignore bool) uint64 {
 		return 0
 	}
 	var totalPrice uint64
-	// Upstream sweeps the loot pouch; this port has no pouch abstraction yet, so
-	// the main backpack stands in. Same items in practice, and the sweep is
-	// depth-one either way — a bag inside the backpack is not emptied.
-	sellable := make(map[uint16]uint32)
-	if bp := p.Inventory[ConstSlotBackpack]; bp != nil {
-		for _, item := range bp.Contents {
-			if item == nil {
-				continue
-			}
-			count := uint32(item.Count)
-			if count == 0 {
-				count = 1
-			}
-			sellable[item.ID] += count
-		}
+	// The gold pouch, not the backpack. Sweeping the backpack would sell the
+	// player.s equipment stack along with their loot.
+	pouch := p.GetLootPouch()
+	if pouch == nil {
+		return 0
 	}
+	sellable := make(map[uint16]uint32)
+	collectSellable(pouch, sellable)
 	for itemID, amount := range sellable {
 		n.sellItemInto(w, p, itemID, 0, amount, ignore, &totalPrice)
 	}
@@ -132,3 +124,60 @@ func (n *Npc) OnPlayerCheckItem(w *World, p *Player, itemID uint16, subType uint
 
 // msgNotEnoughRoom is the text of RETURNVALUE_NOTENOUGHROOM.
 const msgNotEnoughRoom = "There is not enough room."
+
+// GetLootPouch is Player::getLootPouch: the gold pouch, wherever it sits in the
+// inventory tree. It is a container the player cannot drop, which is why
+// onPlayerSellAllLoot sweeps it and not the backpack.
+func (p *Player) GetLootPouch() *Item {
+	for _, item := range p.Inventory {
+		if item == nil {
+			continue
+		}
+		if item.ID == ItemGoldPouch {
+			return item
+		}
+		if found := findItemInContainerTree(item, ItemGoldPouch); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+// findItemInContainerTree is getInventoryItemsFromId's recursive half.
+func findItemInContainerTree(parent *Item, id uint16) *Item {
+	if parent == nil {
+		return nil
+	}
+	for _, child := range parent.Contents {
+		if child == nil {
+			continue
+		}
+		if child.ID == id {
+			return child
+		}
+		if found := findItemInContainerTree(child, id); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+// collectSellable walks the pouch recursively. Upstream descends into nested
+// containers — a bag of loot inside the pouch is sold too, which is the whole
+// point of the sell-all button.
+func collectSellable(container *Item, out map[uint16]uint32) {
+	for _, item := range container.Contents {
+		if item == nil {
+			continue
+		}
+		if len(item.Contents) > 0 {
+			collectSellable(item, out)
+			continue
+		}
+		count := uint32(item.Count)
+		if count == 0 {
+			count = 1
+		}
+		out[item.ID] += count
+	}
+}
