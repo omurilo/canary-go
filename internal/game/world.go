@@ -240,6 +240,39 @@ func (w *World) TempleByTownID(id uint16) (Position, bool) {
 	return p, ok
 }
 
+// ResolveRespawnTown returns the temple a player respawns at, mirroring
+// IOLoginData::loadPlayer (src/io/functions/iologindata_load_player.cpp:181-203):
+// the player's own town first, then "Thais", then the first valid town, and only
+// then the default spawn. canary assigns Thais to a character whose stored town
+// id does not exist on the map, instead of dumping them on the first town.
+func (w *World) ResolveRespawnTown(townID uint16, catalog *items.Catalog) Position {
+	walkable := func(pos Position) bool {
+		t := w.Map.GetTile(pos)
+		return t != nil && t.Walkable(catalog)
+	}
+	if t, ok := w.TempleByTownID(townID); ok && walkable(t) {
+		return t
+	}
+	if t, ok := w.TownTemple("Thais"); ok && walkable(t) {
+		return t
+	}
+	// First valid town by id, mirroring canary's ordered std::map iteration.
+	var best uint32
+	var bestPos Position
+	for id, pos := range w.TownsByID {
+		if id == 0 || !walkable(pos) {
+			continue
+		}
+		if best == 0 || uint32(id) < best {
+			best, bestPos = uint32(id), pos
+		}
+	}
+	if best != 0 {
+		return bestPos
+	}
+	return w.DefaultSpawn
+}
+
 // TownNameByID returns the town's name, or "" when unknown.
 func (w *World) TownNameByID(id uint16) string { return w.TownNames[id] }
 

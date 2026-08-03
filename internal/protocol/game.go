@@ -635,12 +635,9 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	// Resolve the player's temple (respawn point) from the OTBM towns. The SQL
 	// `towns` table only holds placeholder data, so trusting it sends dead
 	// players to a void tile ("limbo"); the OTBM town data has the real temple
-	// positions. Fall back to the default spawn when the town id is unknown or
-	// its tile is not walkable.
-	temple := g.deps.World.DefaultSpawn
-	if t, ok := g.deps.World.TempleByTownID(player.TownID); ok && g.deps.World.Map.GetTile(t).Walkable(g.deps.Items) {
-		temple = t
-	}
+	// positions. Like canary (IOLoginData::loadPlayer), an unknown town id falls
+	// back to Thais / the first valid town rather than the default spawn.
+	temple := g.deps.World.ResolveRespawnTown(player.TownID, g.deps.Items)
 	player.LoginPosition = temple
 
 	// Relocate to the temple if the stored tile has no ground (e.g. a fresh
