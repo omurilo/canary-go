@@ -194,6 +194,28 @@ func readItem(ps *propstream.PropStream) (*game.Item, error) {
 // IOMapSerialize::SaveHouseItemsGuard: the table is cleared and repopulated inside
 // one transaction, so a crash mid-save cannot leave houses half written.
 func (d *DB) SaveHouseItems(ctx context.Context, world *game.World) (int, error) {
+	// Count what a save would actually write, and what is already stored, BEFORE
+	// touching the table. SaveHouseItems used to unconditionally `DELETE FROM
+	// tile_store` and repopulate; a save that ran while the world had no house
+	// items in memory (a shutdown during a partial boot, or after a crash)
+	// permanently wiped every player-placed item — with no binlog or backup,
+	// unrecoverable. Refuse to wipe when there is nothing to write and rows exist.
+	saveable := 0
+	for _, house := range world.Houses {
+		for _, pos := range house.HouseTiles {
+			if tile := world.Map.GetTile(pos); tile != nil && encodeTile(tile, pos, world.Items) != nil {
+				saveable++
+			}
+		}
+	}
+	var existing int
+	if err := d.SQL.QueryRowContext(ctx, "SELECT COUNT(*) FROM `tile_store`").Scan(&existing); err != nil {
+		return 0, err
+	}
+	if saveable == 0 && existing > 0 {
+		return 0, fmt.Errorf("refusing to wipe %d tile_store rows: world has no saveable house items (partial boot?)", existing)
+	}
+
 	tx, err := d.SQL.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
