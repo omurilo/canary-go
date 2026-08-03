@@ -36,10 +36,12 @@ type World struct {
 	creatures           map[uint32]Creature
 	nextCreatureID      atomic.Uint32
 	guilds              map[uint32]*Guild
-	// bedSleepers tracks which player (creature id) is currently asleep in a bed,
-	// keyed by the bed tile. Mirrors Game::getBedSleeper / setBedSleeper. A bed
-	// with a sleeper refuses new occupants until the sleeper wakes or leaves.
-	bedSleepers map[Position]uint32
+	// bedSleepers tracks which player (by DB id, the GUID — stable across
+	// sessions) is asleep in a bed, keyed by the bed tile, plus the free bed item
+	// id to transform the occupied bed back to on wake. Mirrors Game::getBedSleeper
+	// / setBedSleeper. A bed with a sleeper refuses new occupants until the sleeper
+	// wakes or leaves.
+	bedSleepers map[Position]bedSleeper
 
 	Items               *items.Catalog
 	Monsters            *creatures.TypeRegistry
@@ -215,7 +217,7 @@ func NewWorld() *World {
 		byName:              make(map[string]*Player),
 		creatures:           make(map[uint32]Creature),
 		guilds:              make(map[uint32]*Guild),
-		bedSleepers:         make(map[Position]uint32),
+		bedSleepers:         make(map[Position]bedSleeper),
 		TypeRegistry:        creatures.NewTypeRegistry(),
 		Charms:              charms.NewRegistry(),
 		Imbuements:          imbuements.NewRegistry(),
@@ -417,8 +419,16 @@ func (w *World) AddPlayer(p *Player, sess Session) bool {
 	// A player who slept in a bed wakes up on login — free any bed they were in.
 	// The login may have moved them to a walkable tile next to the bed (the bed
 	// tile blocks movement), so scan rather than keying on the spawn position.
+	var wakeBeds []struct {
+		pos    Position
+		freeID uint16
+	}
 	for pos, sleeper := range w.bedSleepers {
-		if sleeper == p.DBID {
+		if sleeper.playerID == p.DBID {
+			wakeBeds = append(wakeBeds, struct {
+				pos    Position
+				freeID uint16
+			}{pos, sleeper.freeID})
 			delete(w.bedSleepers, pos)
 		}
 	}
@@ -426,6 +436,25 @@ func (w *World) AddPlayer(p *Player, sess Session) bool {
 	w.byName[key] = p
 	w.addCreatureToTile(p)
 	w.mu.Unlock()
+
+	// Transform each occupied bed the player slept in back to its free variant,
+	// outside the lock (TransformItem takes w.mu itself).
+	for _, b := range wakeBeds {
+		if b.freeID != 0 {
+			if tile := w.Map.GetTile(b.pos); tile != nil {
+				for _, it := range tile.Items {
+					if it == nil {
+						continue
+					}
+					if t := w.Items.Get(it.ID); t != nil && t.Type == items.ItemTypeBed {
+						w.TransformItem(b.pos, it, b.freeID)
+						break
+					}
+				}
+			}
+		}
+	}
+
 	if w.OnCreatureAppear != nil {
 		w.OnCreatureAppear(p)
 	}
@@ -449,18 +478,34 @@ func (w *World) RemovePlayer(id uint32) {
 	w.mu.Unlock()
 }
 
-// BedSleeper returns the creature id of the player asleep in the bed at pos,
-// or 0 when the bed is free.
+// bedSleeper records who is asleep in a bed and the free bed item id to
+// transform the occupied bed back to on wake.
+type bedSleeper struct {
+	playerID uint32 // DB id (GUID), stable across sessions
+	freeID   uint16 // the free bed item the occupied bed transforms back to
+}
+
+// BedSleeper returns the DB id of the player asleep in the bed at pos, or 0 when
+// the bed is free.
 func (w *World) BedSleeper(pos Position) uint32 {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	return w.bedSleepers[pos]
+	return w.bedSleepers[pos].playerID
 }
 
-// SetBedSleeper records playerID as asleep in the bed at pos.
-func (w *World) SetBedSleeper(pos Position, playerID uint32) {
+// BedFreeID returns the free bed item id for the occupied bed at pos (0 when
+// free). The sleeper's bed is transformed back to this id on wake.
+func (w *World) BedFreeID(pos Position) uint16 {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.bedSleepers[pos].freeID
+}
+
+// SetBedSleeper records playerID as asleep in the bed at pos, remembering the
+// free bed item id (freeID) to transform back to on wake.
+func (w *World) SetBedSleeper(pos Position, playerID uint32, freeID uint16) {
 	w.mu.Lock()
-	w.bedSleepers[pos] = playerID
+	w.bedSleepers[pos] = bedSleeper{playerID: playerID, freeID: freeID}
 	w.mu.Unlock()
 }
 

@@ -13,7 +13,7 @@ func TestBedSleeperLifecycle(t *testing.T) {
 		t.Fatalf("fresh bed has sleeper %d", got)
 	}
 
-	w.SetBedSleeper(pos, 8) // DB id of the sleeping player
+	w.SetBedSleeper(pos, 8, 694) // DB id of the sleeping player
 	if got := w.BedSleeper(pos); got != 8 {
 		t.Fatalf("after sleeping, sleeper = %d, want 8", got)
 	}
@@ -29,7 +29,7 @@ func TestBedSleeperLifecycle(t *testing.T) {
 func TestAddPlayerFreesBedSleeper(t *testing.T) {
 	w := NewWorld()
 	pos := Position{X: 100, Y: 100, Z: 7}
-	w.SetBedSleeper(pos, 99) // DBID 99 slept in this bed
+	w.SetBedSleeper(pos, 99, 694) // DBID 99 slept in this bed
 
 	p := &Player{DBID: 99, Name: "Sleeper"}
 	p.Pos = pos // they logged back in on the bed tile
@@ -45,7 +45,7 @@ func TestAddPlayerFreesBedSleeper(t *testing.T) {
 func TestAddPlayerKeepsForeignSleeper(t *testing.T) {
 	w := NewWorld()
 	bedPos := Position{X: 100, Y: 100, Z: 7}
-	w.SetBedSleeper(bedPos, 42) // another player (DBID 42) is asleep
+	w.SetBedSleeper(bedPos, 42, 700) // another player (DBID 42) is asleep
 
 	p := &Player{DBID: 99, Name: "Other"}
 	p.Pos = Position{X: 200, Y: 200, Z: 7}

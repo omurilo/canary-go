@@ -144,6 +144,13 @@ type ItemType struct {
 	WrapableTo         uint16
 	DestroyID          uint16
 
+	// TransformToOnUseMale / TransformToOnUseFemale are the "occupied bed"
+	// variants a bed transforms to when a player lies down (from
+	// maletransformto / femaletransformto in items.xml). Mirrors C++
+	// ItemType::transformToOnUse[sex].
+	TransformToOnUseMale   uint16
+	TransformToOnUseFemale uint16
+
 	// Stats stores values like "skillsword", "absorbpercentfire", "elementice", "magiclevelpoints", etc.
 	Stats map[string]int32
 

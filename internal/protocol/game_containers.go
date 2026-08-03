@@ -132,7 +132,7 @@ func (g *GameProtocol) useItem(pos netmsg.Position, itemID uint16, stackpos, ind
 	// the behaviour lives in the item type — so this runs after the Lua-action
 	// branch.
 	if t.Type == items.ItemTypeBed {
-		g.useBed(gamePos)
+		g.useBed(item, gamePos)
 		return
 	}
 
@@ -277,7 +277,7 @@ func (g *GameProtocol) useItem(pos netmsg.Position, itemID uint16, stackpos, ind
 // already occupied by someone else refuses the attempt with a poof; using the
 // bed you sleep in wakes you up. The player's position is set to the bed before
 // the logout, so their next login places them there to wake up.
-func (g *GameProtocol) useBed(pos game.Position) {
+func (g *GameProtocol) useBed(item *game.Item, pos game.Position) {
 	world := g.deps.World
 	sleeper := world.BedSleeper(pos)
 	if sleeper != 0 && sleeper != g.player.DBID {
@@ -288,17 +288,34 @@ func (g *GameProtocol) useBed(pos game.Position) {
 		return
 	}
 	if sleeper == g.player.DBID {
-		// Waking up — using the bed you are lying in frees it.
+		// Waking up — transform the occupied bed back to the free bed and free it.
+		if freeID := world.BedFreeID(pos); freeID != 0 {
+			world.TransformItem(pos, item, freeID)
+		}
 		world.RemoveBedSleeper(pos)
 		return
 	}
 
 	// Claim the bed by the player's DB id (their "GUID", as C++ setBedSleeper
 	// uses g_game().getGUID) — the creature id changes every session, so keying
-	// on it would never match on a later login. Move the player onto it, show the
-	// Zzz effect and log the player out at the bed; addPlayer frees the sleeper
-	// when they come back.
-	world.SetBedSleeper(pos, g.player.DBID)
+	// on it would never match on a later login. Transform the free bed into its
+	// occupied variant so the client shows the sleeper lying there (C++
+	// BedItem::updateAppearance), then move the player onto it, show the Zzz
+	// effect and log the player out at the bed; addPlayer frees the sleeper when
+	// they come back.
+	freeID := item.ID
+	occupiedID := uint16(0)
+	if t := g.deps.Items.Get(freeID); t != nil {
+		if g.player.Sex == 1 { // PLAYERSEX_MALE
+			occupiedID = t.TransformToOnUseMale
+		} else {
+			occupiedID = t.TransformToOnUseFemale
+		}
+	}
+	world.SetBedSleeper(pos, g.player.DBID, freeID)
+	if occupiedID != 0 {
+		world.TransformItem(pos, item, occupiedID)
+	}
 	g.broadcastRemove(g.player)
 	world.SetPosition(g.player, pos)
 	g.broadcastAppear(g.player)
