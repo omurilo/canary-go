@@ -7,6 +7,7 @@ import (
 
 	"github.com/omurilo/canary-go/internal/actions"
 	"github.com/omurilo/canary-go/internal/game"
+	"github.com/omurilo/canary-go/internal/items"
 	"github.com/omurilo/canary-go/internal/netmsg"
 )
 
@@ -124,6 +125,15 @@ func (g *GameProtocol) useItem(pos netmsg.Position, itemID uint16, stackpos, ind
 			}
 			return // Handled by Lua script
 		}
+	}
+
+	// Beds: using a free bed makes the player lie down and log out, mirroring
+	// BedItem::sleep (src/items/bed.cpp). There is no datapack action for beds —
+	// the behaviour lives in the item type — so this runs after the Lua-action
+	// branch.
+	if t.Type == items.ItemTypeBed {
+		g.useBed(gamePos)
+		return
 	}
 
 	// Fallback to FloorChange if the item has it
@@ -259,6 +269,44 @@ func (g *GameProtocol) useItem(pos netmsg.Position, itemID uint16, stackpos, ind
 		g.SendToClient(w)
 
 		g.broadcastAppear(p)
+	}
+}
+
+// useBed handles using a bed item (ItemTypeBed): the player lies down on the
+// bed and logs out, mirroring BedItem::sleep (src/items/bed.cpp:168). A bed
+// already occupied by someone else refuses the attempt with a poof; using the
+// bed you sleep in wakes you up. The player's position is set to the bed before
+// the logout, so their next login places them there to wake up.
+func (g *GameProtocol) useBed(pos game.Position) {
+	world := g.deps.World
+	sleeper := world.BedSleeper(pos)
+	if sleeper != 0 && sleeper != g.player.DBID {
+		if world.OnMagicEffect != nil {
+			world.OnMagicEffect(pos, 2) // CONST_ME_POFF
+		}
+		g.sendCancelMessage("This bed is already in use.")
+		return
+	}
+	if sleeper == g.player.DBID {
+		// Waking up — using the bed you are lying in frees it.
+		world.RemoveBedSleeper(pos)
+		return
+	}
+
+	// Claim the bed by the player's DB id (their "GUID", as C++ setBedSleeper
+	// uses g_game().getGUID) — the creature id changes every session, so keying
+	// on it would never match on a later login. Move the player onto it, show the
+	// Zzz effect and log the player out at the bed; addPlayer frees the sleeper
+	// when they come back.
+	world.SetBedSleeper(pos, g.player.DBID)
+	g.broadcastRemove(g.player)
+	world.SetPosition(g.player, pos)
+	g.broadcastAppear(g.player)
+	if world.OnMagicEffect != nil {
+		world.OnMagicEffect(pos, 22) // CONST_ME_SLEEP
+	}
+	if g.conn != nil {
+		g.conn.Close()
 	}
 }
 

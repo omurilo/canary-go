@@ -400,4 +400,6 @@ const (
 
 	constMeMagicBlue uint16 = 12
 	constMeTeleport  uint16 = 11
+	// CONST_ME_SLEEP (the "Zzz" bubbles) shown when a player lies down in a bed.
+	constMeSleep uint16 = 22
 )

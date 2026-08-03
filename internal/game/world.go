@@ -36,6 +36,10 @@ type World struct {
 	creatures           map[uint32]Creature
 	nextCreatureID      atomic.Uint32
 	guilds              map[uint32]*Guild
+	// bedSleepers tracks which player (creature id) is currently asleep in a bed,
+	// keyed by the bed tile. Mirrors Game::getBedSleeper / setBedSleeper. A bed
+	// with a sleeper refuses new occupants until the sleeper wakes or leaves.
+	bedSleepers map[Position]uint32
 
 	Items               *items.Catalog
 	Monsters            *creatures.TypeRegistry
@@ -211,6 +215,7 @@ func NewWorld() *World {
 		byName:              make(map[string]*Player),
 		creatures:           make(map[uint32]Creature),
 		guilds:              make(map[uint32]*Guild),
+		bedSleepers:         make(map[Position]uint32),
 		TypeRegistry:        creatures.NewTypeRegistry(),
 		Charms:              charms.NewRegistry(),
 		Imbuements:          imbuements.NewRegistry(),
@@ -409,6 +414,11 @@ func (w *World) AddPlayer(p *Player, sess Session) bool {
 	p.World = w
 	p.Session = sess
 	p.ensureDefaults()
+	// A player who slept in a bed logs back in on the bed tile; free the bed so
+	// it is usable again (C++ BedItem::checkSleeper on login).
+	if w.bedSleepers[p.Pos] == p.DBID {
+		delete(w.bedSleepers, p.Pos)
+	}
 	w.players[p.ID] = p
 	w.byName[key] = p
 	w.addCreatureToTile(p)
@@ -433,6 +443,28 @@ func (w *World) RemovePlayer(id uint32) {
 		}
 		return
 	}
+	w.mu.Unlock()
+}
+
+// BedSleeper returns the creature id of the player asleep in the bed at pos,
+// or 0 when the bed is free.
+func (w *World) BedSleeper(pos Position) uint32 {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.bedSleepers[pos]
+}
+
+// SetBedSleeper records playerID as asleep in the bed at pos.
+func (w *World) SetBedSleeper(pos Position, playerID uint32) {
+	w.mu.Lock()
+	w.bedSleepers[pos] = playerID
+	w.mu.Unlock()
+}
+
+// RemoveBedSleeper frees the bed at pos.
+func (w *World) RemoveBedSleeper(pos Position) {
+	w.mu.Lock()
+	delete(w.bedSleepers, pos)
 	w.mu.Unlock()
 }
 
