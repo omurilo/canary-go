@@ -164,13 +164,12 @@ func (g *GameProtocol) deliverToOfflineInbox(item *game.Item, recipientID uint32
 // variant (3506 / 3504) preserving writer, date and text attributes.
 func (g *GameProtocol) makeStampedItem(item *game.Item) *game.Item {
 	stamped := &game.Item{
-		ID:         item.ID + 1,
-		Count:      item.Count,
-		Attributes: item.Attributes,
-		Contents:   item.Contents,
+		ID:       item.ID + 1,
+		Count:    item.Count,
+		Contents: item.Contents,
 	}
 	if item.Attr != nil {
-		stamped.Attr = &game.ItemAttributes{}
+		stamped.Attr = &game.ItemAttributes{Raw: item.RawAttributes()}
 		if item.Attr.Text != nil {
 			t := *item.Attr.Text
 			stamped.Attr.Text = &t

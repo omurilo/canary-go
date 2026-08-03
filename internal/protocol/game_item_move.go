@@ -215,7 +215,7 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	if moveCount >= item.Count {
 		moveItem = item
 	} else {
-		moveItem = &game.Item{ID: item.ID, Count: moveCount, Attributes: item.Attributes}
+		moveItem = &game.Item{ID: item.ID, Count: moveCount, Attr: &game.ItemAttributes{Raw: item.RawAttributes()}}
 		item.Count -= moveCount
 	}
 

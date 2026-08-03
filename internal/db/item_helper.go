@@ -34,16 +34,21 @@ func (d *DB) loadItemsFromTable(ctx context.Context, playerID uint32, tableName 
 		}
 
 		item := &game.Item{
-			ID:         itemtype,
-			Count:      count,
-			Attributes: attrs,
+			ID:    itemtype,
+			Count: count,
 		}
-		
+
 		if attr, subType, err := game.DecodeItemAttributes(attrs, count); err != nil {
 			slog.Default().Warn("failed to decode item attributes; preserving raw blob",
 				"player_id", playerID, "itemtype", itemtype, "table", tableName, "err", err)
+			// Keep the undecodable blob so a later save round-trips it verbatim.
+			item.Attr = &game.ItemAttributes{Raw: attrs}
 		} else {
-			item.Attr = attr
+			// attr is nil when the blob is empty (the common case); leave Attr nil.
+			if attr != nil {
+				attr.Raw = attrs
+				item.Attr = attr
+			}
 			item.Count = subType
 		}
 		if imbs := game.DecodeImbuementBlob(attrs); len(imbs) > 0 {

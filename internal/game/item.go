@@ -21,14 +21,10 @@ type Item struct {
 	Count uint16
 
 	// Attr holds the decoded OTBR attribute TLV stream. Nil when the item has
-	// no attributes. Decoded fields are authoritative over the raw blob.
+	// no attributes (the common case: the vast majority of map items carry
+	// none). Decoded fields are authoritative over the raw blob, which is kept
+	// inside ItemAttributes.Raw for undecodable blobs.
 	Attr *ItemAttributes
-
-	// Attributes is the raw OTBR blob, kept as a round-trip fallback for blobs
-	// that DecodeItemAttributes could not fully model (e.g. nested custom
-	// attributes). It is written back verbatim on save only when Attr is nil;
-	// otherwise Attr is authoritative.
-	Attributes []byte
 
 	// Contents holds the items inside a container item (chest, bag, ...), in
 	// stack order. Empty for non-containers.
@@ -56,6 +52,16 @@ type Item struct {
 type ImbuementInfo struct {
 	ID       uint16
 	Duration uint32
+}
+
+// RawAttributes returns the raw OTBR blob kept for round-tripping, or nil.
+// The blob moved from Item into ItemAttributes so that items without any
+// attributes do not carry a 24-byte slice header each.
+func (i *Item) RawAttributes() []byte {
+	if i == nil || i.Attr == nil {
+		return nil
+	}
+	return i.Attr.Raw
 }
 
 // HasPagination returns whether this container supports paginated browsing
@@ -446,6 +452,14 @@ type ItemAttributes struct {
 	// the quick-loot assignment per container instance, like C++.
 	QuickLootContainer *uint32
 	ObtainContainer    *uint32
+
+	// Raw is the raw OTBR attribute blob, kept as a round-trip fallback for
+	// blobs that DecodeItemAttributes could not fully model (e.g. nested custom
+	// attributes). It is written back verbatim on save when Encode produces no
+	// bytes (i.e. the item has no decoded attributes). Keeping it here rather
+	// than on Item saves 24 bytes of slice header on every item that has no
+	// attributes at all — the common case on the map.
+	Raw []byte
 
 	// Custom holds ATTR_CUSTOM: arbitrary script-defined values keyed by name, the
 	// Go side of Item::setCustomAttribute. C++ stores int64, double, string or bool

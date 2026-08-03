@@ -111,9 +111,10 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 		if item.Attr != nil {
 			if b := item.Attr.Encode(item.Count); len(b) > 0 {
 				attrs = b
+			} else if len(item.Attr.Raw) > 0 {
+				// No decoded fields (an undecodable blob): round-trip it verbatim.
+				attrs = item.Attr.Raw
 			}
-		} else if len(item.Attributes) > 0 {
-			attrs = item.Attributes
 		}
 		if imbBlob := game.EncodeImbuementBlob(item.Imbuements); len(imbBlob) > 0 {
 			attrs = append(attrs, imbBlob...)
