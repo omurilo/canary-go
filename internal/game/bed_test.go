@@ -56,3 +56,29 @@ func TestAddPlayerKeepsForeignSleeper(t *testing.T) {
 		t.Fatalf("foreign bed lost its sleeper: got %d, want 42", got)
 	}
 }
+// A two-tile bed records the sleeper on BOTH halves, so PlayerBedParts returns
+// each part with its own free item id for the wake transform.
+func TestPlayerBedPartsReturnsBothHalves(t *testing.T) {
+	w := NewWorld()
+	pillow := Position{X: 100, Y: 100, Z: 7}
+	blanket := Position{X: 101, Y: 100, Z: 7}
+	w.SetBedSleeper(pillow, 8, 694)
+	w.SetBedSleeper(blanket, 8, 695)
+
+	parts := w.PlayerBedParts(8)
+	if len(parts) != 2 {
+		t.Fatalf("PlayerBedParts(8) = %d entries, want 2", len(parts))
+	}
+	freeIDs := map[uint16]bool{}
+	for _, p := range parts {
+		freeIDs[p.FreeID] = true
+	}
+	if !freeIDs[694] || !freeIDs[695] {
+		t.Errorf("free ids = %v, want both 694 and 695", freeIDs)
+	}
+
+	// Another player must not see these parts.
+	if got := w.PlayerBedParts(99); len(got) != 0 {
+		t.Errorf("PlayerBedParts(99) = %d entries, want 0", len(got))
+	}
+}

@@ -150,6 +150,9 @@ type ItemType struct {
 	// ItemType::transformToOnUse[sex].
 	TransformToOnUseMale   uint16
 	TransformToOnUseFemale uint16
+	// BedPartOf is the partner item id of the other half of a two-tile bed (from
+	// bedpartof in items.xml), used to transform both parts when a player sleeps.
+	BedPartOf uint16
 
 	// Stats stores values like "skillsword", "absorbpercentfire", "elementice", "magiclevelpoints", etc.
 	Stats map[string]int32

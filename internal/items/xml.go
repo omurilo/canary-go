@@ -142,6 +142,10 @@ func processAttr(it *ItemType, attr xmlAttribute) {
 		if v, err := strconv.ParseUint(attr.Value, 10, 16); err == nil {
 			it.TransformToOnUseFemale = uint16(v)
 		}
+	case "bedpartof":
+		if v, err := strconv.ParseUint(attr.Value, 10, 16); err == nil {
+			it.BedPartOf = uint16(v)
+		}
 	case "fluidsource", "fluidSource":
 		var fluidType uint16
 		switch strings.ToLower(attr.Value) {

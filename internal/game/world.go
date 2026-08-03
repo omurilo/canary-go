@@ -516,6 +516,27 @@ func (w *World) RemoveBedSleeper(pos Position) {
 	w.mu.Unlock()
 }
 
+// BedPart is one tile of an occupied bed: its position and the free bed item id
+// it must transform back to on wake.
+type BedPart struct {
+	Pos    Position
+	FreeID uint16
+}
+
+// PlayerBedParts returns every bed part the given player is currently asleep in
+// (a two-tile bed yields two entries). Used to restore the bed on wake.
+func (w *World) PlayerBedParts(playerID uint32) []BedPart {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	var out []BedPart
+	for pos, s := range w.bedSleepers {
+		if s.playerID == playerID {
+			out = append(out, BedPart{Pos: pos, FreeID: s.freeID})
+		}
+	}
+	return out
+}
+
 // PlayerByID returns an online player or nil (by creature ID).
 func (w *World) PlayerByID(id uint32) *Player {
 	w.mu.RLock()

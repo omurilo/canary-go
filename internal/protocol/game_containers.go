@@ -288,34 +288,50 @@ func (g *GameProtocol) useBed(item *game.Item, pos game.Position) {
 		return
 	}
 	if sleeper == g.player.DBID {
-		// Waking up — transform the occupied bed back to the free bed and free it.
-		if freeID := world.BedFreeID(pos); freeID != 0 {
-			world.TransformItem(pos, item, freeID)
+		// Waking up — transform every occupied part of this bed back to its free
+		// variant and free the sleeper entries.
+		for _, part := range world.PlayerBedParts(g.player.DBID) {
+			if tile := world.Map.GetTile(part.Pos); tile != nil {
+				for _, it := range tile.Items {
+					if it == nil {
+						continue
+					}
+					if t := g.deps.Items.Get(it.ID); t != nil && t.Type == items.ItemTypeBed {
+						world.TransformItem(part.Pos, it, part.FreeID)
+						break
+					}
+				}
+			}
+			world.RemoveBedSleeper(part.Pos)
 		}
-		world.RemoveBedSleeper(pos)
 		return
 	}
 
 	// Claim the bed by the player's DB id (their "GUID", as C++ setBedSleeper
 	// uses g_game().getGUID) — the creature id changes every session, so keying
-	// on it would never match on a later login. Transform the free bed into its
-	// occupied variant so the client shows the sleeper lying there (C++
-	// BedItem::updateAppearance), then move the player onto it, show the Zzz
-	// effect and log the player out at the bed; addPlayer frees the sleeper when
-	// they come back.
+	// on it would never match on a later login. Transform the free bed (and, for a
+	// two-tile bed, its partner half) into the occupied variant so the client
+	// shows the sleeper lying there (C++ BedItem::updateAppearance), then move the
+	// player onto it, show the Zzz effect and log the player out at the bed;
+	// addPlayer frees the sleeper when they come back.
 	freeID := item.ID
-	occupiedID := uint16(0)
-	if t := g.deps.Items.Get(freeID); t != nil {
-		if g.player.Sex == 1 { // PLAYERSEX_MALE
-			occupiedID = t.TransformToOnUseMale
-		} else {
-			occupiedID = t.TransformToOnUseFemale
-		}
-	}
+	occupiedID := g.bedOccupiedVariant(freeID)
 	world.SetBedSleeper(pos, g.player.DBID, freeID)
 	if occupiedID != 0 {
 		world.TransformItem(pos, item, occupiedID)
 	}
+
+	// Two-tile bed: transform the partner half too, and mark both parts as the
+	// sleeper so the occupied check and wake cover either half.
+	if t := g.deps.Items.Get(freeID); t != nil && t.BedPartOf != 0 {
+		if partItem, partPos := findBedPart(world, pos, t.BedPartOf); partItem != nil {
+			if partOcc := g.bedOccupiedVariant(partItem.ID); partOcc != 0 {
+				world.TransformItem(partPos, partItem, partOcc)
+			}
+			world.SetBedSleeper(partPos, g.player.DBID, partItem.ID)
+		}
+	}
+
 	g.broadcastRemove(g.player)
 	world.SetPosition(g.player, pos)
 	g.broadcastAppear(g.player)
@@ -325,6 +341,38 @@ func (g *GameProtocol) useBed(item *game.Item, pos game.Position) {
 	if g.conn != nil {
 		g.conn.Close()
 	}
+}
+
+// bedOccupiedVariant returns the occupied-bed variant id for a given bed type id
+// and the player's sex, or 0 when the type has no such transform.
+func (g *GameProtocol) bedOccupiedVariant(id uint16) uint16 {
+	t := g.deps.Items.Get(id)
+	if t == nil {
+		return 0
+	}
+	if g.player.Sex == 1 { // PLAYERSEX_MALE
+		return t.TransformToOnUseMale
+	}
+	return t.TransformToOnUseFemale
+}
+
+// findBedPart locates the partner half of a two-tile bed (an item with id
+// partnerID) on a tile adjacent to center, returning it and its position.
+func findBedPart(w *game.World, center game.Position, partnerID uint16) (*game.Item, game.Position) {
+	offsets := [8][2]int{{0, -1}, {1, 0}, {0, 1}, {-1, 0}, {1, -1}, {1, 1}, {-1, 1}, {-1, -1}}
+	for _, off := range offsets {
+		p := game.Position{X: uint16(int(center.X) + off[0]), Y: uint16(int(center.Y) + off[1]), Z: center.Z}
+		tile := w.Map.GetTile(p)
+		if tile == nil {
+			continue
+		}
+		for _, it := range tile.Items {
+			if it != nil && it.ID == partnerID {
+				return it, p
+			}
+		}
+	}
+	return nil, game.Position{}
 }
 
 // reconcileUsedItem updates the client after a use-action mutated an item's
