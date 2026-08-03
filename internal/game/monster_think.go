@@ -240,7 +240,7 @@ func (m *Monster) placeSummon(w *World, s *creatures.MonsterSummon) {
 	if mType == nil {
 		return
 	}
-	pos, ok := w.freeTileAround(m.GetPosition(), s.Force)
+	pos, ok := w.FreeTileAround(m.GetPosition(), s.Force)
 	if !ok {
 		return
 	}
@@ -258,10 +258,10 @@ func (m *Monster) placeSummon(w *World, s *creatures.MonsterSummon) {
 	}
 }
 
-// freeTileAround finds a walkable tile adjacent to center. With force set the
+// FreeTileAround finds a walkable tile adjacent to center. With force set the
 // occupancy check is skipped, which is how upstream's placeCreature(force=true)
 // lets a boss summon into a crowded room.
-func (w *World) freeTileAround(center Position, force bool) (Position, bool) {
+func (w *World) FreeTileAround(center Position, force bool) (Position, bool) {
 	offsets := [8][2]int{{0, -1}, {1, 0}, {0, 1}, {-1, 0}, {1, -1}, {1, 1}, {-1, 1}, {-1, -1}}
 	for _, off := range offsets {
 		pos := Position{X: uint16(int(center.X) + off[0]), Y: uint16(int(center.Y) + off[1]), Z: center.Z}

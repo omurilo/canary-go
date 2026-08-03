@@ -644,9 +644,16 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 	player.LoginPosition = temple
 
 	// Relocate to the temple if the stored tile has no ground (e.g. a fresh
-	// character, or a stored position outside the loaded map).
+	// character, or a stored position outside the loaded map). A tile that
+	// exists but blocks movement — the bed a player slept in logs them out ON
+	// the bed — wakes them on the nearest walkable tile next to it instead of
+	// teleporting them to the temple.
 	if !g.deps.World.Map.GetTile(player.Pos).Walkable(g.deps.Items) {
-		player.Pos = temple
+		if pos, ok := g.deps.World.FreeTileAround(player.Pos, false); ok {
+			player.Pos = pos
+		} else {
+			player.Pos = temple
+		}
 	}
 
 	if !g.deps.World.AddPlayer(player, g) {

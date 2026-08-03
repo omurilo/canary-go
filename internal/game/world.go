@@ -414,10 +414,13 @@ func (w *World) AddPlayer(p *Player, sess Session) bool {
 	p.World = w
 	p.Session = sess
 	p.ensureDefaults()
-	// A player who slept in a bed logs back in on the bed tile; free the bed so
-	// it is usable again (C++ BedItem::checkSleeper on login).
-	if w.bedSleepers[p.Pos] == p.DBID {
-		delete(w.bedSleepers, p.Pos)
+	// A player who slept in a bed wakes up on login — free any bed they were in.
+	// The login may have moved them to a walkable tile next to the bed (the bed
+	// tile blocks movement), so scan rather than keying on the spawn position.
+	for pos, sleeper := range w.bedSleepers {
+		if sleeper == p.DBID {
+			delete(w.bedSleepers, pos)
+		}
 	}
 	w.players[p.ID] = p
 	w.byName[key] = p
