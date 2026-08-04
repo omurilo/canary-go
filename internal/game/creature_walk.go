@@ -38,6 +38,9 @@ const (
 // answer is clamped to 1 rather than allowed to be zero — a zero would divide
 // by zero in the duration formula.
 func CalculatedStepSpeed(stepSpeed int) uint16 {
+	if stepSpeed < 10 {
+		stepSpeed = 10
+	}
 	if float64(stepSpeed) <= -speedB {
 		return 1
 	}

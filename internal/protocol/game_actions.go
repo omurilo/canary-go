@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -448,23 +449,23 @@ func (g *GameProtocol) walkPath(dirs []game.Direction, gen uint64) {
 // the server beat), tripled on the diagonal.
 func (g *GameProtocol) stepDuration(dir game.Direction) time.Duration {
 	speed := g.player.GetSpeed()
-	if speed == 0 {
-		speed = 220
+	if speed < 10 {
+		speed = 10
 	}
-	stepSpeed := game.CalculatedStepSpeed(int(speed))
-	groundSpeed := uint16(150)
+	stepSpeed := float64(game.CalculatedStepSpeed(int(speed)))
+	groundSpeed := float64(150)
 	if tile := g.deps.World.Map.GetTile(g.player.Pos); tile != nil && tile.Ground != nil {
 		if t := g.deps.Items.Get(tile.Ground.ID); t != nil && t.GroundSpeed > 0 {
-			groundSpeed = t.GroundSpeed
+			groundSpeed = float64(t.GroundSpeed)
 		}
 	}
-	const beat = 50
-	d := 1000 * int(groundSpeed) / int(stepSpeed)
-	d = ((d + beat - 1) / beat) * beat
+	const beat = 50.0
+	dur := math.Floor(1000.0 * groundSpeed / stepSpeed)
+	duration := int(math.Ceil(dur/beat) * beat)
 	if dir == game.DirNE || dir == game.DirNW || dir == game.DirSE || dir == game.DirSW {
-		d *= 3 // WALK_DIAGONAL_EXTRA_COST
+		duration *= 3 // WALK_DIAGONAL_EXTRA_COST
 	}
-	return time.Duration(d) * time.Millisecond
+	return time.Duration(duration) * time.Millisecond
 }
 
 // sendMapShift sends the newly revealed strip after the player moved.
