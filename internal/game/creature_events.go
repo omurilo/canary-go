@@ -1,6 +1,9 @@
 package game
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 // Spectator notification: telling the creatures around a change that it
 // happened. This is Game::internalPlaceCreature / removeCreature /
@@ -80,11 +83,12 @@ func (w *World) notifyCreatureMove(c Creature, oldPos, newPos Position) {
 		switch s := spectator.(type) {
 		case *Monster:
 			s.OnCreatureMove(w, c, oldPos, newPos)
-		case *Npc:
-			s.OnCreatureMove(w, c, oldPos, newPos)
 		case *Player:
 			if s.GetFollowTarget() == c {
-				w.StepFollow(s)
+				follower := s
+				GlobalDispatcher.AddEvent(100*time.Millisecond, func() {
+					w.StepFollow(follower)
+				})
 			}
 		}
 	}
@@ -102,10 +106,6 @@ func (w *World) notifyCreatureMove(c Creature, oldPos, newPos Position) {
 		self.OnCreatureWalk()
 	case *Monster:
 		self.OnCreatureMove(w, self, oldPos, newPos)
-	case *Player:
-		if self.GetFollowTarget() != nil {
-			w.StepFollow(self)
-		}
 	}
 }
 
