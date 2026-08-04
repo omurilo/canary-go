@@ -152,6 +152,7 @@ type World struct {
 	// fires it on every think, so a monster visibly faces its target.
 	OnCreatureTurn   func(c Creature)
 	OnCastSpell      func(name string, caster Creature, target Creature) bool
+	OnCastRuneSpell  func(runeID uint16, caster Creature, target Creature, pos Position) bool
 	OnTargetTile     func(funcName string, caster Creature, pos Position)
 	OnTargetCreature func(funcName string, caster Creature, target Creature)
 	OnChangeSpeed    func(c Creature)

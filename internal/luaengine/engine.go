@@ -93,6 +93,24 @@ func New(world *game.World, log *slog.Logger) *Engine {
 			}
 			return e.RunSpell(sp, caster, vtype, targetID, pos)
 		}
+		world.OnCastRuneSpell = func(runeID uint16, caster game.Creature, target game.Creature, targetPos game.Position) bool {
+			sp := spells.FindByRuneID(runeID)
+			if sp == nil {
+				return false
+			}
+			targetID := uint32(0)
+			pos := targetPos
+			vtype := VariantPosition
+			if target != nil {
+				targetID = target.GetID()
+				pos = target.GetPosition()
+				vtype = VariantNumber
+			} else if pos.X == 0 && pos.Y == 0 && caster != nil {
+				pos = caster.GetPosition()
+				vtype = VariantPosition
+			}
+			return e.RunSpell(sp, caster, vtype, targetID, pos)
+		}
 		world.OnTargetTile = func(funcName string, caster game.Creature, pos game.Position) {
 			fn := e.L.GetGlobal(funcName)
 			if fn.Type() != lua.LTFunction {

@@ -67,7 +67,7 @@ var spellMethods = map[string]lua.LGFunction{
 	// this slice yet (rune items aren't wired to cast), but every rune script
 	// calls them, so accept-and-ignore keeps them loading. setPzLocked is an
 	// alias for pzLock and maps to the real field.
-	"runeId":      spellNoop,
+	"runeId":                      spellRuneId,
 	"onCastSpell":                 spellOnCastSpell,
 	"charges":                     spellNoop,
 	"allowFarUse":                 spellNoop,
@@ -269,6 +269,14 @@ func spellAllowOnSelf(L *lua.LState) int {
 func spellPzLock(L *lua.LState) int {
 	s := checkSpell(L)
 	s.PzLock = luaOptBool(L, 2)
+	return spellSelf(L)
+}
+
+func spellRuneId(L *lua.LState) int {
+	s := checkSpell(L)
+	if L.GetTop() >= 2 {
+		s.RuneID = uint16(L.CheckNumber(2))
+	}
 	return spellSelf(L)
 }
 

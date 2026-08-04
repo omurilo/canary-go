@@ -19,8 +19,7 @@ func (g *GameProtocol) sendBrowseField(pos game.Position) {
 
 	// Collect items from the tile (C++ uses tile->getItemList() which excludes Ground).
 	var items []*game.Item
-	for i := len(tile.Items) - 1; i >= 0; i-- {
-		it := tile.Items[i]
+	for _, it := range tile.Items {
 		if it == nil {
 			continue
 		}

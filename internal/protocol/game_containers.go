@@ -824,8 +824,6 @@ func (g *GameProtocol) useItemWith(fromPos netmsg.Position, fromItemID uint16, f
 			}
 		}
 
-		fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
-		toGamePos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
 		beforeCount := fromItem.Count
 		if g.deps.Lua.CallAction(action, g.player, fromItem, fromGamePos, toItem, toGamePos, false) {
 			if isEx {
@@ -838,6 +836,32 @@ func (g *GameProtocol) useItemWith(fromPos netmsg.Position, fromItemID uint16, f
 			}
 			if fromItem.Count != beforeCount {
 				g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
+			}
+			return
+		}
+	}
+
+	// Try rune spell if action is nil
+	if action == nil && g.deps.World.OnCastRuneSpell != nil {
+		if !g.player.CanDoAction() {
+			g.sendCancelMessage("You are exhausted.")
+			return
+		}
+		var targetCreature game.Creature
+		if tile := g.deps.World.Map.GetTile(toGamePos); tile != nil {
+			if len(tile.Creatures) > 0 {
+				targetCreature = tile.Creatures[0]
+			}
+		}
+		beforeCount := fromItem.Count
+		if g.deps.World.OnCastRuneSpell(fromItem.ID, g.player, targetCreature, toGamePos) {
+			g.player.SetNextAction(200 * time.Millisecond)
+			g.SendUseItemCooldown(200)
+			if fromItem.Count > 0 {
+				fromItem.Count--
+				if fromItem.Count != beforeCount {
+					g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
+				}
 			}
 			return
 		}
@@ -933,6 +957,27 @@ func (g *GameProtocol) useWithCreature(fromPos netmsg.Position, fromItemID uint1
 			}
 			if fromItem.Count != beforeCount {
 				g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
+			}
+			return
+		}
+	}
+
+	// Try rune spell if action is nil
+	if action == nil && g.deps.World.OnCastRuneSpell != nil {
+		if !g.player.CanDoAction() {
+			g.sendCancelMessage("You are exhausted.")
+			return
+		}
+		targetPos := targetCreature.GetPosition()
+		beforeCount := fromItem.Count
+		if g.deps.World.OnCastRuneSpell(fromItem.ID, g.player, targetCreature, targetPos) {
+			g.player.SetNextAction(200 * time.Millisecond)
+			g.SendUseItemCooldown(200)
+			if fromItem.Count > 0 {
+				fromItem.Count--
+				if fromItem.Count != beforeCount {
+					g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
+				}
 			}
 			return
 		}
