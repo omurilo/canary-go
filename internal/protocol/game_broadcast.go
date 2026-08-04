@@ -162,6 +162,7 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 		if !gp.canSee(newPos) {
 			continue
 		}
+		gp.setKnown(c.GetID(), false)
 		gp.SendAppendCreature(c, newPos)
 	}
 }
@@ -170,6 +171,7 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 func BroadcastCreatureAppear(w *game.World, c game.Creature) {
 	for _, s := range w.Spectators(c.GetPosition(), c.GetID()) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
+			gp.setKnown(c.GetID(), false)
 			gp.SendAppendCreature(c, c.GetPosition())
 		}
 	}

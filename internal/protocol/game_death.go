@@ -9,6 +9,7 @@ import (
 // (opcode 0x64). Used after a teleport (Lua teleportTo, temple respawn) so the
 // player's own screen follows the jump.
 func (g *GameProtocol) sendFullMapAt(pos game.Position) {
+	g.clearKnown()
 	w := netmsg.NewWriter()
 	w.AddByte(opFullMap)
 	w.AddPosition(netmsg.Position{X: pos.X, Y: pos.Y, Z: pos.Z})

@@ -227,6 +227,12 @@ func (g *GameProtocol) setKnown(id uint32, known bool) {
 	}
 }
 
+func (g *GameProtocol) clearKnown() {
+	g.knownMu.Lock()
+	defer g.knownMu.Unlock()
+	g.known = make(map[uint32]bool)
+}
+
 // openContainerByCID returns the container open under a client cid, preserving
 // the (item, ok) shape callers expect. The open-container state is the single
 // source of truth on game.Player (see Player.openContainers).
