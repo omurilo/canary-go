@@ -397,9 +397,11 @@ func (g *GameProtocol) addMapDescription(w *netmsg.Writer, x, y int, z uint8, wi
 // ClientIndexOfCreature ports Tile::getClientIndexOfCreature
 // (src/items/tile.cpp:1433). It is the index this client's tile stack assigns to
 // creatureID: ground, then always-on-top items, then the creatures ABOVE the
-// target that this player can see — walked in reverse, because the client stacks
-// the most recently added creature lowest. Returns -1 when the creature is not on
-// the tile, exactly like the C++; -1 means "send no packet", not "stackpos 0".
+// target that this player can see. Walked in the same order the client draws the
+// pile — ground, always-on-top items, then the visible creatures below the target
+// — so the index it returns is the target's slot in the client's stack.
+// Returns -1 when the creature is not on the tile, exactly like the C++; -1 means
+// "send no packet", not "stackpos 0".
 //
 // Note the upstream method has no cap: the 10-thing limit is applied by the
 // sender (sendMoveCreature falls back to remove+add when oldStackPos >= 10), not
@@ -413,6 +415,10 @@ func (g *GameProtocol) ClientIndexOfCreature(pos game.Position, creatureID uint3
 // clientIndexOfCreatureLocked is ClientIndexOfCreature for callers that already
 // hold the world lock (the pre-removal capture runs inside it).
 func (g *GameProtocol) clientIndexOfCreatureLocked(pos game.Position, creatureID uint32) int {
+	// Tile::getClientIndexOfCreature (tile.cpp:1433) returns -1 with no viewer.
+	if g.player == nil {
+		return -1
+	}
 	tile := g.deps.World.Map.GetTile(pos)
 	if tile == nil {
 		return -1
@@ -426,6 +432,12 @@ func (g *GameProtocol) clientIndexOfCreatureLocked(pos game.Position, creatureID
 			n++
 		}
 	}
+	// Walk the creatures in FORWARD order, matching Go's tile slice (newest
+	// appended last). The client draws the first thing it receives at the bottom,
+	// so the creature at slice index 0 sits lowest. Counting the visible creatures
+	// that come before the target (below it in the pile) pushes its index up.
+	// This mirrors Tile::getClientIndexOfCreature (tile.cpp:1433), which walks the
+	// vector's reverse_view over an array that is itself newest-first.
 	for i := 0; i < len(tile.Creatures); i++ {
 		c := tile.Creatures[i]
 		if c.GetID() == creatureID {

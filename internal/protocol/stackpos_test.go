@@ -23,10 +23,12 @@ func stackposSetup(t *testing.T, viewer *game.Player) (*GameProtocol, *game.Worl
 	return &GameProtocol{player: viewer, deps: &Deps{World: world, Items: world.Items}}, world
 }
 
-// ClientIndexOfCreature must count ground, then always-on-top items, then only the
-// creatures ABOVE the target, walking the slice in REVERSE — the most recently
-// appended creature is the one the client stacks lowest (src/items/tile.cpp:1433).
-func TestClientIndexOfCreatureCountsVisibleCreaturesAbove(t *testing.T) {
+// ClientIndexOfCreature must count the tile's ground and always-on-top items, then
+// the creatures that piled up BELOW the target — walking the slice FORWARD, the
+// order the client draws them and the one C++ uses to compute the index
+// (Tile::getClientIndexOfCreature, tile.cpp:1433). The first creature in the slice
+// is the one sitting lowest, directly on the item stack.
+func TestClientIndexOfCreatureCountsVisibleCreaturesBelow(t *testing.T) {
 	viewer := &game.Player{ID: 1, Name: "Viewer", GroupID: 1}
 	g, world := stackposSetup(t, viewer)
 
@@ -45,15 +47,15 @@ func TestClientIndexOfCreatureCountsVisibleCreaturesAbove(t *testing.T) {
 	third := game.NewMonster(12, "Bug", nil)
 	tile.Creatures = []game.Creature{first, second, third}
 
-	// Reverse order: third is the bottom-most creature, so it sits directly on
-	// top of the item stack (ground=1 + one top item=1 → index 2).
+	// first is the lowest creature, so it sits directly on top of the item stack
+	// (ground=1 + one top item=1 → index 2); second and third are piled above it.
 	tests := []struct {
 		id   uint32
 		want int
 	}{
-		{12, 2},
+		{10, 2},
 		{11, 3},
-		{10, 4},
+		{12, 4},
 	}
 	for _, tc := range tests {
 		if got := g.ClientIndexOfCreature(pos, tc.id); got != tc.want {
@@ -75,19 +77,20 @@ func TestClientIndexOfCreatureSkipsInvisibleCreatures(t *testing.T) {
 
 	ghost := &game.Player{ID: 2, Name: "Ghost", GroupID: 1, Ghost: true}
 	target := game.NewMonster(10, "Rat", nil)
-	// target is appended first, so ghost is above it in the client's stack.
-	tile.Creatures = []game.Creature{target, ghost}
+	// ghost is appended first, so it piles up below the target and occupies the
+	// slot right on top of the ground for everyone who can see it.
+	tile.Creatures = []game.Creature{ghost, target}
 
-	// A plain player cannot see the ghost: only the ground counts above the target.
+	// A plain player cannot see the ghost: only the ground counts below the target.
 	if got := g.ClientIndexOfCreature(pos, 10); got != 1 {
-		t.Errorf("with an unseen ghost above: got %d, want 1", got)
+		t.Errorf("with an unseen ghost below: got %d, want 1", got)
 	}
 
 	// A gamemaster can see it, so it occupies a slot and pushes the target up.
 	gm := &game.Player{ID: 3, Name: "GM", GroupID: 3}
 	gmProto := &GameProtocol{player: gm, deps: g.deps}
 	if got := gmProto.ClientIndexOfCreature(pos, 10); got != 2 {
-		t.Errorf("with a visible ghost above: got %d, want 2", got)
+		t.Errorf("with a visible ghost below: got %d, want 2", got)
 	}
 }
 
