@@ -51,7 +51,7 @@ func (g *GameProtocol) handleDepotLocker(worldLocker *game.Item, pos netmsg.Posi
 
 	// Open the depot locker container
 	g.player.OpenContainerAtWithPos(index, depotLocker, containerPos, isOnMap)
-	g.sendDepotContainer(index, depotLocker, worldLocker, depotLocker.Parent != nil)
+	g.sendDepotContainer(index, depotLocker, worldLocker, depotLocker.Container != nil && depotLocker.Container.Parent != nil)
 }
 
 // sendDepotContainer sends a depot locker container window with special depot handling.
@@ -64,7 +64,10 @@ func (g *GameProtocol) sendDepotContainer(cid uint8, depotLocker *game.Item, wor
 		name = t.Name
 	}
 
-	contents := depotLocker.Contents
+	var contents []*game.Item
+	if depotLocker.Container != nil {
+		contents = depotLocker.Container.Contents
+	}
 	// C++: container->capacity() — número fixo de slots visíveis por página
 	capacity := int(depotLocker.ContainerCapacity(g.deps.Items))
 	if capacity < 4 {
@@ -79,14 +82,17 @@ func (g *GameProtocol) sendDepotContainer(cid uint8, depotLocker *game.Item, wor
 		capacity = 0xFF
 	}
 
+	pagination := false
+	if depotLocker.Container != nil {
+		pagination = depotLocker.Container.Pagination
+	}
 	unlocked := byte(1)
-	pagination := boolByte(depotLocker.Pagination)
 	firstIndex := uint16(0)
 	if g.player != nil {
 		firstIndex = g.player.GetContainerIndex(cid)
 	}
 	page := len(contents)
-	if depotLocker.Pagination && len(contents) > capacity {
+	if pagination && len(contents) > capacity {
 		page = capacity
 	} else if page > 0xFF {
 		page = 0xFF
@@ -109,7 +115,7 @@ func (g *GameProtocol) sendDepotContainer(cid uint8, depotLocker *game.Item, wor
 	w.AddByte(boolByte(hasParent))
 	w.AddByte(1) // depot search available
 	w.AddByte(unlocked)
-	w.AddByte(pagination)
+	w.AddByte(boolByte(pagination))
 	w.AddU16(uint16(len(contents)))
 	w.AddU16(firstIndex)
 	w.AddByte(byte(visible))

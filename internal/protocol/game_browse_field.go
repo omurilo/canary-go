@@ -29,7 +29,7 @@ func (g *GameProtocol) sendBrowseField(pos game.Position) {
 			continue
 		}
 		// Valid: has sub-container, is movable
-		isContainer := len(it.Contents) > 0
+		isContainer := it.Container != nil && len(it.Container.Contents) > 0
 		isMovable := false
 		if itType := g.deps.Items.Get(it.ID); itType != nil {
 			isMovable = itType.Pickupable
@@ -45,12 +45,12 @@ func (g *GameProtocol) sendBrowseField(pos game.Position) {
 
 	// Create the browse field container (ID 470, like C++ ITEM_BROWSEFIELD)
 	browseContainer := &game.Item{
-		ID:         game.ItemBrowseField,
-		Contents:   items,
-		MaxSize:    30,
-		Pagination: false,
-		MaxItems:   30,
+		ID:        game.ItemBrowseField,
+		Container: game.NewContainer(30),
 	}
+	browseContainer.Container.Contents = items
+	browseContainer.Container.Pagination = false
+	browseContainer.Container.MaxItems = 30
 
 	// Calculate dummy container ID from position (C++ logic)
 	dummyCID := uint8(0xF - ((pos.X % 3) * 3 + (pos.Y % 3)))

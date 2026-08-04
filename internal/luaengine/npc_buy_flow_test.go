@@ -52,9 +52,9 @@ func buyFlowWorld(t *testing.T) (*game.World, *Engine, *game.Npc, *game.Player) 
 
 	p := &game.Player{Name: "Buyer", Level: 10, Health: 100, MaxHealth: 100}
 	// A backpack with gold in it: the money helpers read from the inventory tree.
-	p.Inventory[game.ConstSlotBackpack] = &game.Item{ID: 1988, Contents: []*game.Item{
+	p.Inventory[game.ConstSlotBackpack] = &game.Item{ID: 1988, Container: &game.Container{Contents: []*game.Item{
 		{ID: 3031, Count: 500},
-	}}
+	}}}
 	return w, e, npc, p
 }
 

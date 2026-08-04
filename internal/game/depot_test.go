@@ -70,35 +70,35 @@ func TestGetDepotLockerContents(t *testing.T) {
 		t.Errorf("locker id = %d, want %d", locker.ID, ItemLocker)
 	}
 	// DepotLocker(ITEM_LOCKER, 4): depot container, stash, inbox, market.
-	if locker.MaxSize != 4 {
-		t.Errorf("locker capacity = %d, want 4", locker.MaxSize)
+	if locker.Container == nil || locker.Container.MaxSize != 4 {
+		t.Errorf("locker capacity = %d, want 4", locker.Container.MaxSize)
 	}
 	wantOrder := []uint16{ItemDepot, ItemStash, ItemInbox, ItemMarket}
-	if len(locker.Contents) != len(wantOrder) {
-		t.Fatalf("locker holds %d things, want %d", len(locker.Contents), len(wantOrder))
+	if len(locker.Container.Contents) != len(wantOrder) {
+		t.Fatalf("locker holds %d things, want %d", len(locker.Container.Contents), len(wantOrder))
 	}
 	for i, want := range wantOrder {
-		if locker.Contents[i].ID != want {
-			t.Errorf("locker slot %d = %d, want %d", i, locker.Contents[i].ID, want)
+		if locker.Container.Contents[i].ID != want {
+			t.Errorf("locker slot %d = %d, want %d", i, locker.Container.Contents[i].ID, want)
 		}
 	}
 
 	// CreateItemAsContainer(ITEM_DEPOT, DEPOT_BOXES): one box per configured slot,
 	// numbered 1..n, and the container's capacity is that same count.
-	depot := locker.Contents[0]
+	depot := locker.Container.Contents[0]
 	boxes := depotBoxes()
-	if depot.MaxSize != boxes {
-		t.Errorf("depot container capacity = %d, want %d", depot.MaxSize, boxes)
+	if depot.Container == nil || depot.Container.MaxSize != boxes {
+		t.Errorf("depot container capacity = %d, want %d", depot.Container.MaxSize, boxes)
 	}
-	if len(depot.Contents) != int(boxes) {
-		t.Fatalf("depot container holds %d boxes, want %d", len(depot.Contents), boxes)
+	if len(depot.Container.Contents) != int(boxes) {
+		t.Fatalf("depot container holds %d boxes, want %d", len(depot.Container.Contents), boxes)
 	}
-	for i, box := range depot.Contents {
+	for i, box := range depot.Container.Contents {
 		want := dm.GetDepotChest(uint16(i+1), true).ID
 		if box.ID != want {
 			t.Errorf("box slot %d = %d, want %d (box %d)", i, box.ID, want, i+1)
 		}
-		if box.Parent != depot {
+		if box.Container == nil || box.Container.Parent != depot {
 			t.Errorf("box %d has no parent link to the depot container", i+1)
 		}
 	}

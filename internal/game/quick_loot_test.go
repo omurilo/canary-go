@@ -38,17 +38,17 @@ func TestQuickLoot_FilterAndTransfer(t *testing.T) {
 	world.players[player.ID] = player
 
 	// Player's main backpack
-	mainBag := &Item{ID: 1987, Contents: []*Item{}}
+	mainBag := &Item{ID: 1987, Container: &Container{Contents: []*Item{}}}
 	player.Inventory[ConstSlotBackpack] = mainBag
 
 	// Corpse container on tile
 	corpsePos := Position{X: 101, Y: 100, Z: 7}
 	corpse := &Item{
 		ID: 1987,
-		Contents: []*Item{
+		Container: &Container{Contents: []*Item{
 			{ID: 2148, Count: 100}, // Gold Coin (should be skipped by whitelist)
 			{ID: 2160, Count: 10},  // Crystal Coin (should be looted)
-		},
+		}},
 	}
 	tile := &Tile{
 		Items: []*Item{corpse},
@@ -59,18 +59,18 @@ func TestQuickLoot_FilterAndTransfer(t *testing.T) {
 	world.PlayerQuickLoot(player.ID, corpsePos, 0, 0, false)
 
 	// Verify Crystal Coin was moved to mainBag
-	if len(mainBag.Contents) != 1 {
-		t.Fatalf("expected 1 item in mainBag, got %d", len(mainBag.Contents))
+	if mainBag.Container == nil || len(mainBag.Container.Contents) != 1 {
+		t.Fatalf("expected 1 item in mainBag, got %d", len(mainBag.Container.Contents))
 	}
-	if mainBag.Contents[0].ID != 2160 {
-		t.Errorf("expected looted item ID 2160, got %d", mainBag.Contents[0].ID)
+	if mainBag.Container.Contents[0].ID != 2160 {
+		t.Errorf("expected looted item ID 2160, got %d", mainBag.Container.Contents[0].ID)
 	}
 
 	// Verify Gold Coin remained in corpse
-	if len(corpse.Contents) != 1 {
-		t.Fatalf("expected 1 item remaining in corpse, got %d", len(corpse.Contents))
+	if corpse.Container == nil || len(corpse.Container.Contents) != 1 {
+		t.Fatalf("expected 1 item remaining in corpse, got %d", len(corpse.Container.Contents))
 	}
-	if corpse.Contents[0].ID != 2148 {
-		t.Errorf("expected remaining item ID 2148, got %d", corpse.Contents[0].ID)
+	if corpse.Container.Contents[0].ID != 2148 {
+		t.Errorf("expected remaining item ID 2148, got %d", corpse.Container.Contents[0].ID)
 	}
 }

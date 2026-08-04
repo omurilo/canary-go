@@ -113,10 +113,8 @@ func (dm *PlayerDepotManager) GetDepotChest(depotId uint16, autoCreate bool) *It
 	// off the floor by then, so it was simply gone.
 	//
 	// DepotChest::maxDepotItems = 2000 (depotchest.cpp:16).
-	chest := &Item{
-		ID: chestID, Contents: make([]*Item, 0), Pagination: true,
-		MaxSize: DepotChestPageSize, MaxItems: MaxDepotItems,
-	}
+	chest := &Item{ID: chestID, Container: NewContainer(DepotChestPageSize)}
+	chest.Container.MaxItems = MaxDepotItems
 	dm.Chests[depotId] = chest
 	return chest
 }
@@ -130,32 +128,32 @@ func (dm *PlayerDepotManager) GetDepotLocker(depotId uint16) *Item {
 	// DepotLocker(ITEM_LOCKER, 4): market, inbox, stash and the depot container are
 	// all it ever holds. It was 36, which advertises 32 empty slots the locker does
 	// not have.
-	locker := &Item{ID: ItemLocker, Contents: make([]*Item, 0), Pagination: true, MaxSize: 4}
+	locker := &Item{ID: ItemLocker, Container: NewContainer(4)}
 
 	// CreateItemAsContainer(ITEM_DEPOT, DEPOT_BOXES): the container's capacity is the
 	// box count, not a fixed 17.
 	boxes := depotBoxes()
-	depotChestContainer := &Item{ID: ItemDepot, Contents: make([]*Item, 0), Pagination: true, MaxSize: boxes}
+	depotChestContainer := &Item{ID: ItemDepot, Container: NewContainer(boxes)}
 	for i := uint16(1); i <= boxes; i++ {
 		chest := dm.GetDepotChest(i, true)
-		depotChestContainer.Contents = append(depotChestContainer.Contents, chest)
-		if chest.Parent == nil {
-			chest.Parent = depotChestContainer
+		depotChestContainer.Container.Contents = append(depotChestContainer.Container.Contents, chest)
+		if chest.Container != nil && chest.Container.Parent == nil {
+			chest.Container.Parent = depotChestContainer
 		}
 	}
-	locker.Contents = append(locker.Contents, depotChestContainer)
-	depotChestContainer.Parent = locker
+	locker.Container.Contents = append(locker.Container.Contents, depotChestContainer)
+	depotChestContainer.Container.Parent = locker
 
 	stash := &Item{ID: ItemStash}
-	locker.Contents = append(locker.Contents, stash)
+	locker.Container.Contents = append(locker.Container.Contents, stash)
 
 	if dm.player.Inbox == nil {
-		dm.player.Inbox = &Item{ID: ItemInbox, Contents: make([]*Item, 0), Pagination: true}
+		dm.player.Inbox = &Item{ID: ItemInbox, Container: NewContainer(DefaultContainerCapacity)}
 	}
-	locker.Contents = append(locker.Contents, dm.player.Inbox)
+	locker.Container.Contents = append(locker.Container.Contents, dm.player.Inbox)
 
 	market := &Item{ID: ItemMarket}
-	locker.Contents = append(locker.Contents, market)
+	locker.Container.Contents = append(locker.Container.Contents, market)
 
 	dm.Lockers[depotId] = locker
 	return locker
@@ -180,9 +178,12 @@ func countItemsRecursive(container *Item) int {
 		return 0
 	}
 
-	count := len(container.Contents)
-	for _, item := range container.Contents {
-		if item != nil && len(item.Contents) > 0 {
+	if container.Container == nil {
+		return 0
+	}
+	count := len(container.Container.Contents)
+	for _, item := range container.Container.Contents {
+		if item != nil && item.Container != nil && len(item.Container.Contents) > 0 {
 			count += countItemsRecursive(item)
 		}
 	}

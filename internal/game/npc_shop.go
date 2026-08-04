@@ -144,8 +144,11 @@ func (p *Player) ContainerHoldingCountExceeded(maxContainer uint32) bool {
 // (container.cpp:410): every nested container, not every item.
 func containerHoldingCount(container *Item) uint32 {
 	var n uint32
-	for _, child := range container.Contents {
-		if child == nil || len(child.Contents) == 0 {
+	if container == nil || container.Container == nil {
+		return 0
+	}
+	for _, child := range container.Container.Contents {
+		if child == nil || child.Container == nil || len(child.Container.Contents) == 0 {
 			continue
 		}
 		n += 1 + containerHoldingCount(child)

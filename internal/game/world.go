@@ -312,8 +312,8 @@ func (w *World) AddItem(pos Position, it *Item) bool {
 		return false
 	}
 	// Refresh open browse field for this tile
-	if bf := w.BrowseFieldGet(pos); bf != nil {
-		bf.Contents = append([]*Item{it}, bf.Contents...)
+	if bf := w.BrowseFieldGet(pos); bf != nil && bf.Container != nil {
+		bf.Container.Contents = append([]*Item{it}, bf.Container.Contents...)
 	}
 	// Notify nearby players about the new item
 	if w.OnItemAppear != nil {
@@ -356,10 +356,10 @@ func (w *World) InternalRemoveItem(pos Position, item *Item, count uint16) {
 	} else {
 		w.RemoveMapItem(pos, item)
 		// Remove from open browse field
-		if bf := w.BrowseFieldGet(pos); bf != nil {
-			for i, cit := range bf.Contents {
+		if bf := w.BrowseFieldGet(pos); bf != nil && bf.Container != nil {
+			for i, cit := range bf.Container.Contents {
 				if cit == item {
-					bf.Contents = append(bf.Contents[:i], bf.Contents[i+1:]...)
+					bf.Container.Contents = append(bf.Container.Contents[:i], bf.Container.Contents[i+1:]...)
 					break
 				}
 			}
@@ -1163,18 +1163,20 @@ func (w *World) RemoveItemFromHolder(p *Player, item *Item, count uint16) bool {
 	partial := int(item.Count) > int(count) && count > 0
 
 	// A container the item sits in, which the item itself points at.
-	if parent := item.Parent; parent != nil {
-		for i, c := range parent.Contents {
-			if c != item {
-				continue
+	if item.Container != nil {
+		if parent := item.Container.Parent; parent != nil && parent.Container != nil {
+			for i, c := range parent.Container.Contents {
+				if c != item {
+					continue
+				}
+				if partial {
+					item.Count -= count
+				} else {
+					parent.Container.Contents = append(parent.Container.Contents[:i], parent.Container.Contents[i+1:]...)
+					item.Container.Parent = nil
+				}
+				return true
 			}
-			if partial {
-				item.Count -= count
-			} else {
-				parent.Contents = append(parent.Contents[:i], parent.Contents[i+1:]...)
-				item.Parent = nil
-			}
-			return true
 		}
 	}
 

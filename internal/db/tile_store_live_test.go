@@ -67,9 +67,9 @@ func TestTileStorePersistsAgainstLiveDB(t *testing.T) {
 		Ground: &game.Item{ID: 1},
 		Items: []*game.Item{
 			{ID: 1650},
-			{ID: 1987, Contents: []*game.Item{
+			{ID: 1987, Container: &game.Container{Contents: []*game.Item{
 				{ID: 3031, Count: count, Attr: &game.ItemAttributes{HasCount: true}},
-			}},
+			}}},
 		},
 	})
 	saveWorld.Houses = map[uint32]*game.House{
@@ -107,10 +107,10 @@ func TestTileStorePersistsAgainstLiveDB(t *testing.T) {
 	if bag.ID != 1987 {
 		t.Fatalf("first item = %d, want the bag (1987)", bag.ID)
 	}
-	if len(bag.Contents) != 1 || bag.Contents[0].ID != 3031 {
-		t.Fatalf("the bag's contents did not survive the database: %+v", bag.Contents)
+	if bag.Container == nil || len(bag.Container.Contents) != 1 || bag.Container.Contents[0].ID != 3031 {
+		t.Fatalf("the bag's contents did not survive the database: %+v", bag.Container)
 	}
-	if got := bag.Contents[0].Count; got != count {
+	if got := bag.Container.Contents[0].Count; got != count {
 		t.Errorf("coin count through the database = %d, want %d", got, count)
 	}
 	if tile.Items[1].ID != 1650 {

@@ -142,10 +142,15 @@ func placeHouseItem(cat *items.Catalog, tile *game.Tile, it *game.Item) bool {
 			existing.Attr = it.Attr
 		}
 		existing.Count = it.Count
-		if len(it.Contents) > 0 {
-			existing.Contents = it.Contents
-			for _, c := range existing.Contents {
-				c.Parent = existing
+		if it.Container != nil && len(it.Container.Contents) > 0 {
+			if existing.Container == nil {
+				existing.Container = game.NewContainer(8)
+			}
+			existing.Container.Contents = it.Container.Contents
+			for _, c := range existing.Container.Contents {
+				if c.Container != nil {
+					c.Container.Parent = existing
+				}
 			}
 		}
 		return true
@@ -178,8 +183,13 @@ func readItem(ps *propstream.PropStream) (*game.Item, error) {
 			if err != nil {
 				return nil, err
 			}
-			child.Parent = item
-			item.Contents = append(item.Contents, child)
+			if item.Container == nil {
+				item.Container = game.NewContainer(8)
+			}
+			if child.Container != nil {
+				child.Container.Parent = item
+			}
+			item.Container.Contents = append(item.Container.Contents, child)
 		}
 		// The container tag is followed by the terminator that closed the attribute
 		// list before we were handed control.
@@ -287,13 +297,13 @@ func writeItem(ws *propstream.PropWriteStream, it *game.Item) {
 	if it.Attr != nil {
 		ws.WriteBytes(it.Attr.Encode(it.Count))
 	}
-	if len(it.Contents) > 0 {
+	if it.Container != nil && len(it.Container.Contents) > 0 {
 		ws.WriteUint8(attrContainerItemsTag)
-		ws.WriteUint32(uint32(len(it.Contents)))
+		ws.WriteUint32(uint32(len(it.Container.Contents)))
 		// C++ iterates getReversedItems, so contents go out back to front too.
-		for i := len(it.Contents) - 1; i >= 0; i-- {
-			if it.Contents[i] != nil {
-				writeItem(ws, it.Contents[i])
+		for i := len(it.Container.Contents) - 1; i >= 0; i-- {
+			if it.Container.Contents[i] != nil {
+				writeItem(ws, it.Container.Contents[i])
 			}
 		}
 	}
@@ -305,7 +315,7 @@ func writeItem(ws *propstream.PropWriteStream, it *game.Item) {
 func savedToHouses(it *game.Item, cat *items.Catalog) bool {
 	// A non-empty container is kept regardless of its own type, so its contents
 	// survive even inside fixed furniture.
-	if len(it.Contents) > 0 {
+	if it.Container != nil && len(it.Container.Contents) > 0 {
 		return true
 	}
 	if cat == nil {

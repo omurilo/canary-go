@@ -1683,7 +1683,8 @@ func (e *Engine) playerGetinbox(L *lua.LState) int {
 		return 1
 	}
 	if p.Inbox == nil {
-		p.Inbox = &game.Item{ID: game.ItemInbox, Contents: make([]*game.Item, 0), Pagination: true}
+		p.Inbox = &game.Item{ID: game.ItemInbox, Container: game.NewContainer(0)}
+		p.Inbox.Container.Pagination = true
 	}
 	e.pushContainer(L, p.Inbox)
 	return 1
@@ -1833,10 +1834,10 @@ func (e *Engine) playerGetlootpouch(L *lua.LState) int {
 
 // findItemInTree recursively searches an item's contents for a matching ID.
 func findItemInTree(parent *game.Item, id uint16) *game.Item {
-	if parent == nil {
+	if parent == nil || parent.Container == nil {
 		return nil
 	}
-	for _, child := range parent.Contents {
+	for _, child := range parent.Container.Contents {
 		if child == nil {
 			continue
 		}
@@ -2274,7 +2275,7 @@ func (e *Engine) playerGetstoreinbox(L *lua.LState) int {
 		return 1
 	}
 	if p.StoreInbox == nil {
-		p.StoreInbox = &game.Item{ID: storeInboxItemID}
+		p.StoreInbox = &game.Item{ID: storeInboxItemID, Container: game.NewContainer(20)}
 	}
 	e.pushContainer(L, p.StoreInbox)
 	return 1

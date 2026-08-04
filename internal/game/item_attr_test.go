@@ -270,31 +270,33 @@ func TestCustomAttributeEncodingIsDeterministic(t *testing.T) {
 // prize on every click, forever.
 func TestRemoveItemFromHolder(t *testing.T) {
 	p := &Player{Name: "Holder"}
-	bag := &Item{ID: 1987, Count: 1}
-	mystic := &Item{ID: 6571, Count: 1, Parent: bag}
-	bag.Contents = []*Item{mystic}
+	bag := &Item{ID: 1987, Count: 1, Container: NewContainer(20)}
+	mystic := &Item{ID: 6571, Count: 1, Container: NewContainer(0)}
+	mystic.Container.Parent = bag
+	bag.Container.Contents = []*Item{mystic}
 	p.Inventory[3] = bag
 
 	if !(&World{}).RemoveItemFromHolder(p, mystic, 1) {
 		t.Fatalf("an item inside a backpack must be removable")
 	}
-	if len(bag.Contents) != 0 {
-		t.Errorf("the bag still holds %d items", len(bag.Contents))
+	if len(bag.Container.Contents) != 0 {
+		t.Errorf("the bag still holds %d items", len(bag.Container.Contents))
 	}
-	if mystic.Parent != nil {
+	if mystic.Container != nil && mystic.Container.Parent != nil {
 		t.Errorf("the removed item must not keep pointing at its old container")
 	}
 
 	// A stack loses only the requested amount and stays put.
-	gold := &Item{ID: 3031, Count: 100, Parent: bag}
-	bag.Contents = []*Item{gold}
+	gold := &Item{ID: 3031, Count: 100, Container: NewContainer(0)}
+	gold.Container.Parent = bag
+	bag.Container.Contents = []*Item{gold}
 	if !(&World{}).RemoveItemFromHolder(p, gold, 40) {
 		t.Fatalf("a partial removal must report success")
 	}
 	if gold.Count != 60 {
 		t.Errorf("gold count = %d, want 60", gold.Count)
 	}
-	if len(bag.Contents) != 1 {
+	if len(bag.Container.Contents) != 1 {
 		t.Errorf("a partially removed stack must stay in the container")
 	}
 
@@ -322,8 +324,8 @@ func TestDepotChestPageSize(t *testing.T) {
 	}
 	dm := NewPlayerDepotManager(&Player{Name: "Owner"})
 	chest := dm.GetDepotChest(1, true)
-	if chest.MaxSize != DepotChestPageSize {
-		t.Errorf("chest MaxSize = %d, want %d", chest.MaxSize, DepotChestPageSize)
+	if chest.Container == nil || chest.Container.MaxSize != DepotChestPageSize {
+		t.Errorf("chest MaxSize = %d, want %d", chest.Container.MaxSize, DepotChestPageSize)
 	}
 	if !chest.HasPagination() {
 		t.Errorf("a depot chest must be paginated, or nothing past the first page is reachable")
@@ -332,10 +334,10 @@ func TestDepotChestPageSize(t *testing.T) {
 	// The page is not the limit: a chest holds up to maxDepotItems, and pagination
 	// is how the rest is seen. Nothing here may cap contents at the page size.
 	for i := 0; i < 100; i++ {
-		chest.Contents = append(chest.Contents, &Item{ID: 3031, Count: 1})
+		chest.Container.Contents = append(chest.Container.Contents, &Item{ID: 3031, Count: 1})
 	}
-	if len(chest.Contents) != 100 {
-		t.Errorf("a depot chest must hold more than one page, got %d", len(chest.Contents))
+	if len(chest.Container.Contents) != 100 {
+		t.Errorf("a depot chest must hold more than one page, got %d", len(chest.Container.Contents))
 	}
 }
 
@@ -347,10 +349,10 @@ func TestDepotChestHoldsMoreThanOnePage(t *testing.T) {
 	dm := NewPlayerDepotManager(&Player{Name: "Owner"})
 	chest := dm.GetDepotChest(1, true)
 
-	if chest.MaxItems != MaxDepotItems {
-		t.Fatalf("chest MaxItems = %d, want %d (depotchest.cpp:16)", chest.MaxItems, MaxDepotItems)
+	if chest.Container == nil || chest.Container.MaxItems != MaxDepotItems {
+		t.Fatalf("chest MaxItems = %d, want %d (depotchest.cpp:16)", chest.Container.MaxItems, MaxDepotItems)
 	}
-	if chest.MaxSize != DepotChestPageSize {
+	if chest.Container.MaxSize != DepotChestPageSize {
 		t.Errorf("the page size must stay %d", DepotChestPageSize)
 	}
 
@@ -360,7 +362,7 @@ func TestDepotChestHoldsMoreThanOnePage(t *testing.T) {
 			t.Fatalf("the depot refused item %d, well short of its %d limit", i+1, MaxDepotItems)
 		}
 	}
-	if len(chest.Contents) != DepotChestPageSize+10 {
-		t.Errorf("chest holds %d, want %d", len(chest.Contents), DepotChestPageSize+10)
+	if len(chest.Container.Contents) != DepotChestPageSize+10 {
+		t.Errorf("chest holds %d, want %d", len(chest.Container.Contents), DepotChestPageSize+10)
 	}
 }

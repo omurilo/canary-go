@@ -97,12 +97,15 @@ func (g *GameProtocol) resolveStowItem(pos netmsg.Position, stackpos int, itemID
 			if container == nil {
 				return nil
 			}
-			// C++: player->getContainerIndex(cid) + slot → getItemByIndex
-			slot := int(pos.Z) + int(g.player.GetContainerIndex(cid))
-			if slot < 0 || slot >= len(container.Contents) {
+			if container.Container == nil {
 				return nil
 			}
-			candidate := container.Contents[slot]
+			// C++: player->getContainerIndex(cid) + slot → getItemByIndex
+			slot := int(pos.Z) + int(g.player.GetContainerIndex(cid))
+			if slot < 0 || slot >= len(container.Container.Contents) {
+				return nil
+			}
+			candidate := container.Container.Contents[slot]
 			if candidate == nil || candidate.ID != itemID {
 				return nil
 			}
@@ -119,10 +122,10 @@ func (g *GameProtocol) resolveStowItem(pos netmsg.Position, stackpos int, itemID
 		}
 		// C++: if index (stackpos) > 0, look inside the container at that slot
 		// (getContainer → getItemByIndex(stackpos - 1))
-		if stackpos > 0 && len(slotItem.Contents) > 0 {
+		if stackpos > 0 && slotItem.Container != nil && len(slotItem.Container.Contents) > 0 {
 			idx := stackpos - 1
-			if idx < len(slotItem.Contents) {
-				candidate := slotItem.Contents[idx]
+			if idx < len(slotItem.Container.Contents) {
+				candidate := slotItem.Container.Contents[idx]
 				if candidate != nil && candidate.ID == itemID {
 					return candidate
 				}
@@ -233,7 +236,7 @@ func (g *GameProtocol) sendStashRefresh() {
 	g.player.Session.SendInventoryIds()
 	for cid, oc := range g.player.OpenContainersSnapshot() {
 		if oc.Container != nil {
-			g.sendContainer(uint8(cid), oc.Container, oc.Container.Parent != nil)
+			g.sendContainer(uint8(cid), oc.Container, oc.Container.Container != nil && oc.Container.Container.Parent != nil)
 		}
 	}
 }

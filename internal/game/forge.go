@@ -339,12 +339,15 @@ func (p *Player) removeItemInstance(target *Item) bool {
 }
 
 func removeInstanceFromContents(c, target *Item) bool {
-	for i, child := range c.Contents {
+	if c == nil || c.Container == nil {
+		return false
+	}
+	for i, child := range c.Container.Contents {
 		if child == target {
-			c.Contents = append(c.Contents[:i], c.Contents[i+1:]...)
+			c.Container.Contents = append(c.Container.Contents[:i], c.Container.Contents[i+1:]...)
 			return true
 		}
-		if child != nil && len(child.Contents) > 0 && removeInstanceFromContents(child, target) {
+		if child != nil && child.Container != nil && len(child.Container.Contents) > 0 && removeInstanceFromContents(child, target) {
 			return true
 		}
 	}
@@ -356,10 +359,11 @@ func removeInstanceFromContents(c, target *Item) bool {
 // be placed (no room). Mirrors the C++ flow of creating ITEM_EXALTATION_CHEST,
 // filling it, and internalAddItem'ing it to the player.
 func (p *Player) addExaltationChest(cat *items.Catalog, contents []*Item) bool {
-	chest := &Item{ID: ItemExaltationChest, Count: 1, Contents: contents}
+	chest := &Item{ID: ItemExaltationChest, Count: 1, Container: NewContainer(uint16(len(contents)))}
+	chest.Container.Contents = contents
 	for _, it := range contents {
-		if it != nil {
-			it.Parent = chest
+		if it != nil && it.Container != nil {
+			it.Container.Parent = chest
 		}
 	}
 	if !p.placeItem(cat, chest, ConstSlotWhereever) {

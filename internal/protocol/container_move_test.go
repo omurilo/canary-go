@@ -12,7 +12,7 @@ func TestIsChildOf(t *testing.T) {
 	bp2 := &game.Item{ID: 1988}
 	sword := &game.Item{ID: 2400}
 
-	bp1.Contents = []*game.Item{bp2, sword}
+	bp1.Container = &game.Container{Contents: []*game.Item{bp2, sword}}
 
 	if !isChildOf(bp1, bp1) {
 		t.Fatalf("expected isChildOf(bp1, bp1) to be true")
@@ -33,7 +33,7 @@ func TestContainerDestinationResolution(t *testing.T) {
 	childBp := &game.Item{ID: 1988}
 	potion := &game.Item{ID: 237}
 
-	bp.Contents = []*game.Item{childBp}
+	bp.Container = &game.Container{Contents: []*game.Item{childBp}}
 
 	player := &game.Player{}
 	player.Inventory[game.ConstSlotBackpack] = bp

@@ -46,7 +46,7 @@ func (g *GameProtocol) RefreshContainer(c *game.Item) {
 	}
 	for cid, open := range g.rangeContainers() {
 		if open == c {
-			g.sendContainer(cid, c, c.Parent != nil)
+			g.sendContainer(cid, c, c.Container != nil && c.Container.Parent != nil)
 		}
 	}
 }
@@ -137,8 +137,8 @@ func (g *GameProtocol) SendInventoryIds() {
 				order = append(order, k)
 			}
 			counts[k] += amt
-			if len(it.Contents) > 0 {
-				walk(it.Contents)
+			if it.Container != nil && len(it.Container.Contents) > 0 {
+				walk(it.Container.Contents)
 			}
 		}
 	}

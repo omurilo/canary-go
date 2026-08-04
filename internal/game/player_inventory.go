@@ -73,8 +73,8 @@ func (p *Player) WalkInventory(fn func(it *Item)) {
 				continue
 			}
 			fn(it)
-			if len(it.Contents) > 0 {
-				walk(it.Contents)
+			if it.Container != nil && len(it.Container.Contents) > 0 {
+				walk(it.Container.Contents)
 			}
 		}
 	}
@@ -143,8 +143,8 @@ func (p *Player) FindItemOfType(catalog *items.Catalog, itemId uint16, deepSearc
 		if countMatch(catalog, it, itemId, subType) > 0 {
 			return it
 		}
-		if deepSearch && len(it.Contents) > 0 {
-			if found := findInContents(catalog, it.Contents, itemId, subType); found != nil {
+		if deepSearch && it.Container != nil && len(it.Container.Contents) > 0 {
+			if found := findInContents(catalog, it.Container.Contents, itemId, subType); found != nil {
 				return found
 			}
 		}
@@ -160,8 +160,8 @@ func findInContents(catalog *items.Catalog, items []*Item, itemId uint16, subTyp
 		if countMatch(catalog, it, itemId, subType) > 0 {
 			return it
 		}
-		if len(it.Contents) > 0 {
-			if found := findInContents(catalog, it.Contents, itemId, subType); found != nil {
+		if it.Container != nil && len(it.Container.Contents) > 0 {
+			if found := findInContents(catalog, it.Container.Contents, itemId, subType); found != nil {
 				return found
 			}
 		}
@@ -198,8 +198,8 @@ func (p *Player) RemoveItemOfType(catalog *items.Catalog, itemId uint16, amount 
 				}
 			}
 		}
-		if it2 := p.Inventory[slot]; it2 != nil && len(it2.Contents) > 0 {
-			it2.Contents = removeFromContents(catalog, it2.Contents, itemId, subType, &remaining)
+		if it2 := p.Inventory[slot]; it2 != nil && it2.Container != nil && len(it2.Container.Contents) > 0 {
+			it2.Container.Contents = removeFromContents(catalog, it2.Container.Contents, itemId, subType, &remaining)
 		}
 	}
 	return true
@@ -236,8 +236,8 @@ func removeFromContents(catalog *items.Catalog, contents []*Item, itemId uint16,
 				continue // drop non-stackables and emptied stacks
 			}
 		}
-		if len(it.Contents) > 0 {
-			it.Contents = removeFromContents(catalog, it.Contents, itemId, subType, remaining)
+		if it.Container != nil && len(it.Container.Contents) > 0 {
+			it.Container.Contents = removeFromContents(catalog, it.Container.Contents, itemId, subType, remaining)
 		}
 		out = append(out, it)
 	}
@@ -257,11 +257,14 @@ func (p *Player) GetFreeBackpackSlots(catalog *items.Catalog) int {
 // containerFreeSlots sums (capacity - used) across a container and every nested
 // container, clamped at 0. Guards against runaway depth on a cyclic tree.
 func containerFreeSlots(catalog *items.Catalog, c *Item) int {
-	free := int(c.ContainerCapacity(catalog)) - len(c.Contents)
+	if c == nil || c.Container == nil {
+		return 0
+	}
+	free := int(c.ContainerCapacity(catalog)) - len(c.Container.Contents)
 	if free < 0 {
 		free = 0
 	}
-	for _, child := range c.Contents {
+	for _, child := range c.Container.Contents {
 		if child != nil && child.IsContainer(catalog) {
 			free += containerFreeSlots(catalog, child)
 		}
@@ -412,7 +415,7 @@ func (p *Player) mergeIntoStack(it *Item, stackSize uint16) bool {
 					}
 				}
 			}
-			if len(existing.Contents) > 0 && try(existing.Contents) {
+			if existing.Container != nil && len(existing.Container.Contents) > 0 && try(existing.Container.Contents) {
 				return true
 			}
 		}
@@ -437,7 +440,10 @@ func AddItemToContainer(catalog *items.Catalog, container *Item, item *Item) boo
 		}
 		var merge func(c *Item) bool
 		merge = func(c *Item) bool {
-			for _, existing := range c.Contents {
+			if c == nil || c.Container == nil {
+				return false
+			}
+			for _, existing := range c.Container.Contents {
 				if existing == nil {
 					continue
 				}
@@ -453,7 +459,7 @@ func AddItemToContainer(catalog *items.Catalog, container *Item, item *Item) boo
 						return true
 					}
 				}
-				if len(existing.Contents) > 0 && merge(existing) {
+				if existing.Container != nil && len(existing.Container.Contents) > 0 && merge(existing) {
 					return true
 				}
 			}
@@ -466,21 +472,26 @@ func AddItemToContainer(catalog *items.Catalog, container *Item, item *Item) boo
 
 	// 2. If item still has count > 0, append to container if capacity allows
 	// C++: usa MaxItems (limite), nao ContainerCapacity (pagina)
-	cap := container.MaxItems
+	if container.Container == nil {
+		return false
+	}
+	cap := container.Container.MaxItems
 	if cap == 0 {
 		cap = container.ContainerCapacity(catalog)
 	}
 	if cap < 1 {
 		cap = 20
 	}
-	if int(cap) > len(container.Contents) {
-		item.Parent = container
-		container.Contents = append([]*Item{item}, container.Contents...)
+	if int(cap) > len(container.Container.Contents) {
+		if item.Container != nil {
+			item.Container.Parent = container
+		}
+		container.Container.Contents = append([]*Item{item}, container.Container.Contents...)
 		return true
 	}
 
 	// 3. Otherwise try child containers inside container
-	for _, child := range container.Contents {
+	for _, child := range container.Container.Contents {
 		if child != nil && child.IsContainer(catalog) {
 			if AddItemToContainer(catalog, child, item) {
 				return true
@@ -494,12 +505,17 @@ func AddItemToContainer(catalog *items.Catalog, container *Item, item *Item) boo
 // addToContainerTree inserts it into the first container with a free slot,
 // descending into nested containers. Returns false when the whole tree is full.
 func addToContainerTree(catalog *items.Catalog, c *Item, it *Item) bool {
-	if int(c.ContainerCapacity(catalog)) > len(c.Contents) {
-		it.Parent = c
-		c.Contents = append([]*Item{it}, c.Contents...)
+	if c == nil || c.Container == nil {
+		return false
+	}
+	if int(c.ContainerCapacity(catalog)) > len(c.Container.Contents) {
+		if it.Container != nil {
+			it.Container.Parent = c
+		}
+		c.Container.Contents = append([]*Item{it}, c.Container.Contents...)
 		return true
 	}
-	for _, child := range c.Contents {
+	for _, child := range c.Container.Contents {
 		if child != nil && child.IsContainer(catalog) {
 			if addToContainerTree(catalog, child, it) {
 				return true
@@ -551,8 +567,8 @@ func (p *Player) RemoveForSale(catalog *items.Catalog, itemId uint16, amount uin
 				continue
 			}
 		}
-		if it2 := p.Inventory[slot]; it2 != nil && len(it2.Contents) > 0 {
-			it2.Contents = removeSellableFromContents(catalog, it2.Contents, itemId, subType, &remaining)
+		if it2 := p.Inventory[slot]; it2 != nil && it2.Container != nil && len(it2.Container.Contents) > 0 {
+			it2.Container.Contents = removeSellableFromContents(catalog, it2.Container.Contents, itemId, subType, &remaining)
 		}
 	}
 	removed := amount - remaining
@@ -575,8 +591,8 @@ func removeSellableFromContents(catalog *items.Catalog, contents []*Item, itemId
 				continue
 			}
 		}
-		if len(it.Contents) > 0 {
-			it.Contents = removeSellableFromContents(catalog, it.Contents, itemId, subType, remaining)
+		if it.Container != nil && len(it.Container.Contents) > 0 {
+			it.Container.Contents = removeSellableFromContents(catalog, it.Container.Contents, itemId, subType, remaining)
 		}
 		out = append(out, it)
 	}

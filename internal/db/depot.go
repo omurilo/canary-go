@@ -36,8 +36,13 @@ func (d *DB) LoadPlayerDepot(ctx context.Context, p *game.Player) error {
 		
 		parent := itemsBySID[row.pid]
 		if parent != nil {
-			parent.Contents = append([]*game.Item{row.item}, parent.Contents...)
-			row.item.Parent = parent
+			if parent.Container == nil {
+				parent.Container = game.NewContainer(8)
+			}
+			parent.Container.Contents = append([]*game.Item{row.item}, parent.Container.Contents...)
+			if row.item.Container != nil {
+				row.item.Container.Parent = parent
+			}
 		}
 	}
 
@@ -47,11 +52,13 @@ func (d *DB) LoadPlayerDepot(ctx context.Context, p *game.Player) error {
 			// pid is the depot box number.
 			chest := p.DepotManager.GetDepotChest(uint16(row.pid), true)
 			if chest != nil {
-				if chest.Contents == nil {
-					chest.Contents = make([]*game.Item, 0)
+				if chest.Container == nil {
+					chest.Container = game.NewContainer(8)
 				}
-				chest.Contents = append([]*game.Item{row.item}, chest.Contents...)
-				row.item.Parent = chest
+				chest.Container.Contents = append([]*game.Item{row.item}, chest.Container.Contents...)
+				if row.item.Container != nil {
+					row.item.Container.Parent = chest
+				}
 			}
 		}
 	}
@@ -135,9 +142,11 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 		}
 
 		// Save children recursively
-		for _, child := range item.Contents {
-			if err := saveItem(child, sid); err != nil {
-				return err
+		if item.Container != nil {
+			for _, child := range item.Container.Contents {
+				if err := saveItem(child, sid); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -146,10 +155,10 @@ func (d *DB) SavePlayerDepot(ctx context.Context, p *game.Player) error {
 
 	// Save all chests' contents
 	for pid, chest := range p.DepotManager.Chests {
-		if chest == nil {
+		if chest == nil || chest.Container == nil {
 			continue
 		}
-		for _, item := range chest.Contents {
+		for _, item := range chest.Container.Contents {
 			if err := saveItem(item, int(pid)); err != nil {
 				return err
 			}

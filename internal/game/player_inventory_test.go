@@ -18,7 +18,7 @@ func testCatalog() *items.Catalog {
 
 func playerWithBackpack() *Player {
 	p := &Player{Capacity: 100000}
-	p.Inventory[ConstSlotBackpack] = &Item{ID: 1988}
+	p.Inventory[ConstSlotBackpack] = &Item{ID: 1988, Container: NewContainer(20)}
 	return p
 }
 
@@ -98,7 +98,10 @@ func TestRemoveForSaleSkipsTiered(t *testing.T) {
 	tier := uint8(2)
 	// One plain sword and one tiered sword in the backpack.
 	bp := p.Inventory[ConstSlotBackpack]
-	bp.Contents = append(bp.Contents,
+	if bp.Container == nil {
+		bp.Container = NewContainer(20)
+	}
+	bp.Container.Contents = append(bp.Container.Contents,
 		&Item{ID: 3264, Count: 1},
 		&Item{ID: 3264, Count: 1, Attr: &ItemAttributes{Tier: &tier}},
 	)
@@ -113,9 +116,11 @@ func TestRemoveForSaleSkipsTiered(t *testing.T) {
 	}
 	// The tiered sword must still be present.
 	remaining := 0
-	for _, it := range bp.Contents {
-		if it != nil && it.ID == 3264 {
-			remaining++
+	if bp.Container != nil {
+		for _, it := range bp.Container.Contents {
+			if it != nil && it.ID == 3264 {
+				remaining++
+			}
 		}
 	}
 	if remaining != 1 {

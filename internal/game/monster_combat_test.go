@@ -107,8 +107,8 @@ func TestDeathAwardsExperienceAndLoot(t *testing.T) {
 	}
 	// Nothing is in the corpse here because no event engine is wired in this unit
 	// test; internal/luaengine/loot_flow_test.go drives the real chain.
-	if len(corpse.Contents) != 0 {
-		t.Errorf("the core must not put loot in the corpse itself, got %+v", corpse.Contents)
+	if corpse.Container != nil && len(corpse.Container.Contents) != 0 {
+		t.Errorf("the core must not put loot in the corpse itself, got %+v", corpse.Container.Contents)
 	}
 }
 
@@ -134,8 +134,8 @@ func TestNoLootWhenLootDropDisabled(t *testing.T) {
 	e.handleDeath(monster, nil)
 
 	corpse := w.Map.GetTile(pos).Items[0]
-	if len(corpse.Contents) != 0 {
-		t.Errorf("expected empty corpse with lootDrop=false, got %+v", corpse.Contents)
+	if corpse.Container != nil && len(corpse.Container.Contents) != 0 {
+		t.Errorf("expected empty corpse with lootDrop=false, got %+v", corpse.Container.Contents)
 	}
 	if dropCalls != 0 {
 		t.Errorf("OnMonsterDropLoot fired %d time(s) with lootDrop disabled, want 0", dropCalls)

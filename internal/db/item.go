@@ -23,8 +23,13 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 			p.StoreInbox = row.item
 		} else {
 			if parent, ok := itemsBySID[row.pid]; ok {
-				row.item.Parent = parent
-				parent.Contents = append([]*game.Item{row.item}, parent.Contents...)
+				if parent.Container == nil {
+					parent.Container = game.NewContainer(8)
+				}
+				if row.item.Container != nil {
+					row.item.Container.Parent = parent
+				}
+				parent.Container.Contents = append([]*game.Item{row.item}, parent.Container.Contents...)
 			}
 		}
 	}
@@ -39,12 +44,22 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 	}
 	for _, row := range inboxRows {
 		if row.pid == 0 {
-			row.item.Parent = p.Inbox
-			p.Inbox.Contents = append([]*game.Item{row.item}, p.Inbox.Contents...)
+			if p.Inbox.Container == nil {
+				p.Inbox.Container = game.NewContainer(8)
+			}
+			if row.item.Container != nil {
+				row.item.Container.Parent = p.Inbox
+			}
+			p.Inbox.Container.Contents = append([]*game.Item{row.item}, p.Inbox.Container.Contents...)
 		} else {
 			if parent, ok := inboxItemsBySID[row.pid]; ok {
-				row.item.Parent = parent
-				parent.Contents = append([]*game.Item{row.item}, parent.Contents...)
+				if parent.Container == nil {
+					parent.Container = game.NewContainer(8)
+				}
+				if row.item.Container != nil {
+					row.item.Container.Parent = parent
+				}
+				parent.Container.Contents = append([]*game.Item{row.item}, parent.Container.Contents...)
 			}
 		}
 	}
@@ -63,12 +78,22 @@ func (d *DB) LoadPlayerItems(ctx context.Context, p *game.Player) error {
 	}
 	for _, row := range rewardRows {
 		if row.pid == 0 {
-			row.item.Parent = p.RewardChest
-			p.RewardChest.Contents = append([]*game.Item{row.item}, p.RewardChest.Contents...)
+			if p.RewardChest.Container == nil {
+				p.RewardChest.Container = game.NewContainer(8)
+			}
+			if row.item.Container != nil {
+				row.item.Container.Parent = p.RewardChest
+			}
+			p.RewardChest.Container.Contents = append([]*game.Item{row.item}, p.RewardChest.Container.Contents...)
 		} else {
 			if parent, ok := rewardItemsBySID[row.pid]; ok {
-				row.item.Parent = parent
-				parent.Contents = append([]*game.Item{row.item}, parent.Contents...)
+				if parent.Container == nil {
+					parent.Container = game.NewContainer(8)
+				}
+				if row.item.Container != nil {
+					row.item.Container.Parent = parent
+				}
+				parent.Container.Contents = append([]*game.Item{row.item}, parent.Container.Contents...)
 			}
 		}
 	}
@@ -108,8 +133,10 @@ func (d *DB) restoreOpenContainers(p *game.Player) {
 				p.OpenContainerAt(cid-1, item)
 			}
 		}
-		for _, child := range item.Contents {
-			walk(child)
+		if item.Container != nil {
+			for _, child := range item.Container.Contents {
+				walk(child)
+			}
 		}
 	}
 	for _, item := range p.Inventory {
@@ -143,8 +170,10 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 		if item.Attr != nil {
 			item.Attr.OpenContainer = nil
 		}
-		for _, child := range item.Contents {
-			clearOC(child)
+		if item.Container != nil {
+			for _, child := range item.Container.Contents {
+				clearOC(child)
+			}
 		}
 	}
 	for _, item := range p.Inventory {
@@ -204,9 +233,11 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 				return err
 			}
 
-			for _, child := range item.Contents {
-				if err := saveItem(child, sid); err != nil {
-					return err
+			if item.Container != nil {
+				for _, child := range item.Container.Contents {
+					if err := saveItem(child, sid); err != nil {
+						return err
+					}
 				}
 			}
 			return nil
@@ -238,8 +269,8 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 
 	// 3. Save Inbox
 	var inboxRoots []itemRow
-	if p.Inbox != nil {
-		for _, item := range p.Inbox.Contents {
+	if p.Inbox != nil && p.Inbox.Container != nil {
+		for _, item := range p.Inbox.Container.Contents {
 			inboxRoots = append(inboxRoots, itemRow{pid: 0, item: item})
 		}
 	}
@@ -249,8 +280,8 @@ func (d *DB) SavePlayerItems(ctx context.Context, p *game.Player) error {
 
 	// 4. Save Reward Chest
 	var rewardRoots []itemRow
-	if p.RewardChest != nil {
-		for _, item := range p.RewardChest.Contents {
+	if p.RewardChest != nil && p.RewardChest.Container != nil {
+		for _, item := range p.RewardChest.Container.Contents {
 			rewardRoots = append(rewardRoots, itemRow{pid: 0, item: item})
 		}
 	}

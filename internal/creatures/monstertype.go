@@ -125,6 +125,12 @@ type MonsterType struct {
 	// turns every fire-resistant monster into one that is healed by fire.
 	Healing map[uint32]int32
 	Immunities []uint32 // combat type immunities
+
+	// CreatureEvents is the list of CreatureEvent names this monster type
+	// registers (monster.events, plus any mtype:registerEvent call). Copied onto
+	// every Monster instance at spawn so its onDeath/onHealthChange handlers fire
+	// only for this monster.
+	CreatureEvents []string
 }
 
 // MonsterVoice is one entry of monster.voices, mirroring voiceBlock_t

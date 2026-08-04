@@ -822,8 +822,8 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 			cid := uint8(pos.Y - 0x40)
 			if cont, offset, ok := g.openContainerByCID(cid); ok {
 				fromSlot := int(pos.Z) + offset
-				if fromSlot < len(cont.Contents) {
-					item = cont.Contents[fromSlot]
+				if cont.Container != nil && fromSlot < len(cont.Container.Contents) {
+					item = cont.Container.Contents[fromSlot]
 				}
 			}
 		} else {
@@ -1251,7 +1251,11 @@ func (g *GameProtocol) refreshAfterTrade() {
 		}
 	}
 	for cid, c := range g.rangeContainers() {
-		g.deps.Log.Debug("refreshAfterTrade: refreshing container", "cid", cid, "itemId", c.ID, "contentsCount", len(c.Contents))
+		sz := 0
+		if c.Container != nil {
+			sz = len(c.Container.Contents)
+		}
+		g.deps.Log.Debug("refreshAfterTrade: refreshing container", "cid", cid, "itemId", c.ID, "contentsCount", sz)
 		g.refreshContainerIfOpen(c)
 	}
 	g.sendStats()
@@ -1263,7 +1267,7 @@ func (g *GameProtocol) refreshAfterTrade() {
 func (g *GameProtocol) refreshContainerIfOpen(container *game.Item) {
 	for cid, open := range g.rangeContainers() {
 		if open == container {
-			g.sendContainer(cid, container, container.Parent != nil)
+			g.sendContainer(cid, container, container.Container != nil && container.Container.Parent != nil)
 			return
 		}
 	}

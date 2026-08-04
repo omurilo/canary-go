@@ -168,10 +168,10 @@ func TestExpiredItemsGoToAnOnlineInbox(t *testing.T) {
 		t.Fatalf("ExpireMarketOffers: %v", err)
 	}
 
-	if online.Inbox == nil || len(online.Inbox.Contents) != 2 {
+	if online.Inbox == nil || online.Inbox.Container == nil || len(online.Inbox.Container.Contents) != 2 {
 		t.Fatalf("the online inbox holds %v, want 2 magic swords", online.Inbox)
 	}
-	for _, it := range online.Inbox.Contents {
+	for _, it := range online.Inbox.Container.Contents {
 		if it.ID != 2400 {
 			t.Errorf("unexpected item %d in the live inbox", it.ID)
 		}

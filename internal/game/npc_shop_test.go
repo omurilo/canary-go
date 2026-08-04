@@ -113,7 +113,7 @@ func TestIsBackpackSlotUnavailableWithFullBackpack(t *testing.T) {
 	p := &Player{}
 	// ContainerCapacity never reports 0 for a container, so the bag is filled to
 	// its declared size instead of relying on a zero-capacity type.
-	full := &Item{ID: 1988, MaxSize: 2, Contents: []*Item{{ID: 3155}, {ID: 3155}}}
+	full := &Item{ID: 1988, Container: &Container{MaxSize: 2, Contents: []*Item{{ID: 3155}, {ID: 3155}}}}
 	p.Inventory[ConstSlotBackpack] = full
 
 	if p.GetFreeBackpackSlots(cat) != 0 {
@@ -152,9 +152,9 @@ func TestHasInsufficientFundsCustomCurrency(t *testing.T) {
 
 	// Tokens for the goods but no gold for the bags.
 	p2 := &Player{}
-	p2.Inventory[ConstSlotBackpack] = &Item{ID: 1988, Contents: []*Item{
+	p2.Inventory[ConstSlotBackpack] = &Item{ID: 1988, Container: &Container{Contents: []*Item{
 		{ID: token, Count: 10},
-	}}
+	}}}
 	if !p2.HasInsufficientFunds(cat, token, 5, 20) {
 		t.Error("bags are paid in gold, so no gold must fail")
 	}
@@ -195,7 +195,7 @@ func TestInternalAddItemDoesNotEquipUnfittingItems(t *testing.T) {
 	p := &Player{}
 	// A backpack with capacity 2 that already holds one item: room for exactly one
 	// more, and no equipment slot may take the overflow.
-	bp := &Item{ID: 1988, MaxSize: 2, Contents: []*Item{{ID: 3003}}}
+	bp := &Item{ID: 1988, Container: &Container{MaxSize: 2, Contents: []*Item{{ID: 3003}}}}
 	p.Inventory[ConstSlotBackpack] = bp
 
 	placed, ok := p.InternalAddItem(cat, 3003, 5, -1, ConstSlotWhereever)
@@ -206,8 +206,8 @@ func TestInternalAddItemDoesNotEquipUnfittingItems(t *testing.T) {
 	if len(placed) != 1 {
 		t.Errorf("expected exactly 1 placement to be reported, got %d", len(placed))
 	}
-	if len(bp.Contents) != 2 {
-		t.Errorf("backpack should hold 2 items, holds %d", len(bp.Contents))
+	if bp.Container == nil || len(bp.Container.Contents) != 2 {
+		t.Errorf("backpack should hold 2 items, holds %d", len(bp.Container.Contents))
 	}
 	for s := ConstSlotFirst; s <= ConstSlotLast; s++ {
 		if s == ConstSlotBackpack {

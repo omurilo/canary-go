@@ -111,6 +111,7 @@ const (
 type Player struct {
 	conditionStore
 	damageTracker
+	creatureEventSet
 
 	ID          uint32 // creature id (assigned at spawn)
 	DBID        uint32 // players.id
@@ -899,6 +900,14 @@ func (p *Player) IsBestiaryComplete(raceID uint16, t bestiary.Thresholds) bool {
 
 func (p *Player) GetID() uint32     { return p.ID }
 func (p *Player) GetName() string   { return p.Name }
+
+// RegisterEvent/UnregisterEvent/HasEvent/RegisteredEvents expose *Player's own
+// embedded creatureEventSet (Player does not embed BaseCreature). This is what
+// lets login.lua's player:registerEvent("PlayerDeath") reach the death handler.
+func (p *Player) RegisterEvent(name string)   { p.creatureEventSet.register(name) }
+func (p *Player) UnregisterEvent(name string) { p.creatureEventSet.unregister(name) }
+func (p *Player) HasEvent(name string) bool   { return p.creatureEventSet.has(name) }
+func (p *Player) RegisteredEvents() []string  { return p.creatureEventSet.snapshot() }
 func (p *Player) GetHealth() uint32 { return p.Health }
 func (p *Player) SetHealth(health uint32) {
 	p.Health = health
@@ -1352,10 +1361,10 @@ func (p *Player) GetQuiverAmmoOfType(catalog *items.Catalog, ammoType string) *I
 	} else if q := p.Inventory[ConstSlotLeft]; q != nil && q.IsQuiver(catalog) {
 		quiver = q
 	}
-	if quiver == nil {
+	if quiver == nil || quiver.Container == nil {
 		return nil
 	}
-	for _, ammoItem := range quiver.Contents {
+	for _, ammoItem := range quiver.Container.Contents {
 		if ammoItem == nil {
 			continue
 		}
@@ -1570,14 +1579,14 @@ func (p *Player) ConsumeAmmo(catalog *items.Catalog, ammoType string) {
 	} else if q := p.Inventory[ConstSlotLeft]; q != nil && q.IsQuiver(catalog) {
 		quiver = q
 	}
-	if quiver != nil {
-		for i, ammoItem := range quiver.Contents {
+	if quiver != nil && quiver.Container != nil {
+		for i, ammoItem := range quiver.Container.Contents {
 			if ammoItem != nil && ammoItem.AmmoType(catalog) == ammoType {
 				if ammoItem.Count > 1 {
 					ammoItem.Count--
 				} else {
 					// Remove item from container contents
-					quiver.Contents = append(quiver.Contents[:i], quiver.Contents[i+1:]...)
+					quiver.Container.Contents = append(quiver.Container.Contents[:i], quiver.Container.Contents[i+1:]...)
 				}
 				if p.Session != nil {
 					p.Session.RefreshContainer(quiver)
@@ -2006,9 +2015,17 @@ func (p *Player) isItemStorable(item *Item) bool {
 
 // isInsideDepot checks if the item is inside a depot locker (IDs 3497-3500).
 func (p *Player) isInsideDepot(item *Item) bool {
-	for parent := item.Parent; parent != nil; parent = parent.Parent {
+	if item == nil || item.Container == nil {
+		return false
+	}
+	for parent := item.Container.Parent; parent != nil; {
 		if parent.ID >= 3497 && parent.ID <= 3500 {
 			return true
+		}
+		if parent.Container != nil {
+			parent = parent.Container.Parent
+		} else {
+			parent = nil
 		}
 	}
 	return false
@@ -2018,12 +2035,12 @@ func (p *Player) isInsideDepot(item *Item) bool {
 // position and stackpos index. Only matches containers whose Position matches.
 func (p *Player) FindItemInOpenContainers(pos Position, stackpos int, itemID uint16) *Item {
 	for _, oc := range p.openContainers {
-		if oc.Container == nil {
+		if oc.Container == nil || oc.Container.Container == nil {
 			continue
 		}
 		if oc.Position == pos {
-			if stackpos >= 0 && stackpos < len(oc.Container.Contents) {
-				candidate := oc.Container.Contents[stackpos]
+			if stackpos >= 0 && stackpos < len(oc.Container.Container.Contents) {
+				candidate := oc.Container.Container.Contents[stackpos]
 				if candidate != nil && candidate.ID == itemID {
 					return candidate
 				}
@@ -2052,17 +2069,24 @@ func (p *Player) StowItem(item *Item, count uint32, allItems bool) uint32 {
 
 	if allItems {
 		// C++: containers cannot be stowed via allItems
-		if len(item.Contents) > 0 {
+		if item.Container != nil && len(item.Container.Contents) > 0 {
 			return 0
 		}
 
 		if p.isInsideDepot(item) {
 			// C++: scan depot locker contents
 			var depotContainer *Item
-			for parent := item.Parent; parent != nil; parent = parent.Parent {
-				if parent.ID >= 3497 && parent.ID <= 3500 {
-					depotContainer = parent
-					break
+			if item.Container != nil {
+				for parent := item.Container.Parent; parent != nil; {
+					if parent.ID >= 3497 && parent.ID <= 3500 {
+						depotContainer = parent
+						break
+					}
+					if parent.Container != nil {
+						parent = parent.Container.Parent
+					} else {
+						parent = nil
+					}
 				}
 			}
 			if depotContainer != nil {
@@ -2074,9 +2098,9 @@ func (p *Player) StowItem(item *Item, count uint32, allItems bool) uint32 {
 				totalItemsToStow = p.collectItemsSameType(item, bp, &itemDict, totalItemsToStow, maxItemsToStow)
 			}
 		}
-	} else if len(item.Contents) > 0 {
+	} else if item.Container != nil && len(item.Container.Contents) > 0 {
 		// C++: allItems=false, item is a container → scan its stowable items
-		for _, child := range item.Contents {
+		for _, child := range item.Container.Contents {
 			if totalItemsToStow >= maxItemsToStow {
 				break
 			}
@@ -2150,9 +2174,11 @@ func (p *Player) collectRecursive(target *Item, current *Item, itemDict *StashCo
 		}
 	}
 
-	for _, child := range current.Contents {
-		if child != nil {
-			p.collectRecursive(target, child, itemDict, added, totalSoFar, maxCount)
+	if current.Container != nil {
+		for _, child := range current.Container.Contents {
+			if child != nil {
+				p.collectRecursive(target, child, itemDict, added, totalSoFar, maxCount)
+			}
 		}
 	}
 }
@@ -2199,8 +2225,8 @@ func (p *Player) removeItemFromContainer(item *Item, itemCount uint16) bool {
 	}
 
 	// Check item's explicit parent
-	if item.Parent != nil {
-		p.removeFromContents(item.Parent, item, itemCount)
+	if item.Container != nil && item.Container.Parent != nil {
+		p.removeFromContents(item.Container.Parent, item, itemCount)
 		return true
 	}
 
@@ -2217,10 +2243,13 @@ func (p *Player) removeItemFromContainer(item *Item, itemCount uint16) bool {
 
 // removeFromContents removes a child item from a parent's Contents slice.
 func (p *Player) removeFromContents(parent *Item, item *Item, count uint16) {
-	for i, child := range parent.Contents {
+	if parent == nil || parent.Container == nil {
+		return
+	}
+	for i, child := range parent.Container.Contents {
 		if child == item {
 			if count >= child.Count {
-				parent.Contents = append(parent.Contents[:i], parent.Contents[i+1:]...)
+				parent.Container.Contents = append(parent.Container.Contents[:i], parent.Container.Contents[i+1:]...)
 			} else {
 				child.Count -= count
 			}
@@ -2232,22 +2261,20 @@ func (p *Player) removeFromContents(parent *Item, item *Item, count uint16) {
 // removeFromContentsRecursive recursively searches for an item in a container
 // tree and removes it when found.
 func (p *Player) removeFromContentsRecursive(container *Item, target *Item, count uint16) bool {
-	if container == nil {
+	if container == nil || container.Container == nil {
 		return false
 	}
-	for i, child := range container.Contents {
+	for i, child := range container.Container.Contents {
 		if child == target {
 			if count >= child.Count {
-				container.Contents = append(container.Contents[:i], container.Contents[i+1:]...)
+				container.Container.Contents = append(container.Container.Contents[:i], container.Container.Contents[i+1:]...)
 			} else {
 				child.Count -= count
 			}
 			return true
 		}
-		if len(child.Contents) > 0 {
-			if p.removeFromContentsRecursive(child, target, count) {
-				return true
-			}
+		if child != nil && child.Container != nil && p.removeFromContentsRecursive(child, target, count) {
+			return true
 		}
 	}
 	return false
@@ -2266,8 +2293,10 @@ func (p *Player) countItemInTree(item *Item, id uint16) uint32 {
 			count++
 		}
 	}
-	for _, child := range item.Contents {
-		count += p.countItemInTree(child, id)
+	if item.Container != nil {
+		for _, child := range item.Container.Contents {
+			count += p.countItemInTree(child, id)
+		}
 	}
 	return count
 }

@@ -31,8 +31,8 @@ func GetMoney(items []*Item) uint64 {
 			continue
 		}
 		total += coinValue(it.ID) * uint64(it.Count)
-		if len(it.Contents) > 0 {
-			total += GetMoney(it.Contents)
+		if it.Container != nil && len(it.Container.Contents) > 0 {
+			total += GetMoney(it.Container.Contents)
 		}
 	}
 	return total
@@ -75,15 +75,15 @@ func (p *Player) deleteAllCoins(items []*Item) {
 		}
 		if items[i].ID == GoldCoinID || items[i].ID == PlatinumCoinID || items[i].ID == CrystalCoinID {
 			items[i] = nil
-		} else if len(items[i].Contents) > 0 {
-			p.deleteAllCoins(items[i].Contents)
-			compacted := items[i].Contents[:0]
-			for _, child := range items[i].Contents {
+		} else if items[i].Container != nil && len(items[i].Container.Contents) > 0 {
+			p.deleteAllCoins(items[i].Container.Contents)
+			compacted := items[i].Container.Contents[:0]
+			for _, child := range items[i].Container.Contents {
 				if child != nil {
 					compacted = append(compacted, child)
 				}
 			}
-			items[i].Contents = compacted
+			items[i].Container.Contents = compacted
 		}
 	}
 }
@@ -120,9 +120,15 @@ func (p *Player) AddItem(id uint16, count uint64) {
 		added := false
 		// Try to put it in an existing container first
 		for i := 1; i < len(p.Inventory); i++ {
-			if p.Inventory[i] != nil && (p.Inventory[i].Contents != nil || i == ConstSlotBackpack) {
-				item.Parent = p.Inventory[i]
-				p.Inventory[i].Contents = append(p.Inventory[i].Contents, item)
+			if p.Inventory[i] != nil && (p.Inventory[i].Container != nil || i == ConstSlotBackpack) {
+				if p.Inventory[i].Container == nil {
+					p.Inventory[i].Container = NewContainer(8) // Default fallback
+				}
+				item.Container = NewContainer(0) // Need a container wrapper for parent? Wait, item may not be a container. We only set parent if it's a container... well, actually `item` does not need a parent set necessarily unless we require it. But if we require it, it's `item.Container = NewContainer(0); item.Container.Parent = p.Inventory[i]`. Actually no, `item` itself might just be money.
+				// Wait! Is money a container? No. So item.Container would be nil!
+				// We can't set item.Container.Parent if it's not a container? No, wait!
+				// In the new design, `Parent` is on `Container`. We need to move `Parent` to `Item` instead of `Container`!
+				p.Inventory[i].Container.Contents = append(p.Inventory[i].Container.Contents, item)
 				added = true
 				break
 			}

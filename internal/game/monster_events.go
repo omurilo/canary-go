@@ -338,7 +338,9 @@ func (m *Monster) DropLoot(w *World, corpse *Item) {
 	}
 	count := forgeMinSlivers + rand.Intn(forgeMaxSlivers-forgeMinSlivers+1)
 	sliver := &Item{ID: itemForgeSliver, Count: uint16(count)}
-	corpse.Contents = append(corpse.Contents, sliver)
+	if corpse.Container != nil {
+		corpse.Container.Contents = append(corpse.Container.Contents, sliver)
+	}
 }
 
 // SetSoulPitStack is Monster::setSoulPitStack (monster.cpp:3200). A stack of 40

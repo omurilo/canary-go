@@ -416,7 +416,7 @@ func (g *GameProtocol) clearImbuementSlot(slot uint8) {
 func (g *GameProtocol) refreshContainers() {
 	for cid, container := range g.rangeContainers() {
 		if container != nil {
-			g.sendContainer(cid, container, container.Parent != nil)
+			g.sendContainer(cid, container, container.Container != nil && container.Container.Parent != nil)
 		}
 	}
 }
