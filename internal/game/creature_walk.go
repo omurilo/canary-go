@@ -32,12 +32,12 @@ const (
 	defaultGroundSpeed = 150
 )
 
-// calculatedStepSpeed is Creature::updateCalculatedStepSpeed.
+// CalculatedStepSpeed is Creature::updateCalculatedStepSpeed.
 //
 // The guard is upstream's: below -speedB the logarithm is undefined, and the
 // answer is clamped to 1 rather than allowed to be zero — a zero would divide
 // by zero in the duration formula.
-func calculatedStepSpeed(stepSpeed int) uint16 {
+func CalculatedStepSpeed(stepSpeed int) uint16 {
 	if float64(stepSpeed) <= -speedB {
 		return 1
 	}
@@ -71,7 +71,7 @@ func groundSpeedAt(w *World, pos Position) uint16 {
 // already gives the player the opening the nearby-target penalty exists to give.
 func (m *Monster) GetStepDuration(w *World, dir Direction) uint32 {
 	speed := int(m.GetSpeed())
-	stepSpeed := calculatedStepSpeed(speed)
+	stepSpeed := CalculatedStepSpeed(speed)
 	ground := groundSpeedAt(w, m.GetPosition())
 
 	d := math.Floor(1000 * float64(ground) / float64(stepSpeed))

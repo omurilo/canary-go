@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -2417,7 +2418,20 @@ func (p *Player) ClearModalWindows()            {}
 func (p *Player) GetStepHeight() uint8 { return 0 }
 
 // GetStepDuration returns the walk animation duration.
-func (p *Player) GetStepDuration(direction Direction) uint32 { return 500 }
+func (p *Player) GetStepDuration(direction Direction) uint32 {
+	speed := int(p.GetSpeed())
+	stepSpeed := CalculatedStepSpeed(speed)
+	ground := uint16(defaultGroundSpeed)
+	if p.World != nil {
+		ground = groundSpeedAt(p.World, p.Pos)
+	}
+	d := math.Floor(1000 * float64(ground) / float64(stepSpeed))
+	duration := int(math.Ceil(d/serverBeat) * serverBeat)
+	if direction == DirNE || direction == DirNW || direction == DirSE || direction == DirSW {
+		duration *= walkDiagonalExtraCost
+	}
+	return uint32(duration)
+}
 
 // GetSleepTicks returns remaining sleep/afk ticks.
 func (p *Player) GetSleepTicks() uint32 { return 0 }

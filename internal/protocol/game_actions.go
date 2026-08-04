@@ -451,6 +451,7 @@ func (g *GameProtocol) stepDuration(dir game.Direction) time.Duration {
 	if speed == 0 {
 		speed = 220
 	}
+	stepSpeed := game.CalculatedStepSpeed(int(speed))
 	groundSpeed := uint16(150)
 	if tile := g.deps.World.Map.GetTile(g.player.Pos); tile != nil && tile.Ground != nil {
 		if t := g.deps.Items.Get(tile.Ground.ID); t != nil && t.GroundSpeed > 0 {
@@ -458,7 +459,7 @@ func (g *GameProtocol) stepDuration(dir game.Direction) time.Duration {
 		}
 	}
 	const beat = 50
-	d := 1000 * int(groundSpeed) / int(speed)
+	d := 1000 * int(groundSpeed) / int(stepSpeed)
 	d = ((d + beat - 1) / beat) * beat
 	if dir == game.DirNE || dir == game.DirNW || dir == game.DirSE || dir == game.DirSW {
 		d *= 3 // WALK_DIAGONAL_EXTRA_COST

@@ -785,13 +785,9 @@ func (g *GameProtocol) enterWorld() {
 	w.AddByte(opSelfAppear)
 	w.AddU32(p.ID)
 	w.AddU16(ServerBeat)
-	spd := p.GetSpeed()
-	if spd == 0 {
-		spd = 110
-	}
-	w.AddDouble(float64(spd), 3) // speedA
-	w.AddDouble(0, 3)                // speedB
-	w.AddDouble(0, 3)                // speedC
+	w.AddDouble(857.36, 3)   // speedA
+	w.AddDouble(261.29, 3)   // speedB
+	w.AddDouble(-4795.01, 3) // speedC
 	w.AddByte(0)                     // can change pvp framing
 	w.AddByte(0)                     // expert mode
 	w.AddString("")                  // store images url
