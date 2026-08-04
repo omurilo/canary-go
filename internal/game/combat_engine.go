@@ -807,14 +807,14 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 		}
 
 		if !hasAoL && blessCount < 5 {
-			corpse := &Item{ID: 3058} // Dead human male
-			if p.Sex == 0 {           // Female
+			corpse := &Item{ID: 3058, Container: NewContainer(20)} // Dead human male
+			if p.Sex == 0 {                                        // Female
 				corpse.ID = 3065
 			}
 
 			// Backpack always drops in Tibia (if no AoL/Bless)
 			if bp := p.Inventory[ConstSlotBackpack]; bp != nil {
-				corpse.Contents = append(corpse.Contents, bp)
+				corpse.Container.Contents = append(corpse.Container.Contents, bp)
 				p.Inventory[ConstSlotBackpack] = nil
 			}
 			// Other items have 10% chance
@@ -824,13 +824,13 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 				}
 				if it := p.Inventory[i]; it != nil {
 					if rand.Float32() < 0.10 {
-						corpse.Contents = append(corpse.Contents, it)
+						corpse.Container.Contents = append(corpse.Container.Contents, it)
 						p.Inventory[i] = nil
 					}
 				}
 			}
 
-			if len(corpse.Contents) > 0 {
+			if len(corpse.Container.Contents) > 0 {
 				if e.world.AddItem(p.Pos, corpse) && e.world.OnItemAppear != nil {
 					e.world.OnItemAppear(p.Pos, corpse)
 				}
