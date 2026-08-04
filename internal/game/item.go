@@ -65,19 +65,20 @@ func (i *Item) HasPagination() bool { return i != nil && i.Container != nil && i
 const DefaultContainerCapacity = 8
 
 func (i *Item) ContainerCapacity(catalog *items.Catalog) uint16 {
+	if i == nil {
+		return 0
+	}
+	if catalog != nil {
+		if t := catalog.Get(i.ID); t != nil && t.Capacity > 0 {
+			return uint16(t.Capacity)
+		}
+	}
 	if i.Container != nil && i.Container.MaxSize > 0 {
 		return i.Container.MaxSize
 	}
 	if catalog != nil {
-		if t := catalog.Get(i.ID); t != nil {
-			if t.Capacity > 0 {
-				return uint16(t.Capacity)
-			}
-			// A container with no explicit size still has the default capacity;
-			// never report 0 or the client shows a full, unexpandable window.
-			if t.IsContainer() {
-				return DefaultContainerCapacity
-			}
+		if t := catalog.Get(i.ID); t != nil && t.IsContainer() {
+			return DefaultContainerCapacity
 		}
 	}
 	return 0
