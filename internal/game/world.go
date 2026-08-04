@@ -488,6 +488,7 @@ func (w *World) AddPlayer(p *Player, sess Session) bool {
 		}
 	}
 
+	w.notifyCreatureAppear(p)
 	if w.OnCreatureAppear != nil {
 		w.OnCreatureAppear(p)
 	}
