@@ -106,13 +106,13 @@ func (b *SpawnBlock) CheckSpawnMonster(w *World, now time.Time) {
 			continue
 		}
 
+		if !sb.lastSpawn.IsZero() && now.Before(sb.lastSpawn.Add(sb.interval)) {
+			continue
+		}
 		if mType.Flags.IsBlockable && b.FindPlayer(w, sb.pos) {
 			// Push the clock forward: the respawn timer restarts while a player
 			// stands there rather than firing the instant they leave.
 			sb.lastSpawn = now
-			continue
-		}
-		if !sb.lastSpawn.IsZero() && now.Before(sb.lastSpawn.Add(sb.interval)) {
 			continue
 		}
 		ready = append(ready, due{id: id, sb: sb, mType: mType, blockable: mType.Flags.IsBlockable})
