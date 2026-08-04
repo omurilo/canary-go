@@ -116,19 +116,27 @@ func (t *Tile) BlocksSolid(catalog *items.Catalog) bool {
 	return false
 }
 
-// Map is a sparse tile store keyed by position.
+// Map is a sparse tile store keyed by sector position.
 type Map struct {
 	mu       sync.RWMutex
-	tiles    map[Position]*Tile
+	sectors  map[uint32]*Sector
 	navCache *navCache
 }
 
 // NewMap returns an empty map.
 func NewMap() *Map {
 	return &Map{
-		tiles:    make(map[Position]*Tile),
+		sectors:  make(map[uint32]*Sector),
 		navCache: newNavCache(),
 	}
+}
+
+func sectorIndex(x, y int) uint32 {
+	return uint32(x/SectorSize) | (uint32(y/SectorSize) << 16)
+}
+
+func localIndex(x, y int) int {
+	return (x % SectorSize) * SectorSize + (y % SectorSize)
 }
 
 // GetSectorSnapshot returns a walkability snapshot for the sector at (x,y,z).
@@ -136,11 +144,44 @@ func (m *Map) GetSectorSnapshot(x, y, z int) *NavSectorSnapshot {
 	return m.navCache.getOrCreateSnapshot(m, x, y, z)
 }
 
-// GetTile returns the tile at pos, or nil.
+// getSector gets or creates a sector for the given coordinates under a write lock.
+func (m *Map) getSector(x, y, z int) *SectorFloor {
+	idx := sectorIndex(x, y)
+	s := m.sectors[idx]
+	if s == nil {
+		s = &Sector{}
+		m.sectors[idx] = s
+	}
+	f := s.Floors[z]
+	if f == nil {
+		f = &SectorFloor{}
+		s.Floors[z] = f
+	}
+	return f
+}
+
+// GetTile returns the tile at pos, or nil. It returns the materialized tile if it exists,
+// or the base tile if it hasn't been modified.
 func (m *Map) GetTile(pos Position) *Tile {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.tiles[pos]
+	idx := sectorIndex(int(pos.X), int(pos.Y))
+	s := m.sectors[idx]
+	if s == nil {
+		return nil
+	}
+	if pos.Z >= 16 {
+		return nil
+	}
+	f := s.Floors[pos.Z]
+	if f == nil {
+		return nil
+	}
+	lidx := localIndex(int(pos.X), int(pos.Y))
+	if t := f.Tiles[lidx]; t != nil {
+		return t
+	}
+	return f.Base[lidx]
 }
 
 // RangeRect invokes fn for every loaded tile whose (x,y) lies inside the
@@ -167,7 +208,23 @@ func (m *Map) RangeRect(x0, y0, x1, y1 int, z int, fn func(t *Tile)) {
 			if x < 0 {
 				continue
 			}
-			t := m.tiles[Position{X: uint16(x), Y: uint16(y), Z: uint8(z)}]
+			idx := sectorIndex(x, y)
+			s := m.sectors[idx]
+			if s == nil {
+				continue
+			}
+			if z >= 16 {
+				continue
+			}
+			f := s.Floors[z]
+			if f == nil {
+				continue
+			}
+			lidx := localIndex(x, y)
+			t := f.Tiles[lidx]
+			if t == nil {
+				t = f.Base[lidx]
+			}
 			if t != nil {
 				fn(t)
 			}
@@ -179,19 +236,79 @@ func (m *Map) RangeRect(x0, y0, x1, y1 int, z int, fn func(t *Tile)) {
 func (m *Map) Range(fn func(pos Position, t *Tile) bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	for pos, t := range m.tiles {
-		if !fn(pos, t) {
-			return
+	for idx, s := range m.sectors {
+		for z, f := range s.Floors {
+			if f == nil {
+				continue
+			}
+			baseX := (idx & 0xFFFF) * SectorSize
+			baseY := (idx >> 16) * SectorSize
+			for i := 0; i < SectorSize*SectorSize; i++ {
+				t := f.Tiles[i]
+				if t == nil {
+					t = f.Base[i]
+				}
+				if t != nil {
+					pos := Position{
+						X: uint16(baseX) + uint16(i/SectorSize),
+						Y: uint16(baseY) + uint16(i%SectorSize),
+						Z: uint8(z),
+					}
+					if !fn(pos, t) {
+						return
+					}
+				}
+			}
 		}
 	}
 }
 
-// SetTile stores a tile.
+// SetBaseTile stores a base tile directly from OTBM parsing.
+func (m *Map) SetBaseTile(pos Position, t *Tile) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if pos.Z >= 16 {
+		return
+	}
+	f := m.getSector(int(pos.X), int(pos.Y), int(pos.Z))
+	f.Base[localIndex(int(pos.X), int(pos.Y))] = t
+}
+
+// SetTile stores a tile as an active materialized tile.
 func (m *Map) SetTile(pos Position, t *Tile) {
 	m.mu.Lock()
-	m.tiles[pos] = t
-	m.mu.Unlock()
+	defer m.mu.Unlock()
+	if pos.Z >= 16 {
+		return
+	}
+	f := m.getSector(int(pos.X), int(pos.Y), int(pos.Z))
+	f.Tiles[localIndex(int(pos.X), int(pos.Y))] = t
 	m.navCache.invalidate(int(pos.X), int(pos.Y), int(pos.Z))
+}
+
+// getTileForUpdate returns a materialized *Tile for mutation.
+// It clones the Base tile if the active tile hasn't been created yet.
+func (m *Map) getTileForUpdate(pos Position) *Tile {
+	if pos.Z >= 16 {
+		return nil
+	}
+	f := m.getSector(int(pos.X), int(pos.Y), int(pos.Z))
+	lidx := localIndex(int(pos.X), int(pos.Y))
+	if f.Tiles[lidx] != nil {
+		return f.Tiles[lidx]
+	}
+	base := f.Base[lidx]
+	if base == nil {
+		return nil
+	}
+	// clone
+	cloned := *base
+	if len(base.Items) > 0 {
+		cloned.Items = make([]*Item, len(base.Items))
+		copy(cloned.Items, base.Items)
+	}
+	f.Tiles[lidx] = &cloned
+	return &cloned
 }
 
 // AddItem inserts an item to the front of the tile stack at pos. Returns false if there is no
@@ -199,7 +316,7 @@ func (m *Map) SetTile(pos Position, t *Tile) {
 func (m *Map) AddItem(pos Position, it *Item) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	t := m.tiles[pos]
+	t := m.getTileForUpdate(pos)
 	if t == nil {
 		return false
 	}
@@ -211,7 +328,7 @@ func (m *Map) AddItem(pos Position, it *Item) bool {
 func (m *Map) RemoveItemPtr(pos Position, item *Item) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	t := m.tiles[pos]
+	t := m.getTileForUpdate(pos)
 	if t == nil {
 		return false
 	}
@@ -230,15 +347,17 @@ func (m *Map) RemoveItemPtr(pos Position, item *Item) bool {
 func (m *Map) GenerateFlatField(center Position, radius int, groundID uint16) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if center.Z >= 16 {
+		return
+	}
 	for dx := -radius; dx <= radius; dx++ {
 		for dy := -radius; dy <= radius; dy++ {
-			pos := Position{
-				X: uint16(int(center.X) + dx),
-				Y: uint16(int(center.Y) + dy),
-				Z: center.Z,
-			}
-			if _, exists := m.tiles[pos]; !exists {
-				m.tiles[pos] = &Tile{Ground: &Item{ID: groundID}}
+			x := int(center.X) + dx
+			y := int(center.Y) + dy
+			f := m.getSector(x, y, int(center.Z))
+			lidx := localIndex(x, y)
+			if f.Tiles[lidx] == nil && f.Base[lidx] == nil {
+				f.Base[lidx] = &Tile{Ground: &Item{ID: groundID}}
 			}
 		}
 	}

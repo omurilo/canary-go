@@ -315,12 +315,9 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 
 	// Use tile cache for dedup (house tiles bypass cache).
 	if !house && p.tc != nil {
-		defer func() {
-			cached := p.tc.CreateOrGetTile(tile)
-			if cached != tile {
-				*tile = *cached
-			}
-		}()
+		if cached := p.tc.CreateOrGetTile(tile); cached != nil {
+			tile = cached
+		}
 	}
 
 	if house {
@@ -398,7 +395,7 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 	}
 
 	if tile.Ground != nil || len(tile.Items) > 0 || tile.Flags != 0 {
-		p.m.SetTile(pos, tile)
+		p.m.SetBaseTile(pos, tile)
 		p.res.TileCount++
 	}
 }
@@ -485,7 +482,10 @@ attrLoop:
 		r.depth++
 		nodeType := r.u8()
 		if nodeType == nodeItem {
-			it.Contents = append(it.Contents, p.readItem())
+			if it.Container == nil {
+				it.Container = game.NewContainer(8) // Initialize container if it holds items
+			}
+			it.Container.Contents = append(it.Container.Contents, p.readItem())
 		} else {
 			p.skipNode()
 		}
