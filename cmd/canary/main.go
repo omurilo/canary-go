@@ -51,7 +51,7 @@ func main() {
 		configPath  = flag.String("config", "config.lua", "path to the Lua config file")
 		schemaPath  = flag.String("schema", "schema/schema.sql", "path to the canonical Canary schema")
 		scriptsDir  = flag.String("scripts", "scripts", "directory of Lua scripts to load at startup")
-		appearances = flag.String("appearances", "../data/items/appearances.dat", "path to appearances.dat (item metadata)")
+		appearances = flag.String("appearances", "data/items/appearances.dat", "path to appearances.dat (item metadata)")
 		mapFile     = flag.String("map", "", "path to an OTBM map file (empty = synthetic spawn field)")
 		migrate     = flag.Bool("migrate", true, "apply the schema on startup (idempotent)")
 		seed        = flag.Bool("seed", false, "seed a test account (god/god, char 'Gm Test')")

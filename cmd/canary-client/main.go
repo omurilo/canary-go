@@ -126,18 +126,20 @@ func doLogin(host string, port int, account, password string, key tibcrypto.XTEA
 		if err != nil {
 			return "", err
 		}
-		op := r.GetByte()
-		switch op {
-		case 0x0B: // error
-			return "", fmt.Errorf("server error: %s", r.GetString())
-		case 0x14: // MOTD
-			log.Printf("   MOTD: %s", r.GetString())
-		case 0x28: // session key
-			log.Printf("   session key received")
-		case 0x64: // character list
-			return parseCharList(r)
-		default:
-			log.Printf("   login opcode 0x%02X", op)
+		for r.Remaining() > 0 {
+			op := r.GetByte()
+			switch op {
+			case 0x0B: // error
+				return "", fmt.Errorf("server error: %s", r.GetString())
+			case 0x14: // MOTD
+				log.Printf("   MOTD: %s", r.GetString())
+			case 0x28: // session key
+				log.Printf("   session key received")
+			case 0x64: // character list
+				return parseCharList(r)
+			default:
+				log.Printf("   login opcode 0x%02X", op)
+			}
 		}
 	}
 	return "", fmt.Errorf("timed out waiting for character list")
