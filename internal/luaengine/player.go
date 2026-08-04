@@ -1741,7 +1741,12 @@ func playerGetitemcount(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	// player:getItemCount(id) returns how many of the item the player carries
+	// across their whole inventory tree. This was a stub that returned
+	// HazardPoints, so show scripts gated on carrying an item (e.g. the Dreamers
+	// carrot crossing: getItemCount(3595) > 0) always took the "no item" branch.
+	itemID := uint16(lua.LVAsNumber(L.Get(2)))
+	L.Push(lua.LNumber(p.GetItemCount(itemID)))
 	return 1
 }
 
