@@ -975,8 +975,12 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	// rollLoot, which is why none of the seven loot-modifier scripts (boosted, prey,
 	// hazard, wealth duplex, gem atelier) had any effect.
 	if m, ok := victim.(*Monster); ok && m.Type != nil && m.Type.Flags.LootDrop {
-		if !m.Type.Flags.RewardBoss && e.world.OnMonsterDropLoot != nil {
-			e.world.OnMonsterDropLoot(m, corpse)
+		if !m.Type.Flags.RewardBoss {
+			if e.world.OnMonsterDropLoot != nil {
+				e.world.OnMonsterDropLoot(m, corpse)
+			} else {
+				rollMonsterLoot(m, corpse)
+			}
 		}
 	}
 	if e.world.AddItem(pos, corpse) && e.world.OnItemAppear != nil {
@@ -1107,7 +1111,45 @@ func (e *CombatEngine) executeMonsterSpell(m *Monster, target Creature, s creatu
 
 	if target.GetHealth() == 0 {
 		e.handleDeath(target, m)
-	} else if tp, ok := target.(*Player); ok {
-		e.applyDefensiveCharmRune(m, tp, int32(dmg))
+	}
+}
+
+func rollMonsterLoot(m *Monster, corpse *Item) {
+	if m == nil || m.Type == nil || corpse == nil {
+		return
+	}
+	if corpse.Container == nil {
+		corpse.Container = NewContainer(20)
+	}
+	rollLootBlocks(m.Type.Loot, corpse)
+}
+
+func rollLootBlocks(loot []creatures.LootBlock, corpse *Item) {
+	if corpse == nil || corpse.Container == nil {
+		return
+	}
+	for _, lb := range loot {
+		if lb.ID == 0 {
+			continue
+		}
+		chance := lb.Chance
+		if chance == 0 {
+			chance = maxLootChance
+		}
+		if rand.Uint32()%maxLootChance < chance {
+			count := lb.CountMin
+			if lb.CountMax > lb.CountMin {
+				count += uint32(rand.Intn(int(lb.CountMax - lb.CountMin + 1)))
+			}
+			if count < 1 {
+				count = 1
+			}
+			item := &Item{ID: lb.ID, Count: uint16(count)}
+			if len(lb.ChildLoot) > 0 {
+				item.Container = NewContainer(20)
+				rollLootBlocks(lb.ChildLoot, item)
+			}
+			corpse.Container.Contents = append(corpse.Container.Contents, item)
+		}
 	}
 }

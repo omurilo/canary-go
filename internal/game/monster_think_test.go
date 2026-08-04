@@ -260,7 +260,7 @@ func TestIdleStatusMarksWalkBackAwayFromSpawn(t *testing.T) {
 	atHome := &Monster{SpawnPosition: home}
 	atHome.MaxHealth, atHome.Health = 100, 100
 	atHome.Pos = home
-	atHome.UpdateIdleStatus()
+	atHome.UpdateIdleStatus(nil)
 	if !atHome.Idle || atHome.IsWalkingBack() {
 		t.Errorf("at spawn: Idle = %v walkingBack = %v, want true/false", atHome.Idle, atHome.IsWalkingBack())
 	}
@@ -268,7 +268,7 @@ func TestIdleStatusMarksWalkBackAwayFromSpawn(t *testing.T) {
 	away := &Monster{SpawnPosition: home}
 	away.MaxHealth, away.Health = 100, 100
 	away.Pos = Position{X: 110, Y: 100, Z: 7}
-	away.UpdateIdleStatus()
+	away.UpdateIdleStatus(nil)
 	if away.Idle || !away.IsWalkingBack() {
 		t.Errorf("away from spawn: Idle = %v walkingBack = %v, want false/true", away.Idle, away.IsWalkingBack())
 	}
@@ -284,7 +284,7 @@ func TestMonsterWithATargetIsNotIdle(t *testing.T) {
 	target.ID = 2
 	m.SetTarget(target)
 
-	m.UpdateIdleStatus()
+	m.UpdateIdleStatus(w)
 	if m.Idle || m.IsWalkingBack() {
 		t.Errorf("Idle = %v walkingBack = %v, want both false while fighting", m.Idle, m.IsWalkingBack())
 	}

@@ -365,22 +365,21 @@ func (m *Monster) IsInSpawnRange(pos Position) bool {
 //
 // Idle matters beyond behaviour — an idle monster is skipped by the AI loop, so
 // without this every monster on the map is processed every tick.
-func (m *Monster) UpdateIdleStatus() {
+func (m *Monster) UpdateIdleStatus(w *World) {
 	idle := false
 	if m.Master == nil && m.GetTarget() == nil && len(m.Targets) == 0 {
-		// isInSpawnLocation, not an inline position compare: it is the one place
-		// that decides "home" and it also answers true for a monster with no spawn
-		// at all, which a script-placed monster has.
-		if m.IsInSpawnLocation() {
-			idle = true
-		} else {
-			m.walkingBack = true
+		hasPlayers := false
+		if w != nil {
+			hasPlayers = len(w.Spectators(m.GetPosition(), 0)) > 0
+		}
+		if !hasPlayers {
+			if m.IsInSpawnLocation() {
+				idle = true
+			} else {
+				m.walkingBack = true
+			}
 		}
 	} else {
-		// A monster with a target (or a master) is fighting or following, not
-		// heading home. The walkingBack flag is only meaningful for an idle
-		// wanderer, and leaving it set once a fight starts would march the
-		// monster back to spawn mid-combat.
 		m.walkingBack = false
 	}
 	m.SetIdle(idle)

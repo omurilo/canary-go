@@ -28,18 +28,6 @@ func (g *GameProtocol) sendBrowseField(pos game.Position) {
 		if it.Attr != nil && it.Attr.UniqueID != nil {
 			continue
 		}
-		// Valid: has sub-container, is movable
-		isContainer := it.Container != nil && len(it.Container.Contents) > 0
-		isMovable := false
-		if itType := g.deps.Items.Get(it.ID); itType != nil {
-			isMovable = itType.Pickupable
-		}
-		if !isContainer && !isMovable {
-			// Skip non-interactive blocking items (decorations, walls)
-			if itType := g.deps.Items.Get(it.ID); itType != nil && itType.BlockSolid {
-				continue
-			}
-		}
 		items = append(items, it)
 	}
 

@@ -29,7 +29,7 @@ func (m *Monster) OnThink(w *World, interval uint32) {
 		return
 	}
 
-	m.UpdateIdleStatus()
+	m.UpdateIdleStatus(w)
 
 	m.OnThinkTarget(w, interval)
 	m.OnThinkDefense(w, interval)
@@ -68,10 +68,10 @@ func (m *Monster) OnCreatureAppear(w *World, c Creature) {
 	}
 	if c.GetID() == m.GetID() {
 		m.UpdateTargetList(w)
-		m.UpdateIdleStatus()
+		m.UpdateIdleStatus(w)
 		return
 	}
-	m.OnCreatureEnter(c)
+	m.OnCreatureEnter(w, c)
 }
 
 // OnRemoveCreature is Monster::onRemoveCreature (monster.cpp:390). A monster
@@ -84,7 +84,7 @@ func (m *Monster) OnRemoveCreature(w *World, c Creature) {
 		m.SetIdle(true)
 		return
 	}
-	m.OnCreatureLeave(c)
+	m.OnCreatureLeave(w, c)
 }
 
 // OnCreatureMove is Monster::onCreatureMove (monster.cpp:433): someone moved,
@@ -111,10 +111,10 @@ func (m *Monster) OnCreatureMove(w *World, c Creature, oldPos, newPos Position) 
 	}
 
 	if m.GetPosition().InRangeOf(newPos) {
-		m.OnCreatureEnter(c)
+		m.OnCreatureEnter(w, c)
 		return
 	}
-	m.OnCreatureLeave(c)
+	m.OnCreatureLeave(w, c)
 }
 
 // OnCreatureSay is Monster::onCreatureSay (monster.cpp:567). Upstream's own
@@ -185,7 +185,7 @@ func (m *Monster) RemoveCondition(t combat.ConditionType) {
 }
 
 // OnConditionStatusChange is Monster::onConditionStatusChange (monster.cpp:1572).
-func (m *Monster) OnConditionStatusChange(combat.ConditionType) { m.UpdateIdleStatus() }
+func (m *Monster) OnConditionStatusChange(combat.ConditionType) { m.UpdateIdleStatus(nil) }
 
 // ChangeHealth is Monster::changeHealth (monster.cpp:3458). Two things happen
 // besides the health change: an ambient sound rolls, and the monster is taken

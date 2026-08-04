@@ -114,7 +114,7 @@ func (e *AIEngine) updateAI() {
 				monster.SetTarget(nil)
 			}
 			monster.UpdateTargetList(e.world)
-			monster.UpdateIdleStatus()
+			monster.UpdateIdleStatus(e.world)
 			continue
 		}
 
@@ -171,7 +171,7 @@ func (e *AIEngine) updateAI() {
 		} else {
 			// Monster::updateIdleStatus (monster.cpp:1520): with nothing to fight,
 			// a monster away from its spawn heads back rather than wandering off.
-			monster.UpdateIdleStatus()
+			monster.UpdateIdleStatus(e.world)
 			if !monster.IsInSpawnRange(monster.GetPosition()) {
 				// Past the despawn radius, upstream teleports rather than walking.
 				e.world.TeleportCreature(monster, monster.SpawnPosition)
