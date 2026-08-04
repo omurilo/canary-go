@@ -132,11 +132,11 @@ func NewMap() *Map {
 }
 
 func sectorIndex(x, y int) uint32 {
-	return uint32(x/SectorSize) | (uint32(y/SectorSize) << 16)
+	return uint32((x>>4)&0xFFFF) | (uint32((y>>4)&0xFFFF) << 16)
 }
 
 func localIndex(x, y int) int {
-	return (x % SectorSize) * SectorSize + (y % SectorSize)
+	return ((x & 15) << 4) | (y & 15)
 }
 
 // GetSectorSnapshot returns a walkability snapshot for the sector at (x,y,z).

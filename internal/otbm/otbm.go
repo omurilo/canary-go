@@ -313,13 +313,6 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 	pos := game.Position{X: baseX + uint16(xOff), Y: baseY + uint16(yOff), Z: baseZ}
 	tile := &game.Tile{}
 
-	// Use tile cache for dedup (house tiles bypass cache).
-	if !house && p.tc != nil {
-		if cached := p.tc.CreateOrGetTile(tile); cached != nil {
-			tile = cached
-		}
-	}
-
 	if house {
 		tile.HouseID = r.u32()                    // house id
 		tile.Flags |= game.TileFlagProtectionZone // C++ House::addTile (house.cpp:27)
@@ -391,6 +384,12 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 			p.expectEndNode()
 		default:
 			p.skipNode()
+		}
+	}
+
+	if !house && p.tc != nil {
+		if cached := p.tc.CreateOrGetTile(tile); cached != nil {
+			tile = cached
 		}
 	}
 
