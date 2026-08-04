@@ -76,6 +76,9 @@ func (a *AStarPathfinder) FindNextStep(start, goal Position) Position {
 			next.Y--
 		}
 	}
+	if t := a.M.GetTile(next); t == nil || t.BlocksSolid(a.Catalog) {
+		return start
+	}
 	return next
 }
 
@@ -133,8 +136,8 @@ func FindPath(m *Map, catalog *items.Catalog, start, end Position, maxNodes int)
 				continue
 			}
 
-			snap := m.GetSectorSnapshot(int(nextPos.X), int(nextPos.Y), int(nextPos.Z))
-			cell := snap.Cell(int(nextPos.X)%8, int(nextPos.Y)%8)
+			snap := m.GetSectorSnapshot(catalog, int(nextPos.X), int(nextPos.Y), int(nextPos.Z))
+			cell := snap.Cell(int(nextPos.X)-snap.X, int(nextPos.Y)-snap.Y)
 			if !cell.HasGround || cell.BlockSolid {
 				if nextPos != end {
 					continue

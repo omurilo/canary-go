@@ -140,8 +140,8 @@ func localIndex(x, y int) int {
 }
 
 // GetSectorSnapshot returns a walkability snapshot for the sector at (x,y,z).
-func (m *Map) GetSectorSnapshot(x, y, z int) *NavSectorSnapshot {
-	return m.navCache.getOrCreateSnapshot(m, x, y, z)
+func (m *Map) GetSectorSnapshot(catalog *items.Catalog, x, y, z int) *NavSectorSnapshot {
+	return m.navCache.getOrCreateSnapshot(m, catalog, x, y, z)
 }
 
 // getSector gets or creates a sector for the given coordinates under a write lock.
