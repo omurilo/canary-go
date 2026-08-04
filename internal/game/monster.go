@@ -178,6 +178,16 @@ func NewMonster(id uint32, name string, mType *creatures.MonsterType) *Monster {
 	// setNormalCreatureLight restores that same value when a light condition
 	// ends. Neither happened, so a demon lit nothing around it.
 	m.SetNormalCreatureLight()
+	// Monster::Monster copies its type's registered CreatureEvent names onto the
+	// instance (monster.cpp:111, Monster::Monster loops mType->info.scriptEvents).
+	// This is one point covering every spawn path (spawn engine, gameCreateMonster,
+	// summons, raids), so a quest boss's onDeath handler binds to that boss and
+	// fires only when that boss dies.
+	if mType != nil {
+		for _, name := range mType.CreatureEvents {
+			m.RegisterEvent(name)
+		}
+	}
 	return m
 }
 

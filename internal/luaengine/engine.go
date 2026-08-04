@@ -55,7 +55,7 @@ type Engine struct {
 
 	creatureEventsOnLogin       []*lua.LFunction
 	creatureEventsOnLogout      []*lua.LFunction
-	creatureEventsOnDeath       []*lua.LFunction
+	creatureEventsByName        map[string]*LuaCreatureEvent
 	creatureEventsOnModalWindow []*lua.LFunction
 
 	// GlobalEvents is the scheduling engine for server-wide startup/think/time
@@ -67,7 +67,7 @@ type Engine struct {
 // New creates an engine with the base libraries loaded.
 func New(world *game.World, log *slog.Logger) *Engine {
 	L := lua.NewState()
-	e := &Engine{L: L, log: log, world: world}
+	e := &Engine{L: L, log: log, world: world, creatureEventsByName: make(map[string]*LuaCreatureEvent)}
 	e.registerAPI()
 	e.overrideFileLoaders()
 	e.registerScheduler()

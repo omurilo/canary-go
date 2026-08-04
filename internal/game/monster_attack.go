@@ -77,6 +77,21 @@ func (m *Monster) DoAttacking(w *World, interval uint32) bool {
 	return attacked
 }
 
+// SetTarget overrides BaseCreature.SetTarget to arm the monster's first melee
+// swing when it acquires a target. Monster::attackTicks drives the interval gate
+// in CanUseSpell and starts at 0, so without this an attack block with a 2000ms
+// interval makes a freshly-engaged monster stand silently for up to two seconds
+// before its first swing. Arming the one-shot extraMeleeAttack flag makes that
+// first melee bypass both the interval and the 1500ms floor (monster.cpp:2090);
+// the flag is consumed by the first swing and the normal cadence resumes. The
+// flag was never set anywhere, so the fast-swing path was dead code.
+func (m *Monster) SetTarget(target Creature) {
+	m.BaseCreature.SetTarget(target)
+	if target != nil {
+		m.extraMeleeAttack = true
+	}
+}
+
 // attackBlocks is the monster's attack spell list. Runtime blocks added by a
 // script sit alongside the ones from the type.
 func (m *Monster) attackBlocks() []creatures.MonsterAttack {

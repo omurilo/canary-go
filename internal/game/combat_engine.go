@@ -956,10 +956,18 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 		e.world.OnCreatureDied(victim)
 	}
 
+	// Monster-death script hook: fires before RemoveCreature, while the monster is
+	// still on the tile, so a quest boss's onDeath can spawn the next stage at the
+	// death position. Resolved killers are the same last-hit/most-damage pair the
+	// player-death path uses.
+	if m, ok := victim.(*Monster); ok && e.world.OnMonsterDeath != nil {
+		e.world.OnMonsterDeath(m, killer)
+	}
+
 	// Drop the corpse first (as in dropCorpse, which adds the corpse while the
 	// creature is still on the tile), then remove the creature. The corpse is a
 	// container whose Contents are the rolled loot table.
-	corpse := &Item{ID: corpseID, Count: 1}
+	corpse := &Item{ID: corpseID, Count: 1, Container: NewContainer(20)}
 	// Monster::death and Monster::getCorpse: the monster tears down its own
 	// state (summons, target and friend lists) and stamps the corpse with the
 	// owner, so the top damage dealer gets the loot protection window.

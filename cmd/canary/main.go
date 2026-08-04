@@ -680,6 +680,26 @@ func run(o runOpts, log *slog.Logger) error {
 			log.Warn("save on death failed", "player", p.Name, "err", err)
 		}
 	}
+	world.OnMonsterDeath = func(m *game.Monster, killer game.Creature) {
+		if lengine == nil {
+			return
+		}
+		// Resolve the killers the way the player path does. The monster is NOT
+		// relocated before this point and keeps its position after removal, so the
+		// deferred handler reads the true death tile — the boss the onDeath spawns
+		// (astral glyph, soul splinter, organic matter) appears where the monster
+		// died, not at a temple. Injustice flags don't apply (no PvP killer).
+		lastHit, mostDamage := world.Killers(m)
+		if lastHit == nil {
+			lastHit = killer
+		}
+		if mostDamage == nil {
+			mostDamage = killer
+		}
+		deferLua(func() {
+			lengine.ExecuteMonsterOnDeath(m, nil, lastHit, mostDamage, false, false)
+		})
+	}
 	world.OnGainExperience = func(p *game.Player, source game.Creature, exp uint64, rawExp uint64) uint64 {
 		if events.GlobalEngine != nil {
 			return events.GlobalEngine.ExecuteOnGainExperience(p, source, exp, rawExp)

@@ -271,5 +271,59 @@ func TestMonsterTypeConstructorAndRaceId(t *testing.T) {
 	}
 }
 
+// monster.events is the source of a monster type's CreatureEvent names (the
+// quest bosses — astral glyph, soul splinter, organic matter — bind their onDeath
+// handlers that way). mType:register must parse them, dedup them, and every
+// Monster instance must carry them so ExecuteMonsterOnDeath can fire them only
+// for that monster.
+func TestMonsterTypeCreatureEvents(t *testing.T) {
+	e := newTestEngine()
+	defer e.Close()
+
+	if err := e.L.DoString(`
+		local mType = MonsterType("Cyclops Smith")
+		mType:register({
+			health = 100,
+			events = { "FerumbrasSoulSplinter", "FerumbrasSoulSplinter" },
+		})
+		assert(mType:getCreatureEvents() ~= nil)
+	`); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	mt := e.world.TypeRegistry.Monsters["cyclops smith"]
+	if mt == nil {
+		t.Fatal("Cyclops Smith not registered")
+	}
+	if len(mt.CreatureEvents) != 1 || mt.CreatureEvents[0] != "FerumbrasSoulSplinter" {
+		t.Errorf("CreatureEvents = %v, want [FerumbrasSoulSplinter] (duplicates deduped)", mt.CreatureEvents)
+	}
+
+	// A Monster spawned now carries the type's parsed events, which is what lets
+	// ExecuteMonsterOnDeath fire this boss's handler only for this boss.
+	inst := game.NewMonster(7, "Cyclops Smith", mt)
+	if !inst.HasEvent("FerumbrasSoulSplinter") {
+		t.Errorf("instance missing monster.events name %q", "FerumbrasSoulSplinter")
+	}
+
+	// registerEvent appends at runtime; getCreatureEvents returns the list.
+	if err := e.L.DoString(`
+		local m2 = MonsterType("Cyclops Smith")
+		m2:registerEvent("SecondBoss")
+		local evs = m2:getCreatureEvents()
+		assert(evs[1] == "FerumbrasSoulSplinter", "events[1] = " .. tostring(evs[1]))
+		assert(evs[2] == "SecondBoss", "events[2] = " .. tostring(evs[2]))
+	`); err != nil {
+		t.Fatalf("registerEvent/getCreatureEvents: %v", err)
+	}
+
+	// A monster spawned AFTER a runtime registerEvent picks up the new name too
+	// (spawns happen at runtime, after the datapack finished registering types).
+	inst2 := game.NewMonster(8, "Cyclops Smith", mt)
+	if !inst2.HasEvent("SecondBoss") {
+		t.Errorf("instance spawned after registerEvent missing %q", "SecondBoss")
+	}
+}
+
 
 

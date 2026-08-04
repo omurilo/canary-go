@@ -366,6 +366,21 @@ func (m *MonsterType) IsBoss() bool {
 	return m != nil && m.BosstiaryRaceID != 0 && bosstiary.IsBoss(m.BosstiaryRace)
 }
 
+// AddCreatureEvent registers a CreatureEvent name on this monster type without
+// duplicating an entry already present (monster.events may be listed multiple
+// times across script files). Mirrors NpcType.AddCreatureEvent.
+func (m *MonsterType) AddCreatureEvent(name string) {
+	if m == nil || name == "" {
+		return
+	}
+	for _, e := range m.CreatureEvents {
+		if e == name {
+			return
+		}
+	}
+	m.CreatureEvents = append(m.CreatureEvents, name)
+}
+
 // MonsterByBossRaceID returns the boss monster type with the given bosstiary
 // race id (monster.bosstiary.bossRaceId), or nil. Mirrors
 // IOBosstiary::getMonsterTypeByBossRaceId.
