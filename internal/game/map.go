@@ -286,6 +286,14 @@ func (m *Map) SetTile(pos Position, t *Tile) {
 	m.navCache.invalidate(int(pos.X), int(pos.Y), int(pos.Z))
 }
 
+// GetOrCreateTile returns a materialized *Tile for mutation.
+// It clones the Base tile if the active tile hasn't been created yet.
+func (m *Map) GetOrCreateTile(pos Position) *Tile {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.getTileForUpdate(pos)
+}
+
 // getTileForUpdate returns a materialized *Tile for mutation.
 // It clones the Base tile if the active tile hasn't been created yet.
 func (m *Map) getTileForUpdate(pos Position) *Tile {

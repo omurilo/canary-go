@@ -652,7 +652,7 @@ func (w *World) addCreature(c Creature, startup bool) {
 }
 
 func (w *World) addCreatureToTile(c Creature) {
-	t := w.Map.GetTile(c.GetPosition())
+	t := w.Map.GetOrCreateTile(c.GetPosition())
 	if t != nil {
 		t.Creatures = append(t.Creatures, c)
 	}

@@ -33,7 +33,7 @@ func (h *House) AddTile(w *World, pos Position) {
 	h.mu.Unlock()
 
 	if w != nil && w.Map != nil {
-		if tile := w.Map.GetTile(pos); tile != nil {
+		if tile := w.Map.GetOrCreateTile(pos); tile != nil {
 			tile.HouseID = h.ID
 			tile.Flags |= TileFlagProtectionZone
 		}
