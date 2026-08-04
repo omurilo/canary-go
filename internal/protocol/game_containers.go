@@ -189,7 +189,7 @@ func (g *GameProtocol) useItem(pos netmsg.Position, itemID uint16, stackpos, ind
 	}
 	// Gold pouch (ITEM_GOLD_POUCH = 23721) pode nao ser marcado como container no protobuf
 	// Tratar explicitamente como container (C++ Container subclass)
-	if item.ID == game.ItemGoldPouch || t.IsContainer() {
+	if item.Container != nil || item.ID == game.ItemGoldPouch || t.IsContainer() {
 		if cid := g.player.GetContainerID(item); cid != -1 {
 			g.player.CloseContainer(uint8(cid))
 			w := netmsg.NewWriter()

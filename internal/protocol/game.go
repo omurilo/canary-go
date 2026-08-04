@@ -785,7 +785,11 @@ func (g *GameProtocol) enterWorld() {
 	w.AddByte(opSelfAppear)
 	w.AddU32(p.ID)
 	w.AddU16(ServerBeat)
-	w.AddDouble(float64(p.Speed), 3) // speedA
+	spd := p.GetSpeed()
+	if spd == 0 {
+		spd = 110
+	}
+	w.AddDouble(float64(spd), 3) // speedA
 	w.AddDouble(0, 3)                // speedB
 	w.AddDouble(0, 3)                // speedC
 	w.AddByte(0)                     // can change pvp framing
