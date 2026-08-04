@@ -1,6 +1,8 @@
 package luaengine
 
 import (
+	"fmt"
+
 	"github.com/omurilo/canary-go/internal/game"
 	"github.com/omurilo/canary-go/internal/moveevents"
 	lua "github.com/yuin/gopher-lua"
@@ -160,6 +162,19 @@ func (e *Engine) CallStepIn(m *moveevents.MoveEvent, creature game.Creature, ite
 	if m.OnStepIn == nil || m.OnStepIn.Type() != lua.LTFunction {
 		return false
 	}
+
+	// DIAG: print every stepin that fires, so a repro shows whether the carrot
+	// moveevent is reached and with which item/uid. Remove after diagnosis.
+	uid := uint16(0)
+	itemID := uint16(0)
+	if item != nil {
+		itemID = item.ID
+		if item.Attr != nil && item.Attr.UniqueID != nil {
+			uid = *item.Attr.UniqueID
+		}
+	}
+	fmt.Printf("DIAG CallStepIn uids=%v player=%s item=%d itemUID=%d pos=%d,%d,%d from=%d,%d,%d\n",
+		m.UniqueIDs, creature.GetName(), itemID, uid, pos.X, pos.Y, pos.Z, fromPos.X, fromPos.Y, fromPos.Z)
 
 	// Wrap the creature with its CONCRETE type's metatable so type predicates
 	// resolve — StepIn scripts commonly do `creature:getPlayer()` which is

@@ -119,6 +119,14 @@ func (g *GameProtocol) walk(dir game.Direction) bool {
 			add(evt, ground)
 		}
 
+		// DIAG: when the ground of the walked tile carries a unique id, print
+		// whether any step-in matched, so a repro shows if the carrot uid is
+		// present but its moveevent is missing. Remove after diagnosis.
+		if tile.Ground != nil && tile.Ground.Attr != nil && tile.Ground.Attr.UniqueID != nil {
+			fmt.Printf("DIAG stepIn tile=%d,%d,%d groundUID=%d foundEvents=%d\n",
+				newPos.X, newPos.Y, newPos.Z, *tile.Ground.Attr.UniqueID, len(stepInEvents))
+		}
+
 		for i, evt := range stepInEvents {
 			it := stepInItems[i]
 			g.deps.Lua.CallStepIn(evt, p, it, newPos, oldPos)

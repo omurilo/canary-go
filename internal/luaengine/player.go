@@ -1,6 +1,7 @@
 package luaengine
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -1746,7 +1747,9 @@ func playerGetitemcount(L *lua.LState) int {
 	// HazardPoints, so show scripts gated on carrying an item (e.g. the Dreamers
 	// carrot crossing: getItemCount(3595) > 0) always took the "no item" branch.
 	itemID := uint16(lua.LVAsNumber(L.Get(2)))
-	L.Push(lua.LNumber(p.GetItemCount(itemID)))
+	count := p.GetItemCount(itemID)
+	fmt.Printf("DIAG getItemCount player=%s id=%d count=%d\n", p.Name, itemID, count) // DIAG remove
+	L.Push(lua.LNumber(count))
 	return 1
 }
 
