@@ -4306,6 +4306,13 @@ func playerFeed(L *lua.LState) int {
 	if p == nil {
 		return 0
 	}
+	seconds := luaOptInt(L, 2)
+	if seconds > 0 {
+		p.RegenTicks += int32(seconds * 1000)
+		if p.RegenTicks > 1200000 { // 20 mins max food
+			p.RegenTicks = 1200000
+		}
+	}
 	L.Push(lua.LTrue)
 	return 1
 }

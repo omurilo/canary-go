@@ -951,7 +951,7 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			return 1
 		},
 		"transform":      e.itemTransform,
-		"decay":          stubItemMethod,
+		"decay":          e.itemDecay,
 		"setDuration":    stubItemMethod,
 		"stopDecay":      stubItemMethod,
 		"getDescription": e.itemGetDescription,
@@ -1022,6 +1022,33 @@ func (e *Engine) itemTransform(L *lua.LState) int {
 	if L.GetTop() >= 3 && L.Get(3).Type() == lua.LTNumber {
 		subType := uint16(L.CheckNumber(3))
 		li.item.Count = subType
+	}
+	L.Push(lua.LBool(true))
+	return 1
+}
+
+func (e *Engine) itemDecay(L *lua.LState) int {
+	li := checkItem(L)
+	if li.item == nil {
+		L.Push(lua.LBool(false))
+		return 1
+	}
+	if e.world != nil && e.world.Decay != nil {
+		it := e.world.Items.Get(li.item.ID)
+		if it != nil {
+			if li.item.Attr == nil || li.item.Attr.Duration == nil {
+				dur := int64(it.Duration)
+				if dur <= 0 {
+					dur = 10000
+				}
+				if li.item.Attr == nil {
+					li.item.Attr = &game.ItemAttributes{}
+				}
+				dur32 := int32(dur)
+				li.item.Attr.Duration = &dur32
+			}
+			e.world.Decay.StartDecay(li.pos, li.item)
+		}
 	}
 	L.Push(lua.LBool(true))
 	return 1
