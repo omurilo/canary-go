@@ -82,6 +82,10 @@ func (w *World) notifyCreatureMove(c Creature, oldPos, newPos Position) {
 			s.OnCreatureMove(w, c, oldPos, newPos)
 		case *Npc:
 			s.OnCreatureMove(w, c, oldPos, newPos)
+		case *Player:
+			if s.GetFollowTarget() == c {
+				w.StepFollow(s)
+			}
 		}
 	}
 	for _, spectator := range w.SpectatorCreatures(oldPos) {
@@ -98,6 +102,10 @@ func (w *World) notifyCreatureMove(c Creature, oldPos, newPos Position) {
 		self.OnCreatureWalk()
 	case *Monster:
 		self.OnCreatureMove(w, self, oldPos, newPos)
+	case *Player:
+		if self.GetFollowTarget() != nil {
+			w.StepFollow(self)
+		}
 	}
 }
 

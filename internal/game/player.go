@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/omurilo/canary-go/internal/bestiary"
+	"github.com/omurilo/canary-go/internal/config"
 	"github.com/omurilo/canary-go/internal/bosstiary"
 	"github.com/omurilo/canary-go/internal/creatures"
 	"github.com/omurilo/canary-go/internal/game/combat"
@@ -370,9 +371,11 @@ type Player struct {
 	Party            *Party
 	partyInvitations []*Party
 
-	TargetID    uint32
-	target      Creature
-	ShopOwnerID uint32 // ID of the NPC currently being traded with
+	TargetID       uint32
+	target         Creature
+	FollowTargetID uint32
+	followTarget   Creature
+	ShopOwnerID    uint32 // ID of the NPC currently being traded with
 
 	// lastUIInteraction is the unix-millis timestamp of the last rate-limited UI
 	// action (forge, wheel, ...), mirroring Player::lastUIInteraction.
@@ -464,6 +467,20 @@ func (p *Player) GetTitles() *PlayerTitles {
 // (src/creatures/players/player.cpp). Spell names are compared case-insensitively.
 // TODO(spells): persist learned spells and grant them on level-up / by vocation;
 // this store is currently only populated via LearnSpell (e.g. GM commands/tests).
+func (p *Player) SetFollowTarget(c Creature) {
+	if c == nil {
+		p.FollowTargetID = 0
+		p.followTarget = nil
+		return
+	}
+	p.FollowTargetID = c.GetID()
+	p.followTarget = c
+}
+
+func (p *Player) GetFollowTarget() Creature {
+	return p.followTarget
+}
+
 func (p *Player) HasLearnedSpell(name string) bool {
 	if p.learnedSpells == nil {
 		return false
@@ -1256,10 +1273,23 @@ func (p *Player) ClearConditions() {
 }
 func (p *Player) AttackSpeed() time.Duration {
 	voc := vocations.GetVocation(uint32(p.Vocation))
+	base := 2000
 	if voc != nil && voc.AttackSpeed > 0 {
-		return time.Duration(voc.AttackSpeed) * time.Millisecond
+		base = voc.AttackSpeed
 	}
-	return 2000 * time.Millisecond
+	// rateAttackSpeed (config.lua, default 1.0) divides the base interval the way
+	// Player::getAttackSpeed applies g_configManager().getFloat(RATE_ATTACK_SPEED):
+	// 1.0 keeps the datapack's default cadence, 2.0 halves it, 4.0 quarters it.
+	// A high rate is floored so it cannot produce a zero-interval attack loop.
+	rate := config.Float("rateAttackSpeed", 1.0)
+	if rate <= 0 {
+		rate = 1.0
+	}
+	ms := float64(base) / rate
+	if ms < 100 {
+		ms = 100
+	}
+	return time.Duration(ms) * time.Millisecond
 }
 
 // GetMana/GetMaxMana/AddMana expose the player's mana pool for the combat

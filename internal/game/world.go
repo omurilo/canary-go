@@ -103,6 +103,12 @@ type World struct {
 	// callback runs).
 	OnPlayerDeath    func(p *Player, killer Creature)
 	OnCreatureDied   func(c Creature) // monster/NPC death, fires before RemoveCreature
+	// OnMonsterDeath is fired when a monster dies, before RemoveCreature, so the
+	// quest-boss onDeath handlers in the monster's own `monster.events` can spawn
+	// the next stage at the monster's position (astral glyph, soul splinter,
+	// organic matter). The monster has not been relocated at this point, so
+	// GetPosition() is the true death tile.
+	OnMonsterDeath func(m *Monster, killer Creature)
 	OnGainExperience func(p *Player, source Creature, exp uint64, rawExp uint64) uint64
 
 	// OnHouseOwnerChange persists a house ownership change, the UPDATE `houses`
@@ -1147,7 +1153,56 @@ func (w *World) PlayerRequestTrade(playerID, targetID uint32, pos Position, item
 }
 func (w *World) PlayerAcceptTrade(playerID uint32)      {}
 func (w *World) PlayerCloseTrade(playerID uint32)       {}
-func (w *World) PlayerFollow(playerID, targetID uint32) {}
+func (w *World) PlayerFollow(playerID, targetID uint32) {
+	p := w.PlayerByID(playerID)
+	if p == nil {
+		return
+	}
+	if targetID == 0 {
+		p.SetFollowTarget(nil)
+		return
+	}
+	target := w.CreatureByID(targetID)
+	if target == nil || target == p {
+		p.SetFollowTarget(nil)
+		return
+	}
+	p.SetFollowTarget(target)
+	w.StepFollow(p)
+}
+
+func (w *World) StepFollow(p *Player) {
+	if p == nil || p.Dead {
+		return
+	}
+	target := p.GetFollowTarget()
+	if target == nil {
+		return
+	}
+	pos := p.GetPosition()
+	targetPos := target.GetPosition()
+	if pos.Z != targetPos.Z {
+		p.SetFollowTarget(nil)
+		return
+	}
+	dist := chebyshevDistance(pos, targetPos)
+	if dist <= 1 {
+		if dist == 1 {
+			dir := StepDirection(pos, targetPos)
+			if p.Direction != dir {
+				p.Direction = dir
+			}
+		}
+		return
+	}
+	path := FindPath(w.Map, w.Items, pos, targetPos, 200)
+	if len(path) == 0 {
+		return
+	}
+	nextPos := path[0]
+	dir := StepDirection(pos, nextPos)
+	w.TryMoveCreature(p, dir)
+}
 
 // RemoveItemFromHolder removes count from an item wherever it actually lives —
 // a container, a player's inventory slot, or nowhere at all — and reports whether

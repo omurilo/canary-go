@@ -366,6 +366,9 @@ func autoWalkDir(raw byte) (game.Direction, bool) {
 // manualWalk runs a single key-initiated step, cancelling any auto-walk path in
 // flight (like the real client, a manual step interrupts click-to-move).
 func (g *GameProtocol) manualWalk(dir game.Direction) {
+	if g.player != nil {
+		g.player.SetFollowTarget(nil)
+	}
 	g.walkGen.Add(1)
 	g.actionMu.Lock()
 	g.walk(dir)
@@ -387,7 +390,12 @@ func (g *GameProtocol) manualTurn(dir game.Direction) {
 }
 
 // stopAutoWalk cancels the in-flight auto-walk path (0x69).
-func (g *GameProtocol) stopAutoWalk() { g.walkGen.Add(1) }
+func (g *GameProtocol) stopAutoWalk() {
+	if g.player != nil {
+		g.player.SetFollowTarget(nil)
+	}
+	g.walkGen.Add(1)
+}
 
 // autoWalk parses a click-to-move path (0x64) and walks it step by step, paced by
 // the per-tile step duration so the character walks smoothly instead of teleporting.
