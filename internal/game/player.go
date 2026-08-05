@@ -119,6 +119,12 @@ type Player struct {
 	DBID        uint32 // players.id
 	AccountID   uint32
 	AccountType uint8
+	// PremiumDays is the account's remaining premium days (accounts.prem_days),
+	// copied onto the player at login. Player:getPremiumDays reads it — it was a
+	// stub returning 0, which made Player:isPremium() always false and every
+	// premium-gated script (e.g. the Dreamers carrot crossing) take the free
+	// path.
+	PremiumDays int32
 	GroupID     uint16 // players.group_id — staff groups 4/5/6 cannot be attacked
 	Ghost       bool   // ghost mode (invisible; not targetable by monsters)
 	Name        string

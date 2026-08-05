@@ -637,6 +637,11 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 		g.disconnect("Character not found on this account.")
 		return
 	}
+	// Carry the account's premium days onto the player so Player:getPremiumDays
+	// (and therefore Player:isPremium) reflects the account, not a hardcoded 0.
+	if acc.PremDays > 0 {
+		player.PremiumDays = int32(acc.PremDays)
+	}
 
 	// Resolve the player's temple (respawn point) from the OTBM towns. The SQL
 	// `towns` table only holds placeholder data, so trusting it sends dead

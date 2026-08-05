@@ -2022,10 +2022,10 @@ func playerGetpremiumdays(L *lua.LState) int {
 		L.Push(lua.LNumber(0))
 		return 1
 	}
-	// Return premium days from account. Default 0 if not available.
-	premDays := int32(0)
-	_ = premDays
-	L.Push(lua.LNumber(0))
+	// Player::getPremiumDays returns the account's remaining premium days,
+	// copied onto the player at login (game.Player.PremiumDays). This was a stub
+	// returning 0, which made Player:isPremium() always false.
+	L.Push(lua.LNumber(p.PremiumDays))
 	return 1
 }
 
