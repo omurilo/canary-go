@@ -465,7 +465,16 @@ func creatureGetdirection(L *lua.LState) int {
 }
 
 func creatureGetevents(L *lua.LState) int {
-	L.Push(L.NewTable())
+	// Creature.getEvents returns the names this creature has registered, not the
+	// whole registry (Creature::getCreatureEvents in C++).
+	tbl := L.NewTable()
+	c := getCreature(L, 1)
+	if reg := game.EventRegistrarOf(c); reg != nil {
+		for i, name := range reg.RegisteredEvents() {
+			tbl.RawSetInt(i+1, lua.LString(name))
+		}
+	}
+	L.Push(tbl)
 	return 1
 }
 
@@ -760,7 +769,14 @@ func creatureMove(L *lua.LState) int {
 }
 
 func creatureRegisterevent(L *lua.LState) int {
-	// Event scripting isn't wired to creatures yet; accept so scripts continue.
+	// Creature.registerEvent binds an event to this creature so its onDeath (and
+	// future per-creature callbacks) fire only for it. Mirrors
+	// Creature::registerEvent (creature.cpp).
+	c := getCreature(L, 1)
+	name := L.CheckString(2)
+	if reg := game.EventRegistrarOf(c); reg != nil {
+		reg.RegisterEvent(name)
+	}
 	L.Push(lua.LTrue)
 	return 1
 }
@@ -998,6 +1014,13 @@ func (e *Engine) creatureTeleportto(L *lua.LState) int {
 }
 
 func creatureUnregisterevent(L *lua.LState) int {
+	// Creature.unregisterEvent detaches an event from this creature (used by the
+	// datapack to remove a one-shot handler after it fired).
+	c := getCreature(L, 1)
+	name := L.CheckString(2)
+	if reg := game.EventRegistrarOf(c); reg != nil {
+		reg.UnregisterEvent(name)
+	}
 	L.Push(lua.LTrue)
 	return 1
 }

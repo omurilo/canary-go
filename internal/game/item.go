@@ -26,21 +26,9 @@ type Item struct {
 	// inside ItemAttributes.Raw for undecodable blobs.
 	Attr *ItemAttributes
 
-	// Contents holds the items inside a container item (chest, bag, ...), in
-	// stack order. Empty for non-containers.
-	Contents []*Item
+	// Container points to container data if this item is a container.
+	Container *Container
 
-	// Container metadata, mirroring C++ Container. MaxSize/MaxItems are the
-	// per-slot capacities (Container::capacity / m_maxItems); they default to 0
-	// and callers should fall back to ItemType.Capacity via ContainerCapacity.
-	// Unlocked/Pagination drive the 0x6E open-container packet bytes. Parent is
-	// the holding container/cylinder, needed for hasParent() and auto-close.
-	MaxSize    uint16
-	MaxItems   uint16
-	Unlocked   bool
-	Pagination bool
-	Parent     *Item
-	Actor      bool
 
 	// Imbuements maps slot index to the applied imbuement on this item instance.
 	// The map is nil when no imbuements have ever been set on this item.
@@ -66,7 +54,7 @@ func (i *Item) RawAttributes() []byte {
 
 // HasPagination returns whether this container supports paginated browsing
 // (scroll offset). Mirrors C++ Container::hasPagination.
-func (i *Item) HasPagination() bool { return i != nil && i.Pagination }
+func (i *Item) HasPagination() bool { return i != nil && i.Container != nil && i.Container.Pagination }
 
 // ContainerCapacity returns the container's slot capacity, preferring the
 // stored MaxSize and falling back to the catalog's ItemType.Capacity. catalog
@@ -77,19 +65,20 @@ func (i *Item) HasPagination() bool { return i != nil && i.Pagination }
 const DefaultContainerCapacity = 8
 
 func (i *Item) ContainerCapacity(catalog *items.Catalog) uint16 {
-	if i.MaxSize > 0 {
-		return i.MaxSize
+	if i == nil {
+		return 0
 	}
 	if catalog != nil {
-		if t := catalog.Get(i.ID); t != nil {
-			if t.Capacity > 0 {
-				return uint16(t.Capacity)
-			}
-			// A container with no explicit size still has the default capacity;
-			// never report 0 or the client shows a full, unexpandable window.
-			if t.IsContainer() {
-				return DefaultContainerCapacity
-			}
+		if t := catalog.Get(i.ID); t != nil && t.Capacity > 0 {
+			return uint16(t.Capacity)
+		}
+	}
+	if i.Container != nil && i.Container.MaxSize > 0 {
+		return i.Container.MaxSize
+	}
+	if catalog != nil {
+		if t := catalog.Get(i.ID); t != nil && t.IsContainer() {
+			return DefaultContainerCapacity
 		}
 	}
 	return 0
@@ -98,7 +87,7 @@ func (i *Item) ContainerCapacity(catalog *items.Catalog) uint16 {
 // IsContainer reports whether this item is a container per the catalog.
 func (i *Item) IsContainer(catalog *items.Catalog) bool {
 	if catalog == nil {
-		return len(i.Contents) > 0
+		return i.Container != nil
 	}
 	if t := catalog.Get(i.ID); t != nil {
 		return t.IsContainer()
@@ -121,17 +110,10 @@ func (i *Item) IsQuiver(catalog *items.Catalog) bool {
 // container (mirrors Container::getItemHoldingCount). Guards against cycles via
 // a visited set is unnecessary for the acyclic inventory tree.
 func (i *Item) HoldingCount() int {
-	total := 0
-	for _, child := range i.Contents {
-		if child == nil {
-			continue
-		}
-		total++
-		if len(child.Contents) > 0 {
-			total += child.HoldingCount()
-		}
+	if i.Container == nil {
+		return 0
 	}
-	return total
+	return i.Container.HoldingCount()
 }
 
 // GetTier returns the forge tier of the item (0..10).
@@ -550,8 +532,10 @@ func (i *Item) GetWeight(catalog *items.Catalog) uint32 {
 		total = weight * count
 	}
 
-	for _, child := range i.Contents {
-		total += child.GetWeight(catalog)
+	if i.Container != nil {
+		for _, child := range i.Container.Contents {
+			total += child.GetWeight(catalog)
+		}
 	}
 
 	return total

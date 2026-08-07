@@ -189,7 +189,7 @@ func (g *GameProtocol) useItem(pos netmsg.Position, itemID uint16, stackpos, ind
 	}
 	// Gold pouch (ITEM_GOLD_POUCH = 23721) pode nao ser marcado como container no protobuf
 	// Tratar explicitamente como container (C++ Container subclass)
-	if item.ID == game.ItemGoldPouch || t.IsContainer() {
+	if item.Container != nil || item.ID == game.ItemGoldPouch || t.IsContainer() {
 		if cid := g.player.GetContainerID(item); cid != -1 {
 			g.player.CloseContainer(uint8(cid))
 			w := netmsg.NewWriter()
@@ -215,7 +215,7 @@ func (g *GameProtocol) useItem(pos netmsg.Position, itemID uint16, stackpos, ind
 			// second check would be unreachable. (One was added here and looked like a
 			// fix for the duplicate-window report; it never ran.)
 			g.player.OpenContainerAtWithPos(index, item, containerPos, isOnMap)
-			g.sendContainer(index, item, item.Parent != nil)
+			g.sendContainer(index, item, item.Container != nil && item.Container.Parent != nil)
 		} else {
 			g.openContainerWithPos(item, game.Position{X: pos.X, Y: pos.Y, Z: pos.Z}, true)
 		}
@@ -398,11 +398,13 @@ func (g *GameProtocol) reconcileUsedItem(item *game.Item, pos netmsg.Position, s
 				foundContSlot := uint8(0)
 				for cid := uint8(0); cid < 16; cid++ {
 					if cont, _, ok := g.openContainerByCID(cid); ok {
-						for i, contItem := range cont.Contents {
-							if contItem == item {
-								foundCID = cid
-								foundContSlot = uint8(i)
-								break
+						if cont.Container != nil {
+							for i, contItem := range cont.Container.Contents {
+								if contItem == item {
+									foundCID = cid
+									foundContSlot = uint8(i)
+									break
+								}
 							}
 						}
 						if foundCID != 255 {
@@ -427,8 +429,8 @@ func (g *GameProtocol) reconcileUsedItem(item *game.Item, pos netmsg.Position, s
 				return
 			}
 			if consumed {
-				if int(slot) < len(cont.Contents) {
-					cont.Contents = append(cont.Contents[:slot], cont.Contents[slot+1:]...)
+				if cont.Container != nil && int(slot) < len(cont.Container.Contents) {
+					cont.Container.Contents = append(cont.Container.Contents[:slot], cont.Container.Contents[slot+1:]...)
 				}
 				g.sendRemoveContainerItem(cid, slot, nil)
 				g.refreshContainerIfOpen(cont)
@@ -487,7 +489,7 @@ func (g *GameProtocol) openContainerWithPos(item *game.Item, pos game.Position, 
 	if cid < 0 {
 		return // all 16 container slots in use
 	}
-	g.sendContainer(uint8(cid), item, item.Parent != nil)
+	g.sendContainer(uint8(cid), item, item.Container != nil && item.Container.Parent != nil)
 }
 
 // sendContainer sends the container window (0x6E), mirroring the modern layout of
@@ -504,15 +506,18 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 			movable = 1
 		}
 	}
-	contents := item.Contents
-	// Force pagination for items C++ marks in Container constructor
-	if item.ID == game.ItemGoldPouch || item.ID == game.ItemStoreInbox {
-		item.Pagination = true
-		if item.MaxSize == 0 {
-			item.MaxSize = 32
-		}
-		if item.ID == game.ItemGoldPouch && item.MaxItems == 0 {
-			item.MaxItems = 2000
+	var contents []*game.Item
+	if item.Container != nil {
+		contents = item.Container.Contents
+		// Force pagination for items C++ marks in Container constructor
+		if item.ID == game.ItemGoldPouch || item.ID == game.ItemStoreInbox {
+			item.Container.Pagination = true
+			if item.Container.MaxSize == 0 {
+				item.Container.MaxSize = 32
+			}
+			if item.ID == game.ItemGoldPouch && item.Container.MaxItems == 0 {
+				item.Container.MaxItems = 2000
+			}
 		}
 	}
 	capacity := int(item.ContainerCapacity(g.deps.Items))
@@ -523,7 +528,10 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 		capacity = 0xFF
 	}
 	unlocked := byte(1) // drag & drop allowed unless explicitly locked
-	pagination := boolByte(item.Pagination)
+	pagination := false
+	if item.Container != nil {
+		pagination = item.Container.Pagination
+	}
 	firstIndex := uint16(0)
 	if g.player != nil {
 		firstIndex = g.player.GetContainerIndex(cid)
@@ -535,7 +543,7 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 	// C++: if paginated, maxItems = min(capacity, size-firstIndex)
 	// else: maxItems = capacity
 	var maxItems int
-	if item.Pagination && firstIndex > 0 {
+	if pagination && firstIndex > 0 {
 		maxItems = int(firstIndex) + capacity
 		if maxItems > len(contents) {
 			maxItems = len(contents)
@@ -562,7 +570,7 @@ func (g *GameProtocol) sendContainer(cid uint8, item *game.Item, hasParent bool)
 	w.AddByte(boolByte(hasParent))
 	w.AddByte(0)
 	w.AddByte(unlocked)
-	w.AddByte(pagination)
+	w.AddByte(boolByte(pagination))
 	w.AddU16(uint16(len(contents)))
 	w.AddU16(firstIndex)
 	// C++: if firstIndex >= containerSize, send 0 items
@@ -623,14 +631,18 @@ func (g *GameProtocol) parseSeekContainer(r *netmsg.Reader) {
 	if cap <= 0 {
 		cap = 1
 	}
-	if int(index)%cap != 0 || int(index) >= len(container.Contents) {
+	if container.Container == nil {
+		slog.Default().Info("parseSeekContainer: container nil", "cid", cid)
+		return
+	}
+	if int(index)%cap != 0 || int(index) >= len(container.Container.Contents) {
 		slog.Default().Info("parseSeekContainer: validation failed",
-			"cid", cid, "index", index, "cap", cap, "size", len(container.Contents))
+			"cid", cid, "index", index, "cap", cap, "size", len(container.Container.Contents))
 		return
 	}
 
 	g.player.SetContainerIndex(cid, index)
-	g.sendContainer(cid, container, container.Parent != nil)
+	g.sendContainer(cid, container, container.Container.Parent != nil)
 }
 
 // parseContainerUp handles a container up navigation request (0x88).
@@ -640,12 +652,12 @@ func (g *GameProtocol) parseContainerUp(r *netmsg.Reader) {
 		return
 	}
 	c := g.player.GetContainerByID(cid)
-	if c != nil && c.Parent != nil {
+	if c != nil && c.Container != nil && c.Container.Parent != nil {
 		// C++: reseta o scroll index ao subir (evita que o container pai
 		// herde um firstIndex inválido do container filho paginado)
 		g.player.SetContainerIndex(cid, 0)
-		g.player.OpenContainerAt(cid, c.Parent)
-		g.sendContainer(cid, c.Parent, c.Parent.Parent != nil)
+		g.player.OpenContainerAt(cid, c.Container.Parent)
+		g.sendContainer(cid, c.Container.Parent, c.Container.Parent.Container != nil && c.Container.Parent.Container.Parent != nil)
 	}
 }
 
@@ -812,8 +824,6 @@ func (g *GameProtocol) useItemWith(fromPos netmsg.Position, fromItemID uint16, f
 			}
 		}
 
-		fromGamePos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
-		toGamePos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
 		beforeCount := fromItem.Count
 		if g.deps.Lua.CallAction(action, g.player, fromItem, fromGamePos, toItem, toGamePos, false) {
 			if isEx {
@@ -826,6 +836,32 @@ func (g *GameProtocol) useItemWith(fromPos netmsg.Position, fromItemID uint16, f
 			}
 			if fromItem.Count != beforeCount {
 				g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
+			}
+			return
+		}
+	}
+
+	// Try rune spell if action is nil
+	if action == nil && g.deps.World.OnCastRuneSpell != nil {
+		if !g.player.CanDoAction() {
+			g.sendCancelMessage("You are exhausted.")
+			return
+		}
+		var targetCreature game.Creature
+		if tile := g.deps.World.Map.GetTile(toGamePos); tile != nil {
+			if len(tile.Creatures) > 0 {
+				targetCreature = tile.Creatures[0]
+			}
+		}
+		beforeCount := fromItem.Count
+		if g.deps.World.OnCastRuneSpell(fromItem.ID, g.player, targetCreature, toGamePos) {
+			g.player.SetNextAction(200 * time.Millisecond)
+			g.SendUseItemCooldown(200)
+			if fromItem.Count > 0 {
+				fromItem.Count--
+				if fromItem.Count != beforeCount {
+					g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
+				}
 			}
 			return
 		}
@@ -925,6 +961,27 @@ func (g *GameProtocol) useWithCreature(fromPos netmsg.Position, fromItemID uint1
 			return
 		}
 	}
+
+	// Try rune spell if action is nil
+	if action == nil && g.deps.World.OnCastRuneSpell != nil {
+		if !g.player.CanDoAction() {
+			g.sendCancelMessage("You are exhausted.")
+			return
+		}
+		targetPos := targetCreature.GetPosition()
+		beforeCount := fromItem.Count
+		if g.deps.World.OnCastRuneSpell(fromItem.ID, g.player, targetCreature, targetPos) {
+			g.player.SetNextAction(200 * time.Millisecond)
+			g.SendUseItemCooldown(200)
+			if fromItem.Count > 0 {
+				fromItem.Count--
+				if fromItem.Count != beforeCount {
+					g.reconcileUsedItem(fromItem, fromPos, fromStackPos)
+				}
+			}
+			return
+		}
+	}
 }
 
 // getItemAt returns an item from the given client netmsg.Position and stackpos.
@@ -939,8 +996,8 @@ func (g *GameProtocol) getItemAt(pos netmsg.Position, itemID uint16, stackpos ui
 			cid := uint8(pos.Y - 0x40)
 			if cont, offset, ok := g.openContainerByCID(cid); ok {
 				fromSlot := int(pos.Z) + offset
-				if fromSlot < len(cont.Contents) {
-					item = cont.Contents[fromSlot]
+				if cont.Container != nil && fromSlot < len(cont.Container.Contents) {
+					item = cont.Container.Contents[fromSlot]
 				}
 			}
 		} else {
@@ -1018,14 +1075,16 @@ func (g *GameProtocol) restoreOpenContainers() {
 			slog.Default().Info("Restoring open container", "cid", cid, "itemId", item.ID)
 
 			g.player.OpenContainerAtWithPos(cid, item, game.Position{}, false)
-			g.sendContainer(cid, item, item.Parent != nil)
+			g.sendContainer(cid, item, item.Container != nil && item.Container.Parent != nil)
 			// Clear it so it gets wiped from the DB on next save, preventing it from
 			// becoming a ghost if the client loses sync.
 			item.Attr.OpenContainer = nil
 		}
 		// Also traverse inside this container
-		for _, child := range item.Contents {
-			traverse(child)
+		if item.Container != nil {
+			for _, child := range item.Container.Contents {
+				traverse(child)
+			}
 		}
 	}
 

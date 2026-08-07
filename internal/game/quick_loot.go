@@ -75,11 +75,11 @@ func (w *World) PlayerQuickLoot(playerID uint32, pos Position, itemID uint16, st
 	}
 
 	lootCorpse := func(corpseContainer *Item) {
-		if corpseContainer == nil || !corpseContainer.IsContainer(w.Items) {
+		if corpseContainer == nil || corpseContainer.Container == nil || !corpseContainer.IsContainer(w.Items) {
 			return
 		}
-		for i := len(corpseContainer.Contents) - 1; i >= 0; i-- {
-			item := corpseContainer.Contents[i]
+		for i := len(corpseContainer.Container.Contents) - 1; i >= 0; i-- {
+			item := corpseContainer.Container.Contents[i]
 			if item == nil {
 				continue
 			}
@@ -103,7 +103,7 @@ func (w *World) PlayerQuickLoot(playerID uint32, pos Position, itemID uint16, st
 					count = 1
 				}
 				p.BankBalance += item.Worth() * count
-				corpseContainer.Contents = append(corpseContainer.Contents[:i], corpseContainer.Contents[i+1:]...)
+				corpseContainer.Container.Contents = append(corpseContainer.Container.Contents[:i], corpseContainer.Container.Contents[i+1:]...)
 				continue
 			}
 
@@ -113,7 +113,7 @@ func (w *World) PlayerQuickLoot(playerID uint32, pos Position, itemID uint16, st
 				continue // no container and fallback disabled: leave it in the corpse
 			}
 
-			corpseContainer.Contents = append(corpseContainer.Contents[:i], corpseContainer.Contents[i+1:]...)
+			corpseContainer.Container.Contents = append(corpseContainer.Container.Contents[:i], corpseContainer.Container.Contents[i+1:]...)
 			AddItemToContainer(w.Items, targetContainer, item)
 
 			if p.Session != nil {

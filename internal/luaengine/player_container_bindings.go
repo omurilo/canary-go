@@ -84,7 +84,7 @@ func (e *Engine) playerAdditembatchtopaginedcontainer(L *lua.LState) int {
 		return 1
 	}
 	c := checkContainer(L)
-	if c.item == nil || !c.item.Pagination {
+	if c.item == nil || c.item.Container == nil || !c.item.Container.Pagination {
 		L.Push(lua.LNumber(0)) // only paginated containers accept batch adds
 		return 1
 	}
@@ -100,8 +100,10 @@ func (e *Engine) playerAdditembatchtopaginedcontainer(L *lua.LState) int {
 	cat := e.itemCatalog()
 	capacity := int(c.item.ContainerCapacity(cat))
 	actuallyAdded := 0
-	for actuallyAdded < count && len(c.item.Contents) < capacity {
-		c.item.Contents = append(c.item.Contents, &game.Item{ID: id, Count: 1, Parent: c.item})
+	for actuallyAdded < count && c.item.Container != nil && len(c.item.Container.Contents) < capacity {
+		c.item.Container.Contents = append(c.item.Container.Contents, &game.Item{ID: id, Count: 1})
+		c.item.Container.Contents[len(c.item.Container.Contents)-1].Container = game.NewContainer(0)
+		c.item.Container.Contents[len(c.item.Container.Contents)-1].Container.Parent = c.item
 		actuallyAdded++
 	}
 	if actuallyAdded > 0 && p.Session != nil {

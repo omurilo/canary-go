@@ -1,6 +1,10 @@
 package game
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/omurilo/canary-go/internal/items"
+)
 
 // NavCell stores walkability flags for a single tile position.
 type NavCell struct {
@@ -43,7 +47,7 @@ func newNavCache() *navCache {
 
 // getOrCreateSnapshot returns a cached snapshot for the sector containing (x,y,z),
 // or builds one from the map.
-func (nc *navCache) getOrCreateSnapshot(m *Map, x, y, z int) *NavSectorSnapshot {
+func (nc *navCache) getOrCreateSnapshot(m *Map, catalog *items.Catalog, x, y, z int) *NavSectorSnapshot {
 	sx, sy := sectorOrigin(x, y)
 	key := sectorKey{X: sx, Y: sy, Z: z}
 
@@ -55,7 +59,7 @@ func (nc *navCache) getOrCreateSnapshot(m *Map, x, y, z int) *NavSectorSnapshot 
 	}
 
 	// Build snapshot from scratch.
-	snap = buildSectorSnapshot(m, sx, sy, z)
+	snap = buildSectorSnapshot(m, catalog, sx, sy, z)
 	nc.mu.Lock()
 	nc.sectors[key] = snap
 	nc.mu.Unlock()
@@ -78,7 +82,7 @@ func sectorOrigin(x, y int) (int, int) {
 }
 
 // buildSectorSnapshot creates a NavSectorSnapshot from the map for an 8x8 area.
-func buildSectorSnapshot(m *Map, sx, sy, z int) *NavSectorSnapshot {
+func buildSectorSnapshot(m *Map, catalog *items.Catalog, sx, sy, z int) *NavSectorSnapshot {
 	snap := &NavSectorSnapshot{X: sx, Y: sy, Z: z}
 	for dy := 0; dy < 8; dy++ {
 		for dx := 0; dx < 8; dx++ {
@@ -86,12 +90,13 @@ func buildSectorSnapshot(m *Map, sx, sy, z int) *NavSectorSnapshot {
 			tile := m.GetTile(pos)
 			idx := dy*8 + dx
 			if tile == nil {
-				snap.cells[idx] = NavCell{}
+				snap.cells[idx] = NavCell{HasGround: false, BlockSolid: true}
 				continue
 			}
+			blockSolid := tile.Ground == nil || tile.BlocksSolid(catalog)
 			cell := NavCell{
-				HasGround:  tile.Ground != nil,
-				BlockSolid: tile.Ground == nil,
+				HasGround:  tile.Ground != nil && tile.Ground.ID != 0,
+				BlockSolid: blockSolid,
 			}
 			snap.cells[idx] = cell
 		}

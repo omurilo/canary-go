@@ -28,10 +28,10 @@ func TestTileStoreRoundTrip(t *testing.T) {
 
 	count := uint16(37)
 	actionID := uint16(4242)
-	bag := &game.Item{ID: 1987, Contents: []*game.Item{
+	bag := &game.Item{ID: 1987, Container: &game.Container{Contents: []*game.Item{
 		{ID: 3031, Count: count, Attr: &game.ItemAttributes{HasCount: true}},
 		{ID: 1650},
-	}}
+	}}}
 	tile := &game.Tile{
 		Ground: &game.Item{ID: 1},
 		Items: []*game.Item{
@@ -83,18 +83,18 @@ func TestTileStoreRoundTrip(t *testing.T) {
 
 	// The bag's contents, also reversed.
 	bagBack := got[0]
-	if len(bagBack.Contents) != 2 {
-		t.Fatalf("bag came back with %d items, want 2", len(bagBack.Contents))
+	if bagBack.Container == nil || len(bagBack.Container.Contents) != 2 {
+		t.Fatalf("bag came back with %d items, want 2", len(bagBack.Container.Contents))
 	}
-	if bagBack.Contents[0].ID != 1650 || bagBack.Contents[1].ID != 3031 {
+	if bagBack.Container.Contents[0].ID != 1650 || bagBack.Container.Contents[1].ID != 3031 {
 		t.Errorf("bag contents = %d,%d, want 1650,3031 (reversed)",
-			bagBack.Contents[0].ID, bagBack.Contents[1].ID)
+			bagBack.Container.Contents[0].ID, bagBack.Container.Contents[1].ID)
 	}
-	coin := bagBack.Contents[1]
+	coin := bagBack.Container.Contents[1]
 	if coin.Count != count {
 		t.Errorf("the coin stack count did not survive: got %d, want %d", coin.Count, count)
 	}
-	if bagBack.Contents[0].Parent != bagBack {
+	if bagBack.Container.Contents[0].Container != nil && bagBack.Container.Contents[0].Container.Parent != bagBack {
 		t.Errorf("a restored child must point at its container")
 	}
 }
@@ -120,7 +120,7 @@ func TestTileStoreSkipsTilesWithNothingToSave(t *testing.T) {
 	// An EMPTY container is not saved, but a container with contents is — that is
 	// how a bag inside fixed furniture keeps its items (Item::isSavedToHouses).
 	withContents := &game.Tile{Items: []*game.Item{
-		{ID: 407, Contents: []*game.Item{{ID: 3031, Count: 1}}},
+		{ID: 407, Container: &game.Container{Contents: []*game.Item{{ID: 3031, Count: 1}}}},
 	}}
 	if encodeTile(withContents, pos, cat) == nil {
 		t.Errorf("a non-empty container must be saved even when its own type is fixed")

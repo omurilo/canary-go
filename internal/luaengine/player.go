@@ -1683,7 +1683,8 @@ func (e *Engine) playerGetinbox(L *lua.LState) int {
 		return 1
 	}
 	if p.Inbox == nil {
-		p.Inbox = &game.Item{ID: game.ItemInbox, Contents: make([]*game.Item, 0), Pagination: true}
+		p.Inbox = &game.Item{ID: game.ItemInbox, Container: game.NewContainer(0)}
+		p.Inbox.Container.Pagination = true
 	}
 	e.pushContainer(L, p.Inbox)
 	return 1
@@ -1740,7 +1741,12 @@ func playerGetitemcount(L *lua.LState) int {
 		L.Push(lua.LNil)
 		return 1
 	}
-	L.Push(lua.LNumber(p.HazardPoints))
+	// player:getItemCount(id) returns how many of the item the player carries
+	// across their whole inventory tree. This was a stub that returned
+	// HazardPoints, so show scripts gated on carrying an item (e.g. the Dreamers
+	// carrot crossing: getItemCount(3595) > 0) always took the "no item" branch.
+	itemID := uint16(lua.LVAsNumber(L.Get(2)))
+	L.Push(lua.LNumber(p.GetItemCount(itemID)))
 	return 1
 }
 
@@ -1833,10 +1839,10 @@ func (e *Engine) playerGetlootpouch(L *lua.LState) int {
 
 // findItemInTree recursively searches an item's contents for a matching ID.
 func findItemInTree(parent *game.Item, id uint16) *game.Item {
-	if parent == nil {
+	if parent == nil || parent.Container == nil {
 		return nil
 	}
-	for _, child := range parent.Contents {
+	for _, child := range parent.Container.Contents {
 		if child == nil {
 			continue
 		}
@@ -2016,10 +2022,10 @@ func playerGetpremiumdays(L *lua.LState) int {
 		L.Push(lua.LNumber(0))
 		return 1
 	}
-	// Return premium days from account. Default 0 if not available.
-	premDays := int32(0)
-	_ = premDays
-	L.Push(lua.LNumber(0))
+	// Player::getPremiumDays returns the account's remaining premium days,
+	// copied onto the player at login (game.Player.PremiumDays). This was a stub
+	// returning 0, which made Player:isPremium() always false.
+	L.Push(lua.LNumber(p.PremiumDays))
 	return 1
 }
 
@@ -2274,7 +2280,7 @@ func (e *Engine) playerGetstoreinbox(L *lua.LState) int {
 		return 1
 	}
 	if p.StoreInbox == nil {
-		p.StoreInbox = &game.Item{ID: storeInboxItemID}
+		p.StoreInbox = &game.Item{ID: storeInboxItemID, Container: game.NewContainer(20)}
 	}
 	e.pushContainer(L, p.StoreInbox)
 	return 1
@@ -4304,6 +4310,13 @@ func playerFeed(L *lua.LState) int {
 	p := checkPlayer(L)
 	if p == nil {
 		return 0
+	}
+	seconds := luaOptInt(L, 2)
+	if seconds > 0 {
+		p.RegenTicks += int32(seconds * 1000)
+		if p.RegenTicks > 1200000 { // 20 mins max food
+			p.RegenTicks = 1200000
+		}
 	}
 	L.Push(lua.LTrue)
 	return 1

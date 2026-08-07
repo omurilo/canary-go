@@ -865,10 +865,11 @@ CREATE TABLE IF NOT EXISTS `kv_store` (
   PRIMARY KEY (`key_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
--- Create Account god/god
+-- Create Account god/god (premium so premium-gated content like the Dreamers
+-- carrot crossing works out of the box on a fresh database)
 INSERT INTO `accounts`
-(`id`, `name`, `email`, `password`, `type`) VALUES
-(1, 'god', '@god', '21298df8a3277357ee55b01df9530b535cf08ec1', 6);
+(`id`, `name`, `email`, `password`, `type`, `premdays`) VALUES
+(1, 'god', '@god', '21298df8a3277357ee55b01df9530b535cf08ec1', 6, 999);
 
 -- Create player on GOD account
 -- Create sample characters

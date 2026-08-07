@@ -421,14 +421,13 @@ func (e *Engine) gameCreateItem(L *lua.LState) int {
 
 		// C++ Container constructor: ITEM_GOLD_POUCH -> pagination, maxSize=32
 		if item.ID == game.ItemGoldPouch {
-			item.Pagination = true
-			item.Contents = make([]*game.Item, 0)
-			item.MaxSize = 32
+			item.Container = game.NewContainer(32)
+			item.Container.Pagination = true
 			// C++: m_maxItems = g_configManager().getNumber(LOOTPOUCH_MAXLIMIT)
 			if v, ok := L.GetGlobal("lootPouchMaxLimit").(lua.LNumber); ok && v > 0 {
-				item.MaxItems = uint16(v)
+				item.Container.MaxItems = uint16(v)
 			} else {
-				item.MaxItems = 2000
+				item.Container.MaxItems = 2000
 			}
 		}
 

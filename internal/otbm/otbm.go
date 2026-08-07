@@ -313,16 +313,6 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 	pos := game.Position{X: baseX + uint16(xOff), Y: baseY + uint16(yOff), Z: baseZ}
 	tile := &game.Tile{}
 
-	// Use tile cache for dedup (house tiles bypass cache).
-	if !house && p.tc != nil {
-		defer func() {
-			cached := p.tc.CreateOrGetTile(tile)
-			if cached != tile {
-				*tile = *cached
-			}
-		}()
-	}
-
 	if house {
 		tile.HouseID = r.u32()                    // house id
 		tile.Flags |= game.TileFlagProtectionZone // C++ House::addTile (house.cpp:27)
@@ -397,8 +387,14 @@ func (p *parser) parseTile(baseX, baseY uint16, baseZ uint8, house bool) {
 		}
 	}
 
+	if !house && p.tc != nil {
+		if cached := p.tc.CreateOrGetTile(tile); cached != nil {
+			tile = cached
+		}
+	}
+
 	if tile.Ground != nil || len(tile.Items) > 0 || tile.Flags != 0 {
-		p.m.SetTile(pos, tile)
+		p.m.SetBaseTile(pos, tile)
 		p.res.TileCount++
 	}
 }
@@ -485,7 +481,10 @@ attrLoop:
 		r.depth++
 		nodeType := r.u8()
 		if nodeType == nodeItem {
-			it.Contents = append(it.Contents, p.readItem())
+			if it.Container == nil {
+				it.Container = game.NewContainer(8) // Initialize container if it holds items
+			}
+			it.Container.Contents = append(it.Container.Contents, p.readItem())
 		} else {
 			p.skipNode()
 		}

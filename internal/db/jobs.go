@@ -101,7 +101,7 @@ func (d *DB) SeedTestAccount(ctx context.Context, accountName, email, password, 
 	res, err := d.SQL.ExecContext(ctx,
 		`INSERT INTO accounts (name, email, password, type, premdays)
 		 VALUES (?, ?, ?, 5, 999)
-		 ON DUPLICATE KEY UPDATE email=VALUES(email), password=VALUES(password)`,
+		 ON DUPLICATE KEY UPDATE email=VALUES(email), password=VALUES(password), premdays=VALUES(premdays)`,
 		accountName, email, pwHash)
 	if err != nil {
 		return fmt.Errorf("seed account: %w", err)

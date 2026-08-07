@@ -103,6 +103,12 @@ type World struct {
 	// callback runs).
 	OnPlayerDeath    func(p *Player, killer Creature)
 	OnCreatureDied   func(c Creature) // monster/NPC death, fires before RemoveCreature
+	// OnMonsterDeath is fired when a monster dies, before RemoveCreature, so the
+	// quest-boss onDeath handlers in the monster's own `monster.events` can spawn
+	// the next stage at the monster's position (astral glyph, soul splinter,
+	// organic matter). The monster has not been relocated at this point, so
+	// GetPosition() is the true death tile.
+	OnMonsterDeath func(m *Monster, killer Creature)
 	OnGainExperience func(p *Player, source Creature, exp uint64, rawExp uint64) uint64
 
 	// OnHouseOwnerChange persists a house ownership change, the UPDATE `houses`
@@ -152,6 +158,7 @@ type World struct {
 	// fires it on every think, so a monster visibly faces its target.
 	OnCreatureTurn   func(c Creature)
 	OnCastSpell      func(name string, caster Creature, target Creature) bool
+	OnCastRuneSpell  func(runeID uint16, caster Creature, target Creature, pos Position) bool
 	OnTargetTile     func(funcName string, caster Creature, pos Position)
 	OnTargetCreature func(funcName string, caster Creature, target Creature)
 	OnChangeSpeed    func(c Creature)
@@ -312,8 +319,8 @@ func (w *World) AddItem(pos Position, it *Item) bool {
 		return false
 	}
 	// Refresh open browse field for this tile
-	if bf := w.BrowseFieldGet(pos); bf != nil {
-		bf.Contents = append([]*Item{it}, bf.Contents...)
+	if bf := w.BrowseFieldGet(pos); bf != nil && bf.Container != nil {
+		bf.Container.Contents = append([]*Item{it}, bf.Container.Contents...)
 	}
 	// Notify nearby players about the new item
 	if w.OnItemAppear != nil {
@@ -356,10 +363,10 @@ func (w *World) InternalRemoveItem(pos Position, item *Item, count uint16) {
 	} else {
 		w.RemoveMapItem(pos, item)
 		// Remove from open browse field
-		if bf := w.BrowseFieldGet(pos); bf != nil {
-			for i, cit := range bf.Contents {
+		if bf := w.BrowseFieldGet(pos); bf != nil && bf.Container != nil {
+			for i, cit := range bf.Container.Contents {
 				if cit == item {
-					bf.Contents = append(bf.Contents[:i], bf.Contents[i+1:]...)
+					bf.Container.Contents = append(bf.Container.Contents[:i], bf.Container.Contents[i+1:]...)
 					break
 				}
 			}
@@ -488,6 +495,7 @@ func (w *World) AddPlayer(p *Player, sess Session) bool {
 		}
 	}
 
+	w.notifyCreatureAppear(p)
 	if w.OnCreatureAppear != nil {
 		w.OnCreatureAppear(p)
 	}
@@ -652,7 +660,7 @@ func (w *World) addCreature(c Creature, startup bool) {
 }
 
 func (w *World) addCreatureToTile(c Creature) {
-	t := w.Map.GetTile(c.GetPosition())
+	t := w.Map.GetOrCreateTile(c.GetPosition())
 	if t != nil {
 		t.Creatures = append(t.Creatures, c)
 	}
@@ -1145,7 +1153,56 @@ func (w *World) PlayerRequestTrade(playerID, targetID uint32, pos Position, item
 }
 func (w *World) PlayerAcceptTrade(playerID uint32)      {}
 func (w *World) PlayerCloseTrade(playerID uint32)       {}
-func (w *World) PlayerFollow(playerID, targetID uint32) {}
+func (w *World) PlayerFollow(playerID, targetID uint32) {
+	p := w.PlayerByID(playerID)
+	if p == nil {
+		return
+	}
+	if targetID == 0 {
+		p.SetFollowTarget(nil)
+		return
+	}
+	target := w.CreatureByID(targetID)
+	if target == nil || target == p {
+		p.SetFollowTarget(nil)
+		return
+	}
+	p.SetFollowTarget(target)
+	w.StepFollow(p)
+}
+
+func (w *World) StepFollow(p *Player) {
+	if p == nil || p.Dead {
+		return
+	}
+	target := p.GetFollowTarget()
+	if target == nil {
+		return
+	}
+	pos := p.GetPosition()
+	targetPos := target.GetPosition()
+	if pos.Z != targetPos.Z {
+		p.SetFollowTarget(nil)
+		return
+	}
+	dist := chebyshevDistance(pos, targetPos)
+	if dist <= 1 {
+		if dist == 1 {
+			dir := StepDirection(pos, targetPos)
+			if p.Direction != dir {
+				p.Direction = dir
+			}
+		}
+		return
+	}
+	path := FindPath(w.Map, w.Items, pos, targetPos, 200)
+	if len(path) == 0 {
+		return
+	}
+	nextPos := path[0]
+	dir := StepDirection(pos, nextPos)
+	w.TryMoveCreature(p, dir)
+}
 
 // RemoveItemFromHolder removes count from an item wherever it actually lives —
 // a container, a player's inventory slot, or nowhere at all — and reports whether
@@ -1163,18 +1220,20 @@ func (w *World) RemoveItemFromHolder(p *Player, item *Item, count uint16) bool {
 	partial := int(item.Count) > int(count) && count > 0
 
 	// A container the item sits in, which the item itself points at.
-	if parent := item.Parent; parent != nil {
-		for i, c := range parent.Contents {
-			if c != item {
-				continue
+	if item.Container != nil {
+		if parent := item.Container.Parent; parent != nil && parent.Container != nil {
+			for i, c := range parent.Container.Contents {
+				if c != item {
+					continue
+				}
+				if partial {
+					item.Count -= count
+				} else {
+					parent.Container.Contents = append(parent.Container.Contents[:i], parent.Container.Contents[i+1:]...)
+					item.Container.Parent = nil
+				}
+				return true
 			}
-			if partial {
-				item.Count -= count
-			} else {
-				parent.Contents = append(parent.Contents[:i], parent.Contents[i+1:]...)
-				item.Parent = nil
-			}
-			return true
 		}
 	}
 

@@ -82,8 +82,8 @@ func playerAllItems(p *game.Player) []*game.Item {
 				continue
 			}
 			out = append(out, it)
-			if len(it.Contents) > 0 {
-				walk(it.Contents)
+			if it.Container != nil && len(it.Container.Contents) > 0 {
+				walk(it.Container.Contents)
 			}
 		}
 	}

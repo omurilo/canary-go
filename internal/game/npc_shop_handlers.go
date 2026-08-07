@@ -241,12 +241,15 @@ func removeItemsFromLootPouch(w *World, pouch *Item, itemID uint16, amount uint3
 	remaining := amount
 	var walk func(container *Item)
 	walk = func(container *Item) {
-		out := container.Contents[:0]
-		for _, item := range container.Contents {
+		if container == nil || container.Container == nil {
+			return
+		}
+		out := container.Container.Contents[:0]
+		for _, item := range container.Container.Contents {
 			if item == nil {
 				continue
 			}
-			if len(item.Contents) > 0 {
+			if item.Container != nil && len(item.Container.Contents) > 0 {
 				walk(item)
 				out = append(out, item)
 				continue
@@ -260,7 +263,7 @@ func removeItemsFromLootPouch(w *World, pouch *Item, itemID uint16, amount uint3
 			}
 			out = append(out, item)
 		}
-		container.Contents = out
+		container.Container.Contents = out
 	}
 	walk(pouch)
 	return amount - remaining
@@ -304,10 +307,10 @@ func (p *Player) GetLootPouch() *Item {
 
 // findItemInContainerTree is getInventoryItemsFromId's recursive half.
 func findItemInContainerTree(parent *Item, id uint16) *Item {
-	if parent == nil {
+	if parent == nil || parent.Container == nil {
 		return nil
 	}
-	for _, child := range parent.Contents {
+	for _, child := range parent.Container.Contents {
 		if child == nil {
 			continue
 		}
@@ -329,11 +332,14 @@ func findItemInContainerTree(parent *Item, id uint16) *Item {
 // shop price and selling them by accident is unrecoverable, which is why
 // upstream guards it here rather than trusting the player to unload first.
 func collectSellable(container *Item, prices map[uint16]uint32, out map[uint16]uint32) {
-	for _, item := range container.Contents {
+	if container == nil || container.Container == nil {
+		return
+	}
+	for _, item := range container.Container.Contents {
 		if item == nil {
 			continue
 		}
-		if len(item.Contents) > 0 {
+		if item.Container != nil && len(item.Container.Contents) > 0 {
 			collectSellable(item, prices, out)
 			continue
 		}

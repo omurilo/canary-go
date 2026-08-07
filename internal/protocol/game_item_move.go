@@ -39,8 +39,8 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			if cont, offset, ok := g.openContainerByCID(cid); ok {
 				fromContainer = cont
 				fromSlot = uint8(fromPos.Z + uint8(offset)) // Client sends slot index as Z
-				if int(fromSlot) < len(cont.Contents) {
-					item = cont.Contents[fromSlot]
+				if cont.Container != nil && int(fromSlot) < len(cont.Container.Contents) {
+					item = cont.Container.Contents[fromSlot]
 				}
 			}
 		} else {
@@ -166,16 +166,18 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 						}
 					}
 				} else {
-					slotIdx := int(toPos.Z) + offset
-					if slotIdx >= 0 && slotIdx < len(openCont.Contents) {
-						targetItem := openCont.Contents[slotIdx]
+					if openCont.Container != nil {
+						slotIdx := int(toPos.Z) + offset
+						if slotIdx >= 0 && slotIdx < len(openCont.Container.Contents) {
+							targetItem := openCont.Container.Contents[slotIdx]
 						if targetItem != nil && targetItem.IsContainer(g.deps.Items) && targetItem != item {
 							destContainer = targetItem
 						} else {
 							destContainer = openCont
 						}
-					} else {
-						destContainer = openCont
+						} else {
+							destContainer = openCont
+						}
 					}
 				}
 			}
@@ -257,7 +259,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			}
 		} else {
 			if fromPos.Y >= 0x40 {
-				fromContainer.Contents = append(fromContainer.Contents[:fromSlot], fromContainer.Contents[fromSlot+1:]...)
+				if fromContainer.Container != nil {
+					fromContainer.Container.Contents = append(fromContainer.Container.Contents[:fromSlot], fromContainer.Container.Contents[fromSlot+1:]...)
+				}
 				g.sendRemoveContainerItem(uint8(fromPos.Y-0x40), fromSlot, nil)
 				// Browse field: also remove from tile (use tile stack pos)
 				if fromContainer.ID == game.ItemBrowseField {
@@ -315,7 +319,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		}
 	} else if toPos.X != 0xFFFF {
 		pos := game.Position{X: toPos.X, Y: toPos.Y, Z: toPos.Z}
-		moveItem.Parent = nil
+		if moveItem.Container != nil {
+			moveItem.Container.Parent = nil
+		}
 		
 		// Map merging logic
 		tile := g.deps.World.Map.GetTile(pos)
@@ -366,9 +372,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			cid := uint8(toPos.Y - 0x40)
 			if toContainer, _, ok := g.openContainerByCID(cid); ok {
 				var merged bool
-				if it != nil && it.Stackable {
+				if it != nil && it.Stackable && toContainer.Container != nil {
 					// Search container for any non-full matching stacks first
-					for idx, targetItem := range toContainer.Contents {
+					for idx, targetItem := range toContainer.Container.Contents {
 						if targetItem != nil && targetItem.ID == moveItem.ID && targetItem.Count < 100 {
 							room := 100 - targetItem.Count
 							take := moveItem.Count
@@ -387,15 +393,19 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 				}
 
 				if !merged {
-					moveItem.Parent = toContainer
+					if moveItem.Container != nil {
+						moveItem.Container.Parent = toContainer
+					}
 					// Insert at the beginning (prepend) — C++ comportamento padrao
-					toContainer.Contents = append([]*game.Item{moveItem}, toContainer.Contents...)
-					if len(toContainer.Contents) > 0xFF {
-						toContainer.Contents = toContainer.Contents[:0xFF] // simple truncation
+					if toContainer.Container != nil {
+						toContainer.Container.Contents = append([]*game.Item{moveItem}, toContainer.Container.Contents...)
+						if len(toContainer.Container.Contents) > 0xFF {
+							toContainer.Container.Contents = toContainer.Container.Contents[:0xFF] // simple truncation
+						}
 					}
 					// Skip sendAddContainerItem para containers paginados
 					// (slot 0 na pagina atual nao e o indice absoluto 0)
-					if !toContainer.Pagination {
+					if toContainer.Container == nil || !toContainer.Container.Pagination {
 						g.sendAddContainerItem(cid, 0, moveItem)
 					}
 				}
@@ -404,7 +414,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 		} else {
 			toSlot := uint8(toPos.Y)
 			if toSlot > 0 && toSlot <= 10 {
-				moveItem.Parent = nil
+				if moveItem.Container != nil {
+					moveItem.Container.Parent = nil
+				}
 				var merged bool
 				if it != nil && it.Stackable {
 					if targetItem := g.player.Inventory[toSlot]; targetItem != nil {
@@ -438,7 +450,9 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 	// 5. Handle swapItem placement back to fromPos
 	if swapItem != nil {
 		if fromPos.X != 0xFFFF {
-			swapItem.Parent = nil
+			if swapItem.Container != nil {
+				swapItem.Container.Parent = nil
+			}
 			pos := game.Position{X: fromPos.X, Y: fromPos.Y, Z: fromPos.Z}
 			// Same as above: only the tile-creating fallback needs an explicit
 			// broadcast, because AddItem's OnItemAppear covers the normal path.
@@ -450,16 +464,22 @@ func (g *GameProtocol) parseItemMove(r *netmsg.Reader) {
 			if fromPos.Y >= 0x40 {
 				cid := uint8(fromPos.Y - 0x40)
 				if fromContainer != nil {
-					swapItem.Parent = fromContainer
-					fromContainer.Contents = append([]*game.Item{swapItem}, fromContainer.Contents...)
-					if !fromContainer.Pagination {
-						g.sendAddContainerItem(cid, 0, swapItem)
+					if swapItem.Container != nil {
+						swapItem.Container.Parent = fromContainer
+					}
+					if fromContainer.Container != nil {
+						fromContainer.Container.Contents = append([]*game.Item{swapItem}, fromContainer.Container.Contents...)
+						if !fromContainer.Container.Pagination {
+							g.sendAddContainerItem(cid, 0, swapItem)
+						}
 					}
 				}
 			} else {
 				fSlot := uint8(fromPos.Y)
 				if fSlot > 0 && fSlot <= 10 {
-					swapItem.Parent = nil
+					if swapItem.Container != nil {
+						swapItem.Container.Parent = nil
+					}
 					g.player.Inventory[fSlot] = swapItem
 					g.sendInventoryItem(fSlot, swapItem)
 				}
@@ -501,8 +521,8 @@ func (g *GameProtocol) revertMove(fromPos netmsg.Position, toPos netmsg.Position
 			fromSlot := uint8(fromPos.Z)
 			if cont, _, ok := g.openContainerByCID(cid); ok {
 				var oldItem *game.Item
-				if int(fromSlot) < len(cont.Contents) {
-					oldItem = cont.Contents[fromSlot]
+				if cont.Container != nil && int(fromSlot) < len(cont.Container.Contents) {
+					oldItem = cont.Container.Contents[fromSlot]
 				}
 				g.sendUpdateContainerItem(cid, fromSlot, oldItem)
 			}
@@ -531,7 +551,7 @@ func (g *GameProtocol) revertMove(fromPos netmsg.Position, toPos netmsg.Position
 			// If it was reverted, we just resend the container or it might be OK since we didn't add it yet.
 			// Actually, sending the full container updates it.
 			if cont, _, ok := g.openContainerByCID(cid); ok {
-				g.sendContainer(cid, cont, cont.Parent != nil)
+				g.sendContainer(cid, cont, cont.Container != nil && cont.Container.Parent != nil)
 			}
 		} else {
 			slot := uint8(toPos.Y)
@@ -732,8 +752,10 @@ func (g *GameProtocol) getItemWeight(item *game.Item) uint32 {
 	if it := g.deps.Items.Get(item.ID); it != nil && it.Stackable {
 		weight *= uint32(item.Count)
 	}
-	for _, child := range item.Contents {
-		weight += g.getItemWeight(child)
+	if item.Container != nil {
+		for _, child := range item.Container.Contents {
+			weight += g.getItemWeight(child)
+		}
 	}
 	return weight
 }
@@ -753,10 +775,12 @@ func isChildOf(parent, child *game.Item) bool {
 	if parent == child {
 		return true
 	}
-	for _, item := range parent.Contents {
-		if item != nil {
-			if isChildOf(item, child) {
-				return true
+	if parent.Container != nil {
+		for _, item := range parent.Container.Contents {
+			if item != nil {
+				if isChildOf(item, child) {
+					return true
+				}
 			}
 		}
 	}
@@ -791,15 +815,17 @@ func (g *GameProtocol) restoreToSource(fromPos netmsg.Position, fromContainer *g
 		return
 	}
 	if fromPos.Y >= 0x40 {
-		if fromContainer != nil {
-			item.Parent = fromContainer
-			at := int(fromSlot)
-			if at > len(fromContainer.Contents) {
-				at = len(fromContainer.Contents)
+		if fromContainer != nil && fromContainer.Container != nil {
+			if item.Container != nil {
+				item.Container.Parent = fromContainer
 			}
-			fromContainer.Contents = append(fromContainer.Contents, nil)
-			copy(fromContainer.Contents[at+1:], fromContainer.Contents[at:])
-			fromContainer.Contents[at] = item
+			at := int(fromSlot)
+			if at > len(fromContainer.Container.Contents) {
+				at = len(fromContainer.Container.Contents)
+			}
+			fromContainer.Container.Contents = append(fromContainer.Container.Contents, nil)
+			copy(fromContainer.Container.Contents[at+1:], fromContainer.Container.Contents[at:])
+			fromContainer.Container.Contents[at] = item
 			g.RefreshContainer(fromContainer)
 		}
 		return

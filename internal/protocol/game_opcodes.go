@@ -421,7 +421,7 @@ func (g *GameProtocol) wrapableAt(pos netmsg.Position, itemID uint16, stackpos u
 	}
 
 	// A container has to be emptied first, or its contents vanish with it.
-	if len(item.Contents) > 0 {
+	if item.Container != nil && len(item.Container.Contents) > 0 {
 		g.wrapRefuse("hasContents", "Sorry, not possible.", pos, itemID, stackpos)
 		return
 	}

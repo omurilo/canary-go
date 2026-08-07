@@ -110,7 +110,7 @@ func TestBuildItemDescription(t *testing.T) {
 	// Test backpack container weight (18.00 oz) + 5 crystal coins (0.50 oz) = 18.50 oz
 	backpack := &game.Item{
 		ID:       1988,
-		Contents: []*game.Item{item},
+		Container: &game.Container{Contents: []*game.Item{item}},
 	}
 
 	descBackpack := BuildItemDescription(nil, backpack, cat)

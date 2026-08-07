@@ -1,5 +1,10 @@
 package game
 
+import (
+	"sync"
+	"time"
+)
+
 // Spectator notification: telling the creatures around a change that it
 // happened. This is Game::internalPlaceCreature / removeCreature /
 // map.moveCreature calling onCreatureAppear, onRemoveCreature and
@@ -78,8 +83,13 @@ func (w *World) notifyCreatureMove(c Creature, oldPos, newPos Position) {
 		switch s := spectator.(type) {
 		case *Monster:
 			s.OnCreatureMove(w, c, oldPos, newPos)
-		case *Npc:
-			s.OnCreatureMove(w, c, oldPos, newPos)
+		case *Player:
+			if s.GetFollowTarget() == c {
+				follower := s
+				GlobalDispatcher.AddEvent(100*time.Millisecond, func() {
+					w.StepFollow(follower)
+				})
+			}
 		}
 	}
 	for _, spectator := range w.SpectatorCreatures(oldPos) {
@@ -97,4 +107,76 @@ func (w *World) notifyCreatureMove(c Creature, oldPos, newPos Position) {
 	case *Monster:
 		self.OnCreatureMove(w, self, oldPos, newPos)
 	}
+}
+
+// EventRegistrar is implemented by creatures that carry a per-creature set of
+// registered CreatureEvent names (*Player directly; *Monster and *Npc via
+// BaseCreature). It mirrors Creature::registeredEvents in C++: a monster's
+// events come from its type's `monster.events` plus any dynamic
+// registerEvent/unregisterEvent calls, a player's from login.lua's
+// player:registerEvent(...). An event's callback only fires for the creature
+// that holds its name.
+type EventRegistrar interface {
+	RegisterEvent(name string)
+	UnregisterEvent(name string)
+	HasEvent(name string) bool
+	RegisteredEvents() []string
+}
+
+// EventRegistrarOf returns the registrar for c, or nil when the creature has
+// no per-creature event set.
+func EventRegistrarOf(c Creature) EventRegistrar {
+	if r, ok := c.(EventRegistrar); ok {
+		return r
+	}
+	return nil
+}
+
+// creatureEventSet is the per-creature set of registered event names. It is
+// embedded in BaseCreature and Player. It carries its own lock because the
+// writers and readers live on different goroutines (Lua on the dispatcher, the
+// seed copy in NewMonster on the game thread), and a creature can be registered
+// on from a protocol goroutine during login.
+type creatureEventSet struct {
+	mu    sync.RWMutex
+	names map[string]struct{}
+}
+
+func (s *creatureEventSet) register(name string) {
+	if name == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.names == nil {
+		s.names = make(map[string]struct{})
+	}
+	s.names[name] = struct{}{}
+}
+
+func (s *creatureEventSet) unregister(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.names, name)
+}
+
+func (s *creatureEventSet) has(name string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.names[name]
+	return ok
+}
+
+// snapshot returns a copy of the registered names. The death dispatch loop must
+// iterate a snapshot rather than the live map: the Lua handler runs while the
+// engine lock is held, and a handler calling registerEvent would deadlock on a
+// held set lock.
+func (s *creatureEventSet) snapshot() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]string, 0, len(s.names))
+	for name := range s.names {
+		out = append(out, name)
+	}
+	return out
 }

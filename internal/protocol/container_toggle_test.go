@@ -13,7 +13,7 @@ import (
 // cid=04 with byte-identical payloads.
 func TestContainerIDIsReusedNotDuplicated(t *testing.T) {
 	p := &game.Player{Name: "Owner"}
-	pouch := &game.Item{ID: game.ItemGoldPouch, Contents: []*game.Item{}}
+	pouch := &game.Item{ID: game.ItemGoldPouch, Container: &game.Container{Contents: []*game.Item{}}}
 
 	first := p.AddContainerWithPos(pouch, game.Position{}, false)
 	if first < 0 {
@@ -28,7 +28,7 @@ func TestContainerIDIsReusedNotDuplicated(t *testing.T) {
 	}
 
 	// A different container gets its own cid.
-	other := &game.Item{ID: 1987, Contents: []*game.Item{}}
+	other := &game.Item{ID: 1987, Container: &game.Container{Contents: []*game.Item{}}}
 	if o := p.AddContainerWithPos(other, game.Position{}, false); o == first || o < 0 {
 		t.Errorf("a different container must get its own cid, got %d", o)
 	}

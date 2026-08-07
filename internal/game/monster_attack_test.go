@@ -60,6 +60,39 @@ func TestExtraSwingBypassesTheMeleeFloor(t *testing.T) {
 	}
 }
 
+// A monster that just acquired a target swings immediately instead of standing
+// for a full attack interval. Without the arming, attackTicks starts at 0 and a
+// 2000ms block makes the freshly-engaged monster wait ~2s before its first swing.
+func TestSetTargetArmsTheFirstSwing(t *testing.T) {
+	m := &Monster{Type: &creatures.MonsterType{Name: "Rat"}}
+	m.MaxHealth, m.Health = 100, 100
+	target := &Monster{Type: &creatures.MonsterType{Name: "Prey"}}
+	target.MaxHealth, target.Health = 100, 100
+	target.ID = 2
+
+	// A fresh monster has no swing armed; clearing a nil target must not arm one.
+	m.SetTarget(nil)
+	if m.HasExtraSwing() {
+		t.Fatal("clearing a target must not arm a swing")
+	}
+
+	m.SetTarget(target)
+	if !m.HasExtraSwing() {
+		t.Fatal("acquiring a target must arm the first swing")
+	}
+	if m.GetTarget() != target {
+		t.Fatal("SetTarget must set the active target")
+	}
+
+	// The armed swing bypasses the 2000ms interval on a fresh (0) counter.
+	block := meleeBlock(2000)
+	pos := Position{X: 100, Y: 100, Z: 7}
+	inRange, reset := true, true
+	if !m.CanUseSpell(pos, pos, &block, 100, &inRange, &reset) {
+		t.Error("the armed first swing must bypass the 2000ms interval")
+	}
+}
+
 // A fleeing monster does not melee at all, whatever its timers say.
 func TestFleeingMonsterDoesNotMelee(t *testing.T) {
 	mt := &creatures.MonsterType{Name: "Coward"}

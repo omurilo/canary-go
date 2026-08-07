@@ -27,6 +27,7 @@ type Spell struct {
 	Name    string
 	Words   string
 	SpellID uint16
+	RuneID  uint16
 
 	Level       int
 	MagicLevel  int
@@ -84,6 +85,7 @@ var (
 	spellsMu    sync.RWMutex
 	byName      = make(map[string]*Spell)
 	byWords     = make(map[string]*Spell)
+	byRuneID    = make(map[uint16]*Spell)
 	all         []*Spell
 	nextSpellID uint16
 )
@@ -94,19 +96,24 @@ var (
 func Register(s *Spell) bool {
 	spellsMu.Lock()
 	defer spellsMu.Unlock()
-	if s.Words == "" {
+	if s.Words == "" && s.RuneID == 0 {
 		return false
 	}
-	wordsLow := strings.ToLower(s.Words)
-	if _, dup := byWords[wordsLow]; dup {
-		return false
+	if s.Words != "" {
+		wordsLow := strings.ToLower(s.Words)
+		if _, dup := byWords[wordsLow]; dup {
+			return false
+		}
+		byWords[wordsLow] = s
 	}
 	nextSpellID++
 	s.SpellID = nextSpellID
 	if s.Name != "" {
 		byName[strings.ToLower(s.Name)] = s
 	}
-	byWords[wordsLow] = s
+	if s.RuneID > 0 {
+		byRuneID[s.RuneID] = s
+	}
 	all = append(all, s)
 	return true
 }
@@ -132,6 +139,13 @@ func FindByName(name string) *Spell {
 	spellsMu.RLock()
 	defer spellsMu.RUnlock()
 	return byName[strings.ToLower(name)]
+}
+
+// FindByRuneID returns the rune spell registered for the given item ID, or nil.
+func FindByRuneID(runeID uint16) *Spell {
+	spellsMu.RLock()
+	defer spellsMu.RUnlock()
+	return byRuneID[runeID]
 }
 
 // FindByWords resolves the spell for a spoken phrase, mirroring

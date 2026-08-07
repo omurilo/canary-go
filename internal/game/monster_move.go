@@ -608,7 +608,7 @@ func (m *Monster) doFollowCreature(w *World) (Direction, bool) {
 	// The search bounds come from getPathSearchParams, which is where the
 	// fleeing case widens the range and drops the clear-sight requirement.
 	fpp := m.GetPathSearchParams(target)
-	if path := FindPath(w.Map, w.Items, pos, targetPos, 100); len(path) > 0 {
+	if path := FindPath(w.Map, w.Items, pos, targetPos, 500); len(path) > 0 {
 		want := fpp.MaxTargetDist
 		if chebyshevDistance(path[0], targetPos) >= want || want <= 1 {
 			return StepDirection(pos, path[0]), true
@@ -637,7 +637,7 @@ func (m *Monster) doWalkBack(w *World) (Direction, bool) {
 		m.walkingBack = false
 		return DirNorth, false
 	}
-	path := FindPath(w.Map, w.Items, pos, m.SpawnPosition, 100)
+	path := FindPath(w.Map, w.Items, pos, m.SpawnPosition, 500)
 	if len(path) == 0 {
 		m.walkingBack = false
 		return DirNorth, false

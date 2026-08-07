@@ -181,14 +181,20 @@ func (d *DB) returnExpiredItems(ctx context.Context, world *game.World, playerID
 				continue
 			}
 			if p.Inbox == nil {
-				p.Inbox = &game.Item{ID: game.ItemInbox, Contents: []*game.Item{}, Pagination: true}
+				p.Inbox = &game.Item{ID: game.ItemInbox, Container: game.NewContainer(20)}
 			}
 			for _, s := range stacks {
-				it := &game.Item{ID: itemType, Count: s.count, Parent: p.Inbox}
+				it := &game.Item{ID: itemType, Count: s.count}
 				if tier != 0 {
 					it.SetTier(tier)
 				}
-				p.Inbox.Contents = append(p.Inbox.Contents, it)
+				if p.Inbox.Container != nil {
+					p.Inbox.Container.Contents = append(p.Inbox.Container.Contents, it)
+					// We only set the parent if 'it' is also a container!
+					if it.Container != nil {
+						it.Container.Parent = p.Inbox
+					}
+				}
 			}
 			return nil
 		}

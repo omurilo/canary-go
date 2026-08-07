@@ -8,11 +8,11 @@ import (
 
 func TestAddItemToContainerStackable(t *testing.T) {
 	cat := items.NewCatalog(&items.ItemType{ID: 2160, Stackable: true, StackSize: 100})
-	bp := &Item{ID: 1988}
+	bp := &Item{ID: 1988, Container: NewContainer(20)}
 
 	// First stack of gold coins (ID 2160, stackable) with 50 coins
 	gold1 := &Item{ID: 2160, Count: 50}
-	bp.Contents = []*Item{gold1}
+	bp.Container.Contents = []*Item{gold1}
 
 	// Add 30 gold coins
 	gold2 := &Item{ID: 2160, Count: 30}
@@ -22,10 +22,10 @@ func TestAddItemToContainerStackable(t *testing.T) {
 	}
 
 	// Should stack into gold1 -> 80 coins, no new item in Contents
-	if len(bp.Contents) != 1 {
-		t.Fatalf("expected 1 item in container, got %d", len(bp.Contents))
+	if len(bp.Container.Contents) != 1 {
+		t.Fatalf("expected 1 item in container, got %d", len(bp.Container.Contents))
 	}
-	if bp.Contents[0].Count != 80 {
-		t.Fatalf("expected 80 coins in stack, got %d", bp.Contents[0].Count)
+	if bp.Container.Contents[0].Count != 80 {
+		t.Fatalf("expected 80 coins in stack, got %d", bp.Container.Contents[0].Count)
 	}
 }

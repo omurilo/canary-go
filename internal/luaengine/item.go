@@ -227,11 +227,14 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 							if inventoryItem == it.item {
 								// In a full ECS, we'd remove it from the slot properly.
 								// For now, if we are moving it, we could remove it from parent
-								if it.item.Parent != nil {
-									for i, child := range it.item.Parent.Contents {
-										if child == it.item {
-											it.item.Parent.Contents = append(it.item.Parent.Contents[:i], it.item.Parent.Contents[i+1:]...)
-											break
+								if it.item.Container != nil && it.item.Container.Parent != nil {
+									parentContainer := it.item.Container.Parent.Container
+									if parentContainer != nil {
+										for i, child := range parentContainer.Contents {
+											if child == it.item {
+												parentContainer.Contents = append(parentContainer.Contents[:i], parentContainer.Contents[i+1:]...)
+												break
+											}
 										}
 									}
 								} else {
@@ -246,8 +249,13 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 						})
 					}
 				}
-				destItem.item.Contents = append(destItem.item.Contents, it.item)
-				it.item.Parent = destItem.item
+				if destItem.item.Container == nil {
+					destItem.item.Container = game.NewContainer(8)
+				}
+				destItem.item.Container.Contents = append(destItem.item.Container.Contents, it.item)
+				if it.item.Container != nil {
+					it.item.Container.Parent = destItem.item
+				}
 				L.Push(lua.LTrue)
 				return 1
 			}
@@ -332,7 +340,8 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 				removed = e.world.RemoveItemFromHolder(holder, it.item, uint16(count))
 				if removed && holder != nil && holder.Session != nil {
 					holder.Session.SendInventoryIds()
-					if parent := it.item.Parent; parent != nil {
+					if it.item.Container != nil && it.item.Container.Parent != nil {
+						parent := it.item.Container.Parent
 						holder.Session.RefreshContainer(parent)
 					} else {
 						for _, oc := range holder.OpenContainersSnapshot() {
@@ -366,8 +375,13 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			if count == 0 {
 				count = 1
 			}
-			newItem := &game.Item{ID: itemID, Count: count, Parent: it.item}
-			it.item.Contents = append(it.item.Contents, newItem)
+			newItem := &game.Item{ID: itemID, Count: count}
+			if it.item.Container != nil {
+				if newItem.Container != nil {
+					newItem.Container.Parent = it.item
+				}
+				it.item.Container.Contents = append(it.item.Container.Contents, newItem)
+			}
 			e.pushItem(L, newItem)
 			return 1
 		},
@@ -937,7 +951,7 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 			return 1
 		},
 		"transform":      e.itemTransform,
-		"decay":          stubItemMethod,
+		"decay":          e.itemDecay,
 		"setDuration":    stubItemMethod,
 		"stopDecay":      stubItemMethod,
 		"getDescription": e.itemGetDescription,
@@ -946,9 +960,12 @@ func (e *Engine) itemMethods() map[string]lua.LGFunction {
 		"actor": func(L *lua.LState) int {
 			it := checkItem(L)
 			if L.GetTop() == 1 {
-				L.Push(lua.LBool(it.item.Actor))
+				L.Push(lua.LBool(it.item.Container != nil && it.item.Container.Actor))
 			} else {
-				it.item.Actor = L.CheckBool(2)
+				if it.item.Container == nil {
+					it.item.Container = &game.Container{}
+				}
+				it.item.Container.Actor = L.CheckBool(2)
 				L.Push(lua.LTrue)
 			}
 			return 1
@@ -1010,6 +1027,33 @@ func (e *Engine) itemTransform(L *lua.LState) int {
 	return 1
 }
 
+func (e *Engine) itemDecay(L *lua.LState) int {
+	li := checkItem(L)
+	if li.item == nil {
+		L.Push(lua.LBool(false))
+		return 1
+	}
+	if e.world != nil && e.world.Decay != nil {
+		it := e.world.Items.Get(li.item.ID)
+		if it != nil {
+			if li.item.Attr == nil || li.item.Attr.Duration == nil {
+				dur := int64(it.Duration)
+				if dur <= 0 {
+					dur = 10000
+				}
+				if li.item.Attr == nil {
+					li.item.Attr = &game.ItemAttributes{}
+				}
+				dur32 := int32(dur)
+				li.item.Attr.Duration = &dur32
+			}
+			e.world.Decay.StartDecay(li.pos, li.item)
+		}
+	}
+	L.Push(lua.LBool(true))
+	return 1
+}
+
 func checkItemAt(L *lua.LState, index int) luaItem {
 	ud := L.CheckUserData(index)
 	if v, ok := ud.Value.(luaItem); ok {
@@ -1048,8 +1092,8 @@ func (e *Engine) playerHoldingItem(item *game.Item) *game.Player {
 	}
 	// Climb to the outermost container; that is what sits in an inventory slot.
 	root := item
-	for root.Parent != nil {
-		root = root.Parent
+	for root.Container != nil && root.Container.Parent != nil {
+		root = root.Container.Parent
 	}
 	for _, p := range e.world.Players() {
 		for _, inv := range p.Inventory {

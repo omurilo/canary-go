@@ -197,7 +197,7 @@ func (m *Monster) IsTarget(w *World, c Creature) bool {
 // OnCreatureFound is Monster::onCreatureFound (monster.cpp:787): sort one
 // creature into whichever list it belongs in, and re-evaluate idleness if
 // either changed.
-func (m *Monster) OnCreatureFound(c Creature) {
+func (m *Monster) OnCreatureFound(w *World, c Creature) {
 	listChanged := false
 	if m.IsFriend(c) {
 		listChanged = m.AddFriend(c) || listChanged
@@ -206,24 +206,24 @@ func (m *Monster) OnCreatureFound(c Creature) {
 		listChanged = m.AddTarget(c) || listChanged
 	}
 	if listChanged || m.Idle {
-		m.UpdateIdleStatus()
+		m.UpdateIdleStatus(w)
 	}
 }
 
 // OnCreatureEnter is Monster::onCreatureEnter (monster.cpp:802): someone came
 // into view. This is the wake-up path for an idle monster.
-func (m *Monster) OnCreatureEnter(c Creature) { m.OnCreatureFound(c) }
+func (m *Monster) OnCreatureEnter(w *World, c Creature) { m.OnCreatureFound(w, c) }
 
 // OnCreatureLeave is Monster::onCreatureLeave (monster.cpp:881): someone left
 // view. Idleness is only re-evaluated when the target list actually empties,
 // which is what stops a monster idling while it still has other enemies around.
-func (m *Monster) OnCreatureLeave(c Creature) {
+func (m *Monster) OnCreatureLeave(w *World, c Creature) {
 	if m.IsFriend(c) {
 		m.RemoveFriend(c)
 	}
 	if m.IsOpponent(c) {
 		if m.RemoveTarget(c) && len(m.Targets) == 0 {
-			m.UpdateIdleStatus()
+			m.UpdateIdleStatus(w)
 		}
 	}
 }
@@ -310,9 +310,9 @@ func (m *Monster) UpdateTargetList(w *World) {
 		if c == nil || c.GetID() == m.GetID() || c.GetHealth() == 0 {
 			continue
 		}
-		m.OnCreatureFound(c)
+		m.OnCreatureFound(w, c)
 	}
 	if emptiedTargets && len(m.Targets) == 0 {
-		m.UpdateIdleStatus()
+		m.UpdateIdleStatus(w)
 	}
 }

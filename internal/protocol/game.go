@@ -227,6 +227,12 @@ func (g *GameProtocol) setKnown(id uint32, known bool) {
 	}
 }
 
+func (g *GameProtocol) clearKnown() {
+	g.knownMu.Lock()
+	defer g.knownMu.Unlock()
+	g.known = make(map[uint32]bool)
+}
+
 // openContainerByCID returns the container open under a client cid, preserving
 // the (item, ok) shape callers expect. The open-container state is the single
 // source of truth on game.Player (see Player.openContainers).
@@ -631,6 +637,11 @@ func (g *GameProtocol) OnFirstPacket(c *network.Connection, body []byte) {
 		g.disconnect("Character not found on this account.")
 		return
 	}
+	// Carry the account's premium days onto the player so Player:getPremiumDays
+	// (and therefore Player:isPremium) reflects the account, not a hardcoded 0.
+	if acc.PremDays > 0 {
+		player.PremiumDays = int32(acc.PremDays)
+	}
 
 	// Resolve the player's temple (respawn point) from the OTBM towns. The SQL
 	// `towns` table only holds placeholder data, so trusting it sends dead
@@ -779,9 +790,9 @@ func (g *GameProtocol) enterWorld() {
 	w.AddByte(opSelfAppear)
 	w.AddU32(p.ID)
 	w.AddU16(ServerBeat)
-	w.AddDouble(float64(p.Speed), 3) // speedA
-	w.AddDouble(0, 3)                // speedB
-	w.AddDouble(0, 3)                // speedC
+	w.AddDouble(857.36, 3)   // speedA
+	w.AddDouble(261.29, 3)   // speedB
+	w.AddDouble(-4795.01, 3) // speedC
 	w.AddByte(0)                     // can change pvp framing
 	w.AddByte(0)                     // expert mode
 	w.AddString("")                  // store images url

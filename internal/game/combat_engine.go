@@ -807,14 +807,14 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 		}
 
 		if !hasAoL && blessCount < 5 {
-			corpse := &Item{ID: 3058} // Dead human male
-			if p.Sex == 0 {           // Female
+			corpse := &Item{ID: 3058, Container: NewContainer(20)} // Dead human male
+			if p.Sex == 0 {                                        // Female
 				corpse.ID = 3065
 			}
 
 			// Backpack always drops in Tibia (if no AoL/Bless)
 			if bp := p.Inventory[ConstSlotBackpack]; bp != nil {
-				corpse.Contents = append(corpse.Contents, bp)
+				corpse.Container.Contents = append(corpse.Container.Contents, bp)
 				p.Inventory[ConstSlotBackpack] = nil
 			}
 			// Other items have 10% chance
@@ -824,13 +824,13 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 				}
 				if it := p.Inventory[i]; it != nil {
 					if rand.Float32() < 0.10 {
-						corpse.Contents = append(corpse.Contents, it)
+						corpse.Container.Contents = append(corpse.Container.Contents, it)
 						p.Inventory[i] = nil
 					}
 				}
 			}
 
-			if len(corpse.Contents) > 0 {
+			if len(corpse.Container.Contents) > 0 {
 				if e.world.AddItem(p.Pos, corpse) && e.world.OnItemAppear != nil {
 					e.world.OnItemAppear(p.Pos, corpse)
 				}
@@ -956,10 +956,18 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 		e.world.OnCreatureDied(victim)
 	}
 
+	// Monster-death script hook: fires before RemoveCreature, while the monster is
+	// still on the tile, so a quest boss's onDeath can spawn the next stage at the
+	// death position. Resolved killers are the same last-hit/most-damage pair the
+	// player-death path uses.
+	if m, ok := victim.(*Monster); ok && e.world.OnMonsterDeath != nil {
+		e.world.OnMonsterDeath(m, killer)
+	}
+
 	// Drop the corpse first (as in dropCorpse, which adds the corpse while the
 	// creature is still on the tile), then remove the creature. The corpse is a
 	// container whose Contents are the rolled loot table.
-	corpse := &Item{ID: corpseID, Count: 1}
+	corpse := &Item{ID: corpseID, Count: 1, Container: NewContainer(20)}
 	// Monster::death and Monster::getCorpse: the monster tears down its own
 	// state (summons, target and friend lists) and stamps the corpse with the
 	// owner, so the top damage dealer gets the loot protection window.
@@ -975,8 +983,12 @@ func (e *CombatEngine) handleDeath(victim, killer Creature) {
 	// rollLoot, which is why none of the seven loot-modifier scripts (boosted, prey,
 	// hazard, wealth duplex, gem atelier) had any effect.
 	if m, ok := victim.(*Monster); ok && m.Type != nil && m.Type.Flags.LootDrop {
-		if !m.Type.Flags.RewardBoss && e.world.OnMonsterDropLoot != nil {
-			e.world.OnMonsterDropLoot(m, corpse)
+		if !m.Type.Flags.RewardBoss {
+			if e.world.OnMonsterDropLoot != nil {
+				e.world.OnMonsterDropLoot(m, corpse)
+			} else {
+				rollMonsterLoot(m, corpse)
+			}
 		}
 	}
 	if e.world.AddItem(pos, corpse) && e.world.OnItemAppear != nil {
@@ -1107,7 +1119,45 @@ func (e *CombatEngine) executeMonsterSpell(m *Monster, target Creature, s creatu
 
 	if target.GetHealth() == 0 {
 		e.handleDeath(target, m)
-	} else if tp, ok := target.(*Player); ok {
-		e.applyDefensiveCharmRune(m, tp, int32(dmg))
+	}
+}
+
+func rollMonsterLoot(m *Monster, corpse *Item) {
+	if m == nil || m.Type == nil || corpse == nil {
+		return
+	}
+	if corpse.Container == nil {
+		corpse.Container = NewContainer(20)
+	}
+	rollLootBlocks(m.Type.Loot, corpse)
+}
+
+func rollLootBlocks(loot []creatures.LootBlock, corpse *Item) {
+	if corpse == nil || corpse.Container == nil {
+		return
+	}
+	for _, lb := range loot {
+		if lb.ID == 0 {
+			continue
+		}
+		chance := lb.Chance
+		if chance == 0 {
+			chance = maxLootChance
+		}
+		if rand.Uint32()%maxLootChance < chance {
+			count := lb.CountMin
+			if lb.CountMax > lb.CountMin {
+				count += uint32(rand.Intn(int(lb.CountMax - lb.CountMin + 1)))
+			}
+			if count < 1 {
+				count = 1
+			}
+			item := &Item{ID: lb.ID, Count: uint16(count)}
+			if len(lb.ChildLoot) > 0 {
+				item.Container = NewContainer(20)
+				rollLootBlocks(lb.ChildLoot, item)
+			}
+			corpse.Container.Contents = append(corpse.Container.Contents, item)
+		}
 	}
 }

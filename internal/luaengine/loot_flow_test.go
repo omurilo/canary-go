@@ -97,7 +97,8 @@ func TestMonsterOnDropLootFillsCorpse(t *testing.T) {
 			t.Fatal("the drop loot callback reported failure")
 		}
 		dispatches++
-		for _, it := range corpse.Contents {
+		if corpse.Container != nil {
+			for _, it := range corpse.Container.Contents {
 			if it == nil {
 				continue
 			}
@@ -108,6 +109,7 @@ func TestMonsterOnDropLootFillsCorpse(t *testing.T) {
 			seen[it.ID] += c
 			if it.ID != 3031 && it.ID != 3492 {
 				t.Fatalf("corpse got an item that is not in the loot table: %d", it.ID)
+			}
 			}
 		}
 	}

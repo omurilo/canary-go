@@ -36,8 +36,8 @@ func isMailItem(item *game.Item) bool {
 // For parcels, it looks for a label (ITEM_LABEL) inside the container.
 // For letters, it reads the first line of the item's text attribute.
 func getMailRecipient(item *game.Item) string {
-	if item.ID == game.ItemParcel {
-		for _, content := range item.Contents {
+	if item.ID == game.ItemParcel && item.Container != nil {
+		for _, content := range item.Container.Contents {
 			if content != nil && content.ID == game.ItemLabel {
 				text := itemText(content)
 				if text != "" {
@@ -100,7 +100,8 @@ func (g *GameProtocol) processMailSend(item *game.Item) bool {
 	recipient := g.deps.World.PlayerByName(receiverName)
 	if recipient != nil {
 		if recipient.Inbox == nil {
-			recipient.Inbox = &game.Item{ID: game.ItemInbox, Contents: make([]*game.Item, 0), Pagination: true}
+			recipient.Inbox = &game.Item{ID: game.ItemInbox, Container: game.NewContainer(0)}
+			recipient.Inbox.Container.Pagination = true
 		}
 		return g.deliverToInbox(item, recipient.Inbox, recipient.Name, true)
 	}
@@ -122,10 +123,10 @@ func (g *GameProtocol) processMailSend(item *game.Item) bool {
 // transforms it to the stamped variant, and notifies the recipient.
 func (g *GameProtocol) deliverToInbox(item *game.Item, inbox *game.Item, recipientName string, online bool) bool {
 	stamped := g.makeStampedItem(item)
-	if inbox.Contents == nil {
-		inbox.Contents = make([]*game.Item, 0)
+	if inbox.Container == nil {
+		inbox.Container = game.NewContainer(0)
 	}
-	inbox.Contents = append(inbox.Contents, stamped)
+	inbox.Container.Contents = append(inbox.Container.Contents, stamped)
 
 	if online {
 		g.deps.Lua.Call("onPlayerReceiveMail", recipientName)
@@ -166,7 +167,7 @@ func (g *GameProtocol) makeStampedItem(item *game.Item) *game.Item {
 	stamped := &game.Item{
 		ID:       item.ID + 1,
 		Count:    item.Count,
-		Contents: item.Contents,
+		Container: item.Container,
 	}
 	if item.Attr != nil {
 		stamped.Attr = &game.ItemAttributes{Raw: item.RawAttributes()}

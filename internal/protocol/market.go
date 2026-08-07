@@ -123,15 +123,17 @@ func (g *GameProtocol) aggregateContainerItems(container *game.Item, agg map[uin
 	if container == nil || !container.IsContainer(g.deps.Items) {
 		return
 	}
-	for _, child := range container.Contents {
-		if child == nil {
-			continue
-		}
-		if child.IsContainer(g.deps.Items) {
-			g.aggregateContainerItems(child, agg)
-		} else {
-			key := (uint32(child.ID) << 8) | uint32(child.GetTier())
-			agg[key] += child.Count
+	if container.Container != nil {
+		for _, child := range container.Container.Contents {
+			if child == nil {
+				continue
+			}
+			if child.IsContainer(g.deps.Items) {
+				g.aggregateContainerItems(child, agg)
+			} else {
+				key := (uint32(child.ID) << 8) | uint32(child.GetTier())
+				agg[key] += child.Count
+			}
 		}
 	}
 }
@@ -688,14 +690,16 @@ func (g *GameProtocol) countItemInContainer(container *game.Item, itemId uint16,
 		return 0
 	}
 	var count uint16
-	for _, child := range container.Contents {
-		if child == nil {
-			continue
-		}
-		if child.IsContainer(g.deps.Items) {
-			count += g.countItemInContainer(child, itemId, tier)
-		} else if child.ID == itemId && (tier == 0 || child.GetTier() == tier) {
-			count += child.Count
+	if container.Container != nil {
+		for _, child := range container.Container.Contents {
+			if child == nil {
+				continue
+			}
+			if child.IsContainer(g.deps.Items) {
+				count += g.countItemInContainer(child, itemId, tier)
+			} else if child.ID == itemId && (tier == 0 || child.GetTier() == tier) {
+				count += child.Count
+			}
 		}
 	}
 	return count
@@ -721,19 +725,21 @@ func (g *GameProtocol) removeFromContainer(container *game.Item, itemId uint16, 
 		return amount
 	}
 	remaining := amount
-	for _, child := range container.Contents {
-		if child == nil || remaining == 0 {
-			continue
-		}
-		if child.IsContainer(g.deps.Items) {
-			remaining = g.removeFromContainer(child, itemId, tier, remaining)
-		} else if child.ID == itemId && (tier == 0 || child.GetTier() == tier) {
-			take := child.Count
-			if take > remaining {
-				take = remaining
+	if container.Container != nil {
+		for _, child := range container.Container.Contents {
+			if child == nil || remaining == 0 {
+				continue
 			}
-			child.Count -= take
-			remaining -= take
+			if child.IsContainer(g.deps.Items) {
+				remaining = g.removeFromContainer(child, itemId, tier, remaining)
+			} else if child.ID == itemId && (tier == 0 || child.GetTier() == tier) {
+				take := child.Count
+				if take > remaining {
+					take = remaining
+				}
+				child.Count -= take
+				remaining -= take
+			}
 		}
 	}
 	g.cleanEmptyItems(container)
@@ -746,16 +752,18 @@ func (g *GameProtocol) cleanEmptyItems(container *game.Item) {
 		return
 	}
 	j := 0
-	for _, item := range container.Contents {
-		if item != nil && item.Count > 0 {
-			container.Contents[j] = item
-			j++
+	if container.Container != nil {
+		for _, item := range container.Container.Contents {
+			if item != nil && item.Count > 0 {
+				container.Container.Contents[j] = item
+				j++
+			}
 		}
+		for i := j; i < len(container.Container.Contents); i++ {
+			container.Container.Contents[i] = nil
+		}
+		container.Container.Contents = container.Container.Contents[:j]
 	}
-	for i := j; i < len(container.Contents); i++ {
-		container.Contents[i] = nil
-	}
-	container.Contents = container.Contents[:j]
 }
 
 // returnItemsToDepot puts items back into the player's first depot chest.
@@ -778,10 +786,12 @@ func (g *GameProtocol) addToContainer(container *game.Item, itemId uint16, tier 
 		return
 	}
 	// Stack with existing items first.
-	for _, child := range container.Contents {
-		if child != nil && child.ID == itemId && (tier == 0 || child.GetTier() == tier) {
-			child.Count += amount
-			return
+	if container.Container != nil {
+		for _, child := range container.Container.Contents {
+			if child != nil && child.ID == itemId && (tier == 0 || child.GetTier() == tier) {
+				child.Count += amount
+				return
+			}
 		}
 	}
 	// TODO: create a new Item instance and append — requires items.Catalog reference.

@@ -29,7 +29,7 @@ func TestContainerCapacityDefaultsAndExplicit(t *testing.T) {
 	}
 
 	// An explicit MaxSize on the instance always wins.
-	custom := &Item{ID: 1987, MaxSize: 32}
+	custom := &Item{ID: 1987, Container: &Container{MaxSize: 32}}
 	if got := custom.ContainerCapacity(cat); got != 32 {
 		t.Errorf("instance MaxSize = %d, want 32", got)
 	}

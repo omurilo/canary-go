@@ -94,6 +94,18 @@ func (e *Engine) registerMonsterType() {
 			parseMonsterMisc(m, table)
 			parseMonsterElements(m, table)
 			parseMonsterHealing(m, table)
+			// monster.events is an array of CreatureEvent names whose onDeath (and
+			// other per-creature) handlers must be bound to this monster type. Each
+			// Monster instance copies them at spawn so a handler fires only for the
+			// monster that holds it (creaturescripts_ferumbras_soul_splinter.lua etc).
+			if evTable := table.RawGetString("events"); evTable.Type() == lua.LTTable {
+				evLst := evTable.(*lua.LTable)
+				evLst.ForEach(func(_, v lua.LValue) {
+					if v.Type() == lua.LTString {
+						m.AddCreatureEvent(v.String())
+					}
+				})
+			}
 			if outfitTable := table.RawGetString("outfit"); outfitTable.Type() == lua.LTTable {
 				tb := outfitTable.(*lua.LTable)
 				if val := tb.RawGetString("lookType"); val.Type() == lua.LTNumber {
@@ -147,6 +159,29 @@ func (e *Engine) registerMonsterType() {
 				return 1
 			}
 			L.Push(lootBlocksToLua(L, m.Loot))
+			return 1
+		},
+		// registerEvent/getCreatureEvents let a monster type add and read its
+		// CreatureEvent names at runtime, mirroring the NpcType pair. The names are
+		// what getCreatureEvents returns in monster:register (data/libs/functions),
+		// and each Monster instance copies them at spawn.
+		"registerEvent": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			if m != nil {
+				m.AddCreatureEvent(L.CheckString(2))
+			}
+			L.Push(lua.LTrue)
+			return 1
+		},
+		"getCreatureEvents": func(L *lua.LState) int {
+			m := checkMonsterType(L)
+			tbl := L.NewTable()
+			if m != nil {
+				for i, ev := range m.CreatureEvents {
+					tbl.RawSetInt(i+1, lua.LString(ev))
+				}
+			}
+			L.Push(tbl)
 			return 1
 		},
 		// These four are get/set in C++: called with no argument they report, with a

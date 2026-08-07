@@ -19,8 +19,7 @@ func (g *GameProtocol) sendBrowseField(pos game.Position) {
 
 	// Collect items from the tile (C++ uses tile->getItemList() which excludes Ground).
 	var items []*game.Item
-	for i := len(tile.Items) - 1; i >= 0; i-- {
-		it := tile.Items[i]
+	for _, it := range tile.Items {
 		if it == nil {
 			continue
 		}
@@ -28,29 +27,17 @@ func (g *GameProtocol) sendBrowseField(pos game.Position) {
 		if it.Attr != nil && it.Attr.UniqueID != nil {
 			continue
 		}
-		// Valid: has sub-container, is movable
-		isContainer := len(it.Contents) > 0
-		isMovable := false
-		if itType := g.deps.Items.Get(it.ID); itType != nil {
-			isMovable = itType.Pickupable
-		}
-		if !isContainer && !isMovable {
-			// Skip non-interactive blocking items (decorations, walls)
-			if itType := g.deps.Items.Get(it.ID); itType != nil && itType.BlockSolid {
-				continue
-			}
-		}
 		items = append(items, it)
 	}
 
 	// Create the browse field container (ID 470, like C++ ITEM_BROWSEFIELD)
 	browseContainer := &game.Item{
-		ID:         game.ItemBrowseField,
-		Contents:   items,
-		MaxSize:    30,
-		Pagination: false,
-		MaxItems:   30,
+		ID:        game.ItemBrowseField,
+		Container: game.NewContainer(30),
 	}
+	browseContainer.Container.Contents = items
+	browseContainer.Container.Pagination = false
+	browseContainer.Container.MaxItems = 30
 
 	// Calculate dummy container ID from position (C++ logic)
 	dummyCID := uint8(0xF - ((pos.X % 3) * 3 + (pos.Y % 3)))

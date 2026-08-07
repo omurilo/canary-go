@@ -142,9 +142,11 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 			gp.SendCreatureMove(oldPos, uint8(oldStack), newPos)
 		case moveActionRemoveAdd:
 			gp.SendRemoveCreatureAt(oldPos, uint8(oldStack))
+			gp.setKnown(c.GetID(), false)
 			gp.SendAppendCreature(c, newPos)
 		case moveActionRemove:
 			gp.SendRemoveCreatureAt(oldPos, uint8(oldStack))
+			gp.setKnown(c.GetID(), false)
 		case moveActionAdd:
 			gp.SendAppendCreature(c, newPos)
 		}
@@ -160,6 +162,7 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 		if !gp.canSee(newPos) {
 			continue
 		}
+		gp.setKnown(c.GetID(), false)
 		gp.SendAppendCreature(c, newPos)
 	}
 }
@@ -168,6 +171,7 @@ func BroadcastCreatureMove(w *game.World, c game.Creature, oldPos game.Position,
 func BroadcastCreatureAppear(w *game.World, c game.Creature) {
 	for _, s := range w.Spectators(c.GetPosition(), c.GetID()) {
 		if gp, ok := s.Session.(*GameProtocol); ok {
+			gp.setKnown(c.GetID(), false)
 			gp.SendAppendCreature(c, c.GetPosition())
 		}
 	}
@@ -197,6 +201,7 @@ func BroadcastCreatureRemove(w *game.World, c game.Creature, oldStackPos map[uin
 			continue
 		}
 		gp.SendRemoveCreatureAt(c.GetPosition(), uint8(stack))
+		gp.setKnown(c.GetID(), false)
 	}
 }
 

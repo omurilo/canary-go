@@ -33,7 +33,7 @@ func (h *House) AddTile(w *World, pos Position) {
 	h.mu.Unlock()
 
 	if w != nil && w.Map != nil {
-		if tile := w.Map.GetTile(pos); tile != nil {
+		if tile := w.Map.GetOrCreateTile(pos); tile != nil {
 			tile.HouseID = h.ID
 			tile.Flags |= TileFlagProtectionZone
 		}
@@ -369,7 +369,7 @@ func (h *House) TransferToDepotFor(w *World, p *Player) bool {
 				h.HandleWrapableItem(&moveList, item, p)
 			case it.Pickupable:
 				moveList = append(moveList, item)
-			case len(item.Contents) > 0:
+			case item.Container != nil && len(item.Container.Contents) > 0:
 				h.CollectMovableItemsFromContainer(w, &moveList, item, p)
 			}
 		}
@@ -403,24 +403,26 @@ func (h *House) CollectMovableItemsFromContainer(w *World, moveList *[]*Item, co
 	if container == nil || w == nil || w.Items == nil {
 		return
 	}
-	for _, item := range container.Contents {
-		if item == nil {
-			continue
-		}
-		it := w.Items.Get(item.ID)
-		if it == nil {
-			continue
-		}
-		if len(item.Contents) > 0 {
-			h.CollectMovableItemsFromContainer(w, moveList, item, p)
-			continue
-		}
-		if it.WrapableTo != 0 {
-			h.HandleWrapableItem(moveList, item, p)
-			continue
-		}
-		if it.Pickupable {
-			*moveList = append(*moveList, item)
+	if container.Container != nil {
+		for _, item := range container.Container.Contents {
+			if item == nil {
+				continue
+			}
+			it := w.Items.Get(item.ID)
+			if it == nil {
+				continue
+			}
+			if item.Container != nil && len(item.Container.Contents) > 0 {
+				h.CollectMovableItemsFromContainer(w, moveList, item, p)
+				continue
+			}
+			if it.WrapableTo != 0 {
+				h.HandleWrapableItem(moveList, item, p)
+				continue
+			}
+			if it.Pickupable {
+				*moveList = append(*moveList, item)
+			}
 		}
 	}
 }

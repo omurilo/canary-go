@@ -55,7 +55,7 @@ type Engine struct {
 
 	creatureEventsOnLogin       []*lua.LFunction
 	creatureEventsOnLogout      []*lua.LFunction
-	creatureEventsOnDeath       []*lua.LFunction
+	creatureEventsByName        map[string]*LuaCreatureEvent
 	creatureEventsOnModalWindow []*lua.LFunction
 
 	// GlobalEvents is the scheduling engine for server-wide startup/think/time
@@ -67,7 +67,7 @@ type Engine struct {
 // New creates an engine with the base libraries loaded.
 func New(world *game.World, log *slog.Logger) *Engine {
 	L := lua.NewState()
-	e := &Engine{L: L, log: log, world: world}
+	e := &Engine{L: L, log: log, world: world, creatureEventsByName: make(map[string]*LuaCreatureEvent)}
 	e.registerAPI()
 	e.overrideFileLoaders()
 	e.registerScheduler()
@@ -88,6 +88,24 @@ func New(world *game.World, log *slog.Logger) *Engine {
 				pos = target.GetPosition()
 				vtype = VariantNumber
 			} else if caster != nil {
+				pos = caster.GetPosition()
+				vtype = VariantPosition
+			}
+			return e.RunSpell(sp, caster, vtype, targetID, pos)
+		}
+		world.OnCastRuneSpell = func(runeID uint16, caster game.Creature, target game.Creature, targetPos game.Position) bool {
+			sp := spells.FindByRuneID(runeID)
+			if sp == nil {
+				return false
+			}
+			targetID := uint32(0)
+			pos := targetPos
+			vtype := VariantPosition
+			if target != nil {
+				targetID = target.GetID()
+				pos = target.GetPosition()
+				vtype = VariantNumber
+			} else if pos.X == 0 && pos.Y == 0 && caster != nil {
 				pos = caster.GetPosition()
 				vtype = VariantPosition
 			}

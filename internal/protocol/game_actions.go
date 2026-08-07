@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -366,6 +367,9 @@ func autoWalkDir(raw byte) (game.Direction, bool) {
 // manualWalk runs a single key-initiated step, cancelling any auto-walk path in
 // flight (like the real client, a manual step interrupts click-to-move).
 func (g *GameProtocol) manualWalk(dir game.Direction) {
+	if g.player != nil {
+		g.player.SetFollowTarget(nil)
+	}
 	g.walkGen.Add(1)
 	g.actionMu.Lock()
 	g.walk(dir)
@@ -387,7 +391,12 @@ func (g *GameProtocol) manualTurn(dir game.Direction) {
 }
 
 // stopAutoWalk cancels the in-flight auto-walk path (0x69).
-func (g *GameProtocol) stopAutoWalk() { g.walkGen.Add(1) }
+func (g *GameProtocol) stopAutoWalk() {
+	if g.player != nil {
+		g.player.SetFollowTarget(nil)
+	}
+	g.walkGen.Add(1)
+}
 
 // autoWalk parses a click-to-move path (0x64) and walks it step by step, paced by
 // the per-tile step duration so the character walks smoothly instead of teleporting.
@@ -440,22 +449,23 @@ func (g *GameProtocol) walkPath(dirs []game.Direction, gen uint64) {
 // the server beat), tripled on the diagonal.
 func (g *GameProtocol) stepDuration(dir game.Direction) time.Duration {
 	speed := g.player.GetSpeed()
-	if speed == 0 {
-		speed = 220
+	if speed < 10 {
+		speed = 10
 	}
-	groundSpeed := uint16(150)
+	stepSpeed := float64(game.CalculatedStepSpeed(int(speed)))
+	groundSpeed := float64(150)
 	if tile := g.deps.World.Map.GetTile(g.player.Pos); tile != nil && tile.Ground != nil {
 		if t := g.deps.Items.Get(tile.Ground.ID); t != nil && t.GroundSpeed > 0 {
-			groundSpeed = t.GroundSpeed
+			groundSpeed = float64(t.GroundSpeed)
 		}
 	}
-	const beat = 50
-	d := 1000 * int(groundSpeed) / int(speed)
-	d = ((d + beat - 1) / beat) * beat
+	const beat = 50.0
+	dur := math.Floor(1000.0 * groundSpeed / stepSpeed)
+	duration := int(math.Ceil(dur/beat) * beat)
 	if dir == game.DirNE || dir == game.DirNW || dir == game.DirSE || dir == game.DirSW {
-		d *= 3 // WALK_DIAGONAL_EXTRA_COST
+		duration *= 3 // WALK_DIAGONAL_EXTRA_COST
 	}
-	return time.Duration(d) * time.Millisecond
+	return time.Duration(duration) * time.Millisecond
 }
 
 // sendMapShift sends the newly revealed strip after the player moved.
@@ -822,8 +832,8 @@ func (g *GameProtocol) parseLookAt(r *netmsg.Reader) {
 			cid := uint8(pos.Y - 0x40)
 			if cont, offset, ok := g.openContainerByCID(cid); ok {
 				fromSlot := int(pos.Z) + offset
-				if fromSlot < len(cont.Contents) {
-					item = cont.Contents[fromSlot]
+				if cont.Container != nil && fromSlot < len(cont.Container.Contents) {
+					item = cont.Container.Contents[fromSlot]
 				}
 			}
 		} else {
@@ -1251,7 +1261,11 @@ func (g *GameProtocol) refreshAfterTrade() {
 		}
 	}
 	for cid, c := range g.rangeContainers() {
-		g.deps.Log.Debug("refreshAfterTrade: refreshing container", "cid", cid, "itemId", c.ID, "contentsCount", len(c.Contents))
+		sz := 0
+		if c.Container != nil {
+			sz = len(c.Container.Contents)
+		}
+		g.deps.Log.Debug("refreshAfterTrade: refreshing container", "cid", cid, "itemId", c.ID, "contentsCount", sz)
 		g.refreshContainerIfOpen(c)
 	}
 	g.sendStats()
@@ -1263,7 +1277,7 @@ func (g *GameProtocol) refreshAfterTrade() {
 func (g *GameProtocol) refreshContainerIfOpen(container *game.Item) {
 	for cid, open := range g.rangeContainers() {
 		if open == container {
-			g.sendContainer(cid, container, container.Parent != nil)
+			g.sendContainer(cid, container, container.Container != nil && container.Container.Parent != nil)
 			return
 		}
 	}

@@ -120,8 +120,17 @@ func creatureEventType(L *lua.LState) int {
 	return 1
 }
 
+// creatureEventRegister publishes a CreatureEvent under its name so a creature
+// can later bind to it via registerEvent(name). The login/logout/modalWindow
+// callbacks keep the old global dispatch (every registered event fires for every
+// player); onDeath is deliberately NOT appended to a global slice — it resolves
+// per creature at death time, by the names the creature registered
+// (creaturescripts/player/death.lua + the monster's `monster.events`).
 func (e *Engine) creatureEventRegister(L *lua.LState) int {
 	ev := checkCreatureEvent(L)
+	if ev.Name != "" {
+		e.creatureEventsByName[ev.Name] = ev
+	}
 	if ev.OnLogin != nil {
 		e.creatureEventsOnLogin = append(e.creatureEventsOnLogin, ev.OnLogin)
 	}
@@ -130,9 +139,6 @@ func (e *Engine) creatureEventRegister(L *lua.LState) int {
 	}
 	if ev.OnModalWindow != nil {
 		e.creatureEventsOnModalWindow = append(e.creatureEventsOnModalWindow, ev.OnModalWindow)
-	}
-	if ev.OnDeath != nil {
-		e.creatureEventsOnDeath = append(e.creatureEventsOnDeath, ev.OnDeath)
 	}
 	L.Push(lua.LTrue)
 	return 1
@@ -219,25 +225,51 @@ func (e *Engine) ExecuteCreatureOnModalWindow(player *game.Player, modalWindowID
 	}
 }
 
-// ExecuteCreatureOnDeath runs the registered onDeath handlers. The datapack's
-// signature is onDeath(player, corpse, killer, mostDamageKiller, unjustified,
-// mostDamageUnjustified) — death.lua uses every argument to build the player_deaths
-// row, so passing fewer would write a row with the wrong killer.
-//
-// corpse is passed as nil when the caller has none to hand: the script only reads it
-// for the description, and Lua guards it.
+// ExecuteCreatureOnDeath runs the onDeath handlers the player registered
+// (login.lua's player:registerEvent). The datapack's signature is
+// onDeath(player, corpse, killer, mostDamageKiller, unjustified,
+// mostDamageUnjustified) — death.lua uses every argument to build the
+// player_deaths row, so passing fewer would write a row with the wrong killer.
 func (e *Engine) ExecuteCreatureOnDeath(player *game.Player, corpse *game.Item, killer, mostDamageKiller game.Creature, unjustified, mostDamageUnjustified bool) bool {
+	return e.executeCreatureOnDeath(game.EventRegistrarOf(player), player, corpse, killer, mostDamageKiller, unjustified, mostDamageUnjustified)
+}
+
+// ExecuteMonsterOnDeath runs the onDeath handlers bound to this monster — the
+// ones named in its type's `monster.events`, copied onto the instance at spawn.
+// Quest bosses created by Game.createMonster after the creature's death bind
+// their handler to the boss itself, so they fire here (at the death tile) and
+// not for every player death at the temple.
+func (e *Engine) ExecuteMonsterOnDeath(m *game.Monster, corpse *game.Item, killer, mostDamageKiller game.Creature, unjustified, mostDamageUnjustified bool) bool {
+	return e.executeCreatureOnDeath(game.EventRegistrarOf(m), m, corpse, killer, mostDamageKiller, unjustified, mostDamageUnjustified)
+}
+
+// executeCreatureOnDeath is the shared per-creature death dispatch: it looks up
+// each event name the creature holds in the registry and runs that event's
+// onDeath, rather than running every onDeath in the system. The creature is
+// bound as the most specific metatable (Player/Monster/Npc) via
+// pushCreatureAs(_, "Creature"). A handler returning false vetoes the death
+// (aggregated), mirroring the C++ onPrepareDeath semantics.
+//
+// corpse is passed as nil when the caller has none to hand: the script only
+// reads it for the description, and Lua guards it.
+func (e *Engine) executeCreatureOnDeath(reg game.EventRegistrar, c game.Creature, corpse *game.Item, killer, mostDamageKiller game.Creature, unjustified, mostDamageUnjustified bool) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	result := true
-	for _, fn := range e.creatureEventsOnDeath {
-		e.L.Push(fn)
+	if reg == nil {
+		return result
+	}
+	for _, name := range reg.RegisteredEvents() {
+		ev, ok := e.creatureEventsByName[name]
+		if !ok || ev.OnDeath == nil {
+			continue
+		}
+		e.L.Push(ev.OnDeath)
 
-		pUd := e.L.NewUserData()
-		pUd.Value = player
-		e.L.SetMetatable(pUd, e.L.GetTypeMetatable("Player"))
-		e.L.Push(pUd)
+		if !e.pushCreatureAs(e.L, c, "Creature") {
+			e.L.Push(lua.LNil)
+		}
 
 		if corpse != nil {
 			e.pushItem(e.L, corpse)
@@ -250,7 +282,7 @@ func (e *Engine) ExecuteCreatureOnDeath(player *game.Player, corpse *game.Item, 
 		e.L.Push(lua.LBool(mostDamageUnjustified))
 
 		if err := e.L.PCall(6, 1, nil); err != nil {
-			e.log.Warn("Error executing CreatureEvent onDeath", "err", err)
+			e.log.Warn("Error executing CreatureEvent onDeath", "event", name, "err", err)
 			continue
 		}
 		ret := e.L.Get(-1)

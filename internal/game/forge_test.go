@@ -24,14 +24,19 @@ func forgeCatalog() *items.Catalog {
 
 func forgePlayer() *Player {
 	p := &Player{Capacity: 1_000_000_000, BankBalance: 100_000_000_000}
-	p.Inventory[ConstSlotBackpack] = &Item{ID: 1988}
+	p.Inventory[ConstSlotBackpack] = &Item{ID: 1988, Container: NewContainer(20)}
 	return p
 }
 
 func addToBackpack(p *Player, it *Item) {
 	bp := p.Inventory[ConstSlotBackpack]
-	it.Parent = bp
-	bp.Contents = append(bp.Contents, it)
+	if bp.Container == nil {
+		bp.Container = NewContainer(20)
+	}
+	if it.Container != nil {
+		it.Container.Parent = bp
+	}
+	bp.Container.Contents = append(bp.Container.Contents, it)
 }
 
 func withTier(id uint16, tier uint8) *Item {
@@ -155,14 +160,14 @@ func TestForgeFusionSuccess(t *testing.T) {
 	}
 	// The two source blades are gone; an exaltation chest holds one tier-1 blade.
 	chest := findFirst(p, ItemExaltationChest)
-	if chest == nil {
+	if chest == nil || chest.Container == nil {
 		t.Fatalf("no exaltation chest produced")
 	}
-	if len(chest.Contents) != 1 {
-		t.Fatalf("chest holds %d items, want 1 (second item consumed on bonus 0)", len(chest.Contents))
+	if len(chest.Container.Contents) != 1 {
+		t.Fatalf("chest holds %d items, want 1 (second item consumed on bonus 0)", len(chest.Container.Contents))
 	}
-	if chest.Contents[0].GetTier() != 1 {
-		t.Fatalf("forged item tier = %d, want 1", chest.Contents[0].GetTier())
+	if chest.Container.Contents[0].GetTier() != 1 {
+		t.Fatalf("forged item tier = %d, want 1", chest.Container.Contents[0].GetTier())
 	}
 	if countInstances(p, 100, 0) != 0 {
 		t.Fatalf("tier-0 source blades should be consumed")
@@ -189,11 +194,11 @@ func TestForgeFusionConvergence(t *testing.T) {
 		t.Fatalf("bank = %d, want %d", p.BankBalance, 100_000_000_000-170_000_000)
 	}
 	chest := findFirst(p, ItemExaltationChest)
-	if chest == nil || len(chest.Contents) != 1 {
+	if chest == nil || chest.Container == nil || len(chest.Container.Contents) != 1 {
 		t.Fatalf("convergence should leave one forged item in the chest")
 	}
-	if chest.Contents[0].GetTier() != 3 { // tier+1
-		t.Fatalf("convergence forged tier = %d, want 3", chest.Contents[0].GetTier())
+	if chest.Container.Contents[0].GetTier() != 3 { // tier+1
+		t.Fatalf("convergence forged tier = %d, want 3", chest.Container.Contents[0].GetTier())
 	}
 }
 
@@ -221,10 +226,10 @@ func TestForgeTransfer(t *testing.T) {
 		t.Fatalf("bank = %d, want %d", p.BankBalance, 100_000_000_000-8_000_000)
 	}
 	chest := findFirst(p, ItemExaltationChest)
-	if chest == nil || len(chest.Contents) != 1 {
+	if chest == nil || chest.Container == nil || len(chest.Container.Contents) != 1 {
 		t.Fatalf("transfer should leave the receiver in the chest")
 	}
-	got := chest.Contents[0]
+	got := chest.Container.Contents[0]
 	if got.ID != 101 || got.GetTier() != 1 { // receiver gains tier-1
 		t.Fatalf("transfer result id=%d tier=%d, want id=101 tier=1", got.ID, got.GetTier())
 	}

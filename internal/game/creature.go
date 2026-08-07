@@ -30,6 +30,7 @@ type Creature interface {
 type BaseCreature struct {
 	conditionStore
 	damageTracker
+	creatureEventSet
 
 	World      *World
 	ID         uint32
@@ -147,3 +148,11 @@ func (c *BaseCreature) ClearConditions() {
 func (c *BaseCreature) TickConditions(interval int32) {
 	c.conditionStore.ExecuteConditions(adaptCreature(c), interval)
 }
+
+// RegisterEvent/UnregisterEvent/HasEvent/RegisteredEvents expose the embedded
+// creatureEventSet on *BaseCreature (and, promoted, on *Monster and *Npc) so
+// every monster satisfies game.EventRegistrar.
+func (c *BaseCreature) RegisterEvent(name string)   { c.creatureEventSet.register(name) }
+func (c *BaseCreature) UnregisterEvent(name string) { c.creatureEventSet.unregister(name) }
+func (c *BaseCreature) HasEvent(name string) bool   { return c.creatureEventSet.has(name) }
+func (c *BaseCreature) RegisteredEvents() []string  { return c.creatureEventSet.snapshot() }

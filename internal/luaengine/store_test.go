@@ -86,10 +86,13 @@ func TestStoreInboxDelivery(t *testing.T) {
 	if player.StoreInbox == nil {
 		t.Fatal("StoreInbox not created")
 	}
-	if got := len(player.StoreInbox.Contents); got != 1 {
+	if player.StoreInbox.Container == nil {
+		t.Fatalf("StoreInbox has no container")
+	}
+	if got := len(player.StoreInbox.Container.Contents); got != 1 {
 		t.Fatalf("StoreInbox has %d items, want 1", got)
 	}
-	deliv := player.StoreInbox.Contents[0]
+	deliv := player.StoreInbox.Container.Contents[0]
 	if deliv.ID != 3031 || deliv.Count != 5 {
 		t.Fatalf("delivered item = id %d x%d, want 3031 x5", deliv.ID, deliv.Count)
 	}

@@ -125,6 +125,12 @@ type MonsterType struct {
 	// turns every fire-resistant monster into one that is healed by fire.
 	Healing map[uint32]int32
 	Immunities []uint32 // combat type immunities
+
+	// CreatureEvents is the list of CreatureEvent names this monster type
+	// registers (monster.events, plus any mtype:registerEvent call). Copied onto
+	// every Monster instance at spawn so its onDeath/onHealthChange handlers fire
+	// only for this monster.
+	CreatureEvents []string
 }
 
 // MonsterVoice is one entry of monster.voices, mirroring voiceBlock_t
@@ -358,6 +364,21 @@ func NewTypeRegistry() *TypeRegistry {
 // IsBoss reports whether this monster type is a bosstiary boss.
 func (m *MonsterType) IsBoss() bool {
 	return m != nil && m.BosstiaryRaceID != 0 && bosstiary.IsBoss(m.BosstiaryRace)
+}
+
+// AddCreatureEvent registers a CreatureEvent name on this monster type without
+// duplicating an entry already present (monster.events may be listed multiple
+// times across script files). Mirrors NpcType.AddCreatureEvent.
+func (m *MonsterType) AddCreatureEvent(name string) {
+	if m == nil || name == "" {
+		return
+	}
+	for _, e := range m.CreatureEvents {
+		if e == name {
+			return
+		}
+	}
+	m.CreatureEvents = append(m.CreatureEvents, name)
 }
 
 // MonsterByBossRaceID returns the boss monster type with the given bosstiary
